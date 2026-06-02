@@ -11,6 +11,7 @@ import {
   User,
   Activity,
   FlaskConical,
+  ClipboardList,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -215,6 +216,12 @@ export function PatientDetailPage() {
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
             <ModuleLink
+              to={`/pacientes/${patient.id.toString()}/consultas`}
+              icon={ClipboardList}
+              label="Consultas"
+              hint="Historial clínico y wizard SOAP"
+            />
+            <ModuleLink
               to={`/pacientes/${patient.id.toString()}/antropometria`}
               icon={Activity}
               label="Antropometría"
@@ -226,7 +233,6 @@ export function PatientDetailPage() {
               label="Laboratorio"
               hint="Indicadores bioquímicos y cálculos derivados"
             />
-            <PlaceholderModule label="Plan alimentario" hint="Comidas y equivalentes SMAE" />
           </CardContent>
         </Card>
       </PageContent>
@@ -239,15 +245,6 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
     <div className="flex items-center justify-between gap-4 border-b pb-2 last:border-0 last:pb-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-medium">{value}</span>
-    </div>
-  );
-}
-
-function PlaceholderModule({ label, hint }: { label: string; hint: string }) {
-  return (
-    <div className="rounded-md border border-dashed bg-muted/30 p-3">
-      <p className="text-sm font-medium">{label}</p>
-      <p className="text-xs text-muted-foreground">{hint}</p>
     </div>
   );
 }

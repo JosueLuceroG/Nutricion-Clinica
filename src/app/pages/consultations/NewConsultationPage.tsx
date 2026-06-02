@@ -1,33 +1,72 @@
-import { Link } from "react-router-dom";
-import { Button } from "@components/ui/button";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import { Button } from "@components/ui/button";
+import { Skeleton } from "@components/ui/skeleton";
+import { ErrorState } from "@components/layout/EmptyState";
+import { ConsultationWizard } from "@modules/consultation/ui/ConsultationWizard";
+import { usePatient } from "@modules/patient/ui/usePatientHooks";
+import { PatientId } from "@modules/patient/domain/PatientId";
 
 export function NewConsultationPage() {
+  const { patientId } = useParams();
+  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const { data: patient, loading, error, reload } = usePatient(id);
+
+  if (loading) {
+    return (
+      <>
+        <PageHeader title="Cargando paciente…" />
+        <PageContent>
+          <Skeleton className="h-96 w-full" />
+        </PageContent>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <PageHeader title="Error" />
+        <PageContent>
+          <ErrorState message={error.message} onRetry={reload} />
+        </PageContent>
+      </>
+    );
+  }
+
+  if (!patient || !id) {
+    return (
+      <>
+        <PageHeader title="Paciente no encontrado" />
+        <PageContent>{null}</PageContent>
+      </>
+    );
+  }
+
   return (
     <>
       <PageHeader
         title="Nueva consulta"
-        description="Registro de consulta nutricional"
+        description={`Paciente: ${patient.fullName} · ${patient.age} años`}
         actions={
           <Button asChild variant="outline">
-            <Link to="/consultas">Cancelar</Link>
+            <Link to={`/pacientes/${patient.id.toString()}/consultas`}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </Link>
           </Button>
         }
       />
       <PageContent>
-        <Card>
-          <CardHeader>
-            <CardTitle>Formulario de consulta</CardTitle>
-            <CardDescription>
-              Aquí se integrará el flujo completo: paciente → antropometría →
-              laboratorio → plan alimentario.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            Wizard multi-paso, validación con Zod, autoguardado en IndexedDB.
-          </CardContent>
-        </Card>
+        <div className="mx-auto max-w-3xl">
+          <ConsultationWizard
+            patientId={id}
+            onComplete={(consultationId) =>
+              window.location.assign(`#/consultas/${consultationId}`)
+            }
+          />
+        </div>
       </PageContent>
     </>
   );

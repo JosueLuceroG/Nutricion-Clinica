@@ -2,11 +2,13 @@ import Dexie, { type Table } from "dexie";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import type { AnthropometryRow } from "@modules/anthropometry/infrastructure/anthropometryMapper";
 import type { LabPanelRow } from "@modules/laboratory/infrastructure/labPanelMapper";
+import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
   anthropometry!: Table<AnthropometryRow, string>;
   lab_panels!: Table<LabPanelRow, string>;
+  consultations!: Table<ConsultationRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -39,6 +41,18 @@ export class NutriClinicaDB extends Dexie {
         "patient_id",
         "taken_at",
         "[patient_id+taken_at]",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+      ].join(", "),
+      consultations: [
+        "id",
+        "patient_id",
+        "consultation_date",
+        "[patient_id+consultation_date]",
+        "status",
+        "anthropometry_id",
+        "lab_panel_id",
         "created_at",
         "updated_at",
         "deleted_at",
