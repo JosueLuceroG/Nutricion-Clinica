@@ -229,6 +229,7 @@ export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
           control={control}
           register={register}
           watch={watch}
+          slotKcalTarget={Math.round((kcalTarget ?? 0) * DEFAULT_KCAL_DISTRIBUTION[slot])}
         />
       ))}
 
@@ -373,11 +374,13 @@ function MealSection({
   control,
   register,
   watch,
+  slotKcalTarget,
 }: {
   slot: MealSlot;
   control: ReturnType<typeof useForm<MealPlanFormValues>>["control"];
   register: ReturnType<typeof useForm<MealPlanFormValues>>["register"];
   watch: ReturnType<typeof useForm<MealPlanFormValues>>["watch"];
+  slotKcalTarget: number;
 }) {
   const idx = MEAL_SLOT_ORDER.indexOf(slot);
   const { fields, append, remove, update } = useFieldArray({
@@ -430,7 +433,7 @@ function MealSection({
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div>
+          <div className="flex-1 min-w-0">
             <CardTitle className="text-base">{MealSlotLabel[slot]}</CardTitle>
             <CardDescription>
               {fields.length === 0
@@ -448,6 +451,7 @@ function MealSection({
             {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </Button>
         </div>
+        <SlotProgress actualKcal={totals.kcal} targetKcal={slotKcalTarget} />
       </CardHeader>
       {!collapsed && (
         <CardContent className="space-y-2">
@@ -539,6 +543,68 @@ function Field({
       </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+function SlotProgress({ actualKcal, targetKcal }: { actualKcal: number; targetKcal: number }) {
+  if (targetKcal <= 0) {
+    return (
+      <p className="text-[10px] text-muted-foreground mt-1">
+        Define kcal objetivo para ver distribución sugerida
+      </p>
+    );
+  }
+  const ratio = actualKcal / targetKcal;
+  const pct = Math.min(ratio, 1.5) * 100;
+  const tone =
+    ratio < 0.5
+      ? "bg-amber-400"
+      : ratio > 1.15
+        ? "bg-rose-500"
+        : ratio >= 0.85 && ratio <= 1.15
+          ? "bg-emerald-500"
+          : "bg-amber-500";
+  const adherence =
+    ratio < 0.5
+      ? "muy bajo"
+      : ratio > 1.15
+        ? "excede"
+        : ratio >= 0.85 && ratio <= 1.15
+          ? "en meta"
+          : "ajustar";
+  return (
+    <div className="mt-2 space-y-1" aria-label={`${Math.round(actualKcal)} de ${targetKcal} kcal (${adherence})`}>
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+        <span>
+          {Math.round(actualKcal)} / {targetKcal} kcal ({Math.round(ratio * 100)}%)
+        </span>
+        <Badge
+          variant={
+            adherence === "en meta"
+              ? "success"
+              : adherence === "excede"
+                ? "destructive"
+                : "warning"
+          }
+          className="text-[10px]"
+        >
+          {adherence}
+        </Badge>
+      </div>
+      <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full ${tone} transition-all`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+        {ratio > 1 && (
+          <div
+            className="absolute right-0 top-0 h-full w-0.5 bg-rose-700"
+            style={{ left: `${(1 / Math.max(ratio, 1)) * 100}%` }}
+            aria-hidden
+          />
+        )}
+      </div>
     </div>
   );
 }
