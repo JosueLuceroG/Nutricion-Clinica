@@ -4,6 +4,7 @@ import type { AnthropometryRow } from "@modules/anthropometry/infrastructure/ant
 import type { LabPanelRow } from "@modules/laboratory/infrastructure/labPanelMapper";
 import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
 import type { MealPlanRow } from "@modules/mealplan/infrastructure/mealPlanMapper";
+import type { SmaeCustomFoodRow } from "@modules/smae/infrastructure/smaeMapper";
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
@@ -11,6 +12,7 @@ export class NutriClinicaDB extends Dexie {
   lab_panels!: Table<LabPanelRow, string>;
   consultations!: Table<ConsultationRow, string>;
   meal_plans!: Table<MealPlanRow, string>;
+  smae_custom_foods!: Table<SmaeCustomFoodRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -84,6 +86,10 @@ export class NutriClinicaDB extends Dexie {
         "updated_at",
         "deleted_at",
       ].join(", "),
+    });
+
+    this.version(3).stores({
+      smae_custom_foods: "id, group, name, created_at",
     });
   }
 }
