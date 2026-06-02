@@ -3,6 +3,17 @@ import { useForm, useFieldArray, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import {
+  DndContext,
+  useDraggable,
+  useDroppable,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
   Save,
   X,
   Plus,
@@ -12,6 +23,7 @@ import {
   ChevronUp,
   Target,
   Apple,
+  GripVertical,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -48,7 +60,7 @@ export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
 
-  const { control, register, handleSubmit, watch, formState: { errors } } =
+  const { control, register, handleSubmit, watch, setValue, formState: { errors } } =
     useForm<MealPlanFormValues>({
       resolver: zodResolver(MealPlanFormSchema),
       defaultValues: mealPlanFormDefaultValues,
@@ -86,6 +98,45 @@ export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
       { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
     );
   }, [meals]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    const foodMatch = activeId.match(/^food-(.+)-(\d+)$/);
+    const slotMatch = overId.match(/^slot-(.+)$/);
+    if (!foodMatch || !slotMatch) return;
+    const sourceSlot = foodMatch[1];
+    const sourceRowIdx = parseInt(foodMatch[2] ?? "", 10);
+    const targetSlot = slotMatch[1];
+    if (!sourceSlot || !targetSlot) return;
+    if (sourceSlot === targetSlot) return;
+
+    const sourceIdx = MEAL_SLOT_ORDER.indexOf(sourceSlot as MealSlot);
+    const targetIdx = MEAL_SLOT_ORDER.indexOf(targetSlot as MealSlot);
+    if (sourceIdx < 0 || targetIdx < 0) return;
+
+    const sourceMeal = meals[sourceIdx];
+    const sourceExchanges = sourceMeal?.exchanges ?? [];
+    if (sourceRowIdx < 0 || sourceRowIdx >= sourceExchanges.length) return;
+    const exchange = sourceExchanges[sourceRowIdx];
+    if (!exchange || !exchange.foodId || !exchange.count) return;
+
+    const newSource = sourceExchanges.filter((_, i) => i !== sourceRowIdx);
+    const targetExchanges = meals[targetIdx]?.exchanges ?? [];
+    const newTarget = [...targetExchanges, exchange];
+
+    setValue(`meals.${sourceIdx}.exchanges`, newSource, { shouldDirty: true });
+    setValue(`meals.${targetIdx}.exchanges`, newTarget, { shouldDirty: true });
+    toast.success(`${getSystemFoodById(exchange.foodId)?.name ?? "Alimento"} movido a ${MealSlotShortLabel[targetSlot as MealSlot]}`);
+  };
 
   const suggestDistribution = () => {
     toast.info("Distribución calórica sugerida", {
@@ -222,16 +273,18 @@ export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
         fatTargetG={fatTargetG}
       />
 
-      {MEAL_SLOT_ORDER.map((slot) => (
-        <MealSection
-          key={slot}
-          slot={slot}
-          control={control}
-          register={register}
-          watch={watch}
-          slotKcalTarget={Math.round((kcalTarget ?? 0) * DEFAULT_KCAL_DISTRIBUTION[slot])}
-        />
-      ))}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        {MEAL_SLOT_ORDER.map((slot) => (
+          <MealSection
+            key={slot}
+            slot={slot}
+            control={control}
+            register={register}
+            watch={watch}
+            slotKcalTarget={Math.round((kcalTarget ?? 0) * DEFAULT_KCAL_DISTRIBUTION[slot])}
+          />
+        ))}
+      </DndContext>
 
       <Card>
         <CardHeader>
@@ -430,7 +483,7 @@ function MealSection({
   };
 
   return (
-    <Card>
+    <DroppableMealCard slot={slot}>
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex-1 min-w-0">
@@ -458,49 +511,17 @@ function MealSection({
           {fields.map((row, rowIdx) => {
             const food = row.foodId ? getSystemFoodById(row.foodId) : null;
             return (
-              <div
+              <DraggableFoodRow
                 key={row.id}
-                className="grid grid-cols-12 items-end gap-2 rounded-md border bg-muted/10 p-2"
-              >
-                <div className="col-span-7">
-                  <Label className="text-xs">Alimento</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start font-normal"
-                    onClick={() => openPickerForEdit(rowIdx)}
-                  >
-                    <Apple className="mr-2 h-3 w-3" />
-                    {food ? (
-                      <span className="truncate">{food.name}</span>
-                    ) : (
-                      <span className="text-muted-foreground">Seleccionar alimento…</span>
-                    )}
-                  </Button>
-                </div>
-                <div className="col-span-3">
-                  <Label className="text-xs">Raciones</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    {...register(`meals.${idx}.exchanges.${rowIdx}.count`, {
-                      valueAsNumber: true,
-                    })}
-                  />
-                </div>
-                <div className="col-span-2 flex items-end justify-end">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label="Eliminar"
-                    onClick={() => remove(rowIdx)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+                slot={slot}
+                rowIdx={rowIdx}
+                foodName={food?.name ?? null}
+                onClickFood={() => openPickerForEdit(rowIdx)}
+                onDelete={() => remove(rowIdx)}
+                countProps={register(`meals.${idx}.exchanges.${rowIdx}.count`, {
+                  valueAsNumber: true,
+                })}
+              />
             );
           })}
           <Button
@@ -520,7 +541,85 @@ function MealSection({
           />
         </CardContent>
       )}
-    </Card>
+    </DroppableMealCard>
+  );
+}
+
+function DroppableMealCard({ slot, children }: { slot: MealSlot; children: React.ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `slot-${slot}` });
+  return (
+    <div ref={setNodeRef} className={isOver ? "ring-2 ring-primary ring-offset-2 rounded-lg" : ""}>
+      {children}
+    </div>
+  );
+}
+
+interface DraggableFoodRowProps {
+  slot: MealSlot;
+  rowIdx: number;
+  foodName: string | null;
+  onClickFood: () => void;
+  onDelete: () => void;
+  countProps: ReturnType<ReturnType<typeof useForm<MealPlanFormValues>>["register"]>;
+}
+
+function DraggableFoodRow({
+  slot,
+  rowIdx,
+  foodName,
+  onClickFood,
+  onDelete,
+  countProps,
+}: DraggableFoodRowProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `food-${slot}-${rowIdx}`,
+  });
+  const style: React.CSSProperties = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
+    : {};
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`grid grid-cols-12 items-end gap-2 rounded-md border bg-muted/10 p-2 ${isDragging ? "opacity-40" : ""}`}
+    >
+      <div className="col-span-1 flex items-end pb-1">
+        <button
+          type="button"
+          aria-label="Arrastrar a otro tiempo"
+          className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="col-span-6">
+        <Label className="text-xs">Alimento</Label>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start font-normal"
+          onClick={onClickFood}
+        >
+          <Apple className="mr-2 h-3 w-3" />
+          {foodName ? (
+            <span className="truncate">{foodName}</span>
+          ) : (
+            <span className="text-muted-foreground">Seleccionar alimento…</span>
+          )}
+        </Button>
+      </div>
+      <div className="col-span-3">
+        <Label className="text-xs">Raciones</Label>
+        <Input type="number" step="0.5" min="0" {...countProps} />
+      </div>
+      <div className="col-span-2 flex items-end justify-end">
+        <Button type="button" variant="ghost" size="icon-sm" aria-label="Eliminar" onClick={onDelete}>
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
   );
 }
 
