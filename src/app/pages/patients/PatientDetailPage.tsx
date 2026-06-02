@@ -12,6 +12,7 @@ import {
   Activity,
   FlaskConical,
   ClipboardList,
+  UtensilsCrossed,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -232,6 +233,12 @@ export function PatientDetailPage() {
               icon={FlaskConical}
               label="Laboratorio"
               hint="Indicadores bioquímicos y cálculos derivados"
+            />
+            <ModuleLink
+              to={`/pacientes/${patient.id.toString()}/planes`}
+              icon={UtensilsCrossed}
+              label="Planes alimentarios"
+              hint="Diseño basado en SMAE 5ª edición"
             />
           </CardContent>
         </Card>

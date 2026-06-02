@@ -15,7 +15,9 @@ import { NewLabPanelPage } from "@app/pages/laboratory/NewLabPanelPage";
 import { LaboratoryPage } from "@app/pages/LaboratoryPage";
 import { CalculationsPage } from "@app/pages/CalculationsPage";
 import { PlansListPage } from "@app/pages/plans/PlansListPage";
-import { PlanEditorPage } from "@app/pages/plans/PlanEditorPage";
+import { MealPlanDetailPage } from "@app/pages/plans/MealPlanDetailPage";
+import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
+import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
 import { SettingsPage } from "@app/pages/SettingsPage";
 import { HelpPage } from "@app/pages/HelpPage";
 import { NotFoundPage } from "@app/pages/NotFoundPage";
@@ -60,6 +62,13 @@ const router = createHashRouter([
               { path: "nueva", element: <NewConsultationPage /> },
             ],
           },
+          {
+            path: ":patientId/planes",
+            children: [
+              { index: true, element: <PatientMealPlansPage /> },
+              { path: "nuevo", element: <NewMealPlanPage /> },
+            ],
+          },
         ],
       },
       {
@@ -76,8 +85,7 @@ const router = createHashRouter([
         path: "planes",
         children: [
           { index: true, element: <PlansListPage /> },
-          { path: "nuevo", element: <PlanEditorPage /> },
-          { path: ":planId", element: <PlanEditorPage /> },
+          { path: ":planId", element: <MealPlanDetailPage /> },
         ],
       },
       { path: "agenda", element: <Navigate to="/consultas" replace /> },
