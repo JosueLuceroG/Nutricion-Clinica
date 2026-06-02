@@ -10,7 +10,7 @@ import {
 } from "./smaeUseCases";
 import { parseKeywordsInput, SmaeCustomFoodFormSchema } from "./smaeFormSchema";
 import {
-  Food,
+  type Food,
   type FoodId,
   type FoodRepository,
   FoodNotFoundError,
