@@ -9,6 +9,8 @@ import { NewConsultationPage } from "@app/pages/consultations/NewConsultationPag
 import { ConsultationDetailPage } from "@app/pages/consultations/ConsultationDetailPage";
 import { PatientMeasurementsPage } from "@app/pages/anthropometry/PatientMeasurementsPage";
 import { NewMeasurementPage } from "@app/pages/anthropometry/NewMeasurementPage";
+import { PatientLabPage } from "@app/pages/laboratory/PatientLabPage";
+import { NewLabPanelPage } from "@app/pages/laboratory/NewLabPanelPage";
 import { LaboratoryPage } from "@app/pages/LaboratoryPage";
 import { CalculationsPage } from "@app/pages/CalculationsPage";
 import { PlansListPage } from "@app/pages/plans/PlansListPage";
@@ -41,6 +43,13 @@ const router = createHashRouter([
             children: [
               { index: true, element: <PatientMeasurementsPage /> },
               { path: "nueva", element: <NewMeasurementPage /> },
+            ],
+          },
+          {
+            path: ":patientId/laboratorio",
+            children: [
+              { index: true, element: <PatientLabPage /> },
+              { path: "nuevo", element: <NewLabPanelPage /> },
             ],
           },
         ],

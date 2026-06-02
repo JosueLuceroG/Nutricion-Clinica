@@ -10,6 +10,7 @@ import {
   Calendar,
   User,
   Activity,
+  FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -219,7 +220,12 @@ export function PatientDetailPage() {
               label="Antropometría"
               hint="Mediciones, BMI, composición corporal"
             />
-            <PlaceholderModule label="Laboratorio" hint="Indicadores bioquímicos" />
+            <ModuleLink
+              to={`/pacientes/${patient.id.toString()}/laboratorio`}
+              icon={FlaskConical}
+              label="Laboratorio"
+              hint="Indicadores bioquímicos y cálculos derivados"
+            />
             <PlaceholderModule label="Plan alimentario" hint="Comidas y equivalentes SMAE" />
           </CardContent>
         </Card>
