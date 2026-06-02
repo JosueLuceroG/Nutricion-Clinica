@@ -21,6 +21,8 @@ import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
 import { SettingsPage } from "@app/pages/SettingsPage";
 import { HelpPage } from "@app/pages/HelpPage";
 import { NotFoundPage } from "@app/pages/NotFoundPage";
+import { NotificationsPage } from "@app/pages/NotificationsPage";
+import { ProfilePage } from "@app/pages/ProfilePage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
 
 const router = createHashRouter([
@@ -89,6 +91,8 @@ const router = createHashRouter([
         ],
       },
       { path: "agenda", element: <Navigate to="/consultas" replace /> },
+      { path: "notificaciones", element: <NotificationsPage /> },
+      { path: "perfil", element: <ProfilePage /> },
       { path: "configuracion", element: <SettingsPage /> },
       { path: "ayuda", element: <HelpPage /> },
       { path: "*", element: <NotFoundPage /> },

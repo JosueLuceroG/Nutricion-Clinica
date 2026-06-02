@@ -2,7 +2,6 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, Search, Moon, Sun, MonitorSmartphone, User } from "lucide-react";
 import { Button } from "@components/ui/button";
-import { Input } from "@components/ui/input";
 import { Badge } from "@components/ui/badge";
 import {
   DropdownMenu,
@@ -24,7 +23,6 @@ export function Header() {
   const user = useAuthStore((s) => s.user);
   const unread = useNotificationStore((s) => s.unread);
   const navigate = useNavigate();
-  const [search, setSearch] = React.useState("");
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -53,14 +51,14 @@ export function Header() {
           className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
           aria-hidden
         />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onFocus={() => openCommand(true)}
-          placeholder="Buscar pacientes, consultas, alimentos… (Ctrl+K)"
-          className="h-9 pl-9 pr-12"
-          aria-label="Búsqueda global"
-        />
+        <button
+          type="button"
+          onClick={() => openCommand(true)}
+          className="flex h-9 w-full items-center rounded-md border border-input bg-transparent pl-9 pr-12 text-left text-sm text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label="Búsqueda global (Ctrl+K)"
+        >
+          Buscar pacientes, consultas, alimentos…
+        </button>
         <kbd className="pointer-events-none absolute right-2 top-1/2 hidden h-5 -translate-y-1/2 select-none items-center rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
           Ctrl K
         </kbd>

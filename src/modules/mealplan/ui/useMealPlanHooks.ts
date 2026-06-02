@@ -3,6 +3,7 @@ import { mealPlanService } from "@services/mealPlanService";
 import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
 import type { MealPlanId } from "@modules/mealplan/domain/MealPlanId";
 import type { PatientId } from "@modules/patient/domain/PatientId";
+import type { MealPlanQuery } from "@modules/mealplan/domain/MealPlanRepository";
 
 interface AsyncState<T> {
   data: T | null;
@@ -11,6 +12,54 @@ interface AsyncState<T> {
 }
 
 const initial: AsyncState<never> = { data: null, error: null, loading: true };
+
+export function useMealPlans(query: MealPlanQuery = {}) {
+  const [state, setState] = React.useState<AsyncState<{ items: MealPlan[]; total: number }>>(
+    initial,
+  );
+
+  const stableQuery = JSON.stringify(query);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    mealPlanService.list
+      .execute(query)
+      .then((result) => {
+        if (!cancelled) setState({ data: result, error: null, loading: false });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setState({
+            data: null,
+            error: err instanceof Error ? err : new Error(String(err)),
+            loading: false,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stableQuery]);
+
+  const reload = React.useCallback(() => {
+    const parsed = JSON.parse(stableQuery) as MealPlanQuery;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    mealPlanService.list
+      .execute(parsed)
+      .then((result) => setState({ data: result, error: null, loading: false }))
+      .catch((err) =>
+        setState({
+          data: null,
+          error: err instanceof Error ? err : new Error(String(err)),
+          loading: false,
+        }),
+      );
+  }, [stableQuery]);
+
+  return { ...state, reload };
+}
 
 export function usePatientMealPlans(patientId: PatientId | null) {
   const [state, setState] = React.useState<AsyncState<{ items: MealPlan[]; total: number }>>(

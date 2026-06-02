@@ -3,6 +3,7 @@ import { consultationService } from "@services/consultationService";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import type { PatientId } from "@modules/patient/domain/PatientId";
+import type { ConsultationQuery } from "@modules/consultation/domain/ConsultationRepository";
 
 interface AsyncState<T> {
   data: T | null;
@@ -11,6 +12,54 @@ interface AsyncState<T> {
 }
 
 const initial: AsyncState<never> = { data: null, error: null, loading: true };
+
+export function useConsultations(query: ConsultationQuery = {}) {
+  const [state, setState] = React.useState<AsyncState<{ items: Consultation[]; total: number }>>(
+    initial,
+  );
+
+  const stableQuery = JSON.stringify(query);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    consultationService.list
+      .execute(query)
+      .then((result) => {
+        if (!cancelled) setState({ data: result, error: null, loading: false });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setState({
+            data: null,
+            error: err instanceof Error ? err : new Error(String(err)),
+            loading: false,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stableQuery]);
+
+  const reload = React.useCallback(() => {
+    const parsed = JSON.parse(stableQuery) as ConsultationQuery;
+    setState((s) => ({ ...s, loading: true, error: null }));
+    consultationService.list
+      .execute(parsed)
+      .then((result) => setState({ data: result, error: null, loading: false }))
+      .catch((err) =>
+        setState({
+          data: null,
+          error: err instanceof Error ? err : new Error(String(err)),
+          loading: false,
+        }),
+      );
+  }, [stableQuery]);
+
+  return { ...state, reload };
+}
 
 export function usePatientConsultations(patientId: PatientId | null) {
   const [state, setState] = React.useState<AsyncState<{ items: Consultation[]; total: number }>>(
