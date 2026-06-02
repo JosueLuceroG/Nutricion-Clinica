@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -11,7 +12,10 @@ import type { Sex } from "@modules/patient/domain/Sex";
 
 export function NewLabPanelPage() {
   const { patientId } = useParams();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading, error, reload } = usePatient(id);
 
   if (loading) {

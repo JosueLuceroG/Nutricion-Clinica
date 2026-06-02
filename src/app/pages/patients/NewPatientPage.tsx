@@ -1,4 +1,5 @@
 import { Link, useParams } from "react-router-dom";
+import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -9,7 +10,10 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 export function NewPatientPage() {
   const { patientId } = useParams();
   const isEdit = Boolean(patientId);
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading } = usePatient(isEdit ? id : null);
 
   return (

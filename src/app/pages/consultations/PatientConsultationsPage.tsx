@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
+import * as React from "react";
 import { ArrowLeft, Plus, ClipboardList, Calendar, Activity, Trash2, User } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -18,7 +19,10 @@ import { useUIStore } from "@store/uiStore";
 export function PatientConsultationsPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading: patientLoading } = usePatient(id);
   const { data, loading, error, reload } = usePatientConsultations(id);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);

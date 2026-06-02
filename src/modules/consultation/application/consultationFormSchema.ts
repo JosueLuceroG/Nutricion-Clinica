@@ -15,19 +15,31 @@ import { z } from "zod";
  */
 const optionalText = (max: number) =>
   z
-    .string()
-    .trim()
-    .max(max, `Máximo ${max} caracteres`)
-    .optional()
-    .or(z.literal(""))
-    .transform((v) => (v && v.length > 0 ? v : null));
+    .preprocess(
+      (v) => (v === null || v === undefined ? "" : v),
+      z
+        .string()
+        .trim()
+        .max(max, `Máximo ${max} caracteres`)
+        .optional()
+        .or(z.literal(""))
+        .transform((v) => (v && v.length > 0 ? v : null)),
+    );
+
+const vitalField = (min: number, max: number, integer = true) =>
+  z.preprocess(
+    (v) => (typeof v === "number" && Number.isNaN(v) ? undefined : v),
+    integer
+      ? z.coerce.number().int().min(min).max(max).optional()
+      : z.coerce.number().min(min).max(max).optional(),
+  );
 
 const vitalSignsSchema = z
   .object({
-    systolicMmHg: z.coerce.number().int().min(50).max(260).optional().or(z.literal(NaN)),
-    diastolicMmHg: z.coerce.number().int().min(30).max(180).optional().or(z.literal(NaN)),
-    heartRateBpm: z.coerce.number().int().min(20).max(220).optional().or(z.literal(NaN)),
-    temperatureC: z.coerce.number().min(30).max(45).optional().or(z.literal(NaN)),
+    systolicMmHg: vitalField(50, 260, true),
+    diastolicMmHg: vitalField(30, 180, true),
+    heartRateBpm: vitalField(20, 220, true),
+    temperatureC: vitalField(30, 45, false),
   })
   .partial();
 
@@ -53,17 +65,17 @@ export const ConsultationFormSchema = z
     plan: optionalText(4000),
     anthropometryId: z.string().optional().or(z.literal("")),
     labPanelId: z.string().optional().or(z.literal("")),
-    nextVisitDate: z
-      .string()
-      .optional()
-      .refine(
-        (v) => !v || !Number.isNaN(new Date(v).getTime()),
-        "Fecha inválida",
-      )
-      .refine(
-        (v) => !v || new Date(v).getTime() >= Date.now() - 24 * 60 * 60 * 1000,
-        "La próxima cita no puede estar en el pasado",
-      ),
+    nextVisitDate: z.preprocess(
+      (v) => (v === "" ? undefined : v),
+      z
+        .string()
+        .optional()
+        .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Fecha inválida")
+        .refine(
+          (v) => !v || new Date(v).getTime() >= Date.now() - 24 * 60 * 60 * 1000,
+          "La próxima cita no puede estar en el pasado",
+        ),
+    ),
   })
   .strict();
 

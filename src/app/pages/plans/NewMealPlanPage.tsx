@@ -1,4 +1,5 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
+import * as React from "react";
 import { ArrowLeft, User } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -11,7 +12,10 @@ import { MealPlanForm } from "@modules/mealplan/ui/MealPlanForm";
 export function NewMealPlanPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading, error } = usePatient(id);
 
   if (loading) {

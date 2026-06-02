@@ -70,7 +70,10 @@ const TRACKED_TESTS: LabTestCode[] = [
 export function PatientLabPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading: patientLoading } = usePatient(id);
   const { data, loading, error, reload } = usePatientLabPanels(id);
 

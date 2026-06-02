@@ -83,41 +83,54 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
     if (target < step) setStep(target);
   };
 
-  const onSubmit = methods.handleSubmit(async (values) => {
-    setSubmitting(true);
-    try {
-      const nextVisitDate = values.nextVisitDate ? new Date(values.nextVisitDate) : null;
-      const consultation = await consultationService.schedule.execute({
-        patientId,
-        consultationDate: new Date(values.consultationDate),
-        consultationNumber: 0,
-        reason: values.reason.trim(),
-        subjective: values.subjective,
-        objective: values.objective,
-        assessment: values.assessment,
-        plan: values.plan,
-        anthropometryId: values.anthropometryId ? AnthropometryId.fromUnsafe(values.anthropometryId) : null,
-        labPanelId: values.labPanelId ? LabPanelId.fromUnsafe(values.labPanelId) : null,
-        nextVisitDate,
-      });
+  const onSubmit = methods.handleSubmit(
+    async (values) => {
+      setSubmitting(true);
+      try {
+        const nextVisitDate = values.nextVisitDate ? new Date(values.nextVisitDate) : null;
+        const consultation = await consultationService.schedule.execute({
+          patientId,
+          consultationDate: new Date(values.consultationDate),
+          consultationNumber: 0,
+          reason: values.reason.trim(),
+          subjective: values.subjective,
+          objective: values.objective,
+          assessment: values.assessment,
+          plan: values.plan,
+          anthropometryId: values.anthropometryId ? AnthropometryId.fromUnsafe(values.anthropometryId) : null,
+          labPanelId: values.labPanelId ? LabPanelId.fromUnsafe(values.labPanelId) : null,
+          nextVisitDate,
+        });
 
-      toast.success("Consulta registrada", {
-        description: `Consulta #${consultation.consultationNumber} agendada`,
-      });
+        toast.success("Consulta registrada", {
+          description: `Consulta #${consultation.consultationNumber} agendada`,
+        });
 
-      if (onComplete) {
-        onComplete(consultation.id.toString());
-      } else {
-        navigate(`/pacientes/${patientId.toString()}/consultas`);
+        if (onComplete) {
+          onComplete(consultation.id.toString());
+        } else {
+          navigate(`/pacientes/${patientId.toString()}/consultas`);
+        }
+      } catch (err) {
+        toast.error("No se pudo guardar la consulta", {
+          description: err instanceof Error ? err.message : String(err),
+        });
+      } finally {
+        setSubmitting(false);
       }
-    } catch (err) {
-      toast.error("No se pudo guardar la consulta", {
-        description: err instanceof Error ? err.message : String(err),
+    },
+    (errors) => {
+      const messages = Object.entries(errors)
+        .map(([k, v]) => {
+          const msg = (v as { message?: string } | undefined)?.message;
+          return msg ? `${k}: ${msg}` : null;
+        })
+        .filter((s): s is string => s !== null);
+      toast.error("Corrige los errores del formulario", {
+        description: messages.length > 0 ? messages.join("\n") : "Revisa los campos marcados en rojo.",
       });
-    } finally {
-      setSubmitting(false);
-    }
-  });
+    },
+  );
 
   const errors = methods.formState.errors as FieldErrors<ConsultationFormValues>;
   const currentStepDef = WIZARD_STEPS[step - 1];

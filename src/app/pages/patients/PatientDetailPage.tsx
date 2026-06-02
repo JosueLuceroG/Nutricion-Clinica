@@ -30,7 +30,10 @@ import { patientService } from "@services/patientService";
 export function PatientDetailPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading, error, reload } = usePatient(id);
   const [busy, setBusy] = React.useState(false);
 

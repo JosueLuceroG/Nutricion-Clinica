@@ -19,7 +19,10 @@ import { bodyFatFromBMI, waistHipRisk } from "@utils/calculations/bodyCompositio
 export function PatientMeasurementsPage() {
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const id = patientId ? PatientId.fromUnsafe(patientId) : null;
+  const id = React.useMemo(
+    () => (patientId ? PatientId.fromUnsafe(patientId) : null),
+    [patientId],
+  );
   const { data: patient, loading: patientLoading } = usePatient(id);
   const { data, loading, error, reload } = usePatientMeasurements(id);
 
