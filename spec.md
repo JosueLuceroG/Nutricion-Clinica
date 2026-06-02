@@ -34,6 +34,20 @@
 19. [Sistema de IA (Fase 4)](#19-sistema-de-ia-fase-4)
 20. [Performance y observabilidad](#20-performance-y-observabilidad)
 21. [Diseño SQL (target migración Dexie → SQLite nativo)](#21-diseño-sql-target-migración-dexie--sqlite-nativo)
+22. [Expediente clínico integral del paciente (módulo 31)](#22-expediente-clínico-integral-del-paciente-módulo-31)
+23. [Antropometría y composición corporal (módulo 32)](#23-antropometría-y-composición-corporal-módulo-32)
+24. [Interpretación de laboratorios (módulo 33)](#24-interpretación-de-laboratorios-módulo-33)
+25. [Seguimiento y evolución del paciente (módulo 34)](#25-seguimiento-y-evolución-del-paciente-módulo-34)
+26. [Sistema de objetivos clínicos (módulo 35)](#26-sistema-de-objetivos-clínicos-módulo-35)
+27. [Adherencia al tratamiento (módulo 41)](#27-adherencia-al-tratamiento-módulo-41)
+28. [Recetario profesional (módulo 36)](#28-recetario-profesional-módulo-36)
+29. [Planificador semanal + lista de compras (módulos 37 y 38)](#29-planificador-semanal--lista-de-compras-módulos-37-y-38)
+30. [Agenda y gestión de citas (módulo 40)](#30-agenda-y-gestión-de-citas-módulo-40)
+31. [Catálogo de medicamentos e interacciones (módulo 42)](#31-catálogo-de-medicamentos-e-interacciones-módulo-42)
+32. [Generación de documentos profesionales (módulo 43)](#32-generación-de-documentos-profesionales-módulo-43)
+33. [Portal del paciente (módulo 45, PWA)](#33-portal-del-paciente-módulo-45-pwa)
+34. [Módulo económico (módulo 39)](#34-módulo-económico-módulo-39)
+35. [Resumen del roadmap de detalle funcional](#35-resumen-del-roadmap-de-detalle-funcional)
 - [Apéndice A — Métricas del proyecto](#apéndice-a--métricas-del-proyecto)
 - [Apéndice B — Cómo correr](#apéndice-b--cómo-correr)
 - [Apéndice C — Estructura de carpetas completa](#apéndice-c--estructura-de-carpetas-completa)
@@ -2096,7 +2110,7 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 
 ## Apéndice A — Métricas del proyecto
 
-**Fecha de corte:** tras enriquecimiento post-Sprint 10 (espec v2: 91KB → 140KB con plan de arquitectura completo).
+**Fecha de corte:** tras enriquecimiento post-Sprint 10 (espec v3: 91KB → 193KB con detalle funcional de 13 módulos).
 
 | Métrica | Valor |
 |---------|-------|
@@ -2111,7 +2125,7 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 | Dependencias dev | 30 |
 | Commits | 17+ (ver git log) |
 | Cobertura de dominio | ~85% (estimado) |
-| **Spec.md** | **140.6 KB, 2834 líneas, 23 secciones + 3 apéndices** |
+| **Spec.md** | **193.1 KB, 3931 líneas, 35 secciones + 3 apéndices** |
 | **Plan de arquitectura referenciado** | 466 KB, 49 documentos (Doc 1, 30-47, 48 UX/UI, 49 Técnica) |
 
 ## Apéndice B — Cómo correr
@@ -2144,7 +2158,8 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
-| `(spec enrich v2)` | docs(spec): incorporar plan completo de arquitectura (466KB) → 138KB | Post-Sprint 10 | Nuevas §1.5-1.6 Principios, §3.6-3.20 Módulos, §6.5-6.8 Topología, §8.5-8.11 UX/UI Design System, §19 IA, §20 Performance, §21 SQL. **Aquí estamos (pausa para enriquecer spec).** |
+| `(spec enrich v3)` | docs(spec): añadir detalle funcional de 13 módulos del plan → 193KB | Post-Sprint 10 | Nuevas §22-§34: expediente, antropometría, laboratorio, seguimiento, objetivos, adherencia, recetas, planificador, agenda, medicamentos, documentos, portal paciente, económico. **Aquí estamos (pausa).** |
+| `(spec enrich v2)` | docs(spec): incorporar plan completo de arquitectura (466KB) → 144KB | Post-Sprint 10 | §1.5-1.6 Principios, §3.6-3.20 Módulos, §6.5-6.8 Topología, §8.5-8.11 UX/UI, §19 IA, §20 Performance, §21 SQL. |
 | `f114d55` | feat(mealplan): drag&drop entre tiempos con @dnd-kit | Sprint 10 | DndContext, DroppableMealCard, DraggableFoodRow, PointerSensor distance 5, KeyboardSensor. |
 | `6b345e0` | feat(mealplan): SlotProgress con barras de kcal + delta vs distribución | Sprint 10 | Visualización de kcal por tiempo, delta vs `DEFAULT_KCAL_DISTRIBUTION` (emerald/amber/rose). |
 | `d22683f` | feat(mealplan): FoodPicker con tab equivalencia inversa | Sprint 10 | Dialog de selección de alimentos: tab "Catálogo" + tab "Por equivalencia inversa". |
@@ -2829,6 +2844,1101 @@ snapshots
 ✅ Nombres y campos siguen la convención snake_case que se mapeará 1:1 a SQL.
 ⏳ Migración a SQLite nativo se hará en Fase 3 vía `tauri-plugin-sql` (Fase 3, ADR-001).
 ⏳ Tablas secundarias (`allergies`, `medications`, `clinical_events`, etc.) se crearán cuando se implementen los módulos respectivos.
+
+---
+
+## 22. Expediente clínico integral del paciente (módulo 31)
+
+> **Origen:** Plan de arquitectura §31. **Fase objetivo:** 2 (después del MVP).
+
+### 22.1 Objetivo
+
+Consolidar en una única entidad clínica longitudinal toda la información demográfica, biomédica, conductual y nutricional del paciente, con captura cronológica auditable, versionada y trazable, que funcione como **fuente única de verdad** para los módulos clínico, antropométrico, bioquímico, de objetivos, de adherencia y de generación de documentos.
+
+### 22.2 Entidad `PACIENTE` (modelo canónico)
+
+Esta es la versión expandida del modelo de paciente que reemplaza la versión MVP actual (16 campos) cuando se implemente el módulo completo.
+
+**Identidad (16 campos):**
+- `id` (UUIDv7), `clave_interna` (folio autogenerado, no usar nombre)
+- `nombres`, `apellido_paterno`, `apellido_materno`
+- `fecha_nacimiento`, `sexo_biologico` (M / F / Intersexual)
+- `genero_autodeclarado` (Mujer / Hombre / No binario / Prefiere no decir / Otro)
+- `estado_civil`, `ocupacion`, `escolaridad`
+- `lugar_nacimiento`, `lugar_residencia`, `direccion`
+- `telefono_principal`, `telefono_secundario`, `correo_electronico`
+- `foto` (opcional, ruta relativa, **cifrada**)
+
+**Contacto de emergencia (3 campos):**
+- `contacto_emergencia_nombre`, `contacto_emergencia_parentesco`, `contacto_emergencia_telefono`
+
+**Identificación oficial (2 campos, cifrados):**
+- `identificacion_oficial_tipo` (INE, pasaporte, otro)
+- `identificacion_oficial_numero` (**cifrado**)
+
+**Metadata del expediente (8 campos):**
+- `fecha_apertura_expediente`
+- `estado_expediente` (activo / inactivo / alta / derivado / baja)
+- `motivo_alta` (texto)
+- `fecha_ultima_consulta`
+- `profesional_responsable_id`
+- `numero_expediente_externo` (opcional, para referencia hospitalaria)
+- `consentimiento_informado_id` (FK a `consents`)
+- `fecha_firma_consentimiento`
+- `version_politica_privacidad`
+
+**Adicionales:**
+- `observaciones_generales`
+- `etiquetas_clinicas` (lista controlada, ej. "diabético", "embarazo", "vegetariano")
+
+**Total: ~40 campos** (vs 16 actuales del MVP).
+
+### 22.3 Entidades clínicas relacionadas
+
+| Entidad | Cardinalidad | Contenido |
+|---------|--------------|-----------|
+| `antecedente_heredofamiliar` | 1-N | parentesco + condición (catálogo: diabetes, HTA, obesidad, cáncer, ECV, ERC, tiroidea, autoinmune, osteoporosis, etc.) + estatus + edad diagnóstico |
+| `antecedente_personal_patologico` | 1-N | condición + fecha diagnóstico + estatus + médico tratante + tratamiento |
+| `cirugia` | 1-N | tipo + fecha + hospital + complicaciones |
+| `hospitalizacion` | 1-N | motivo + fecha ingreso/egreso + días estancia + hospital |
+| `medicamento` | 1-N | nombre comercial + principio activo (FK catálogo) + dosis + frecuencia + vía + motivo + fecha inicio/fin + médico prescriptor + adherencia reportada |
+| `suplemento` | 1-N | nombre + marca + categoría (multivitamínico, hierro, calcio, Vit D, omega 3, proteína, creatina, probiótico, herbolario, homeopático) + composición + dosis |
+| `alergia` | 1-N | alérgeno (catálogo) + reacción + severidad (leve/moderada/severa/anafilaxia) + tipo diagnóstico (clínico/prick/RAST/desafío) |
+| `intolerancia` | 1-N | alimento + síntoma + severidad + dosis umbral + mecanismo (lactosa, fructosa, sorbitol, histamina, gluten) |
+| `habito` | 1-N | categoría (tabaquismo, alcohol, sueño, estrés, hidratación, café, ultraprocesados) + estado + frecuencia + cantidad |
+| `actividad_fisica` | 1-N | tipo + frecuencia semanal + duración + intensidad (Borg) + fecha inicio/fin |
+| `historia_dietetica` | 1-1 (versión actual) | tipo dieta + N° comidas + horarios + lugar + quien prepara + tiempo disponible + presupuesto + equipos cocina + antecedentes dietas previas + lectura etiquetas + conocimiento nutricional + preferencias + aversiones + masticación + horario laboral + personas hogar |
+| `recordatorio_24h` | 1-N | tiempos comida detalle (estructura anidada) + líquidos + suplementos + interpretación nutrióloga + kcal/macros calculados + alertas |
+| `frecuencia_consumo` | 1-N | alimento_grupo_id + frecuencia (diario/3-5/sem/1-2/sem/1-3/mes/ocasional/nunca) + cantidad + preparación |
+| `sintoma_gastrointestinal` | 1-N | síntoma (estreñimiento, diarrea, distensión, reflujo, etc.) + frecuencia + severidad 1-10 + relación alimentos |
+| `evento_clinico` | 1-N | tipo (síntoma nuevo, cambio medicación, evento agudo, hospitalización, procedimiento) + descripción + fecha + profesional_id |
+| `consulta` | 1-N | ver §22.4 |
+| `snapshot_expediente` | 1-N | copia inmutable por consulta con hash SHA-256 |
+
+### 22.4 `CONSULTA` entidad cabecera
+
+- `id`, `paciente_id`, `numero_consulta` (1, 2, 3...), `fecha`, `hora`
+- `tipo` (primera_vez / seguimiento / urgencia / control / cierre)
+- `profesional_id`
+- `motivo_consulta`, `padecimiento_actual`
+- `estado` (en_curso / cerrada / cancelada)
+- SOAP: `resumen_subjetivo (S)`, `resumen_objetivo (O)`, `evaluacion_clinica (A)`, `plan (P)`
+- `diagnosticos_ids[]`, `objetivos_ids[]`, `plan_alimentario_id`, `recomendaciones_ids[]`
+- `alertas_generadas[]`, `tiempo_total_consulta_min`
+- `snapshot_expediente_id` (FK), `version_smae_usado`
+- `firma_digital_id`
+
+### 22.5 `SNAPSHOT_EXPEDIENTE` (inmutable por consulta)
+
+- `id`, `consulta_id`, `fecha_snapshot`
+- `contenido_json_expediente` (anamnesis)
+- `contenido_json_antropometria`
+- `contenido_json_bioquimica`
+- `contenido_json_plan`
+- `hash_integridad` (SHA-256)
+- `version_smae`, `profesional_id`
+
+### 22.6 Flujos
+
+**Apertura del expediente (13 pasos):**
+1. Validar consentimiento informado firmado.
+2. Capturar datos demográficos.
+3. Validar unicidad (no duplicar paciente).
+4. Capturar antecedentes heredofamiliares.
+5. Capturar antecedentes personales patológicos.
+6. Capturar cirugías y hospitalizaciones.
+7. Capturar alergias e intolerancias.
+8. Capturar medicamentos y suplementos.
+9. Capturar hábitos y antecedentes dietéticos.
+10. Capturar síntomas gastrointestinales.
+11. Calcular edad, IMC si hay peso y talla, alertas iniciales.
+12. Generar folio y crear snapshot inicial.
+13. Activar expediente.
+
+**Captura cronológica:** cada dato se asocia a timestamp + profesional. Modificaciones se versionan; nunca se borra el dato original, solo se marca como inactivo o se reemplaza.
+
+**Evolución clínica (consulta subsecuente, 10 pasos):**
+1. Cargar último snapshot.
+2. Preguntar cambios desde última visita (diagnósticos, medicación, alergias, hábitos, eventos).
+3. Actualizar entidades vigentes.
+4. Capturar nueva antropometría.
+5. Capturar nueva bioquímica (si aplica).
+6. Capturar recordatorio 24h o frecuencia de consumo.
+7. Reevaluar plan.
+8. Generar nuevo snapshot.
+9. Comparar contra snapshot anterior (diff).
+10. Cerrar consulta.
+
+### 22.7 Reglas de negocio (12 reglas)
+
+- **RN-EXP-01**: todo paciente debe tener consentimiento firmado antes de la primera consulta clínica.
+- **RN-EXP-02**: una alergia activa **bloquea de forma permanente** cualquier alimento que la contenga (motor de reglas).
+- **RN-EXP-03**: una intolerancia activa marca como **advertencia** cualquier alimento relacionado, con severidad configurable.
+- **RN-EXP-04**: la modificación de un antecedente o medicamento no altera los snapshots históricos, pero sí afecta el estado clínico actual.
+- **RN-EXP-05**: el cierre de un expediente requiere motivo documentado (alta, derivación, defunción, cambio profesional, pérdida de contacto).
+- **RN-EXP-06**: cada consulta genera un snapshot inmutable.
+- **RN-EXP-07**: no se permite borrar datos clínicos; solo se reemplazan versiones y se justifica.
+- **RN-EXP-08**: los datos de identificación oficial se almacenan **cifrados** (AES-256).
+- **RN-EXP-09**: el acceso al expediente queda registrado en bitácora con timestamp, usuario, módulo y acción.
+- **RN-EXP-10**: la foto del paciente es opcional, se almacena cifrada y se utiliza solo para identificación visual.
+- **RN-EXP-11**: las etiquetas clínicas se generan a partir de reglas (ej. si hay diabetes mellitus, se etiqueta automáticamente).
+- **RN-EXP-12**: el sistema **no diagnostica ni prescribe**, solo asiste el registro y la organización.
+
+### 22.8 Validaciones
+
+Consentimiento firmado, edad válida, IMC computable, alergia con alérgeno del catálogo, medicamento con principio activo del catálogo, duplicado de paciente, fecha cirugía/hospitalización vs fecha nacimiento, severidad alergia registrada, dosis numérica, email válido, teléfono válido, frecuencia de hábito válida.
+
+### 22.9 Auditoría y versionamiento
+
+- Bitácora append-only de todo evento sobre el expediente: lectura, creación, edición, eliminación lógica, exportación, impresión, firmado.
+- Cada evento: timestamp, usuario, IP/local, módulo, acción, entidad afectada, valor anterior (hash), valor nuevo (hash), justificación.
+- Snapshots inmutables por consulta, verificables por hash.
+- Exportación de la bitácora por paciente, rango, profesional, tipo de evento.
+- **Retención mínima: 10 años** (LFPDPPP + NOM-024).
+- Entidades versionadas: antecedentes personales, cirugías, hospitalizaciones, alergias, intolerancias, medicamentos, suplementos, historia dietética, frecuencia de consumo, hábitos, actividad física, síntomas. Cada cambio genera nueva versión, conserva la anterior.
+
+### 22.10 Seguridad
+
+- Cifrado en reposo (AES-256) para datos sensibles: identificación oficial, dirección, teléfono, correo, foto.
+- Cifrado en tránsito (TLS 1.3).
+- Control de acceso por rol (nutrióloga, asistente, administrador).
+- Permisos granulares por módulo.
+- Acceso de solo lectura a ciertos roles (asistente no puede modificar historia clínica).
+- Doble factor de autenticación (opcional, recomendado).
+- Bloqueo automático por inactividad.
+- Política de contraseñas robusta.
+
+### 22.11 Rendimiento (objetivos)
+
+- Carga del expediente: **<500 ms**.
+- Búsqueda de pacientes: **<200 ms**.
+- Snapshot por consulta: **<1 s** para 200 entidades.
+- Búsqueda por folio: **<50 ms** (índice).
+- Búsqueda fuzzy por nombre: **<300 ms**.
+- Auto-guardado de captura: **cada 5 s**, asíncrono, no bloqueante.
+- Carga de expediente histórico de 5 años: **<2 s** con paginación.
+
+### 22.12 Casos especiales
+
+- **Homónimos**: distinción por fecha de nacimiento, CURP opcional, clave interna autogenerada.
+- **Sin identificación oficial**: marcar "sin identificación", registrar motivo.
+- **Múltiples patologías**: N antecedentes activos, N medicamentos, N alergias.
+- **Tutor legal** (menores, personas con discapacidad): registrar datos del tutor y relación.
+- **Omisión de datos sensibles**: marcar "prefiere no declarar", **no inventar**.
+- **Tratamiento compartido** (varios profesionales): marcar profesionales con permiso de lectura/escritura.
+- **Migración de expediente de otro sistema**: módulo de importación con mapeo de campos.
+- **Expediente cerrado que se reabre**: nuevo episodio clínico, conservando histórico del anterior.
+
+### 22.13 Datos que requieren captura manual
+
+Demográficos, consentimiento informado, antecedentes familiares, antecedentes personales, cirugías, hospitalizaciones, alergias, intolerancias, medicamentos, suplementos, hábitos, actividad física, historia dietética, recordatorio 24h, frecuencia de consumo, síntomas gastrointestinales, eventos clínicos.
+
+### 22.14 Datos que el sistema **nunca** debe inventar
+
+Diagnósticos médicos, dosis de medicamentos, alergias, eventos clínicos no declarados, hábitos no declarados, actividad física no declarada, datos de identidad, datos de contacto, antecedentes familiares no declarados, historia dietética subjetiva, adherencia sin declaración.
+
+### 22.15 Estado actual
+
+✅ **MVP**: entidad `Patient` con 16 campos básicos (Sprint 1).
+⏳ **Fase 2**: expansión a 40+ campos + entidades de antecedentes, alergias, hábitos, historia dietética, recordatorio 24h.
+⏳ **Fase 3**: snapshot inmutable + versionamiento + bitácora de auditoría detallada.
+
+---
+
+## 23. Antropometría y composición corporal (módulo 32)
+
+> **Origen:** Plan §32. **Fase objetivo:** 2 (ya implementado el MVP, esta es la expansión).
+
+### 23.1 Entidad `MEDICION_ANTROPOMETRICA` (expandida)
+
+**Identificación:** `id`, `paciente_id`, `consulta_id` (opcional), `fecha`, `hora`, `profesional_id`, `equipo_id` (FK a `equipo_antropometria`).
+
+**Medidas básicas (8):** `peso_kg`, `talla_cm`, `circunferencia_cintura_cm`, `circunferencia_cadera_cm`, `circunferencia_cuello_cm`, `circunferencia_muslo_cm`, `circunferencia_brazo_cm`, `circunferencia_pantorrilla_cm`.
+
+**Pliegues cutáneos (5):** tricipital_mm, bicipital_mm, subescapular_mm, suprailiaco_mm, abdominal_mm.
+
+**Composición corporal (calculados/capturados, 9):** `imc`, `peso_ideal_kg`, `peso_ajustado_kg`, `tmb_kcal`, `get_kcal`, `relacion_cintura_cadera`, `riesgo_cv_cintura`, `porcentaje_grasa`, `masa_grasa_kg`, `masa_libre_grasa_kg`, `masa_muscular_kg`, `agua_corporal_total_litros`, `agua_corporal_porcentaje`, `grasa_visceral_kg`, `masa_muscular_esqueletica_kg`.
+
+**BIA (opcional, 6 campos):** `unidades_bia_equipo` (modelo + serial), `angulo_fase_grados`, `tasa_metabolica_basal_bia_kcal`, `resistencia_ohmios`, `reactancia_ohmios`, `tasa_metabolica_basal_bia_kcal`.
+
+**Vitales (3):** `tension_arterial_sistolica`, `tension_arterial_diastolica`, `frecuencia_cardiaca_lpm`.
+
+**Opcionales:** `temperatura_corporal_c`, `spo2`, `notas`, `estado` (capturada/validada/firmada), `snapshot_id`.
+
+### 23.2 Entidad `CALCULO_ANTROPOMETRICO` (caché auditable)
+
+Almacena **qué fórmula se usó** para cada cálculo, garantizando reproducibilidad:
+
+- `formula_tmb` (Mifflin-St Jeor / Harris-Benedict / FAO-OMS / Katch-McArdle)
+- `formula_peso_ideal` (Devine / Robinson / Miller / Hamwi)
+- `formula_grasa` (Deurenberg / Jackson-Pollock 3 / Jackson-Pollock 7 / BIA)
+- `formula_musculo` (Janssen / BIA)
+- `formula_agua` (Watson / Hume / BIA)
+- `parametros_entrada_json`, `resultados_json`
+- `fecha_calculo`, `version_motor_calculo`
+
+### 23.3 Entidad `EQUIPO_ANTROPOMETRIA` (catálogo)
+
+`id`, `nombre`, `tipo` (báscula, estadiómetro, cinta, plicómetro, bioimpedancia, tensiómetro, dinamómetro), `marca`, `modelo`, `serial`, `calibracion_fecha`, `calibracion_vencimiento`, `precision`, `rango_medicion`, `estado` (activo/inactivo/mantenimiento), `notas`.
+
+### 23.4 Entidad `TENDENCIA_ANTROPOMETRICA` (cálculo derivado)
+
+`id`, `paciente_id`, `variable`, `periodo` (7d/30d/90d/6m/1y/total), `valor_inicial`, `valor_final`, `cambio_absoluto`, `cambio_porcentual`, `tendencia` (ascendente/descendente/estable), `velocidad_cambio_semanal`, `fecha_calculo`.
+
+### 23.5 Equipos compatibles (importación BIA)
+
+- **Básculas y estadiometros**: captura manual + USB/Bluetooth (Genérico, Tanita, seca, InBody, Omron).
+- **Cintas métricas**: manual con validación de marcas.
+- **Plicómetros**: manual.
+- **Bioimpedancia**:
+  - Tanita BC-554, BC-558, BC-1500, RD-545, SC-240, MC-780, MC-980.
+  - InBody H20B, 120, 230, 270, 570, 720, 770, 970.
+  - seca mBCA 514, 525, 554.
+  - Omron HBF-514, HBF-516, HBF-702T.
+  - Importación CSV/TSV/PDF con mapeo configurable por modelo.
+- **Tensiómetros**: manual + Omron, Microlife, Citizen, A&D.
+- **Dinamómetros**: Takei, Jamar, Genérico.
+
+### 23.6 Flujos
+
+**Captura (12 pasos):**
+1. Verificar última medición (cargar histórico).
+2. Capturar peso, talla, circunferencias.
+3. Capturar pliegues (si aplica).
+4. Capturar datos de BIA (importación CSV / captura manual / sin BIA).
+5. Capturar tensión arterial, FC.
+6. Validar coherencia de datos.
+7. Calcular índices derivados.
+8. Clasificar resultados.
+9. Generar alertas.
+10. Comparar contra medición anterior.
+11. Confirmar y guardar.
+12. Asociar a consulta (si aplica).
+
+**Importación BIA (7 pasos):** detectar formato → mapear campos → validar rangos → vista previa → aplicar → recalcular → guardar con referencia al equipo.
+
+**Análisis de tendencia (5 pasos):** obtener mediciones → calcular (valor inicial, final, cambio, velocidad, regresión lineal) → clasificar tendencia → generar alertas (pérdida >1% peso/sem, ganancia >0.5%, variabilidad errática, estancamiento) → devolver resultado + gráfica.
+
+### 23.7 Reglas de negocio (15 reglas)
+
+- **RN-ANT-01**: toda medición debe tener fecha, hora, peso, talla y al menos cintura para ser válida.
+- **RN-ANT-02**: BIA importada debe identificar equipo, fecha de calibración y versión del firmware.
+- **RN-ANT-03**: si se importa BIA, los valores del equipo ceden (con registro de fuente).
+- **RN-ANT-04**: circunferencias fuera de rango (>3 DE sobre media poblacional) generan advertencia.
+- **RN-ANT-05**: la fórmula de TMB puede seleccionarse; el sistema guarda la elección y la usa consistentemente.
+- **RN-ANT-06**: cálculos derivados se guardan en `CALCULO_ANTROPOMETRICO` para auditoría.
+- **RN-ANT-07**: cambio abrupto de peso (>3% en 7 días) genera alerta clínica.
+- **RN-ANT-08**: captura repetida el mismo día solo con justificación.
+- **RN-ANT-09**: TA elevada sostenida → derivación a médico.
+- **RN-ANT-10**: pérdida no intencionada >5% en 3 meses → alerta de desnutrición (OMS, adultos mayores).
+- **RN-ANT-11**: masa muscular baja en pacientes con peso normal/bajo → alerta de sarcopenia.
+- **RN-ANT-12**: % grasa se clasifica según sexo, edad y referencia (ACE, Gallagher, configurable).
+- **RN-ANT-13**: agua corporal <50% (H) o <45% (M) → alerta de hidratación.
+- **RN-ANT-14**: la talla solo se modifica con justificación explícita.
+- **RN-ANT-15**: el sistema **no realiza interpretación diagnóstica**, solo asiste en clasificación y alerta.
+
+### 23.8 Casos especiales
+
+- **Amputado**: registro de amputación, ajuste de peso, anotación.
+- **Embarazada**: ajustes por edad gestacional; IMC pregestacional como referencia.
+- **Edema / ascitis**: peso no confiable; marcar "con edema", sugerir alternativas.
+- **Sonda nasogástrica / gastrostomía**: documentar, ajustar recomendaciones.
+- **Pediátricos**: percentiles (OMS 0-5, OMS 5-19, CDC), z-scores.
+- **Adultos mayores**: pérdida no intencionada, ángulo de fase BIA relevante.
+- **Atletas de élite**: composición específica, ajustes por deporte.
+- **Enanismo / talla alta constitucional**: percentiles o referencia individual.
+- **Cuerpo amputado, prótesis, órtesis**: registro y ajustes.
+
+### 23.9 Estado actual
+
+✅ **MVP**: peso, talla, cintura, cadera, cuello, IMC, % grasa (Sprint 2). Cálculos BMI, BMR, TDEE, bodyComposition (5 archivos en `utils/calculations/`).
+✅ **MVP**: Vitals VO con PA, FC, SpO2 opcional (Sprint 8, T2).
+⏳ **Fase 2**: pliegues cutáneos, BIA import, equipo catálogo, fórmulas alternativas, alertas clínicas, análisis de tendencia, casos especiales (embarazada, amputado, pediátrico).
+
+---
+
+## 24. Interpretación de laboratorios (módulo 33)
+
+> **Origen:** Plan §33. **Estado actual:** MVP (24 códigos con rangos México, Recharts trend — Sprint 4).
+
+### 24.1 Entidad `ESTUDIO_LABORATORIO` (expandida)
+
+- `id`, `paciente_id`, `consulta_id` (opcional)
+- `tipo_estudio` (sangre/orina/heces/saliva/otro)
+- `subtipo` (biometría hemática, química sanguínea, perfil lipídico, HbA1c, EGO, etc.)
+- `fecha_estudio`, `fecha_captura`
+- `laboratorio` (texto), `medico_solicitante`, `motivo_estudio`
+- `archivo_origen` (ruta cifrada, opcional), `hash_archivo`
+- `metodo_captura` (manual / importación PDF / CSV / HL7)
+- `estado` (borrador/validado/firmado)
+- `version_rangos_referencia` (FK a tabla de rangos)
+- `notas`, `profesional_id`
+
+### 24.2 Entidad `PARAMETRO_LABORATORIO`
+
+- `id`, `estudio_id`
+- `parametro_codigo` (catálogo: GLU, HbA1c, COL, HDL, LDL, TRI, CRE, BUN, etc.)
+- `parametro_nombre`, `valor_numerico`, `valor_texto` (cualitativos)
+- `unidad` (mg/dL, mmol/L, %, g/dL)
+- `rango_referencia_min`, `rango_referencia_max`
+- `rango_referencia_texto` (cualitativos)
+- `rango_critico_min`, `rango_critico_max` (opcionales)
+- `clasificacion`: bajo / normal / limítrofe bajo / limítrofe alto / alterado bajo / alterado alto / crítico bajo / crítico alto
+- `notas`, `alerta_generada`, `alerta_id`
+
+### 24.3 Entidad `RANGO_REFERENCIA` (catálogo versionado)
+
+- `parametro_codigo`, `poblacion` (general, masculino, femenino, pediátrico, gestante, anciano)
+- `edad_min`, `edad_max`
+- `unidad`, `rango_min`, `rango_max`
+- `rango_critico_min`, `rango_critico_max`
+- `fuente` ("UpToDate 2023", "NOM", "LabCorp")
+- `fecha_vigencia_inicio`, `fecha_vigencia_fin`
+- `version`, `activo`, `notas`
+
+### 24.4 Catálogo de parámetros comunes (no exhaustivo)
+
+| Categoría | Parámetros |
+|-----------|------------|
+| **Glucosa** | Glucosa ayunas, HbA1c, insulina basal, HOMA-IR, índice HOMA, péptido C, PTOG |
+| **Lípidos** | CT, HDL, LDL, TG, VLDL, ApoA, ApoB, Lp(a) |
+| **Renal** | Creatinina, BUN, urea, ácido úrico, cistatina C, TFGe |
+| **Electrolitos** | Na, K, Cl, Ca, P, Mg |
+| **Hierro** | Hierro sérico, ferritina, transferrina, saturación transferrina, TIBC |
+| **Vitaminas** | A, D (25-OH), E, B12, folato, B6, C |
+| **Proteínas** | Albúmina, prealbúmina, transferrina, PCR, proteína total |
+| **Hepático** | AST, ALT, GGT, FA, bilirrubina total/directa |
+| **Tiroideo** | TSH, T3 libre, T4 libre, anticuerpos antitiroideos |
+| **Hormonas** | Insulina, cortisol, leptina, adiponectina, grelina |
+| **Inflamatorio** | PCR, VSG, ferritina (fase aguda) |
+| **Hematología** | Hb, Hto, VCM, HCM, leucocitos, plaquetas, reticulocitos |
+| **Orina** | Densidad, pH, proteínas, Cr, Na, K, microalbúmina |
+| **Heces** | Sangre oculta, parásitos, calprotectina, elastasa pancreática |
+| **Óseo** | Ca iónico, P, PTH, osteocalcina, CTX, P1NP, 25-OH vit D |
+| **Cardiovascular** | BNP, NT-proBNP, troponinas (solo se registran, no se interpretan nutricionalmente) |
+
+### 24.5 Alertas nutricionales automáticas (motor de reglas)
+
+El motor detecta los siguientes hallazgos **y sugiere** acciones nutricionales generales + derivación a médico. **No prescribe ni recomienda dosis.**
+
+| Hallazgo | Acción sugerida |
+|----------|-----------------|
+| HbA1c >7% en paciente con diabetes | Control de CHO, derivación a médico si >9% |
+| HbA1c >9% | Alerta bloqueante, derivación urgente |
+| Glucosa ayunas >126 mg/dL en dos ocasiones | Screening diabetes, derivación |
+| Glucosa ayunas >200 mg/dL | Alerta crítica, derivación inmediata |
+| LDL >160 mg/dL | Reducción de grasas saturadas, derivación |
+| TG >200 mg/dL | Reducción de CHO simples, ejercicio |
+| HDL <40 (H) o <50 (M) | Aumento de actividad física, grasas saludables |
+| Cr elevada + TFGe <60 | Alerta ERC, derivación a nefrología |
+| K >5.5 mEq/L | Alerta crítica, restricción de K, derivación |
+| K <3.5 mEq/L | Alerta, ajuste de dieta |
+| Hierro bajo o ferritina baja | Aumento de hierro hemo + vit C, suplementación |
+| Vit D <20 ng/mL | Suplementación, exposición solar |
+| Vit B12 baja | Suplementación, estudio de causa |
+| Folato bajo en embarazo | Suplementación inmediata |
+| Calcio bajo | Aumento de lácteos, suplementación |
+| Albúmina <3.5 g/dL | Alerta nutricional, evaluar ingesta proteica |
+| PCR elevada | Marcador inflamatorio, derivación si persiste |
+| TSH alterado | Derivación a endocrinología |
+
+### 24.6 Reglas de negocio (15 reglas)
+
+- **RN-LAB-01**: el sistema **no emite diagnósticos médicos**; cualquier interpretación nutricional debe ser escrita por la nutrióloga.
+- **RN-LAB-02**: el sistema **no sugiere tratamientos médicos** ni cambios de medicación.
+- **RN-LAB-03**: valor crítico (fuera de rango crítico) → alerta bloqueante + derivación a médico.
+- **RN-LAB-04**: valor alterado → clasificación visual pero no altera automáticamente el plan.
+- **RN-LAB-05**: rangos de referencia editables y versionados.
+- **RN-LAB-06**: múltiples rangos por parámetro según población (sexo, edad, embarazo).
+- **RN-LAB-07**: el médico tratante se registra pero **no es usuario** del sistema.
+- **RN-LAB-08**: cuando un parámetro tiene interpretación nutricional automática, la alerta es **sugerencia**, no acción.
+- **RN-LAB-09**: importación PDF/CSV requiere confirmación manual; no se aplica de forma automática.
+- **RN-LAB-10**: fecha del estudio coherente con fecha de captura.
+- **RN-LAB-11**: estudio completo requiere ≥1 parámetro capturado.
+- **RN-LAB-12**: correlaciones nutricionales (ej. HbA1c → control CHO) vía motor de reglas con severidad configurable.
+- **RN-LAB-13**: estudios asociados a consulta (recomendado) pero pueden existir independientes.
+- **RN-LAB-14**: archivo origen (PDF, imagen) se almacena cifrado.
+- **RN-LAB-15**: hash del archivo se conserva para integridad.
+
+### 24.7 Importación PDF / CSV (flujos)
+
+**PDF (6 pasos):** detectar formato → extraer texto (OCR si escaneo) → mapear parámetros (parser configurable por laboratorio) → revisión manual obligatoria → vista previa → aplicar rangos y clasificar.
+
+**CSV (6 pasos):** validar estructura → mapear columnas a parámetros del catálogo → validar tipos → vista previa → aplicar rangos → confirmar y guardar.
+
+### 24.8 Estado actual
+
+✅ **MVP**: 24 códigos con `MEXICO_REFERENCE_RANGES`, captura manual, semaforización (normal/limítrofe/alterado), Recharts trend, importador CSV básico (Sprint 4).
+⏳ **Fase 2**: importador PDF con OCR, parser configurable por laboratorio, alertas nutricionales automáticas, alertas críticas, versionamiento de rangos, alertas bloqueantes.
+⏳ **Fase 3**: integración HL7, conversión automática de unidades (mg/dL ↔ mmol/L), parser por laboratorio configurable.
+
+---
+
+## 25. Seguimiento y evolución del paciente (módulo 34)
+
+> **Origen:** Plan §34. **Fase objetivo:** 2.
+
+### 25.1 Objetivo
+
+Permitir el monitoreo longitudinal del paciente a lo largo de las consultas sucesivas, mediante **snapshots inmutables**, comparaciones temporales, análisis de tendencia, evaluación del cumplimiento de objetivos y alertas de estancamiento o deterioro.
+
+### 25.2 Entidad `CONSULTA_SEGUIMIENTO` (extiende `CONSULTA`)
+
+- `cambios_desde_ultima_consulta` (texto estructurado)
+- `eventos_intercurrentes` (síntomas nuevos, hospitalizaciones, cambios de medicación)
+- `cumplimiento_percibido` (escala 1-10)
+- `barreras_identificadas` (texto)
+- `facilitadores_identificados` (texto)
+- `satisfaccion_paciente` (escala 1-5)
+- `proxima_cita`
+- `plan_proxima_consulta` (texto)
+- `requiere_interconsulta`, `especialidades_a_derivar[]`
+
+### 25.3 Entidad `INDICADOR_EVOLUCION` (cálculo derivado)
+
+- `paciente_id`, `variable` (peso, IMC, % grasa, MLG, HbA1c, etc.)
+- `consulta_inicial_id`, `consulta_actual_id`
+- `valor_inicial`, `valor_actual`
+- `cambio_absoluto`, `cambio_porcentual`, `cambio_porcentual_mensual`
+- `objetivo_id` (FK opcional)
+- `valor_objetivo`, `distancia_al_objetivo`, `porcentaje_de_avance`
+- `estado` (en_progreso / logrado / superado / estancado / en_retroceso)
+- `fecha_calculo`
+
+### 25.4 Entidad `COMPARACION_TEMPORAL`
+
+- `paciente_id`, `consulta_actual_id`, `consulta_comparada_id`
+- `diferencias_json`, `resumen_cambios`, `fecha_calculo`
+
+### 25.5 Entidad `ALERTA_ESTANCAMIENTO`
+
+- `paciente_id`, `variable`, `periodo_sin_cambio`
+- `severidad`, `fecha_generacion`
+- `accion_tomada` (opcional), `notas`
+
+### 25.6 Detección de estancamiento (algoritmo)
+
+```
+Paciente con objetivo activo
+  → Obtener mediciones de la variable objetivo de las últimas X semanas (default 4)
+  → Calcular pendiente (regresión lineal)
+  → Si pendiente ~ 0 Y adherencia ≥70%: alerta de estancamiento
+  → Si pendiente < 0 en objetivo de ganancia: alerta de retroceso
+  → Si pendiente > 0 en objetivo de pérdida: alerta de retroceso
+  → Si cambio errático: alerta de inconsistencia (posible falta adherencia)
+```
+
+### 25.7 Reglas de negocio (10 reglas)
+
+- **RN-SEG-01**: toda consulta de seguimiento debe tener al menos una medición antropométrica o bioquímica, o una nota de seguimiento.
+- **RN-SEG-02**: snapshot de cada consulta es inmutable.
+- **RN-SEG-03**: cálculo de tendencia requiere ≥2 puntos; con menos, "datos insuficientes".
+- **RN-SEG-04**: alerta de estancamiento solo se genera cuando adherencia ≥70% (si es menor, primero se aborda adherencia).
+- **RN-SEG-05**: periodo de evaluación configurable (default 4 semanas).
+- **RN-SEG-06**: objetivos cerrados se conservan en histórico; no se borran.
+- **RN-SEG-07**: cambio de objetivo requiere justificación.
+- **RN-SEG-08**: alertas de evolución se muestran en consulta pero **no bloquean el cierre**.
+- **RN-SEG-09**: la consulta debe tener, antes de cerrarse, una evaluación del plan previo.
+- **RN-SEG-10**: comparaciones temporales contra cualquier consulta anterior o entre dos específicas.
+
+### 25.8 Métricas e indicadores
+
+**Antropométricos:** peso, IMC, % grasa, MLG, masa muscular, agua, circunferencias. Velocidad semanal. Distancia al objetivo.
+
+**Bioquímicos:** HbA1c, perfil lipídico, función renal, electrolitos, vitaminas, hierro, función hepática. Tendencia 3/6/12 meses. % cambio.
+
+**Clínicos:** TA, FC, síntomas, capacidad funcional.
+
+**Dietéticos:** cumplimiento del menú, variabilidad, hidratación, frecuencia de alimentos clave.
+
+**Conductuales:** sueño, estrés, actividad física, estado de ánimo.
+
+### 25.9 Estado actual
+
+⏳ No implementado. Depende de `snapshot_expediente` (módulo 31) y del motor de objetivos (módulo 26).
+✅ Wizard SOAP (Sprint 5) puede extenderse con paso 7 de "cambios desde última consulta".
+✅ Dashboard ya tiene KPIs básicos (Sprint 7) que pueden usarse como punto de partida.
+
+---
+
+## 26. Sistema de objetivos clínicos (módulo 35)
+
+> **Origen:** Plan §35. **Fase objetivo:** 2 (después del MVP).
+
+### 26.1 Entidad `OBJETIVO_CLINICO`
+
+- `paciente_id`, `consulta_origen_id`
+- `tipo` (antropométrico / bioquímico / clínico / dietético / conductual / personalizado)
+- `variable` (peso, IMC, % grasa, HbA1c, LDL, TA sistólica, etc.)
+- `valor_inicial`, `valor_inicial_fecha`
+- `valor_objetivo` (numérico o texto)
+- `unidad`
+- `fecha_inicio`, `fecha_objetivo` (plazo)
+- `fecha_cierre` (cuando se cumple/abandona)
+- `estado` (activo / en_pausa / logrado / no_logrado / abandonado / modificado)
+- `criterio_exito` (numérico, rango, cualitativo)
+- `criterio_exito_detalle`
+- `prioridad` (alta / media / baja)
+- `fuente_objetivo` (clínica / paciente / ambos)
+- `motivo`, `plan_accion`, `metricas_seguimiento[]`
+- `alertas_activas`, `profesional_id`, `notas`
+
+### 26.2 Entidad `EVALUACION_OBJETIVO` (cálculo en cada consulta)
+
+- `objetivo_id`, `consulta_id`
+- `valor_actual`, `cambio_absoluto`, `cambio_porcentual`
+- `distancia_al_objetivo`, `porcentaje_avance`
+- `estado_calculado` (en_progreso / en_ritmo / retrasado / estancado / logrado / superado / en_retroceso)
+- `velocidad_mensual`, `proyeccion_fecha_logro`, `alerta`
+- `fecha_calculo`
+
+### 26.3 Tipos de objetivos predefinidos (catálogo)
+
+| Tipo | Variable típica | Criterio de éxito típico | Plazo típico |
+|------|-----------------|--------------------------|--------------|
+| **Pérdida de peso** | peso | -5% a -10% del inicial | 12-24 sem |
+| **Ganancia de peso** | peso | +5% del inicial | 12-16 sem |
+| **Ganancia muscular** | MLG | +2 kg | 16-24 sem |
+| **Reducción de grasa** | % grasa | -3% absoluto | 12-16 sem |
+| **Control glucémico** | HbA1c | <7% (o -1% absoluto) | 12-24 sem |
+| **Mejora de perfil lipídico** | LDL | <100 mg/dL | 12-24 sem |
+| **Reducción de TA** | TA sistólica | <130 mmHg | 8-12 sem |
+| **Función renal** | TFGe | estabilización o +5 | 24-52 sem |
+| **Reducción de circunferencia** | cintura | -5 cm | 12-16 sem |
+| **Aumento de fibra dietaria** | fibra g/día | 25-30 g/día | 4-8 sem |
+| **Reducción de sodio** | Na mg/día | <2000 mg/día | 4-8 sem |
+| **Cese de alcohol** | consumo | 0 g/sem | 4-12 sem |
+| **Aumento de actividad física** | min/sem | 150 min/sem | 4-12 sem |
+| **Mejora de sueño** | horas | 7-8 h | 4-8 sem |
+| **Reducción de estrés** | escala | -2 puntos | 8-12 sem |
+| **Mejora de hidratación** | L/día | 2-2.5 L | 2-4 sem |
+| **Adherencia al menú** | % | ≥80% | 4-8 sem |
+| **Aumento de HDL** | HDL | >50 (M) / >60 (F) | 12-24 sem |
+| **Reducción de TG** | TG | <150 mg/dL | 12-24 sem |
+| **Reducción de ácido úrico** | uricemia | <6 mg/dL (F) / <7 (M) | 12-24 sem |
+| **Mejora de vit D** | 25-OH | >30 ng/mL | 12-24 sem |
+| **Mejora de ferritina** | ferritina | >30 ng/mL (F) / >50 (M) | 8-12 sem |
+| **Personalizado** | variable del paciente | definido por nutrióloga | definido |
+
+### 26.4 Reglas de negocio (13 reglas)
+
+- **RN-OBJ-01**: todo objetivo debe tener valor inicial, valor objetivo, plazo y criterio de éxito.
+- **RN-OBJ-02**: plazo realista según tipo y condición.
+- **RN-OBJ-03**: no se permiten objetivos con valores físicamente imposibles (ej. perder 20 kg en 4 sem).
+- **RN-OBJ-04**: objetivo "logrado" requiere cumplir criterio + confirmar en 2ª consulta.
+- **RN-OBJ-05**: pérdida de peso máxima recomendada = **1% del peso corporal por semana**.
+- **RN-OBJ-06**: ganancia de masa muscular máxima = **0.25-0.5 kg/sem**.
+- **RN-OBJ-07**: objetivos múltiples deben ser coherentes (ej. pérdida de peso y ganancia muscular son parcialmente excluyentes, advertencia).
+- **RN-OBJ-08**: modificación requiere justificación.
+- **RN-OBJ-09**: cierre requiere evaluación final.
+- **RN-OBJ-10**: objetivo abandonado **no se puede reactivar**; se debe crear uno nuevo.
+- **RN-OBJ-11**: objetivos personalizados requieren definición completa.
+- **RN-OBJ-12**: alertas automáticas según clasificación.
+- **RN-OBJ-13**: se permiten objetivos "sin plazo" (ej. mantenimiento continuo).
+
+### 26.5 Validaciones
+
+Valor inicial vs objetivo coherente, plazo ≥1 sem, plazo ≤104 sem (2 años), velocidad de cambio dentro de rango saludable, variable medible, criterio de éxito definido, coherencia con condición clínica, coherencia con objetivos activos, plan de acción no vacío.
+
+### 26.6 Casos especiales
+
+- **Objetivos múltiples con conflictos**: advertencia y prioridad explícita.
+- **Comorbilidades múltiples**: solo compatibles si la nutrióloga confirma.
+- **Embarazo**: restricciones (no pérdida de peso en 2°-3er trimestre, salvo indicación médica).
+- **Lactancia**: restricciones similares.
+- **Adolescentes**: percentiles en lugar de valores absolutos.
+- **Adultos mayores**: objetivos más conservadores.
+- **Deportistas**: compatibles con temporada competitiva.
+- **Oncológicos**: conservadores, énfasis en calidad de vida.
+- **Paliativos**: centrados en confort, no en cifras.
+
+### 26.7 Estado actual
+
+⏳ No implementado. Resolverá feedbacks #7 (sugerir diagnóstico) y #8 (plan sugerido) junto con `clinical-engine` (módulo 27 / Fase 3).
+
+---
+
+## 27. Adherencia al tratamiento (módulo 41)
+
+> **Origen:** Plan §41. **Fase objetivo:** 2.
+
+### 27.1 Entidad `REGISTRO_ADHERENCIA`
+
+- `paciente_id`, `fecha`, `consulta_id` (opcional)
+- `origen` (consulta / portal / app / llamada)
+- `adherencia_menu` (% o escala)
+- `adherencia_agua` (% o volumen real)
+- `adherencia_actividad` (% o tiempo real)
+- `adherencia_suplementos` (%)
+- `adherencia_sueño` (% o horas reales)
+- `hambre_promedio` (1-10), `saciedad_promedio` (1-10), `estado_animo_promedio` (1-10), `energia_promedio` (1-10)
+- `eventos_intercurrentes` (texto)
+- `barreras` (texto), `facilitadores` (texto)
+- `comidas_realizadas` (estructura: tiempo + alimentos + adherencia específica)
+- `notas`
+
+### 27.2 Entidad `INDICE_ADHERENCIA` (cálculo derivado)
+
+- `paciente_id`, `periodo_inicio`, `periodo_fin`
+- `puntaje_adherencia_menu` (0-100)
+- `puntaje_adherencia_actividad` (0-100)
+- `puntaje_adherencia_agua` (0-100)
+- `puntaje_adherencia_suplementos` (0-100)
+- `puntaje_global` (0-100)
+- `tendencia` (mejorando / estable / empeorando)
+- `fecha_calculo`
+
+### 27.3 Entidad `EVENTO_BARRERA`
+
+- `paciente_id`, `tipo_barrera` (económica / tiempo / social / emocional / salud / conocimiento / otra)
+- `descripcion`, `fecha`, `fecha_resolucion` (opcional), `accion_tomada`
+
+### 27.4 Algoritmo de cálculo de índice
+
+```
+Para cada componente (menú, agua, actividad, suplementos, sueño):
+  → Obtener valores reportados
+  → Calcular promedio
+  → Calcular consistencia
+Ponderar componentes (configurable):
+  → Menú: peso X
+  → Agua: peso Y
+  → Actividad: peso Z
+  → Suplementos: peso W
+  → Sueño: peso V
+Calcular índice global (0-100)
+Clasificar: excelente / buena / regular / baja / muy baja
+Generar tendencia
+```
+
+### 27.5 Reglas de negocio (9 reglas)
+
+- **RN-ADH-01**: el índice es una **medida, no un juicio**.
+- **RN-ADH-02**: el sistema **no sanciona** la baja adherencia; ofrece soporte.
+- **RN-ADH-03**: las barreras se registran para abordarlas, no para culpabilizar.
+- **RN-ADH-04**: la captura puede ser reportada por el paciente o estimada por la nutrióloga, con marca de fuente.
+- **RN-ADH-05**: el algoritmo es transparente y configurable.
+- **RN-ADH-06**: adherencia al menú se evalúa por coincidencia con el plan, no por duplicación exacta.
+- **RN-ADH-07**: registros del portal/app se validan y consolidan en consulta.
+- **RN-ADH-08**: alertas por adherencia muy baja con severidad configurable.
+- **RN-ADH-09**: el sistema **no usa IA** para clasificar barreras; usa el catálogo controlado.
+
+### 27.6 Estado actual
+
+⏳ No implementado. Se captura cumplimiento percibido (1-10) en wizard SOAP (Sprint 5) pero no se calcula índice ni se gestionan barreras.
+
+---
+
+## 28. Recetario profesional (módulo 36)
+
+> **Origen:** Plan §36. **Fase objetivo:** 2.
+
+### 28.1 Entidad `RECETA`
+
+- `nombre`, `descripcion` (opcional)
+- `categoria` (entrada / plato fuerte / postre / bebida / snack)
+- `subcategoria` (opcional)
+- `cocina` (mexicana / mediterránea / asiática / etc.)
+- `dificultad` (fácil / media / difícil)
+- `prep_time_min`, `cook_time_min`
+- `servings`, `porcion_unit`, `porcion_weight_g`
+- `instrucciones` (JSON con pasos numerados)
+- `notas`, `photo_paths[]` (opcional)
+- `tags[]` (vegetariano, vegano, sin gluten, bajo en sodio, etc.)
+- `allergens[]` (leche, huevo, gluten, soya, cacahuate, etc.)
+- `cost_total`, `cost_per_serving` (opcional)
+- `currency` (MXN por default)
+- `status` (draft / active / archived)
+- `current_version` (entero)
+
+### 28.2 Entidad `RECIPE_INGREDIENT`
+
+- `recipe_id` (FK)
+- `equivalent_id` (FK a `equivalents` SMAE)
+- `quantity`, `unit`
+- `weight_g`
+- `order_index`
+- `is_optional`
+
+### 28.3 Entidad `RECIPE_STEP`
+
+- `recipe_id` (FK)
+- `order_index`
+- `description`
+- `duration_min` (opcional)
+- `temperature` (opcional)
+- `photo_path` (opcional)
+
+### 28.4 Wizard de creación (3 pasos)
+
+1. **Datos básicos**: nombre, categoría, tiempo, porciones.
+2. **Ingredientes**: autocomplete SMAE, cantidades.
+3. **Preparación**: pasos numerados, fotos.
+
+**Post-creación:**
+- Sistema calcula nutrición automáticamente (suma de ingredientes × equivalentes SMAE).
+- Sistema etiqueta alérgenos automáticamente.
+- Nutrióloga ajusta etiquetas manualmente.
+- Captura costos (opcional).
+- Vista previa.
+- Guarda como versión borrador.
+- Activa (botón "Publicar").
+
+### 28.5 Versionamiento
+
+- Cada cambio genera nueva versión.
+- Receta activa tiene puntero a versión actual.
+- Historial completo conservado.
+- Permite escalamiento de porciones (proporcional a servings).
+
+### 28.6 Estado actual
+
+⏳ No implementado. Sprint candidato: **Sprint 18-19**.
+
+---
+
+## 29. Planificador semanal + lista de compras (módulos 37 y 38)
+
+> **Origen:** Plan §37 y §38. **Fase objetivo:** 2.
+
+### 29.1 Planificador (`meal_plans`, `menus`, `menu_times`, `menu_items`)
+
+**Entidad `MEAL_PLAN`** (expandida del MVP actual):
+- `paciente_id`, `consulta_id` (opcional)
+- `name`, `type` (daily/weekly/biweekly/monthly)
+- `start_date`, `end_date`
+- `target_kcal`, `target_protein_pct`, `target_fat_pct`, `target_carb_pct`, `target_fiber_g`
+- `times_per_day` (3/4/5/6)
+- `pathology`, `restrictions` (JSON), `preferences` (JSON)
+- `status` (draft / active / completed / cancelled)
+- `smae_version_id` (FK)
+
+**Entidad `MENU`:** meal_plan_id, day_number, date, notes.
+
+**Entidad `MENU_TIME`:** menu_id, time_slot (breakfast/collation/lunch/snack/dinner), order_index, target_kcal.
+
+**Entidad `MENU_ITEM`:** menu_time_id, food_equivalent_id, servings (1.5, 2, etc.), preparation, notes, order_index, is_recipe (boolean).
+
+### 29.2 Distribución automática de macros
+
+- Porcentaje de kcal por tiempo (default: 25% desayuno / 10% colación mañana / 35% comida / 10% colación tarde / 20% cena).
+- Ajustable según patología (ej. diabetes: 5 tiempos más balanceados, cena ligera).
+- Restricciones: vegetariano, vegano, renal (bajo K, P, Na), diabético (índice glucémico bajo), etc.
+- Lista de compras automática: agregar todos los `equivalent_id` del plan, agrupados por grupo SMAE.
+
+### 29.3 Lista de compras (`SHOPPING_LIST`)
+
+- `paciente_id`, `meal_plan_id` (opcional), `menu_ids[]` (opcional)
+- `name`, `number_of_people`
+- `purchase_unit_pref` (kg / g / pieza / manojo / etc.)
+- `total_estimated` (opcional), `currency`
+- `content` (JSON con lista agrupada por grupo SMAE)
+- `generated_at`
+
+### 29.4 Estado actual
+
+✅ **MVP**: MealPlan con 5 slots, 30 alimentos SMAE, `planCalculations`, distribución básica (Sprint 6).
+✅ **Sprint 10**: SlotProgress con barras de kcal + delta vs `DEFAULT_KCAL_DISTRIBUTION`; drag&drop entre tiempos.
+⏳ **Fase 2**: lista de compras, restricción por patología, escalamiento, planificador mensual, versionamiento, menús cíclicos.
+
+---
+
+## 30. Agenda y gestión de citas (módulo 40)
+
+> **Origen:** Plan §40. **Fase objetivo:** 2.
+
+### 30.1 Entidad `APPOINTMENT` (expandida del MVP)
+
+- `paciente_id` (FK), `user_id` (profesional FK)
+- `consultorio_id` (opcional, multi-sala)
+- `appointment_date`, `start_time`, `end_time`, `duration_min`
+- `type` (primera_vez / seguimiento / urgencia / control / cierre)
+- `status` (scheduled / confirmed / in_progress / completed / cancelled / no_show / rescheduled)
+- `reason`, `notes`
+- `consultation_id` (FK cuando se completa)
+- `reminder_sent` (boolean), `confirmed_at` (opcional)
+- `cancelled_reason` (opcional)
+- `rescheduled_from_id` (FK opcional)
+- `cost`, `paid`, `payment_method`
+- `created_at`, `updated_at`, `version`
+
+### 30.2 Entidades auxiliares
+
+- `SCHEDULE` (horario del profesional): user_id, day_of_week, start_time, end_time.
+- `BLOCK` (bloqueos de agenda): user_id, start, end, reason (vacaciones, capacitación, etc.).
+- `REMINDER` (recordatorios): appointment_id, sent_at, method (email/SMS), result (delivered/failed).
+
+### 30.3 Flujos
+
+**Agendamiento (5 pasos):** seleccionar paciente → fecha/hora disponible → tipo y duración → motivo y notas → confirmar.
+
+**Reagendado (4 pasos):** seleccionar nueva fecha/hora → marcar original como "reagendada" → crear nueva cita con FK a la original → notificar al paciente.
+
+**Cancelación (5 pasos):** capturar motivo → confirmar → marcar estado → notificar → liberar espacio.
+
+**No asistencia:** sistema marca automáticamente según tiempo → alerta a nutrióloga → intentar contacto (registrar intentos) → decidir acción (reagendar, dar de baja) → registrar en historial.
+
+### 30.4 Reglas de negocio (12 reglas)
+
+- **RN-AGE-01**: cita solo dentro del horario del profesional.
+- **RN-AGE-02**: no dos citas del mismo profesional en el mismo horario.
+- **RN-AGE-03**: las salas pueden tener agenda propia.
+- **RN-AGE-04**: cancelaciones requieren motivo.
+- **RN-AGE-05**: reagendado conserva el historial.
+- **RN-AGE-06**: no asistencia se marca automáticamente a X minutos después de la hora.
+- **RN-AGE-07**: recordatorios se envían según configuración del paciente.
+- **RN-AGE-08**: confirmación positiva se registra con timestamp.
+- **RN-AGE-09**: citas de primera vez tienen duración más larga.
+- **RN-AGE-10**: citas pueden tener costo asociado y estado de pago.
+- **RN-AGE-11**: calendario externo (Google/Outlook) es opcional; integración de una vía (sync hacia afuera).
+- **RN-AGE-12**: el sistema **no envía SMS/correos** sin acción explícita de la nutrióloga o configuración previa.
+
+### 30.5 Casos especiales
+
+- **Citas recurrentes** (semanal/quincenal): programación múltiple.
+- **Citas grupales** (charlas, talleres): múltiples pacientes.
+- **Citas a domicilio**: ubicación especial.
+- **Citas virtuales** (videollamada): integración con plataforma.
+- **Citas en feriado**: advertencia, requiere configuración explícita.
+- **Citas urgentes**: prioridad alta, reagendado si es necesario.
+- **Lista de espera**: cuando no hay huecos.
+
+### 30.6 Estado actual
+
+⏳ No implementado. Sprint candidato: **Sprint 14-15**.
+
+---
+
+## 31. Catálogo de medicamentos e interacciones (módulo 42)
+
+> **Origen:** Plan §42. **Fase objetivo:** 3.
+
+### 31.1 Entidad `MEDICATION` (catálogo)
+
+- `nombre_comercial`, `principio_activo`
+- `presentacion` (tabletas, cápsulas, jarabe, etc.)
+- `concentracion` (ej. 500 mg, 5 mg/5 ml)
+- `via_administracion` (oral, IV, IM, SC, tópica, inhalada)
+- `categoria_farmacologica`
+- `efectos_secundarios` (JSON)
+- `interacciones_nutrientes` (JSON: lista de interacciones alimento-medicamento conocidas)
+- `interacciones_medicamentos` (JSON)
+- `contraindicaciones` (JSON)
+- `notas`
+
+### 31.2 Entidad `INTERACCION_NUTRIENTE_MEDICAMENTO`
+
+- `medicamento_id`
+- `nutriente` (vit K, calcio, hierro, potasio, etc.) o `alimento_grupo_id`
+- `tipo` (reduce_absorcion / aumenta_absorcion / potencia_efecto / antagoniza_efecto / toxicidad)
+- `severidad` (leve / moderada / severa)
+- `recomendacion` (texto)
+- `fuente` (UpToDate, FDA, etc.)
+- `fecha_vigencia`
+
+### 31.3 Alertas automáticas (motor de reglas)
+
+- Warfarina + vitamina K (verduras verdes): alerta de INR, sugerir consistencia.
+- Tetraciclinas / quinolonas + calcio / hierro: separar 2h de lácteos y suplementos.
+- IECA / ARA-II + potasio: vigilar K sérico.
+- Metformina + vitamina B12: vigilar déficit a largo plazo.
+- Levotiroxina + calcio / hierro: separar 4h.
+- Corticoides + calcio / vitamina D: sugerir suplementación.
+- Estatinas + pomelo: evitar.
+
+### 31.4 Estado actual
+
+✅ `medications` se almacenan en `patients` (1-N, relacionados al expediente, Sprint 1).
+⏳ Catálogo global de medicamentos, interacciones nutriente-medicamento, alertas automáticas. Sprint candidato: **Sprint 20+**.
+
+---
+
+## 32. Generación de documentos profesionales (módulo 43)
+
+> **Origen:** Plan §43. **Fase objetivo:** 2.
+
+### 32.1 Entidad `DOCUMENT`
+
+- `paciente_id` (FK opcional), `consultation_id` (FK opcional)
+- `template_id` (FK)
+- `type` (clinical_report / meal_plan / shopping_list / recipe_book / consent / referral)
+- `title`
+- `content_html`, `content_pdf_path` (opcional)
+- `parameters` (JSON: rango fechas, pacientes, profesionales, módulos)
+- `generated_at`, `generated_by`
+- `status` (draft / signed / delivered / voided)
+- `signed_at`, `signed_by` (opcional)
+- `signature_hash` (opcional, SHA-256)
+- `void_reason` (opcional)
+- `created_at`, `version`
+
+### 32.2 Entidad `DOCUMENT_TEMPLATE`
+
+- `nombre`, `descripcion`
+- `type` (clinical_report, meal_plan, consent, referral, recipe, shopping_list)
+- `version`
+- `contenido_html` (con placeholders `{{paciente.nombre}}`, `{{consulta.fecha}}`, etc.)
+- `parametros_requeridos` (JSON: lista de variables que se deben sustituir)
+- `estilos_css` (opcional)
+- `header_image`, `footer_image` (opcional)
+- `activo`
+
+### 32.3 Entidad `DOCUMENT_SIGNATURE`
+
+- `document_id` (FK)
+- `profesional_id`
+- `signed_at`
+- `signature_data` (imagen de firma o hash)
+- `signature_hash` (SHA-256 del documento + firma)
+- `ip_address`
+- `device_info`
+- `certificado_digital` (opcional, para firma avanzada NOM-151)
+
+### 32.4 Flujo de generación (9 pasos)
+
+1. Cualquier módulo → botón **[📄 Generar documento]**.
+2. Modal/drawer con plantillas filtradas por contexto.
+3. Vista previa en vivo.
+4. Personalización (qué incluir).
+5. Selección de versión.
+6. Preview final.
+7. **[Firmar]** → aplica firma digital.
+8. **[Descargar]** / **[Enviar al paciente]** / **[Imprimir]**.
+9. Registro automático en bitácora.
+
+### 32.5 Tipos de plantillas
+
+- **Reporte de consulta clínica** (nota SOAP completa).
+- **Plan de alimentación** (formato paciente con menú semanal).
+- **Lista de compras** (agrupada por grupo SMAE).
+- **Recetario personalizado** (recetas filtradas por preferencias del paciente).
+- **Consentimiento informado** (firma al inicio del tratamiento).
+- **Derivación a especialista** (carta formal a médico tratante).
+- **Receta médica** (no aplica; el sistema no prescribe).
+- **Reporte de evolución** (snapshot comparativo entre 2 consultas).
+- **Reporte para instancia regulatoria** (COFEPRIS, Secretaría de Salud).
+
+### 32.6 Estado actual
+
+⏳ No implementado. Sprint candidato: **Sprint 11 (PDF básico) + Sprint 16-17 (firmas y plantillas)**.
+
+---
+
+## 33. Portal del paciente (módulo 45, PWA)
+
+> **Origen:** Plan §45. **Fase objetivo:** 5 (diferido).
+
+### 33.1 Objetivo
+
+PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, agenda citas, recibe recordatorios, descarga documentos firmados. **NO sustituye al escritorio** — es un complemento para consulta remota.
+
+### 33.2 Funcionalidades
+
+- **Vista del plan alimentario** (formato paciente, sin nomenclatura técnica).
+- **Registro de comidas** (foto + texto + adherencia 1-5).
+- **Auto-reporte de adherencia** (menú, agua, actividad, suplementos, sueño).
+- **Agenda de citas** (ver, reagendar, cancelar).
+- **Recepción de recordatorios** (configurable: email, push, SMS).
+- **Descarga de documentos firmados** (plan, recetas, reportes).
+- **Mensajería con la nutrióloga** (asíncrona, no tiempo real).
+- **Visualización de evolución** (gráficas de peso, % grasa, perímetro abdominal).
+
+### 33.3 Arquitectura PWA
+
+- React + Vite + TypeScript (mismo stack que escritorio, build separado).
+- Service Worker para offline-first.
+- IndexedDB local para datos en caché.
+- Push notifications vía `tauri-plugin-notifications` (escritorio) o Web Push API (PWA).
+- Sincronización con servidor (Fase 3) cuando hay red.
+
+### 33.4 Autenticación
+
+- Magic link por email (sin contraseñas que recordar).
+- 2FA TOTP opcional.
+- Sesión persistente con refresh token (15 días).
+
+### 33.5 Privacidad
+
+- El paciente solo ve **sus propios datos**.
+- Cifrado en tránsito (TLS 1.3) y reposo.
+- Consentimiento explícito para compartir datos con la nutrióloga (ya implícito en la relación clínica).
+- Logs de acceso del paciente (qué vio, cuándo, desde qué IP).
+
+### 33.6 Estado actual
+
+⏳ No implementado. Diferido a Fase 5.
+
+---
+
+## 34. Módulo económico (módulo 39)
+
+> **Origen:** Plan §39. **Fase objetivo:** 3.
+
+### 34.1 Entidad `PAYMENT`
+
+- `paciente_id` (FK)
+- `consultation_id` (FK opcional)
+- `appointment_id` (FK opcional)
+- `meal_plan_id` (FK opcional)
+- `concept` (consulta / plan / receta / documento)
+- `amount`, `currency` (MXN por default)
+- `method` (efectivo / transferencia / tarjeta / cheque / otro)
+- `status` (pending / paid / partial / refunded / cancelled)
+- `paid_at` (opcional)
+- `reference` (número de transferencia, autorización de tarjeta, etc.)
+- `invoice_number` (opcional, CFDI)
+- `invoice_xml` (opcional, ruta cifrada)
+- `notes`
+
+### 34.2 Entidad `EXPENSE` (opcional)
+
+- `fecha`, `concept`, `amount`, `currency`, `category` (insumos / equipo / capacitación / etc.), `notes`.
+
+### 34.3 Reglas de negocio
+
+- **RN-ECO-01**: el sistema **no emite facturas CFDI** automáticamente; el nutriólogo es responsable de la facturación.
+- **RN-ECO-02**: las citas de primera vez tienen costo configurable por profesional.
+- **RN-ECO-03**: los pagos se asocian a la cita o consulta que los originó.
+- **RN-ECO-04**: el sistema NO procesa pagos con tarjeta directamente; registra pagos reportados por el paciente.
+- **RN-ECO-05**: el reporte financiero mensual es auditable y exportable.
+- **RN-ECO-06**: la información económica es accesible solo para el profesional y el administrador.
+
+### 34.4 Reportes financieros
+
+- Ingresos por periodo (diario, semanal, mensual, anual).
+- Ingresos por tipo de servicio.
+- Ingresos por paciente.
+- Pendientes de pago.
+- Gráfica de tendencia.
+- Exportación a Excel / CSV.
+
+### 34.5 Estado actual
+
+⏳ No implementado. Sprint candidato: **Sprint 21+**.
+
+---
+
+## 35. Resumen del roadmap de detalle funcional
+
+| Módulo | Plan § | Fase | Estado actual | Sprint candidato |
+|--------|--------|------|---------------|-------------------|
+| 31 Expediente clínico | 22 | 2 | MVP (16 campos) | 12-13 |
+| 32 Antropometría | 23 | 2 | MVP (peso/talla/cintura) | 14 |
+| 33 Laboratorio | 24 | 2 | MVP (24 códigos México) | 12-13 |
+| 34 Seguimiento | 25 | 2 | No | 18-19 |
+| 35 Objetivos | 26 | 2-3 | No | 16-17 |
+| 36 Recetas | 28 | 2 | No | 18-19 |
+| 37 Planificador | 29 | 2 | MVP (5 slots) | 15-16 |
+| 38 Lista compras | 29 | 2 | No | 16 |
+| 39 Económico | 34 | 3 | No | 21+ |
+| 40 Agenda | 30 | 2 | No | 14-15 |
+| 41 Adherencia | 27 | 2 | Parcial (cumplimiento percibido) | 15-16 |
+| 42 Medicamentos | 31 | 3 | Solo registro en paciente | 20+ |
+| 43 Documentos | 32 | 2 | No | 11 (PDF) + 16-17 (firmas) |
+| 44 Dashboard | (ya en §20) | 3 | MVP (4 KPIs) | 19-20 |
+| 45 Portal paciente | 33 | 5 | No | Diferido |
+| 46 Seguridad | (ya en §9) | 3 | MVP (datos locales) | 17-18 |
+| 47 Arquitectura técnica | (ya en §6) | 1-3 | MVP | Continuo |
 
 ---
 
