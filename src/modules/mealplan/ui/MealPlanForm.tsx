@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useForm, useFieldArray, Controller, type SubmitHandler } from "react-hook-form";
+import { useForm, useFieldArray, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import {
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Target,
+  Apple,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -25,7 +26,7 @@ import {
   DEFAULT_KCAL_DISTRIBUTION,
   type MealSlot,
 } from "@modules/mealplan/domain/MealSlot";
-import { getSystemFoods as getAllFoods, type FoodId, FoodGroupLabel } from "@modules/smae/domain";
+import { getSystemFoodById, type FoodId } from "@modules/smae/domain";
 import { foodExchangeNutrition } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
 import type { PatientId } from "@modules/patient/domain/PatientId";
@@ -36,13 +37,12 @@ import { Label } from "@components/ui/label";
 import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
+import { FoodPicker } from "./FoodPicker";
 
 interface MealPlanFormProps {
   patientId: PatientId;
   onSaved?: (planId: string) => void;
 }
-
-const ALL_FOODS = getAllFoods();
 
 export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
   const navigate = useNavigate();
@@ -380,12 +380,14 @@ function MealSection({
   watch: ReturnType<typeof useForm<MealPlanFormValues>>["watch"];
 }) {
   const idx = MEAL_SLOT_ORDER.indexOf(slot);
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control,
     name: `meals.${idx}.exchanges`,
   });
   const currentMeal = watch(`meals.${idx}`);
   const [collapsed, setCollapsed] = React.useState(false);
+  const [pickerOpen, setPickerOpen] = React.useState(false);
+  const [editingRowIdx, setEditingRowIdx] = React.useState<number | null>(null);
 
   const totals = React.useMemo(() => {
     return (currentMeal?.exchanges ?? []).reduce(
@@ -401,6 +403,28 @@ function MealSection({
       { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 },
     );
   }, [currentMeal]);
+
+  const openPickerForNew = () => {
+    setEditingRowIdx(null);
+    setPickerOpen(true);
+  };
+
+  const openPickerForEdit = (rowIdx: number) => {
+    setEditingRowIdx(rowIdx);
+    setPickerOpen(true);
+  };
+
+  const handlePickerSelect = (foodId: FoodId) => {
+    if (editingRowIdx === null) {
+      append({ foodId, count: 1 });
+    } else {
+      const existing = fields[editingRowIdx];
+      if (existing) {
+        update(editingRowIdx, { ...existing, foodId });
+      }
+    }
+    setEditingRowIdx(null);
+  };
 
   return (
     <Card>
@@ -427,65 +451,69 @@ function MealSection({
       </CardHeader>
       {!collapsed && (
         <CardContent className="space-y-2">
-          {fields.map((row, rowIdx) => (
-            <div
-              key={row.id}
-              className="grid grid-cols-12 items-end gap-2 rounded-md border bg-muted/10 p-2"
-            >
-              <div className="col-span-7">
-                <Label className="text-xs">Alimento</Label>
-                <Controller
-                  control={control}
-                  name={`meals.${idx}.exchanges.${rowIdx}.foodId`}
-                  render={({ field }) => (
-                    <select
-                      value={field.value ?? ""}
-                      onChange={(e) => field.onChange(e.target.value)}
-                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                    >
-                      <option value="">Seleccionar…</option>
-                      {ALL_FOODS.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name} — {FoodGroupLabel[f.group]}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                />
+          {fields.map((row, rowIdx) => {
+            const food = row.foodId ? getSystemFoodById(row.foodId) : null;
+            return (
+              <div
+                key={row.id}
+                className="grid grid-cols-12 items-end gap-2 rounded-md border bg-muted/10 p-2"
+              >
+                <div className="col-span-7">
+                  <Label className="text-xs">Alimento</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start font-normal"
+                    onClick={() => openPickerForEdit(rowIdx)}
+                  >
+                    <Apple className="mr-2 h-3 w-3" />
+                    {food ? (
+                      <span className="truncate">{food.name}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Seleccionar alimento…</span>
+                    )}
+                  </Button>
+                </div>
+                <div className="col-span-3">
+                  <Label className="text-xs">Raciones</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    {...register(`meals.${idx}.exchanges.${rowIdx}.count`, {
+                      valueAsNumber: true,
+                    })}
+                  />
+                </div>
+                <div className="col-span-2 flex items-end justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Eliminar"
+                    onClick={() => remove(rowIdx)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="col-span-3">
-                <Label className="text-xs">Raciones</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  {...register(`meals.${idx}.exchanges.${rowIdx}.count`, {
-                    valueAsNumber: true,
-                  })}
-                />
-              </div>
-              <div className="col-span-2 flex items-end justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Eliminar"
-                  onClick={() => remove(rowIdx)}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           <Button
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => append({ foodId: "" as FoodId, count: 1 })}
+            onClick={openPickerForNew}
           >
             <Plus className="mr-2 h-3 w-3" />
             Añadir alimento
           </Button>
+
+          <FoodPicker
+            open={pickerOpen}
+            onOpenChange={setPickerOpen}
+            onSelect={handlePickerSelect}
+          />
         </CardContent>
       )}
     </Card>
