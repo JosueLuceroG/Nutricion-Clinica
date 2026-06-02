@@ -1,0 +1,210 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* === Surfaces === */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    /* === Primary (azul clínico) === */
+    --primary: 222 96% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-50: 222 100% 97%;
+    --primary-100: 222 100% 94%;
+    --primary-200: 222 100% 87%;
+    --primary-300: 222 100% 78%;
+    --primary-400: 222 100% 67%;
+    --primary-500: 222 96% 56%;
+    --primary-600: 222 90% 48%;
+    --primary-700: 222 85% 38%;
+    --primary-800: 222 80% 28%;
+    --primary-900: 222 75% 20%;
+
+    /* === Secondary === */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+
+    /* === Muted === */
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+
+    /* === Accent === */
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 6% 10%;
+
+    /* === Semantic === */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* === Borders & inputs === */
+    --border: 240 6% 90%;
+    --input: 240 6% 90%;
+    --ring: 222 96% 56%;
+
+    /* === Radius === */
+    --radius: 0.5rem;
+
+    /* === Charts (Recharts) === */
+    --chart-1: 222 96% 56%;
+    --chart-2: 142 71% 45%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 199 89% 48%;
+    --chart-5: 271 81% 56%;
+    --chart-6: 14 90% 60%;
+    --chart-7: 340 82% 52%;
+    --chart-8: 160 84% 39%;
+
+    /* === Colores clínicos === */
+    --clinic-verde: 142 71% 36%;
+    --clinic-azul: 199 89% 48%;
+    --clinic-amarillo: 48 96% 53%;
+    --clinic-naranja: 25 95% 53%;
+    --clinic-rojo: 0 72% 51%;
+    --clinic-violeta: 271 81% 56%;
+    --clinic-rosa: 330 81% 60%;
+    --clinic-teal: 173 80% 40%;
+  }
+
+  .dark {
+    --background: 240 10% 4%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 6%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 6%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 222 100% 67%;
+    --primary-foreground: 240 10% 4%;
+    --primary-50: 222 75% 20%;
+    --primary-100: 222 80% 28%;
+    --primary-200: 222 85% 38%;
+    --primary-300: 222 90% 48%;
+    --primary-400: 222 96% 56%;
+    --primary-500: 222 100% 67%;
+    --primary-600: 222 100% 75%;
+    --primary-700: 222 100% 82%;
+    --primary-800: 222 100% 88%;
+    --primary-900: 222 100% 94%;
+
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 98%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 60%;
+    --warning-foreground: 240 10% 4%;
+    --info: 199 89% 60%;
+    --info-foreground: 240 10% 4%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 222 100% 67%;
+
+    --clinic-verde: 142 71% 45%;
+    --clinic-azul: 199 89% 60%;
+    --clinic-amarillo: 48 96% 60%;
+    --clinic-naranja: 25 95% 60%;
+    --clinic-rojo: 0 72% 60%;
+    --clinic-violeta: 271 81% 70%;
+    --clinic-rosa: 330 81% 70%;
+    --clinic-teal: 173 80% 50%;
+  }
+
+  .high-contrast {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --border: 0 0% 0%;
+    --input: 0 0% 0%;
+    --ring: 222 96% 35%;
+    --primary: 222 96% 35%;
+    --primary-foreground: 0 0% 100%;
+  }
+
+  .high-contrast.dark {
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --border: 0 0% 100%;
+    --input: 0 0% 100%;
+    --ring: 222 100% 75%;
+    --primary: 222 100% 75%;
+    --primary-foreground: 0 0% 0%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1, "cv11" 1, "ss01" 1;
+  }
+
+  /* Scrollbar moderna */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neutral-300 dark:bg-neutral-700;
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-400 dark:bg-neutral-600;
+  }
+
+  /* Foco accesible */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Tabular numbers para datos clínicos */
+  .tabular-nums,
+  .font-mono,
+  [data-tabular] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Respetar reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  .skeleton {
+    @apply animate-shimmer rounded-md bg-gradient-to-r from-neutral-200 via-neutral-100 to-neutral-200 bg-[length:200%_100%] dark:from-neutral-800 dark:via-neutral-700 dark:to-neutral-800;
+  }
+}
