@@ -30,6 +30,7 @@ import { labPanelService } from "@services/labPanelService";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
+import { Vitals } from "@modules/consultation/domain/Vitals";
 import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
@@ -88,6 +89,9 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
       setSubmitting(true);
       try {
         const nextVisitDate = values.nextVisitDate ? new Date(values.nextVisitDate) : null;
+        const vitals = values.vitalsTaken
+          ? Vitals.from(values.vitalSigns ?? {})
+          : Vitals.empty();
         const consultation = await consultationService.schedule.execute({
           patientId,
           consultationDate: new Date(values.consultationDate),
@@ -95,6 +99,7 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           reason: values.reason.trim(),
           subjective: values.subjective,
           objective: values.objective,
+          vitals,
           assessment: values.assessment,
           plan: values.plan,
           anthropometryId: values.anthropometryId ? AnthropometryId.fromUnsafe(values.anthropometryId) : null,
@@ -168,7 +173,11 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" disabled={submitting}>
+                <Button
+                  type="button"
+                  onClick={() => void onSubmit()}
+                  disabled={submitting}
+                >
                   <Save className="mr-2 h-4 w-4" />
                   {submitting ? "Guardando…" : "Guardar consulta"}
                 </Button>
@@ -301,7 +310,8 @@ function StepObjective({
   patientId: PatientId;
   errors: FieldErrors<ConsultationFormValues>;
 }) {
-  const { register } = useFormContextSafe();
+  const { register, watch, setValue } = useFormContextSafe();
+  const vitalsTaken = watch("vitalsTaken");
   const [measurements, setMeasurements] = React.useState<
     Array<{ id: string; measuredAt: string; weightKg: number; heightCm: number; bmi: number }>
   >([]);
@@ -341,42 +351,70 @@ function StepObjective({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Objetivo (O) — signos vitales
+            Signos vitales
           </CardTitle>
-          <CardDescription>Toma clínica del día</CardDescription>
+          <CardDescription>Marca esta opción solo si se tomaron signos vitales en esta consulta</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          <Field label="Tensión arterial sistólica (mmHg)" error={errors.vitalSigns?.systolicMmHg?.message}>
-            <Input
-              type="number"
-              {...register("vitalSigns.systolicMmHg", { valueAsNumber: true })}
-              placeholder="120"
+        <CardContent>
+          <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-muted/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+            <input
+              type="checkbox"
+              checked={vitalsTaken}
+              onChange={(e) => setValue("vitalsTaken", e.target.checked, { shouldDirty: true })}
+              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border border-primary text-primary accent-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
-          </Field>
-          <Field label="Tensión arterial diastólica (mmHg)" error={errors.vitalSigns?.diastolicMmHg?.message}>
-            <Input
-              type="number"
-              {...register("vitalSigns.diastolicMmHg", { valueAsNumber: true })}
-              placeholder="80"
-            />
-          </Field>
-          <Field label="Frecuencia cardíaca (lpm)" error={errors.vitalSigns?.heartRateBpm?.message}>
-            <Input
-              type="number"
-              {...register("vitalSigns.heartRateBpm", { valueAsNumber: true })}
-              placeholder="72"
-            />
-          </Field>
-          <Field label="Temperatura (°C)" error={errors.vitalSigns?.temperatureC?.message}>
-            <Input
-              type="number"
-              step="0.1"
-              {...register("vitalSigns.temperatureC", { valueAsNumber: true })}
-              placeholder="36.5"
-            />
-          </Field>
+            <div className="flex-1">
+              <p className="text-sm font-medium leading-none">¿Se tomaron signos vitales?</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Opcional. Si los tomaste, completa los campos; si no, deja apagado y registra solo las notas de exploración.
+              </p>
+            </div>
+          </label>
         </CardContent>
       </Card>
+
+      {vitalsTaken && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Heart className="h-4 w-4" />
+              Captura de signos vitales
+            </CardTitle>
+            <CardDescription>Toma clínica del día</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="Tensión arterial sistólica (mmHg)" error={errors.vitalSigns?.systolicMmHg?.message}>
+              <Input
+                type="number"
+                {...register("vitalSigns.systolicMmHg", { valueAsNumber: true })}
+                placeholder="120"
+              />
+            </Field>
+            <Field label="Tensión arterial diastólica (mmHg)" error={errors.vitalSigns?.diastolicMmHg?.message}>
+              <Input
+                type="number"
+                {...register("vitalSigns.diastolicMmHg", { valueAsNumber: true })}
+                placeholder="80"
+              />
+            </Field>
+            <Field label="Frecuencia cardíaca (lpm)" error={errors.vitalSigns?.heartRateBpm?.message}>
+              <Input
+                type="number"
+                {...register("vitalSigns.heartRateBpm", { valueAsNumber: true })}
+                placeholder="72"
+              />
+            </Field>
+            <Field label="Temperatura (°C)" error={errors.vitalSigns?.temperatureC?.message}>
+              <Input
+                type="number"
+                step="0.1"
+                {...register("vitalSigns.temperatureC", { valueAsNumber: true })}
+                placeholder="36.5"
+              />
+            </Field>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

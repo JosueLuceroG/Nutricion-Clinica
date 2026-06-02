@@ -3,6 +3,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import type { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import type { ConsultationStatus } from "./ConsultationStatus";
+import { Vitals } from "./Vitals";
 
 /**
  * Consulta nutricional. Snapshot inmutable de una visita.
@@ -26,6 +27,7 @@ export class Consultation {
     public readonly reason: string,
     public readonly subjective: string | null,
     public readonly objective: string | null,
+    public readonly vitals: Vitals,
     public readonly assessment: string | null,
     public readonly plan: string | null,
     public readonly anthropometryId: AnthropometryId | null,
@@ -64,6 +66,7 @@ export class Consultation {
     reason?: string;
     subjective?: string | null;
     objective?: string | null;
+    vitals?: Vitals;
     assessment?: string | null;
     plan?: string | null;
     anthropometryId?: AnthropometryId | null;
@@ -81,6 +84,7 @@ export class Consultation {
       reason: updates.reason ?? this.reason,
       subjective: updates.subjective !== undefined ? updates.subjective : this.subjective,
       objective: updates.objective !== undefined ? updates.objective : this.objective,
+      vitals: updates.vitals ?? this.vitals,
       assessment: updates.assessment !== undefined ? updates.assessment : this.assessment,
       plan: updates.plan !== undefined ? updates.plan : this.plan,
       anthropometryId:
@@ -109,6 +113,7 @@ export class Consultation {
       reason: this.reason,
       subjective: this.subjective,
       objective: this.objective,
+      vitals: this.vitals,
       assessment: this.assessment,
       plan: this.plan,
       anthropometryId: this.anthropometryId,
@@ -141,6 +146,7 @@ export class Consultation {
       input.reason.trim(),
       input.subjective?.trim() ? input.subjective.trim() : null,
       input.objective?.trim() ? input.objective.trim() : null,
+      input.vitals ?? Vitals.empty(),
       input.assessment?.trim() ? input.assessment.trim() : null,
       input.plan?.trim() ? input.plan.trim() : null,
       input.anthropometryId ?? null,
@@ -162,6 +168,7 @@ export class Consultation {
       props.reason,
       props.subjective,
       props.objective,
+      props.vitals ?? Vitals.empty(),
       props.assessment,
       props.plan,
       props.anthropometryId,
@@ -210,6 +217,7 @@ export interface ConsultationProps {
   reason: string;
   subjective: string | null;
   objective: string | null;
+  vitals: Vitals;
   assessment: string | null;
   plan: string | null;
   anthropometryId: AnthropometryId | null;
@@ -229,6 +237,7 @@ export interface ConsultationCreate {
   reason: string;
   subjective?: string | null;
   objective?: string | null;
+  vitals?: Vitals;
   assessment?: string | null;
   plan?: string | null;
   anthropometryId?: AnthropometryId | null;

@@ -2,11 +2,25 @@ import { z } from "zod";
 import { SexSchema } from "@modules/patient/domain/Sex";
 
 const optionalCm = z
-  .union([z.literal(""), z.coerce.number({ invalid_type_error: "Debe ser número" }).positive("Debe ser positivo").max(300, "Valor demasiado alto")])
+  .union([
+    z.literal(""),
+    z.coerce
+      .number({ invalid_type_error: "Debe ser un número" })
+      .positive("Debe ser positivo")
+      .min(1, "Mínimo 1 cm")
+      .max(300, "Máximo 300 cm"),
+  ])
   .optional();
 
 const optionalMm = z
-  .union([z.literal(""), z.coerce.number().nonnegative().max(80, "Valor demasiado alto")])
+  .union([
+    z.literal(""),
+    z.coerce
+      .number({ invalid_type_error: "Debe ser un número" })
+      .nonnegative("No puede ser negativo")
+      .min(0, "Mínimo 0 mm")
+      .max(80, "Máximo 80 mm"),
+  ])
   .optional();
 
 export const AnthropometryFormSchema = z.object({
@@ -29,7 +43,11 @@ export const AnthropometryFormSchema = z.object({
     .min(50, "Mínimo 50 cm")
     .max(250, "Máximo 250 cm"),
   sex: SexSchema,
-  ageYears: z.coerce.number().int().min(0).max(130),
+  ageYears: z.coerce
+    .number({ invalid_type_error: "Debe ser un número" })
+    .int("Debe ser un entero")
+    .min(0, "Mínimo 0 años")
+    .max(130, "Máximo 130 años"),
   neck: optionalCm,
   chest: optionalCm,
   waist: optionalCm,
@@ -45,7 +63,7 @@ export const AnthropometryFormSchema = z.object({
   abdominal: optionalMm,
   thigh_skinfold: optionalMm,
   calf_skinfold: optionalMm,
-  notes: z.string().max(2000).optional().or(z.literal("")),
+  notes: z.string().max(2000, "Máximo 2000 caracteres").optional().or(z.literal("")),
 });
 
 export type AnthropometryFormValues = z.infer<typeof AnthropometryFormSchema>;

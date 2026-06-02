@@ -4,6 +4,7 @@ import type { ConsultationStatus } from "../domain/ConsultationStatus";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
+import { Vitals } from "../domain/Vitals";
 
 export interface ConsultationRow {
   id: string;
@@ -13,6 +14,7 @@ export interface ConsultationRow {
   reason: string;
   subjective: string | null;
   objective: string | null;
+  vitals_json: string | null;
   assessment: string | null;
   plan: string | null;
   anthropometry_id: string | null;
@@ -33,6 +35,7 @@ export const consultationRowToDomain = (row: ConsultationRow): Consultation => {
     reason: row.reason,
     subjective: row.subjective,
     objective: row.objective,
+    vitals: Vitals.fromJSON(row.vitals_json ? JSON.parse(row.vitals_json) : null),
     assessment: row.assessment,
     plan: row.plan,
     anthropometryId: row.anthropometry_id ? AnthropometryId.fromUnsafe(row.anthropometry_id) : null,
@@ -55,6 +58,7 @@ export const consultationDomainToRow = (c: Consultation): ConsultationRow => {
     reason: c.reason,
     subjective: c.subjective,
     objective: c.objective,
+    vitals_json: c.vitals.isEmpty ? null : JSON.stringify(c.vitals.toJSON()),
     assessment: c.assessment,
     plan: c.plan,
     anthropometry_id: c.anthropometryId?.toString() ?? null,

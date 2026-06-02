@@ -123,8 +123,20 @@ export function AnthropometryForm({
     }
   };
 
+  const onInvalid = (errs: typeof errors) => {
+    const messages = Object.entries(errs)
+      .map(([k, v]) => {
+        const msg = (v as { message?: string } | undefined)?.message;
+        return msg ? `${k}: ${msg}` : null;
+      })
+      .filter((s): s is string => s !== null);
+    toast.error("Corrige los errores del formulario", {
+      description: messages.length > 0 ? messages.join("\n") : "Revisa los campos marcados en rojo.",
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+    <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6" noValidate>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

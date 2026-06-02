@@ -23,6 +23,7 @@ import { Label } from "@components/ui/label";
 import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip";
 
 interface LabPanelFormProps {
   patientId: PatientId;
@@ -229,9 +230,22 @@ function LabCategorySection({
                   aria-invalid={!!errors[test.code]}
                 />
                 {hasValue && flag !== "normal" && (
-                  <Badge variant={flag === "critical-low" || flag === "critical-high" ? "destructive" : "warning"}>
-                    {flag === "low" ? "↓" : flag === "high" ? "↑" : flag === "critical-low" ? "↓↓" : "↑↑"}
-                  </Badge>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge
+                        variant={flag === "critical-low" || flag === "critical-high" ? "destructive" : "warning"}
+                        aria-label={labFlagMessage(flag, test.name, value as number, range)}
+                      >
+                        {flag === "low" ? "↓" : flag === "high" ? "↑" : flag === "critical-low" ? "↓↓" : "↑↑"}
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="font-medium">{labFlagTitle(flag, test.name)}</p>
+                      <p className="mt-0.5 text-[11px] opacity-90">
+                        Valor: {value} {test.unit} · Rango: {range?.low ?? "—"}–{range?.high ?? "—"} {test.unit}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
               </div>
               {range && hasValue && (
@@ -268,6 +282,42 @@ function FormField({
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
+}
+
+function labFlagTitle(flag: string, testName: string): string {
+  switch (flag) {
+    case "low":
+      return `${testName}: por debajo del rango`;
+    case "high":
+      return `${testName}: por encima del rango`;
+    case "critical-low":
+      return `${testName}: críticamente bajo`;
+    case "critical-high":
+      return `${testName}: críticamente alto`;
+    default:
+      return testName;
+  }
+}
+
+function labFlagMessage(
+  flag: string,
+  testName: string,
+  value: number,
+  range: { low: number | null; high: number | null } | null,
+): string {
+  const rangeText = range ? `Rango de referencia: ${range.low ?? "—"} a ${range.high ?? "—"}` : "Sin rango de referencia";
+  switch (flag) {
+    case "low":
+      return `${testName} está por debajo del rango normal. ${rangeText}.`;
+    case "high":
+      return `${testName} está por encima del rango normal. ${rangeText}.`;
+    case "critical-low":
+      return `${testName} está críticamente bajo. Requiere atención inmediata. ${rangeText}.`;
+    case "critical-high":
+      return `${testName} está críticamente alto. Requiere atención inmediata. ${rangeText}.`;
+    default:
+      return `${testName}: ${value}`;
+  }
 }
 
 export function LabPanelFormSkeleton() {

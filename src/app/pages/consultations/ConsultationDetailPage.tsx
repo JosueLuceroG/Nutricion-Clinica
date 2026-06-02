@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Activity,
   FlaskConical,
+  Heart,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -19,6 +20,7 @@ import { ErrorState, EmptyState } from "@components/layout/EmptyState";
 import { useConsultation } from "@modules/consultation/ui/useConsultationHooks";
 import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { ConsultationStatusLabel } from "@modules/consultation/domain/ConsultationStatus";
+import type { Vitals } from "@modules/consultation/domain/Vitals";
 import { consultationService } from "@services/consultationService";
 
 export function ConsultationDetailPage() {
@@ -160,6 +162,7 @@ export function ConsultationDetailPage() {
           <div className="space-y-4 lg:col-span-2">
             <SOAPSection title="Subjetivo (S)" body={consultation.subjective} />
             <SOAPSection title="Objetivo (O)" body={consultation.objective} />
+            <VitalsSection vitals={consultation.vitals} />
             <SOAPSection title="Diagnóstico (A)" body={consultation.assessment} />
             <SOAPSection title="Plan (P)" body={consultation.plan} />
           </div>
@@ -259,6 +262,42 @@ function SOAPSection({ title, body }: { title: string; body: string | null }) {
           <p className="whitespace-pre-wrap text-sm leading-relaxed">{body}</p>
         ) : (
           <p className="text-sm italic text-muted-foreground">Sin notas</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function VitalsSection({ vitals }: { vitals: Vitals }) {
+  const rows: Array<{ label: string; value: string | null; unit: string }> = [
+    { label: "Tensión arterial", value: vitals.systolicMmHg !== null && vitals.diastolicMmHg !== null ? `${vitals.systolicMmHg}/${vitals.diastolicMmHg}` : null, unit: "mmHg" },
+    { label: "Frecuencia cardíaca", value: vitals.heartRateBpm?.toString() ?? null, unit: "lpm" },
+    { label: "Temperatura", value: vitals.temperatureC?.toString() ?? null, unit: "°C" },
+  ];
+  const captured = rows.filter((r) => r.value !== null);
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Heart className="h-4 w-4" />
+          Signos vitales
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {vitals.isEmpty || captured.length === 0 ? (
+          <p className="text-sm italic text-muted-foreground">No se tomaron signos vitales en esta consulta.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {rows.map((r) => (
+              <div key={r.label} className="rounded-md border bg-muted/20 p-3">
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{r.label}</p>
+                <p className="mt-1 text-lg font-semibold">
+                  {r.value ?? <span className="text-sm font-normal text-muted-foreground">—</span>}
+                  {r.value && <span className="ml-1 text-xs font-normal text-muted-foreground">{r.unit}</span>}
+                </p>
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

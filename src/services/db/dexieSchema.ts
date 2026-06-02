@@ -70,6 +70,21 @@ export class NutriClinicaDB extends Dexie {
         "deleted_at",
       ].join(", "),
     });
+
+    this.version(2).stores({
+      consultations: [
+        "id",
+        "patient_id",
+        "consultation_date",
+        "[patient_id+consultation_date]",
+        "status",
+        "anthropometry_id",
+        "lab_panel_id",
+        "created_at",
+        "updated_at",
+        "deleted_at",
+      ].join(", "),
+    });
   }
 }
 
