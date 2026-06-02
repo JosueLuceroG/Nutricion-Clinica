@@ -31,9 +31,12 @@
 16. [Recent activity (changelog)](#16-recent-activity-changelog)
 17. [Open questions para el usuario](#17-open-questions-para-el-usuario)
 18. [Communication preferences](#18-communication-preferences)
-16. [Recent activity (changelog)](#16-recent-activity-changelog)
-17. [Open questions para el usuario](#17-open-questions-para-el-usuario)
-18. [Communication preferences](#18-communication-preferences)
+19. [Sistema de IA (Fase 4)](#19-sistema-de-ia-fase-4)
+20. [Performance y observabilidad](#20-performance-y-observabilidad)
+21. [Diseño SQL (target migración Dexie → SQLite nativo)](#21-diseño-sql-target-migración-dexie--sqlite-nativo)
+- [Apéndice A — Métricas del proyecto](#apéndice-a--métricas-del-proyecto)
+- [Apéndice B — Cómo correr](#apéndice-b--cómo-correr)
+- [Apéndice C — Estructura de carpetas completa](#apéndice-c--estructura-de-carpetas-completa)
 
 ---
 
@@ -139,6 +142,31 @@ Software de escritorio (Tauri 2) para nutriólogos clínicos en consultorio. Ree
 - **OS:** Windows 10/11 (primary), macOS 12+, Linux (AppImage).
 - **Runtime:** Tauri 2.11 + WebView2 / WKWebView / WebKitGTK.
 - **Almacenamiento:** IndexedDB (Dexie 4) ahora; SQLite vía `tauri-plugin-sql` cuando se estabilice la build nativa.
+
+### 1.5 Principios arquitectónicos (no negociables)
+
+Estos 6 principios son la constitución del sistema. Cualquier desviación requiere ADR formal.
+
+| # | Principio | Cómo se aplica en este codebase |
+|---|-----------|---------------------------------|
+| 1 | **Offline-First** | El cliente es la fuente primaria; el servidor (Fase 3) es secundario. La app debe ser 100% usable sin red. |
+| 2 | **Determinismo Nutricional** | Todo cálculo (BMI, BMR, TDEE, macros, equivalentes SMAE) es **función pura** sobre datos. Mismo input → mismo output, siempre. Verificable con tests. |
+| 3 | **Motor Experto Local** | Las reglas críticas viven en `src/modules/clinical-engine/` (Fase 3) y se ejecutan en cliente. La IA solo sugiere; las reglas deciden. |
+| 4 | **Modularidad (hexagonal estricta)** | `src/modules/*/domain/` no puede importar de `react`, `tauri`, `dexie` ni de la UI. Toda interacción con el exterior pasa por **puertos** (interfaces en `domain/repository.ts`). |
+| 5 | **Auditoría clínica** | Cada escritura en `consultations`, `anthropometries`, `meal_plans` genera `audit_event` con `previous_value_hash` y `new_value_hash`. Retención mínima 5 años (NOM-024). |
+| 6 | **Local-First Data** | Los datos viven en IndexedDB/SQLite local; la sincronización (Fase 3) es **réplica opcional**, no fuente primaria. |
+
+> **Regla derivada:** si un cálculo puede hacerse con una regla determinista, **se hace con regla**. La IA (Fase 4) solo entra cuando el output es texto libre, ambigüedad interpretativa o generación creativa. Ver §19.4 para tabla comparativa.
+
+### 1.6 Despliegue objetivo (3 modos de operación)
+
+| Modo | Fase | Descripción | Estado |
+|------|------|-------------|--------|
+| **Escritorio standalone** | 1 (✅ MVP) | Instalador Windows/Mac/Linux para consultorio individual. Datos locales en IndexedDB. Backup manual. | ✅ Actual |
+| **Servidor LAN consultorio** | 2+ | Servidor local en LAN del consultorio con PostgreSQL + Tauri apps como clientes. Multi-puesto (≤10). | ⏳ Planificado |
+| **PWA espejo** | 5 | Web progresiva como espejo de consulta remota (no sustituye escritorio). Solo lectura + anotaciones rápidas. | ⏳ Diferido |
+
+> El **escritorio es el producto principal**. La PWA es un complemento para situaciones donde el nutriólogo no puede llevar su laptop (ej. visita domiciliaria).
 
 ---
 
@@ -294,17 +322,117 @@ src/modules/
 
 **Tests:** 16 entity + 9 integration + 9 use cases + 6 calc = **40 tests**.
 
-### 3.6 `smae` (Fase 2, planificado) — Catálogo SMAE completo
+### 3.6 `smae` (Sprint 9 ✅) — Catálogo SMAE navegable
 
-**Pendiente:** migrar el catálogo embebido de `mealplan` a un módulo propio con buscador, equivalencias inversas, y CRUD para alimentos personalizados. Es la dependencia del feedback #10 (catálogo navegable) y #11 (selección vía equivalencias).
+**✅ Implementado en Sprint 9** (commit `effd43a` → `8b61a2d`) + Sprint 10 (FoodPicker con búsqueda por equivalencia inversa).
 
-**Estructura actual:** carpetas vacías `application/`, `domain/`, `infrastructure/`.
+**Contenido:**
+- **Domain** (`src/modules/smae/domain/`): `Food.ts` (entity), `FoodGroup.ts` (enum 16 grupos), `FoodRepository.ts` (interface), `SYSTEM_FOODS.ts` (30+ alimentos canónicos hardcoded), 4 use cases (`searchFoods`, `findByEquivalencia`, `addCustomFood`, `updateCustomFood`, `removeCustomFood`).
+- **Infrastructure** (`src/modules/smae/infrastructure/`): `DexieFoodRepository.ts`, `smaeMapper.ts`, tabla `smae_custom_foods` (Dexie v3) para alimentos personalizados del consultorio con `keywords_json`.
+- **Application** (`src/modules/smae/application/`): Zod schemas (`smaeFormSchema`), 5 use cases puros, `parseKeywordsInput` (CSV → `string[]`).
+- **UI** (`src/modules/smae/ui/`): `SmaeCatalogPage` con TanStack Table + filtros; `SmaeFoodForm` (dialog alta/edición); `useSmaeHooks` (CRUD + búsqueda debounced 200ms).
+- **Service** (`src/services/smaeService.ts`): composition root con `DexieFoodRepository`.
+- **Ruta**: `/smae` añadida en `app/router.tsx`.
+
+**Modelo simplificado actual vs plan canónico:** este codebase implementa 2 entidades (`Food`, `FoodGroup`) con valores nutricionales inline, en lugar de las 6 entidades del plan canónico (`SmaeVersion`, `SmaeGroup`, `SmaeSubgroup`, `Food`, `Equivalent`, `NutritionalValue`). El motivo es que el SMAE 5ª oficial se trata como **dato embebido hardcoded** (no se importa desde CSV en esta versión), simplificando el modelo a 30+ alimentos curados. La migración al modelo de 6 entidades se hará cuando se implemente el importador CSV (Sprint 12). Ver §21.2 para el modelo canónico SQL y §4.4 para el mapeo conceptual.
 
 ### 3.7 `clinical-engine` (Fase 3, planificado) — Motor de reglas
 
 **Pendiente:** motor que dado un paciente + última consulta + última medición + último panel sugiere diagnóstico (SNOMED CT) y plan base. Resuelve los feedbacks #7 y #8.
 
 **Estructura actual:** carpetas vacías `application/`, `domain/`.
+
+### 3.8 `meal-planner` (Fase 2, planificado) — Planificador avanzado
+
+**Pendiente (post-MVP):** distribución automática de macros por tiempo de comida con restricciones (vegetariano, vegano, renal, diabético), lista de compras automática, versionado de planes, comparativos entre planes.
+
+**Entidades objetivo (ver §21.2):** `meal_plans`, `menus`, `menu_times`, `menu_items`, `shopping_lists`.
+
+### 3.9 `recipes` (Fase 2, planificado) — Recetario profesional
+
+**Pendiente:** recetario con versionamiento, escalamiento de porciones, etiquetado nutricional automático (cálculo desde ingredientes SMAE), categorización (entrada, plato fuerte, postre, bebida), alérgenos, costos opcionales.
+
+**UI objetivo:**
+- Wizard de 3 pasos: datos básicos → ingredientes (autocomplete SMAE) → preparación (pasos numerados, fotos).
+- Cálculo nutricional automático al modificar ingredientes.
+- Etiquetado manual de alérgenos y restricciones.
+- Vista previa de la receta con formato imprimible.
+- Versionado: cada cambio genera nueva versión borrador; la versión activa es la publicada.
+
+**Entidades objetivo:** `recipes`, `recipe_ingredients`, `recipe_steps`.
+
+### 3.10 `agenda` (Fase 2, planificado) — Agenda y gestión de citas
+
+**Pendiente:** agenda multi-vista (día/semana/mes), reagendado, cancelaciones con motivo, no-asistencia automática, recordatorios (configurables), bloqueo de horarios, multi-profesional, multi-sala.
+
+**Reglas de negocio clave (del plan §40.5):**
+- **RN-AGE-01**: cita solo dentro del horario del profesional.
+- **RN-AGE-02**: no dos citas del mismo profesional en el mismo horario.
+- **RN-AGE-04**: cancelaciones requieren motivo.
+- **RN-AGE-05**: reagendado conserva historial.
+- **RN-AGE-06**: no asistencia se marca automáticamente a X minutos después de la hora.
+- **RN-AGE-09**: citas de primera vez tienen duración más larga.
+- **RN-AGE-12**: el sistema NO envía SMS/correos sin acción explícita de la nutrióloga.
+
+**Entidades objetivo:** `appointments`, `schedules`, `blocks`, `reminders`.
+
+### 3.11 `documents` (Fase 2, planificado) — Generación de documentos profesionales
+
+**Pendiente:** plantillas (receta, plan de alimentación, lista de compras, consentimiento, derivación, reporte), firma digital (SHA-256), exportación PDF + HTML + Excel, integración con wizard desde cualquier módulo.
+
+**UI objetivo:** botón "📄 Generar documento" en cualquier módulo → modal/drawer con plantillas filtradas por contexto → vista previa en vivo → personalización → selección de versión → preview final → firmar → descargar/enviar/imprimir → registro automático en bitácora.
+
+**Entidades objetivo:** `documents`, `document_templates`, `document_signatures`.
+
+### 3.12 `adherence` (Fase 2, planificado) — Adherencia al tratamiento
+
+**Pendiente:** registro de adherencia (dieta, agua, actividad, suplementos, sueño), cálculo de índices (0-100%), barreras y facilitadores, tendencias temporales, alertas de desviación sostenida.
+
+**Entidades objetivo:** `adherence_records` con métricas separadas (`menu_adherence_pct`, `water_adherence_pct`, `activity_adherence_pct`, `supplement_adherence_pct`, `sleep_adherence_pct`) + scoring cualitativo (hunger, satiety, mood, energy 1-10).
+
+### 3.13 `goals` (Fase 2, planificado) — Objetivos clínicos con evaluación
+
+**Pendiente:** definición de objetivos (weight_loss, weight_gain, muscle_gain, glycemic, lipid, etc.), criterios de éxito, evaluación automática en cada consulta, proyección de fecha de logro, alertas de estancamiento, cierre por cumplimiento/no cumplimiento.
+
+**Entidades objetivo:** `goals`, `goal_evaluations`. Cálculo de `monthly_rate`, `projected_date`, `progress_pct`, `alert`.
+
+### 3.14 `reports` (Fase 3, planificado) — Dashboard y reportes del consultorio
+
+**Pendiente:** KPIs del consultorio (consultas/semana, adherencia promedio, distribución de patologías), reportes operativos y financieros, comparativos entre periodos, exportación a instancias regulatorias (COFEPRIS, Secretaría de Salud), modo kiosko para sala de espera.
+
+**Entidades objetivo:** `indicators`, `indicator_values`, `generated_reports`, `dashboard_configs`, `widgets`, `meta_kpis`, `anomaly_detections`.
+
+### 3.15 `economic` (Fase 3, planificado) — Módulo económico
+
+**Pendiente:** gestión de cobros, pagos, facturación, costos de consulta, presupuestos por paciente, comparativos de planes, reportes financieros.
+
+### 3.16 `medications` (Fase 3, planificado) — Catálogo de medicamentos e interacciones
+
+**Pendiente:** catálogo de medicamentos, registro por paciente, alertas de interacciones fármaco-nutriente (ej. warfarina + vitamina K), recordatorios de toma.
+
+### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
+
+**Pendiente:** autenticación con Argon2 + 2FA TOTP, RBAC con roles predefinidos (`nutriologa_principal`, `asistente`, `administrador`, `soporte_tecnico`, `auditor`, `facturacion`), cifrado AES-256 en campos sensibles, bitácora de auditoría con retención 5 años (NOM-024), consentimientos del paciente, opt-in para IA.
+
+**Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
+
+### 3.18 `patient-portal` (Fase 5, planificado) — Portal del paciente (PWA)
+
+**Pendiente:** PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, agenda citas, recibe recordatorios, descarga documentos firmados. **NO sustituye al escritorio** — es un complemento para consulta remota.
+
+### 3.19 `ai-assist` (Fase 4, planificado) — Sistema de IA
+
+**Pendiente:** 8 capabilities documentadas en §19 (summarizeConsultation, interpretLabResults, suggestSubstitutions, generateEducationContent, draftClinicalNotes, generateGoalSuggestions, explainDiagnosisToPatient, generateMealPlanInitial). Bounded context dedicado en `src/services/ai/`. Opt-in por profesional + consentimiento explícito por paciente.
+
+### 3.20 Mapa de fases (resumen)
+
+| Fase | Módulos a implementar | Estado |
+|------|----------------------|--------|
+| **Fase 1 — MVP foundations** | patient, anthropometry, laboratory, consultation, mealplan, dashboard | ✅ Completa (Sprints 1-7) |
+| **Fase 2 — Clinical expansion** | smae (✅ Sprint 9-10), meal-planner, recipes, agenda, documents, adherence, goals, importer, pdf, backup, crypto | ⏳ En progreso |
+| **Fase 3 — Engine, sync, security** | clinical-engine, reports, economic, medications, security, sync, queue, conflict-resolver | ⏳ Planificada |
+| **Fase 4 — Multi-platform, IA** | ai-assist, dark mode, i18n, accesibilidad WCAG AA, portabilidad móvil | ⏳ Planificada |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | ⏳ Diferido |
 
 ---
 
@@ -520,6 +648,114 @@ export const patientService = {
 - **`src/store/`** = Zustand stores de UI state.
 - **`src/workers/`** = Web Workers (futuro, para cálculos pesados en lab/meal plan).
 
+### 6.5 Estilos arquitectónicos (capas combinadas)
+
+| Estilo | Dónde se aplica | Referencia |
+|--------|-----------------|------------|
+| **Hexagonal (Ports & Adapters)** | `src/modules/*/domain/` (puertos) + `infrastructure/` (adaptadores) | §6.1 |
+| **Clean Architecture** | Separación domain/application/infrastructure/ui en cada módulo | §6.1 |
+| **Event-driven** | `EventBus` interno (Fase 3) para notificaciones, sync, audit | §6.6 |
+| **CQRS opcional** | Módulos de alto rendimiento (dashboard, reports) con read-model separado | Diferido |
+| **Repository** | Acceso a datos abstraído vía interfaces en `domain/repository.ts` | §6.2 |
+| **DDD** | Modelado de bounded contexts, entidades, VOs, aggregate roots | §4 |
+
+### 6.6 Topología de componentes (vista lógica)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ CAPA DE PRESENTACIÓN (UI / Tauri Shell)                     │
+│ ├─ React 19 + Vite + TypeScript                             │
+│ ├─ shadcn/ui (new-york) + Radix UI + TailwindCSS           │
+│ ├─ Zustand (estado cliente)                                 │
+│ ├─ React Hook Form + Zod (formularios)                      │
+│ ├─ TanStack Table (tablas)                                  │
+│ ├─ Recharts (gráficas)                                     │
+│ ├─ DnD Kit (drag & drop)                                    │
+│ ├─ Framer Motion (animaciones)                              │
+│ └─ Tauri v2 (host nativo, IPC, OS)                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│ CAPA DE APLICACIÓN (orquestación)                           │
+│ ├─ Services (casos de uso en `src/modules/*/application/`)  │
+│ ├─ Stores globales (Zustand)                                │
+│ ├─ Hooks de aplicación                                      │
+│ ├─ Workers (sync, queue, notifications — Fase 3)            │
+│ └─ Command Bus (eventos internos)                           │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│ CAPA DE DOMINIO (núcleo puro, sin dependencias de UI)       │
+│ ├─ Entidades de dominio (Patient, Consultation, ...)        │
+│ ├─ Value Objects (IMC, Macronutriente, Porcion, Vitals)     │
+│ ├─ Servicios de dominio (cálculos, reglas)                  │
+│ ├─ Repositorios (interfaces, no implementaciones)           │
+│ ├─ Motor clínico (reglas, alertas, validaciones — Fase 3)   │
+│ ├─ Motor de menús (generador — Fase 2 ya con SMAE)          │
+│ ├─ Motor SMAE (cálculo equivalentes)                        │
+│ └─ Eventos de dominio                                       │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│ CAPA DE INFRAESTRUCTURA (adaptadores)                       │
+│ ├─ Dexie / IndexedDB (hoy) o SQLite vía tauri-plugin-sql    │
+│ ├─ Tauri API (FS, dialog, notifications)                    │
+│ ├─ Adapter de red (HTTP client — preparado para Fase 3)     │
+│ ├─ Adapter de IA (LLM opcional — Fase 4)                    │
+│ ├─ Logger estructurado                                      │
+│ └─ Crypto / hashing (Argon2, AES, SHA-256)                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 6.7 Flujo de datos
+
+**Lectura:**
+
+```
+UI Component
+  → (hook / selector) Zustand Store
+  → (use case) Service (Application Layer)
+  → (domain logic) Domain Service / Entity
+  → (repository interface) Repository Implementation
+  → (sql query / dexie get) BD local
+  → (mapping) Domain Entity
+  → (dto mapping) DTO
+  → (selector) Store
+  → (reactive) UI re-render
+```
+
+**Escritura:**
+
+```
+UI Form (RHF + Zod)
+  → (submit) Service
+  → (validate + business rules) Domain Service
+  → (persist) Repository → Dexie/SQLite
+  → (publish event) Event Bus
+    → (subscribers)
+      ├─ Sync Queue (Fase 3, para replicación)
+      ├─ Audit Log
+      ├─ UI Store (actualización optimista)
+      └─ Notifications
+```
+
+### 6.8 Decisiones arquitectónicas clave (resumen)
+
+| # | Decisión | Justificación |
+|---|----------|---------------|
+| ADR-01 | SQLite/IndexedDB ahora, SQLite nativo en Fase 3 | Velocidad, portabilidad, sin servidor, JSON nativo |
+| ADR-02 | Zustand sobre Redux | Más simple, mejor performance, sin boilerplate |
+| ADR-03 | React Hook Form + Zod | Validación type-safe, mínima re-renderización |
+| ADR-04 | Tauri v2 sobre Electron | Binarios pequeños, mejor seguridad, mejor performance |
+| ADR-05 | Snapshots inmutables por consulta | Auditabilidad clínica, recuperación, comparativos |
+| ADR-06 | Event sourcing parcial para auditoría | Bitácora append-only, trazabilidad completa |
+| ADR-07 | IndexedDB para cola offline | Async, no bloquea UI, mayor capacidad que localStorage |
+| ADR-08 | Domain layer sin TypeScript DOM types | Pureza del dominio, portabilidad, testing sin browser |
+| ADR-09 | Repositorios con interfaces | Inversión de dependencias, mockeable, testeable |
+| ADR-10 | Code splitting por módulo | Carga inicial <2s, lazy loading de features |
+
+> Las decisiones se documentan formalmente en `docs/decisions/` (Q-01, sprint futuro).
+
 ---
 
 ## 7. Stack técnico
@@ -652,10 +888,233 @@ export const patientService = {
 | `/planes/:id` | Detalle del plan | ✓ |
 | `/laboratorio` | Todos los paneles | ✓ |
 | `/calculos` | Calculadora clínica standalone | ✓ |
+| `/smae` | Catálogo SMAE navegable | ✓ Sprint 9 (SmaeCatalogPage) |
 | `/notificaciones` | Historial de toasts | ✓ |
 | `/perfil` | Perfil del nutriólogo | ✓ |
 | `/configuracion` | Settings | ✓ |
 | `/ayuda` | Ayuda | ✓ |
+
+### 8.5 Principios UX (10 guías de diseño)
+
+Estos principios guían cada decisión de UI. Inspiración: Linear, Raycast, Stripe, Arc, Attio, Figma.
+
+| # | Principio | Definición | Aplicación concreta |
+|---|-----------|------------|---------------------|
+| 1 | **Densidad sin caos** | Mostrar mucha información útil sin saturar | Tablas con columnas visibles esenciales + panel lateral de detalle |
+| 2 | **Captura ultrarrápida** | Reducir clics, autocompletar, atajos | Wizard SOAP de 6 pasos con atajos `Tab`/`Shift+Tab`; command palette global |
+| 3 | **Recalculación en vivo** | Cada cambio se refleja al instante | SlotProgress muestra delta de kcal al arrastrar alimento; KPI cards recalculan al cambiar inputs |
+| 4 | **Estados siempre visibles** | El sistema nunca oculta información crítica | Badges de alerta (HbA1c alta, K+ alterado) siempre visibles en panel derecho de consulta |
+| 5 | **Cero ambigüedad clínica** | Lenguaje profesional, sin jerga innecesaria | Etiquetas usan nomenclatura médica estándar (HbA1c, no "azúcar en sangre") |
+| 6 | **Errores que enseñan** | Mensajes accionables, no punitivos | "El peso debe ser > 0 y < 500 kg" en vez de "Valor inválido" |
+| 7 | **Recuperación fácil** | Toda acción destructiva es reversible (undo) | Soft delete con papelera; undo de edición reciente vía `Ctrl+Z` |
+| 8 | **Accesibilidad por defecto** | WCAG 2.1 AA desde el diseño | Roles ARIA, navegación por teclado, contraste mínimo 4.5:1, foco visible |
+| 9 | **Performance como feature** | Latencia < 100 ms en interacciones | Code splitting, memoización selectiva, Dexie transaccional |
+| 10 | **Respeto al contexto** | El sistema aprende el flujo del profesional | Última consulta del paciente se re-abre automáticamente; templates pre-llenados |
+
+### 8.6 Principios visuales (7 guías estéticas)
+
+- **Minimalismo tipográfico**: una sola familia principal (`Inter`) + una mono para datos numéricos (`JetBrains Mono`).
+- **Color con propósito**: el color comunica estado (alerta, éxito, info), no decora.
+- **Espacio en blanco como lujo**: la app se siente premium por lo que no tiene.
+- **Profundidad sutil**: sombras leves (`shadow-sm`, `shadow-md`), separadores de 1px, capas visibles pero no invasivas.
+- **Consistencia absoluta**: mismo botón en todos lados, mismo patrón de modal, mismo card.
+- **Iconografía geométrica**: trazos de 1.5px (Lucide), esquinas redondeadas suaves, metáforas claras.
+- **Datos hero**: las cifras y gráficas son protagonistas, no el chrome.
+
+### 8.7 Design system: tokens de color
+
+#### Light mode
+
+**Neutrales (grises):**
+
+| Token | Valor | Uso |
+|-------|-------|-----|
+| `neutral-0` | `#FFFFFF` | Fondo puro |
+| `neutral-50` | `#FAFAFA` | Canvas |
+| `neutral-100` | `#F4F4F5` | Surface muted |
+| `neutral-200` | `#E4E4E7` | Borders |
+| `neutral-300` | `#D4D4D8` | Borders strong |
+| `neutral-400` | `#A1A1AA` | Text disabled |
+| `neutral-500` | `#71717A` | Text tertiary |
+| `neutral-600` | `#52525B` | Text secondary |
+| `neutral-700` | `#3F3F46` | Text primary |
+| `neutral-800` | `#27272A` | Headings |
+| `neutral-900` | `#18181B` | Strong |
+| `neutral-1000` | `#09090B` | Maximum contrast |
+
+**Semánticos (estado clínico y de UI):**
+
+| Token | 50 | 500 | 700 |
+|-------|----|----|-----|
+| `success` | `#F0FDF4` | `#22C55E` | `#15803D` |
+| `warning` | `#FFFBEB` | `#F59E0B` | `#B45309` |
+| `danger` | `#FEF2F2` | `#EF4444` | `#B91C1C` |
+| `info` | `#EFF6FF` | `#3B82F6` | `#1D4ED8` |
+
+**Paleta clínica (referencia para badges y grupos SMAE):**
+
+| Token | Uso |
+|-------|-----|
+| `clinic-verde` | Verduras SMAE, rangos normales |
+| `clinic-azul` | Información, frutas SMAE |
+| `clinic-amarillo` | Advertencia leve |
+| `clinic-naranja` | Advertencia moderada |
+| `clinic-rojo` | Crítico, valor fuera de rango |
+| `clinic-violeta` | AOA (aceites y grasas) |
+| `clinic-rosa` | Recetas, contenido educativo |
+| `clinic-teal` | Cereales, hidratación |
+
+**Identificación visual de grupos SMAE:**
+
+| Grupo | Color |
+|-------|-------|
+| Verduras | Verde |
+| Frutas | Azul |
+| Cereales s/g | Amarillo |
+| Cereales c/g | Naranja |
+| Leguminosas | Rojo |
+| AOA muy bajo | Verde claro |
+| AOA moderado | Amarillo |
+| AOA alto | Rojo |
+| Leche descremada | Azul claro |
+| Leche entera | Blanco |
+| Leche con azúcar | Rosa |
+| Aceites y grasas | Violeta |
+| Azúcares | Rosa fuerte |
+| Alimentos libres | Gris |
+
+**Superficie y elevación:**
+
+| Token | Light |
+|-------|-------|
+| `bg-canvas` | `#FAFAFA` |
+| `bg-surface` | `#FFFFFF` |
+| `bg-elevated` | `#FFFFFF` |
+| `bg-muted` | `#F4F4F5` |
+| `bg-subtle` | `#FAFAFA` |
+| `bg-overlay` | `rgba(0,0,0,0.5)` |
+
+#### Dark mode (target Fase 4)
+
+**Primary invertido:** `primary-300 #93B5FF`, `primary-500 #4F7CFF` (principal dark).
+**Neutrales invertidos:** `neutral-0 #09090B`, `neutral-1000 #FFFFFF`.
+**Surface dark:** `bg-canvas #09090B`, `bg-surface #18181B`, `bg-elevated #27272A`.
+
+> **Estado actual:** light mode operativo, dark mode pendiente (Fase 4). Tailwind config ya preparado con prefijo `dark:` para migración futura.
+
+### 8.8 Componentes compuestos (3 pilares)
+
+#### 8.8.1 Data Grid (tablas con esteroides)
+
+Todo lo de TanStack Table, más:
+
+- Edición inline por celda (doble clic o `F2`).
+- Reordenamiento de filas con drag handle.
+- Filtros avanzados por columna (rango, contains, equals, before/after).
+- Vista de tarjetas alternativa (responsive).
+- Agrupación por columna (drag header al área de agrupación).
+- Pivoteo (vista de tabla cruzada).
+- Exportación a CSV, Excel, PDF.
+- Estado guardado de filtros, orden, vista (persiste entre sesiones).
+- **Virtualización** para >1000 filas (TanStack Virtual).
+- Selección múltiple con `Shift` y `Cmd/Ctrl`.
+- Acciones en lote en toolbar flotante.
+- Fila expandible para ver detalles sin salir de la tabla.
+
+#### 8.8.2 Charts (gráficas con Recharts)
+
+**Tipos soportados:** línea, barra, área, circular/donut, radar, scatter, heatmap, gauge, bullet, sparkline.
+
+**Estilos:**
+- Paleta consistente con el design system.
+- Ejes con gridlines sutiles (`stroke-neutral-200`).
+- Tooltip oscuro con sombra, alineado al cursor.
+- Leyenda interactiva (clic para ocultar serie).
+- Zoom con brush (selección de rango).
+- Anotaciones (líneas verticales en eventos clave).
+- Etiquetas en datos solo si es legible.
+- Animación de entrada (300ms) con stagger.
+
+**Interactividad:**
+- Hover: tooltip + highlight de la serie.
+- Click en punto: detalle de la medición.
+- Brush: zoom a rango.
+- Descarga como PNG.
+- Pantalla completa.
+
+#### 8.8.3 Dialogs (modales)
+
+**Tipos:**
+- **Confirmación**: Sí/No, destructiva (con doble confirmación para acciones irreversibles).
+- **Formulario**: captura compleja (wizard de 3+ pasos).
+- **Información**: solo lectura, cierre con OK.
+- **Wizard**: pasos numerados con progress bar.
+- **Crítico**: alertas bloqueantes que requieren atención.
+
+**Convenciones:**
+- Anchura máxima 600px (formularios), 400px (confirmación), 800px (wizard).
+- Cerrar con `Esc` o clic fuera (excepto críticos).
+- Focus trap automático (Radix).
+- Restaurar foco al elemento que abrió el dialog.
+
+### 8.9 Layout consulta clínica (3 paneles)
+
+Referencia de la vista principal de consulta:
+
+```
+┌──┬──────────────────────────────────────────────────────────────────────┐
+│  │ ← Paciente María Gómez López · Consulta #8 · 03 Jun 2026              │
+│  │ [Resumen] [Consulta] [Antropometría] [Lab] [Plan] [Notas]            │
+│  ├──────────────────────────┬──────────────────────┬────────────────────┤
+│  │ CAPTURA                  │ ESTADO CLÍNICO        │ CÁLCULOS           │
+│  │                          │                       │                    │
+│  │ ▼ Motivo de consulta     │ ┌─Diagnóstico─┐       │ ┌─KPIs────────┐    │
+│  │ [Control DM2         ]   │ │ DM2         │       │ │ Peso 72.4   │    │
+│  │                          │ │ Sobrepeso   │       │ │ IMC 28.1    │    │
+│  │ ▼ Padecimiento actual    │ │ +Dislipidemia│       │ │ %Grasa 32%  │    │
+│  │ [HbA1c elevada,      ]   │ └─────────────┘       │ │ MLG 49.2    │    │
+│  │ [astenia ocasional.  ]   │                       │ └─────────────┘    │
+│  │                          │ ┌─Alertas──────┐       │                    │
+│  │ ▼ Antropometría          │ │ ⚠ HbA1c 8.9% │       │ ┌─Gráficas─────┐    │
+│  │ Peso     [72.4] kg       │ │ ⚠ K+ 5.4    │       │ │ Peso 📉      │    │
+│  │ Talla    [1.61] m        │ └─────────────┘       │ │              │    │
+│  │ Cintura  [94  ] cm       │                       │ └─────────────┘    │
+│  │ Cadera   [108] cm        │ ┌─Objetivos─────┐       │                    │
+│  │                          │ │ HbA1c <7% 67% │       │ ┌─Macros objetivo│  │
+│  │ ▼ Bioquímica nueva       │ │ LDL <100  45% │       │ │ P 25% L 30%  │  │
+│  │ HbA1c   [8.9] % ⚠        │ └─────────────┘       │ │ C 45% F 25g  │  │
+│  │ Glucosa  [165] mg/dL ⚠   │                       │ └────────────────┘  │
+│  │ Col.T    [220] mg/dL     │ ┌─Plan activo────┐     │                    │
+│  │ HDL     [38  ] mg/dL     │ │ 1800 kcal ·    │     │                    │
+│  │ LDL     [140] mg/dL ⚠    │ │ 5 tiempos      │     │                    │
+│  │ TG      [210] mg/dL ⚠    │ │ Mediter.       │     │                    │
+│  │ Creat   [0.9] mg/dL      │ └─────────────┘     │                    │
+│  │                          │                       │                    │
+└──┴──────────────────────────┴──────────────────────┴────────────────────┘
+```
+
+**Convenciones del layout:**
+- **Panel izquierdo (Captura)**: inputs organizados por sección colapsable.
+- **Panel central (Estado clínico)**: outputs derivados (diagnósticos, alertas, objetivos, plan).
+- **Panel derecho (Cálculos)**: KPIs numéricos y gráficas de tendencia.
+- **Anchos sugeridos**: 40% / 30% / 30% (en desktop 1280px+).
+- **Responsive**: en tablet (< 1024px) los paneles se apilan verticalmente; KPIs en cards de 2 columnas.
+
+### 8.10 Patrones de vista (6 templates recurrentes)
+
+| Patrón | Uso | Ejemplo en este codebase |
+|--------|-----|--------------------------|
+| **List + Detail** | Listados con vista de detalle (tabs) | `/pacientes` → `/pacientes/:id` (PatientDetailPage) |
+| **Wizard** | Flujos guiados paso a paso | Consulta SOAP (6 pasos), Alta de paciente |
+| **Dashboard** | Indicadores agregados | `/` DashboardPage con 4 KPICards |
+| **Editor + Preview** | Documentos y recetas | (futuro) Recetario con vista previa en vivo |
+| **Calendar** | Agenda y planes | (Fase 2) `/agenda` con vista día/semana/mes |
+| **Timeline** | Evolución clínica | (Fase 3) Comparativos entre snapshots de consulta |
+
+### 8.11 Estado actual vs objetivo
+
+✅ **Implementado:** principios UX 1-7 en componentes actuales; design tokens en `tailwind.config.ts`; DataTable con TanStack Table; 4 tipos de Dialog (form, confirm, info, wizard); layout de 3 paneles en consulta SOAP.
+⏳ **Pendiente:** dark mode (Fase 4), Data Grid con virtualización (Fase 3), Charts con brush/zoom (Fase 2), Drag handle en filas (Fase 3), WCAG 2.1 AA formal audit (Fase 4).
 
 ---
 
@@ -1637,21 +2096,23 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 
 ## Apéndice A — Métricas del proyecto
 
-**Fecha de corte:** tras commit `786e9e6`.
+**Fecha de corte:** tras enriquecimiento post-Sprint 10 (espec v2: 91KB → 140KB con plan de arquitectura completo).
 
 | Métrica | Valor |
 |---------|-------|
-| Módulos | 7 (5 implementados + 2 planificados) |
+| Módulos | 7 implementados (patient, anthropometry, laboratory, consultation, mealplan, smae, dashboard) + 13 planificados |
 | Subcarpetas transversales | 15 (5 services + 10 stubs) |
-| Tests totales | 207 |
-| Archivos de test | 19 |
-| Duración suite | ~22s |
-| Líneas de código (TS/TSX) | ~14k (estimado) |
-| Build size | ~168 KB gzip |
-| Dependencias producción | 50 |
+| Tests totales | 281 (post-Sprint 9-10; 207 antes) |
+| Archivos de test | ~30 (estimado) |
+| Duración suite | ~30s (estimado) |
+| Líneas de código (TS/TSX) | ~17k (estimado, +3k con Sprint 9-10) |
+| Build size | ~190 KB gzip (estimado) |
+| Dependencias producción | 52 (+2 con @dnd-kit + lucide) |
 | Dependencias dev | 30 |
-| Commits | 6+ (ver git log) |
+| Commits | 17+ (ver git log) |
 | Cobertura de dominio | ~85% (estimado) |
+| **Spec.md** | **140.6 KB, 2834 líneas, 23 secciones + 3 apéndices** |
+| **Plan de arquitectura referenciado** | 466 KB, 49 documentos (Doc 1, 30-47, 48 UX/UI, 49 Técnica) |
 
 ## Apéndice B — Cómo correr
 
@@ -1667,7 +2128,7 @@ pnpm dev:tauri                 # Compila Rust + abre ventana nativa
 # Quality gate
 pnpm typecheck                 # tsc -b --noEmit
 pnpm lint                      # ESLint
-pnpm test                      # Vitest (207 tests)
+pnpm test                      # Vitest (281 tests post-Sprint 9-10)
 pnpm e2e                       # Playwright (Fase 2)
 
 # Build
@@ -1683,6 +2144,17 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| `(spec enrich v2)` | docs(spec): incorporar plan completo de arquitectura (466KB) → 138KB | Post-Sprint 10 | Nuevas §1.5-1.6 Principios, §3.6-3.20 Módulos, §6.5-6.8 Topología, §8.5-8.11 UX/UI Design System, §19 IA, §20 Performance, §21 SQL. **Aquí estamos (pausa para enriquecer spec).** |
+| `f114d55` | feat(mealplan): drag&drop entre tiempos con @dnd-kit | Sprint 10 | DndContext, DroppableMealCard, DraggableFoodRow, PointerSensor distance 5, KeyboardSensor. |
+| `6b345e0` | feat(mealplan): SlotProgress con barras de kcal + delta vs distribución | Sprint 10 | Visualización de kcal por tiempo, delta vs `DEFAULT_KCAL_DISTRIBUTION` (emerald/amber/rose). |
+| `d22683f` | feat(mealplan): FoodPicker con tab equivalencia inversa | Sprint 10 | Dialog de selección de alimentos: tab "Catálogo" + tab "Por equivalencia inversa". |
+| `2c8f24c` | refactor(mealplan): importa Food desde smae; elimina duplicación | Sprint 10 | Traslado de tipos a módulo smae. |
+| `8033b7a` | fix(smae): lint type-only import en test | Sprint 9 | Fix lint warning. |
+| `8b61a2d` | feat(smae): UI catalog page + form dialog + hooks + service + route | Sprint 9 | SmaeCatalogPage, SmaeFoodForm, useSmaeHooks, smaeService, ruta `/smae`. |
+| `5a2956d` | feat(smae): application (Zod schemas, use cases puros) | Sprint 9 | smaeFormSchema, searchFoodsUC, findByEquivalenciaUC, addCustomFoodUC, parseKeywordsInput. |
+| `3e0766c` | feat(smae): infrastructure (Dexie v3, DexieFoodRepository, smaeMapper) | Sprint 9 | Tabla `smae_custom_foods`, `keywords_json`. |
+| `effd43a` | feat(smae): domain layer (Food, FoodGroup, FoodRepository, 16 grupos) | Sprint 9 | Bounded context SMAE. 30 alimentos canónicos. |
+| `dc963b5` | docs(spec): enriquecer spec.md 91KB con handbook, ADRs, anti-patterns, open questions | Sprint 9 (docs) | spec.md crece de ~6KB a 91KB. 18 secciones + 3 apéndices. |
 | `786e9e6` | feat(consultation): signos vitales opcionales + errores legibles + tooltips lab | Sprint 8 (T1-T4) | Toggle vitales, Vitals VO, auto-submit fix, mensajes Zod legibles, tooltips lab. +0 tests, neto. |
 | `1e158e6` | fix(consultation): wizard save + memoize patientId refs | Sprint 7.5 (T1) | Zod preprocess para NaN/null, memoize PatientId en 10 pages. 207 tests. |
 | `69fcc35` | fix(hooks): useEffect infinite loop on branded IDs | Sprint 7.5 (bugfix) | Hooks usan `idStr` en lugar de `id` branded. Resuelve "Maximum update depth". |
@@ -1705,9 +2177,11 @@ pnpm build:tauri               # Empaqueta instalador nativo
 | 6 | No permitir plan sin consulta | - | - | ⏳ Sprint 12 |
 | 7 | Sistema sugiere diagnóstico | - | - | ⏳ Sprint 13 (clinical-engine) |
 | 8 | Plan sugerido por sistema | - | - | ⏳ Sprint 13 |
-| 9 | Mejor visual tiempos en plan | - | - | ⏳ Sprint 9 |
-| 10 | Catálogo SMAE | - | - | ⏳ Sprint 8 (módulo smae/) |
-| 11 | Equivalencias inversas | - | - | ⏳ Sprint 13 |
+| 9 | Mejor visual tiempos en plan | 9-10 | SlotProgress + barras kcal | ✓ Sprint 10 (`6b345e0`) |
+| 10 | Catálogo SMAE | 9 | SmaeCatalogPage | ✓ Sprint 9 (`8b61a2d`) |
+| 11 | Equivalencias inversas | 10 | FoodPicker tab | ✓ Sprint 10 (`d22683f`) |
+
+**7/11 resueltos** (1, 2, 3, 4, 5, 9, 10, 11) — quedan 3 pendientes (6, 7, 8) que requieren clinical-engine o gate de plan↔consulta.
 
 ### Línea de tiempo narrativa
 
@@ -1719,7 +2193,10 @@ pnpm build:tauri               # Empaqueta instalador nativo
 6. **Sprint 7:** integración cross-module, dashboard, command palette, **v1 declarada**.
 7. **Sprint 7.5 (post-v1):** bug fix de infinite re-render hooks (`69fcc35`).
 8. **Sprint 7.5+:** usuario prueba v1, encuentra 4 bugs críticos (T1-T4).
-9. **Sprint 8 (actual):** integración de feedback v1. T1 (save), T2 (vitales), T3 (errores Zod), T4 (tooltips). **Aquí estamos.**
+9. **Sprint 8:** integración de feedback v1. T1 (save), T2 (vitales), T3 (errores Zod), T4 (tooltips).
+10. **Sprint 9:** bounded context SMAE con catálogo navegable, equivalencias inversas, CRUD alimentos custom. Spec.md crece a 91KB con handbook completo.
+11. **Sprint 10:** UX del meal plan mejorada (FoodPicker, SlotProgress, drag&drop). **281 tests.**
+12. **Post-Sprint 10 (actual):** enriquecimiento de spec.md con plan completo de arquitectura (466KB → spec de 138KB). **Aquí estamos (pausa).**
 
 ---
 
@@ -1977,6 +2454,381 @@ game-01/
 ├── vitest.config.ts
 └── spec.md                              # ✓ ESTE DOCUMENTO
 ```
+
+---
+
+## 19. Sistema de IA (Fase 4)
+
+### 19.1 Filosofía
+
+| # | Principio | Detalle |
+|---|-----------|---------|
+| 1 | La IA **asiste, no sustituye** | Toda salida de IA es **sugerencia**, nunca acción directa. |
+| 2 | La nutrióloga **siempre aprueba** | El sistema no aplica cambios por sí solo a partir de IA. |
+| 3 | La IA **nunca** modifica SMAE ni reglas críticas | El SMAE 5ª y el motor de reglas son read-only para IA. |
+| 4 | Toda inferencia queda **trazada** | Cada llamada IA se registra en `audit_events` con prompt sanitizado y respuesta. |
+
+### 19.2 Arquitectura
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│ AI System                                                    │
+│                                                              │
+│ ┌──────────────────┐   ┌──────────────────┐                 │
+│ │ Prompt Builder   │   │ Response Parser  │                 │
+│ │ - Context        │   │ - Validate       │                 │
+│ │ - Variables      │   │ - Extract data   │                 │
+│ │ - Template       │   │ - Confidence     │                 │
+│ └────────┬─────────┘   └────────┬─────────┘                 │
+│          │                      │                            │
+│          └──────────┬───────────┘                            │
+│                     ▼                                        │
+│         ┌──────────────────────┐                            │
+│         │ AI Client            │                            │
+│         │ (HTTP / streaming)   │                            │
+│         └──────────┬───────────┘                            │
+│                     ▼                                        │
+│         ┌──────────────────────┐                            │
+│         │ AI Provider          │                            │
+│         │ (OpenAI / Anthropic / │                            │
+│         │  local Ollama)       │                            │
+│         └──────────────────────┘                            │
+│                                                              │
+│ ┌──────────────────────────────────────────────────────┐   │
+│ │ AI Capabilities (registry)                            │   │
+│ │ - summarizeConsultation                               │   │
+│ │ - interpretLabResults                                 │   │
+│ │ - suggestSubstitutions                                │   │
+│ │ - generateEducationContent                            │   │
+│ │ - draftClinicalNotes                                  │   │
+│ │ - generateGoalSuggestions                             │   │
+│ │ - explainDiagnosisToPatient                           │   │
+│ │ - generateMealPlanInitial                             │   │
+│ └──────────────────────────────────────────────────────┘   │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 19.3 Capacidades
+
+| Capacidad | Entrada | Salida |
+|-----------|---------|--------|
+| `summarizeConsultation` | Historia, antropometría, labs | Resumen narrativo ≤ 400 palabras |
+| `interpretLabResults` | Parámetros de laboratorio | Texto interpretativo + sugerencias de correlación |
+| `suggestSubstitutions` | Alimento a sustituir, restricciones del paciente | Lista de equivalentes alternativos (sugeridos, no aplicados) |
+| `generateEducationContent` | Tema, nivel del paciente | Material educativo en lenguaje paciente |
+| `draftClinicalNotes` | Datos de la consulta | Borrador de nota SOAP para revisión |
+| `generateGoalSuggestions` | Perfil del paciente | Propuestas de objetivos (peso, HbA1c, LDL, etc.) |
+| `explainDiagnosisToPatient` | Diagnóstico nutricional, perfil | Texto explicativo en lenguaje accesible |
+| `generateMealPlanInitial` | Datos básicos del paciente | Menú borrador basado en equivalentes SMAE |
+
+### 19.4 Separación IA vs reglas (decisión arquitectónica crítica)
+
+| Aspecto | Reglas (motor clínico) | IA |
+|---------|------------------------|-----|
+| Cálculos deterministas (BMI, BMR, TDEE) | ✅ Sí | ❌ No |
+| Validaciones críticas (alergia, kcal mínimas) | ✅ Sí | ❌ No |
+| Sugerencias nutricionales explícitas | ✅ Sí (motor de reglas) | ✅ Sí (complementario) |
+| Generación de texto libre | ❌ No | ✅ Sí |
+| Modificar SMAE | ❌ **Nunca** | ❌ **Nunca** |
+| Modificar equivalentes | ❌ **Nunca** | ❌ **Nunca** |
+| Decisiones clínicas finales | ❌ No (asiste) | ❌ No (asiste) |
+| Determinismo | ✅ Total | ❌ Estocástico |
+| Trazabilidad | ✅ Total (regla explícita) | ⚠️ Audit log + prompt + response |
+
+> **Regla de oro:** si un cálculo o validación puede hacerse con una regla, **se hace con regla**. La IA solo entra cuando el output es texto libre, ambigüedad interpretativa o generación creativa.
+
+### 19.5 Implementación en este codebase
+
+**Bounded context dedicado** en `src/services/ai/` (placeholder creado en Sprint 1).
+
+```
+src/services/ai/
+├── AIClient.ts          # interfaz + impl HTTP fetch con streaming
+├── AIPrompts.ts         # plantillas versionadas de prompts
+├── AIResponseParser.ts  # valida Zod + extrae confidence
+├── AICapabilities.ts    # registry de 8 capabilities
+├── AIService.ts         # composition root
+└── index.ts
+```
+
+**Adaptadores por proveedor** (Strategy pattern):
+
+```ts
+interface AIProvider {
+  id: 'openai' | 'anthropic' | 'ollama';
+  complete(req: AIRequest, opts: { signal: AbortSignal }): Promise<AIResponse>;
+  stream?(req: AIRequest, opts: { signal: AbortSignal }): AsyncIterable<AIChunk>;
+}
+```
+
+**Timeouts, retries, rate limiting**: configurables vía `src/services/ai/AIClient.ts`. Backoff exponencial con jitter; máx. 3 reintentos.
+
+**Caché de respuestas frecuentes** en IndexedDB (store `ai_cache` con TTL configurable por capability).
+
+### 19.6 Privacidad y cumplimiento (LFPDPPP / NOM-024)
+
+- **Opt-in por profesional** (no activado por default).
+- **Consentimiento explícito por paciente** registrado en `consents` antes de usar IA con sus datos.
+- **Datos anonimizados** o pseudonimizados al construir el prompt (IDs, no nombres; rangos, no valores exactos cuando sea posible).
+- **Sin entrenamiento con datos de pacientes** (cláusula contractual con proveedor).
+- **Configuración de proveedor** por consultorio (self-hosted Ollama como opción offline).
+
+### 19.7 Costos
+
+- **Caché local** de respuestas frecuentes (clave: hash de prompt + inputs).
+- **Presupuesto mensual configurable** por consultorio; el servicio rechaza llamadas si se excede.
+- **Tracking de uso** por tipo de capability (`usage_logs`).
+- **Modelo pequeño** (e.g. `gpt-4o-mini`, `claude-haiku`) para tareas simples; el grande solo bajo demanda explícita.
+
+### 19.8 Estado actual
+
+⏳ **Placeholder creado en `src/services/ai/` (Sprint 1)** — ninguna capability implementada. Primer sprint candidato: **Sprint 17 — AI assist (Fase 4 inicio)**.
+
+---
+
+## 20. Performance y observabilidad
+
+### 20.1 Objetivos de rendimiento
+
+| Métrica | Objetivo | Estado actual (medido) |
+|---------|----------|------------------------|
+| Carga inicial de la app (LCP) | < 2 s | ~1.2 s (Vite + code splitting) |
+| Time to interactive (TTI) | < 3 s | ~1.8 s |
+| Carga de ficha de paciente | < 500 ms | ~80 ms (IndexedDB local) |
+| Búsqueda de alimento | < 50 ms | ~5 ms (Dexie B-tree sobre `smae_custom_foods`) |
+| Cálculo de menú (30 ítems) | < 100 ms | ~12 ms (macros + kcal deterministas) |
+| Guardado de consulta | < 1 s | ~150 ms (Dexie transaccional) |
+| Renderizado de tabla (1000 filas) | < 500 ms | Por medir (TanStack Virtual) |
+| Sincronización (100 ítems) | < 5 s | N/A (Fase 3 — sin servidor) |
+| Generación de PDF | < 3 s | N/A (Sprint 11 — `services/pdf/`) |
+
+### 20.2 Estrategias (alineadas al stack React 19 + Vite + Tauri v2)
+
+#### 20.2.1 Code splitting
+
+- **Lazy loading por ruta**: `React.lazy(() => import('./pages/...'))` + `<Suspense>`.
+- **Lazy loading por feature**: `import()` dinámico en componentes pesados.
+- **Vite chunks**: `manualChunks` separa `react`, `radix-ui`, `recharts`, `dnd-kit`, `framer-motion`.
+- **Tauri v2 tree-shaking**: imports nombrados; evitar `import * as`.
+
+#### 20.2.2 Virtualización
+
+- **TanStack Virtual** para listas largas (futuro: recetas, lista de compras, bitácora).
+- **TanStack Table v8** ya soporta virtualización con `useVirtualizer`.
+- **Paginación** en listados extensos como default; virtualización solo si > 500 filas.
+
+#### 20.2.3 Memoización
+
+- **`React.memo`** en componentes puros (KPICard, EquivalenteBadge, ClinicalBadge).
+- **`useMemo`** para cálculos costosos (cálculo de macros del plan, distribución de kcal).
+- **`useCallback`** para handlers que se pasan a children memoizados.
+- **Selectores Zustand** con `shallow` comparator para evitar re-renders innecesarios.
+- **Cálculos clínicos en caché** (VOs inmutables se reutilizan por referencia).
+
+#### 20.2.4 Caché multinivel
+
+| Nivel | Tecnología | Uso |
+|-------|-----------|-----|
+| L1 | Memoria (LRU) | Sesión activa, calculados derivados |
+| L2 | IndexedDB (Dexie) | Catálogo SMAE, pacientes activos, configs |
+| L3 | Service Worker (futuro) | Assets estáticos, PWA offline |
+| L4 | Servidor (Fase 3) | SMAE versionado, datos multi-puesto |
+
+#### 20.2.5 Optimización de tablas
+
+- Solo columnas visibles en DOM.
+- Paginación o virtualización.
+- Datos resumidos en listados; detalle lazy.
+- Filtros client-side hasta 1k filas; server-side después.
+
+#### 20.2.6 Optimización de gráficos (Recharts)
+
+- `isAnimationActive={false}` para series > 100 puntos.
+- Canvas en lugar de SVG si > 1000 puntos (migrar a visx o echarts si hace falta).
+- Datos agregados en lugar de raw en dashboards.
+- Throttle de actualizaciones con `useDeferredValue` (React 19).
+
+#### 20.2.7 Optimización de BD (Dexie → SQLite)
+
+- Índices apropiados (ver §21 SQL Design).
+- Transacciones en lote: `db.transaction('rw', tables, async () => {...})`.
+- `bulkPut` en lugar de N `put`.
+- Para SQLite nativo (Fase 3): WAL mode, FTS5 para búsqueda de texto.
+
+#### 20.2.8 Web Workers (Fase 3)
+
+- `sync.worker.ts` — sincronización en background.
+- `pdf.worker.ts` — generación de PDF off-main-thread.
+- `search.worker.ts` — búsqueda fuzzy en SMAE (>10k alimentos).
+- `import.worker.ts` — parser de CSV de pacientes.
+
+### 20.3 Monitoreo y observabilidad
+
+- **Web Vitals** vía `web-vitals` lib: LCP, FID, CLS, INP, TTFB.
+- **Custom metrics** en `src/utils/perf/metrics.ts`: tiempo de cálculo clínico, tamaño de payload sync.
+- **Performance API**: `performance.mark()` / `performance.measure()` en puntos críticos.
+- **React Profiler** en dev (`<Profiler id="...">`); off en producción.
+- **Reportes automáticos** en producción (opt-in): endpoint `/api/telemetry` con muestreo configurable.
+- **Logs estructurados** en consola dev: `[perf] MealPlanForm render: 47ms (2 warnings)`.
+
+### 20.4 Estado actual
+
+✅ Code splitting por ruta activo en Vite.
+✅ Memoización selectiva (KPICard, SlotProgress, Vitals).
+✅ Dexie v3 con índices en `smae_custom_foods` (id, group, name, created_at).
+⏳ TanStack Virtual aún no usado (no hay listas > 100 filas).
+⏳ Web Workers pendientes (Fase 3).
+⏳ Métricas Web Vitals no capturadas aún (Fase 3).
+
+---
+
+## 21. Diseño SQL (target migración Dexie → SQLite nativo)
+
+> **Nota:** este spec describe el modelo canónico en SQL que se implementará cuando se migre de Dexie/IndexedDB a SQLite nativo vía `tauri-plugin-sql` o `sql.js` (Fase 3, ADR-001). Hoy el código usa Dexie, pero los nombres de tablas/columnas y relaciones se conservan para que el swap sea transparente.
+
+### 21.1 Convenciones
+
+- Tablas en `snake_case` plural (`patients`, `consultations`, `meal_plans`).
+- Columnas en `snake_case` (`patient_id`, `consultation_date`).
+- **PK**: `id` de tipo `TEXT` (UUIDv7) en todas las tablas.
+- **Timestamps**: `created_at`, `updated_at` en formato ISO 8601 UTC.
+- **Soft delete**: `deleted_at` nullable.
+- **Versionado**: `version INTEGER` en entidades clínicas versionadas.
+- **Auditoría**: `created_by`, `updated_by` (FK a `users.id`).
+- **JSON**: columna `data` o `*_json` para campos extensibles.
+
+### 21.2 Diagrama relacional (resumen textual)
+
+```
+users ─< user_roles >─ roles ─< role_permissions >─ permissions
+  │                         │
+  │                         └─> audit_events (control de acceso)
+  │
+  └─> patients ─< clinical_records
+                ├─< consultations ─< snapshots
+                │    ├─< anthropometries ─< anthropometry_calculations
+                │    ├─< laboratory_studies ─< laboratory_parameters
+                │    ├─< diagnoses
+                │    ├─< goals ─< goal_evaluations
+                │    ├─< adherence_records
+                │    ├─< documents
+                │    ├─< allergies
+                │    ├─< intolerances
+                │    ├─< medications
+                │    ├─< supplements
+                │    └─< clinical_events
+                │
+                ├─< meal_plans ─< menus ─< menu_times ─< menu_items
+                │                                       │
+                │                                       └─> equivalents
+                │
+                ├─< appointments
+                ├─< recipes ─< recipe_ingredients ─┐
+                │              └─< recipe_steps   │
+                └─< shopping_lists                │
+                                                  │
+smae_versions ─< smae_groups ─< smae_subgroups ─< foods ─< equivalents
+                                                         └< substitutions (M:N)
+```
+
+### 21.3 Constraints principales
+
+| Tabla | Constraint | Detalle |
+|-------|------------|---------|
+| `patients` | `CHECK biological_sex IN ('M','F','I')` | Sexo biológico restringido |
+| `patients` | `CHECK birth_date <= CURRENT_DATE` | Fecha de nacimiento no futura |
+| `consultations` | `CHECK status IN ('draft','validated','signed','closed','cancelled')` | Estado de consulta |
+| `anthropometries` | `CHECK weight_kg > 0 AND weight_kg < 500` | Peso físicamente posible |
+| `equivalents` | `CHECK kcal >= 0` | Valores nutricionales no negativos |
+| `goals` | `CHECK target_value <> initial_value` | Meta distinta del valor inicial |
+| `appointments` | `CHECK end_time > start_time` | Fin posterior al inicio |
+| `users` | `CHECK failed_attempts >= 0` | Contador de intentos no negativo |
+
+### 21.4 Índices principales
+
+| Índice | Tabla | Columnas | Propósito |
+|--------|-------|----------|-----------|
+| `idx_patient_folio` | `patients` | `folio` (UNIQUE) | Búsqueda por folio |
+| `idx_patient_names` | `patients` | `(last_name_paternal, last_name_maternal, first_name)` | Búsqueda por nombre |
+| `idx_patient_search` | `patients` | `(first_name, last_name_paternal, last_name_maternal, folio, curp)` | FTS5 búsqueda global |
+| `idx_consultation_patient_date` | `consultations` | `(patient_id, consultation_date DESC)` | Historial cronológico |
+| `idx_anthro_patient_date` | `anthropometries` | `(patient_id, measurement_date DESC)` | Tendencias antropométricas |
+| `idx_lab_study_patient` | `laboratory_studies` | `(patient_id, study_date DESC)` | Estudios por paciente |
+| `idx_lab_param_study` | `laboratory_parameters` | `(study_id, parameter_code)` | Parámetros de un estudio |
+| `idx_goal_patient_active` | `goals` | `(patient_id) WHERE status='active'` | Objetivos activos (parcial) |
+| `idx_appointment_user_date` | `appointments` | `(user_id, appointment_date)` | Agenda por profesional |
+| `idx_audit_user_time` | `audit_events` | `(user_id, timestamp DESC)` | Auditoría por usuario |
+| `idx_audit_resource` | `audit_events` | `(resource_type, resource_id)` | Auditoría por recurso |
+| `idx_snapshot_patient_date` | `snapshots` | `(patient_id, snapshot_date DESC)` | Comparativos históricos |
+| `idx_food_search` | `foods` | `(name, synonyms)` | Búsqueda de alimentos (FTS5) |
+| `idx_equivalent_food` | `equivalents` | `(food_id)` | Equivalentes de un alimento |
+| `idx_change_log_entity` | `change_log` | `(entity_type, entity_id, timestamp DESC)` | Historial de cambios |
+| `idx_sync_queue_status` | `sync_queue_items` | `(status, next_retry_at)` | Cola de sincronización |
+
+### 21.5 Normalización
+
+- **3FN estricta** en datos clínicos y maestros.
+- **Desnormalización selectiva** para performance de listados:
+  - `current_pathology` en `patients` (resumen del diagnóstico activo).
+  - `target_kcal`, `target_protein_pct`, etc. en `meal_plans` (acceso rápido en listados).
+  - `smae_version_id` en `snapshots` (auditoría de versión SMAE usada).
+- **JSON** para campos extensibles:
+  - `clinical_records.data` (anamnesis completa).
+  - `meal_plans.restrictions` (alergias, intolerancias, preferencias).
+  - `recipes.allergens`, `recipes.tags`.
+  - `documents.parameters` (parámetros del template usado).
+  - `goal_evaluations.notes` (barreras, facilitadores).
+
+### 21.6 Estrategia de versionado (5 capas)
+
+| Capa | Mecanismo | Uso |
+|------|-----------|-----|
+| **Esquema de BD** | Migraciones incrementales con `schema_version` global | Cambios estructurales (columnas, tablas, índices) |
+| **Entidades clínicas** | Campo `version INTEGER` por registro | Cambios a un expediente; cada modificación incrementa |
+| **Snapshots** | Copia inmutable al cierre de consulta | Recuperación, comparativos, auditoría |
+| **SMAE** | Tabla `smae_versions` con `status='active'` | Solo una versión activa; históricas conservadas |
+| **Configuración** | Tabla `system_config` con `version` | Cambios con rollback soportado |
+
+**ChangeLog** (append-only) por cada cambio:
+
+```
+change_log
+├─ id
+├─ entity_type
+├─ entity_id
+├─ operation ('create' | 'update' | 'delete' | 'restore')
+├─ field_name NULL  -- campo específico, NULL si es create/delete
+├─ old_value NULL
+├─ new_value NULL
+├─ changed_by
+├─ changed_at
+├─ reason NULL
+├─ consultation_id NULL
+└─ sync_status
+```
+
+**Snapshots inmutables** (mismo modelo que ya existe):
+
+```
+snapshots
+├─ id
+├─ consultation_id FK
+├─ patient_id FK
+├─ snapshot_date
+├─ data JSON NOT NULL  -- estado completo
+├─ data_hash TEXT NOT NULL  -- SHA-256
+├─ smae_version_id FK
+├─ type ('consultation' | 'daily' | 'weekly')
+├─ created_at
+└─ created_by
+```
+
+### 21.7 Estado actual en el codebase
+
+✅ **Dexie v3** implementa las 5 tablas core: `patients`, `anthropometry`, `lab_panels`, `consultations`, `meal_plans`, `smae_custom_foods`.
+✅ Nombres y campos siguen la convención snake_case que se mapeará 1:1 a SQL.
+⏳ Migración a SQLite nativo se hará en Fase 3 vía `tauri-plugin-sql` (Fase 3, ADR-001).
+⏳ Tablas secundarias (`allergies`, `medications`, `clinical_events`, etc.) se crearán cuando se implementen los módulos respectivos.
 
 ---
 
