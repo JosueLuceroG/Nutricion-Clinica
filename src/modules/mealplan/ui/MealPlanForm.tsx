@@ -25,8 +25,7 @@ import {
   DEFAULT_KCAL_DISTRIBUTION,
   type MealSlot,
 } from "@modules/mealplan/domain/MealSlot";
-import { getAllFoods, type FoodId } from "@modules/mealplan/domain/Food";
-import { FoodGroupLabel } from "@modules/mealplan/domain/FoodGroup";
+import { getSystemFoods as getAllFoods, type FoodId, FoodGroupLabel } from "@modules/smae/domain";
 import { foodExchangeNutrition } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
 import type { PatientId } from "@modules/patient/domain/PatientId";

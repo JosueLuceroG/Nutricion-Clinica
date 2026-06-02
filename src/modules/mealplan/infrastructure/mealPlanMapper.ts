@@ -4,7 +4,7 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
 import type { MealPlanStatus } from "../domain/MealPlanStatus";
-import type { FoodId } from "../domain/Food";
+import type { FoodId } from "@modules/smae/domain";
 
 export interface MealPlanRow {
   id: string;

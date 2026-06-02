@@ -1,5 +1,4 @@
-import { getFood, type FoodId } from "../domain/Food";
-import { GroupNutrition, type FoodGroup } from "../domain/FoodGroup";
+import { getSystemFoodById as getFood, type FoodId, GroupNutrition, type FoodGroup } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
 import type { MealPlan, PlanMeal } from "../domain/MealPlan";
 

@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { FoodIdSchema } from "./Food";
-import type { FoodId } from "./Food";
+import { FoodIdSchema, type FoodId } from "@modules/smae/domain";
 import { MealPlanId } from "./MealPlanId";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";

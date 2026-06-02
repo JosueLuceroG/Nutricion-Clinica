@@ -31,7 +31,7 @@ import {
   MEAL_SLOT_ORDER,
   MealSlotLabel,
 } from "@modules/mealplan/domain/MealSlot";
-import { FoodGroupLabel } from "@modules/mealplan/domain/FoodGroup";
+import { FoodGroupLabel } from "@modules/smae/domain";
 import {
   planDailyNutrition,
   planVsTarget,

@@ -4,9 +4,6 @@
  *
  * Esta es la fuente canónica del SMAE 5ª edición. Cualquier cálculo
  * nutricional en la app se deriva de estos valores.
- *
- * Nota: existe una copia transitoria en `mealplan/domain/FoodGroup.ts`
- * que se eliminará en el commit 6 (refactor de imports).
  */
 import { z } from "zod";
 
