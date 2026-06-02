@@ -66,6 +66,8 @@ export function usePatientMealPlans(patientId: PatientId | null) {
     initial,
   );
 
+  const patientIdStr = patientId?.toString();
+
   const load = React.useCallback(() => {
     if (!patientId) {
       setState({ data: null, error: null, loading: false });
@@ -86,7 +88,8 @@ export function usePatientMealPlans(patientId: PatientId | null) {
 
   React.useEffect(() => {
     load();
-  }, [load]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patientIdStr]);
 
   return { ...state, reload: load };
 }
@@ -97,7 +100,7 @@ export function useMealPlan(id: MealPlanId | null) {
   const idStr = id?.toString();
 
   React.useEffect(() => {
-    if (!id) {
+    if (!idStr || !id) {
       setState({ data: null, error: null, loading: false });
       return;
     }
@@ -120,7 +123,8 @@ export function useMealPlan(id: MealPlanId | null) {
     return () => {
       cancelled = true;
     };
-  }, [idStr, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idStr]);
 
   const reload = React.useCallback(() => {
     if (!id) return;

@@ -66,7 +66,7 @@ export function usePatient(id: PatientId | null) {
   const idStr = id?.toString();
 
   React.useEffect(() => {
-    if (!id) {
+    if (!idStr || !id) {
       setState({ data: null, error: null, loading: false });
       return;
     }
@@ -89,7 +89,8 @@ export function usePatient(id: PatientId | null) {
     return () => {
       cancelled = true;
     };
-  }, [idStr, id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idStr]);
 
   const reload = React.useCallback(() => {
     if (!id) return;
