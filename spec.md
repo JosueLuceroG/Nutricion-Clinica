@@ -2294,6 +2294,36 @@ Cosas que **no** están decididas formalmente y que la siguiente IA debería con
 
 **Recomendación:** C, pero con un commit dedicado. El valor histórico ya está capturado en spec.md §14.
 
+### 17.1 Resoluciones (2026-06-02)
+
+Todas las preguntas Q-01..Q-07 fueron resueltas en esta sesión. Resumen:
+
+| # | Resolución | Acción / Commit |
+|---|-----------|-----------------|
+| **Q-01** | **B)** Crear las 10 ADRs completas con plantilla Nygard en `docs/decisions/0001-…0010-*.md` + `README.md` índice. | `b678ed7` docs(adr). 11 archivos, 956 inserciones. |
+| **Q-02** | **A)** Monolingüe es-MX. Sin `react-i18next`/`react-intl`. `src/i18n/` queda vacío. | Sin commit (status quo). |
+| **Q-03** | **A)** Suite Playwright formal en `tests/e2e/*.spec.ts` + job `e2e` en CI (ubuntu-latest, depends on quality). 9 tests, 1 browser, 1 worker. | `b3a984b` test(e2e). 4 archivos, 204 inserciones. |
+| **Q-04** | **B)** Dexie/IndexedDB hasta Fase 3. VS Build Tools y `tauri-plugin-sql` siguen siendo un blocker latente. | Sin commit (status quo, decisión de no-acción). |
+| **Q-05** | **A)** Status quo: hooks custom + repos directos. TanStack Query queda pendiente para Fase 3 (cuando haya sync). | Sin commit (status quo). |
+| **Q-06** | **A)** Sí, agregar property tests con fast-check para `Vitals`, `Measurements` (Weight, Height, Circumference, Skinfold), y 5 branded IDs (Patient, Consultation, MealPlan, LabPanel, Anthropometry). | `0c03ff1` test(property). 4 archivos, 665 inserciones, 74 nuevos property tests. |
+| **Q-07** | **A)** Dejar como están. Decisión del usuario (override de la recomendación original C). Valor histórico en spec §14 sigue siendo la fuente. | Sin commit (status quo). |
+
+**Resultado neto de la sesión:**
+
+- 3 acciones de código ejecutadas: Q-01 (ADRs), Q-03 (E2E), Q-06 (property tests).
+- 4 decisiones de status quo: Q-02, Q-04, Q-05, Q-07.
+- Bugs latentes descubiertos durante Q-06: el polyfill de `crypto.randomUUID()` en `tests/setup.ts` no producía UUIDv7 (corregido en el commit de Q-06).
+- Stats del repo:
+  - **Tests**: 281 → 355 (+74 property tests, +9 E2E = +83 totales).
+  - **Docs**: 10 ADRs nuevos (38KB).
+  - **CI**: nuevo job `e2e` (ubuntu, depends on quality).
+  - **spec.md**: sin cambios estructurales en esta sesión; solo este §17.1.
+
+Próximas decisiones pendientes (más allá de Q-01..Q-07):
+- Open question IK-02: idempotencia de saves en IndexedDB (3 entries duplicadas).
+- Open question "Fase 4 AI": capabilities y modelo (sin resolver).
+- Open question "Sync engine": 3 modos (manual/automático/híbrido) y UI modal diff (sin resolver).
+
 ---
 
 ## 18. Communication preferences
