@@ -3942,4 +3942,1219 @@ PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, ag
 
 ---
 
+## 36. Anexo: SMAE canónico (5 entidades, importador, versionamiento)
+
+> **Origen:** Plan Parte I §1-§8. **Modelo simplificado actual:** §3.6 + §5.1 (Food + FoodGroup con valores nutricionales inline). **Este anexo documenta el modelo canónico** que se alcanzará cuando se implemente el importador Excel/CSV del SMAE 5ª edición oficial (Sprint 12).
+
+### 36.1 Modelo de 5 entidades anidadas (estructura oficial)
+
+```
+VERSIÓN_SMAE
+  └─ GRUPO (verduras, frutas, cereales, leguminosas, AOA, leche, azúcares, grasas, alimentos libres)
+     └─ SUBGRUPO (cuando aplique)
+        └─ ALIMENTO (nombre, claves de identificación)
+           └─ EQUIVALENTE (cada uno representa 1 porción oficial)
+              └─ VALOR_NUTRICIONAL (kcal, P, L, CHO, fibra, micros)
+```
+
+### 36.2 `VERSIÓN_SMAE`
+
+- `id`, `nombre` (ej. "SMAE 5ª edición")
+- `editorial` (Piensa en Nutrir / autor)
+- `año`, `fecha_importacion`, `fecha_activacion`
+- `estado` (borrador / activo / histórico)
+- `responsable` (profesional que aprobó)
+
+### 36.3 `GRUPO`
+
+- `id`, `version_smae_id` (FK)
+- `codigo`, `nombre`, `descripcion`
+- `color_ui`, `icono_ui`
+- `orden_presentacion`
+- `kcal_por_equivalente` (promedio para grupos completos como Verduras)
+- `recomendaciones_diarias_min`, `recomendaciones_diarias_max`
+
+### 36.4 `SUBGRUPO`
+
+- `id`, `grupo_id` (FK)
+- `codigo`, `nombre`, `descripcion`, `orden`
+
+### 36.5 `ALIMENTO`
+
+- `id`, `subgrupo_id` (FK opcional)
+- `nombre`, `nombre_cientifico` (opcional)
+- `sinonimos` (lista), `claves_busqueda` (tokens derivados)
+- `unidad_habitual` (g, ml, pieza)
+- `categoria_especial` (libre, light, integral, etc.)
+
+### 36.6 `EQUIVALENTE`
+
+- `id`, `alimento_id` (FK)
+- `porcion_oficial` (valor + unidad)
+- `peso_neto_g`, `peso_bruto_g`, `peso_cocido_g` (cuando aplique)
+- `metodo_preparacion` (crudo / cocido / al vapor)
+- `rend_coccion` (factor)
+- `notas`
+
+### 36.7 `VALOR_NUTRICIONAL` (entidad separada, no inline)
+
+- `id`, `equivalente_id` (FK)
+- `kcal`, `proteina_g`, `lipidos_g`, `carbohidratos_g`, `fibra_g`, `azucar_g`
+- `sodio_mg`, `potasio_mg`, `calcio_mg`, `hierro_mg`, `magnesio_mg`, `zinc_mg`, `fosforo_mg`
+- `vitamina_a_ug`, `vitamina_c_mg`, `vitamina_d_ug`, `vitamina_e_mg`, `vitamina_k_ug`
+- `tiamina_mg`, `riboflavina_mg`, `niacina_mg`, `b6_mg`, `b12_ug`, `folato_ug`
+- `fuente_dato`, `fecha_referencia`
+
+### 36.8 Tablas auxiliares del repositorio
+
+- **`SUSTITUCION_OFICIAL`**: par de equivalentes del mismo grupo con pesos equivalentes, `kcal_macros_iguales` (boolean), cociente macros, nota oficial, fuente.
+- **`ALERGENO`** (catálogo): gluten, lactosa, proteína de leche, huevo, cacahuate, frutos secos, soya, pescado, mariscos, trigo.
+- **`ETIQUETA_ALIMENTO`**: alimento + tag (vegano, vegetariano, kosher, halal, sin gluten, sin lactosa, orgánico).
+- **`RESTRICCION_CLINICA`**: alimento + condición (ERC, diabetes, hipertensión, hiperuricemia, celiaquía) + recomendación (evitar, limitar, permitido).
+
+### 36.9 Datos que NO se almacenan en código (regla crítica)
+
+> **Ningún valor numérico del SMAE debe estar hardcodeado.** Todo proviene de la importación.
+
+- ❌ No hardcodear: kcal de una manzana, proteína de la avena.
+- ✅ Sí: lógica de cálculo, validaciones, formato de porción.
+
+### 36.10 Datos que requieren captura manual
+
+- Sinónimos regionales de alimentos.
+- Etiquetas culturales (kosher, halal, vegano) si no están en la fuente.
+- Rendimientos de cocción específicos del consultorio.
+- Precios aproximados por región (módulo económico).
+
+### 36.11 Importación desde Excel (pipeline de 9 pasos)
+
+1. Validación de estructura (encabezados, hojas, tipos).
+2. Lectura por lotes.
+3. Validación por reglas de dominio (tipos numéricos, rangos esperados, FK, códigos únicos, coherencia macros vs kcal ±5%).
+4. Vista previa para la nutrióloga (resumen X alimentos, Y equivalentes, Z alertas).
+5. Carga en staging (zona temporal).
+6. Validación cruzada (suma macros ~ kcal, sustituciones simétricas, alérgenos consistentes, duplicados).
+7. Activación: versión en estado "borrador".
+8. Revisión manual + firma digital.
+9. Activación oficial (entra a consultas nuevas, conserva histórico).
+
+### 36.12 Hojas del Excel esperado
+
+| Hoja | Contenido |
+|------|-----------|
+| Metadatos | Versión, editorial, año, fecha, responsable, observaciones |
+| Grupos | Código, nombre, orden, kcal_promedio, min_diario, max_diario |
+| Subgrupos | Código grupo, código subgrupo, nombre |
+| Alimentos | Código, nombre, subgrupo, sinónimo 1, sinónimo 2, unidad habitual |
+| Equivalentes | Código alimento, porción, unidad, peso neto/bruto/cocido, método, notas |
+| Valores nutricionales | Código equivalente, kcal, P, L, CHO, fibra, azúcar, Na, K, Ca, Fe, Mg, Zn, P, vit A/C/D/E/K, B1/B2/B3/B6/B12, folato, fuente |
+| Sustituciones | Código eq 1, código eq 2, notas |
+| Alérgenos | Código alimento, alérgeno, severidad (trazas / contiene) |
+| Etiquetas | Código alimento, etiqueta |
+| Restricciones clínicas | Código alimento, condición, recomendación |
+
+### 36.13 Validaciones automáticas de importación
+
+| Validación | Regla |
+|------------|-------|
+| Cálculo calórico | (P×4) + (L×9) + (CHO×4) debe coincidir con kcal ±10% |
+| Campos obligatorios | Grupo, alimento, equivalente, kcal no pueden estar vacíos |
+| Rangos numéricos | kcal entre 0 y 900 por equivalente |
+| Coherencia CHO | CHO ≥ fibra, CHO ≥ 0 |
+| Códigos únicos | No se permiten códigos duplicados |
+| Integridad referencial | Toda FK debe existir |
+| Duplicados | Por nombre + grupo |
+| Sodio | Advertencia si >800 mg por equivalente |
+| Azúcar añadido | Advertencia si el grupo no es "azúcares" pero tiene azúcar alto |
+
+### 36.14 Manejo de errores durante importación
+
+- **Errores bloqueantes**: archivo no se carga; reporte descargable.
+- **Advertencias**: archivo se carga en staging; la nutrióloga decide continuar o corregir.
+- **Bitácora de importación**: fecha, usuario, versión, total registros, errores, advertencias, hash del archivo.
+
+### 36.15 Importación incremental vs completa
+
+- **Completa**: nueva versión del SMAE (cambio mayor, ej. 5ª → 6ª edición).
+- **Incremental**: alta de alimentos individuales, corrección, ajuste de porción (cambio menor).
+- Toda importación es **versionada y trazable**.
+
+### 36.16 Versionamiento semántico
+
+- **MAJOR**: cambio de edición (5ª → 6ª).
+- **MINOR**: alta/baja de alimentos, nuevos grupos.
+- **PATCH**: corrección de valores, ajustes de porción, adición de sinónimos.
+
+### 36.17 Política de convivencia de versiones
+
+- Una sola versión activa por consultorio (configurable).
+- Versiones históricas conservadas **indefinidamente** para auditoría de consultas pasadas.
+- Toda consulta clínica registra explícitamente qué versión SMAE usó.
+- Migración de planes: cuando se cambia de versión, los planes activos deben ser revisados manualmente. El sistema alerta: alimentos dados de baja, equivalentes con valores modificados, diferencias calóricas o de macros.
+
+### 36.18 Proceso de actualización
+
+```
+Nueva versión disponible (archivo)
+  → Importar como versión "borrador" (no afecta consultas)
+  → Comparar contra versión activa (diff)
+  → Reporte de impacto: X nuevos, Y modificados, Z eliminados, N planes activos afectados
+  → Decisión: revisar plan por plan, ajustar o reemplazar
+  → Activar nueva versión
+  → La versión anterior pasa a "histórico"
+```
+
+### 36.19 Compatibilidad hacia atrás
+
+- Las consultas antiguas siempre se leen con la versión SMAE que tenían al momento de su creación.
+- El sistema **no reinterpreta** valores históricos con versiones nuevas.
+
+### 36.20 Manejo de equivalencias oficiales (5 tipos)
+
+- **Equivalencia exacta**: mismo grupo + mismo subgrupo + kcal similares.
+- **Equivalencia funcional**: mismo grupo, distinto subgrupo, kcal similares.
+- **Equivalencia cruzada**: distinto grupo, pero intercambiables por propósito nutricional.
+- **Equivalencia no oficial**: creada por la nutrióloga.
+- **No equivalencia**: distinto grupo y propósito.
+
+Cada equivalencia almacena: ID, equivalente A (FK), equivalente B (FK), tipo, diferencia calórica (%), diferencia de macronutrimentos (g), fuente, notas.
+
+### 36.21 Grafo de equivalencias (interno)
+
+- **Nodos**: equivalentes.
+- **Aristas**: relación de equivalencia.
+- **Pesos**: similitud nutricional.
+
+Permite: encontrar sustitutos en N pasos, detectar comunidades (grupos), calcular diversidad del menú.
+
+### 36.22 Sustituciones: 5 niveles
+
+| Nivel | Tipo | Descripción |
+|-------|------|-------------|
+| **0** | Oficial automática | Mismo alimento, misma equivalencia, distinta forma de preparación |
+| **1** | Oficial misma equivalencia | Mismo grupo + mismo subgrupo, kcal ±5% |
+| **2** | Oficial misma equivalencia funcional | Mismo grupo, kcal ±10% |
+| **3** | Cruzada validada | Distinto grupo, kcal ±5%, validada por la nutrióloga (queda como "no oficial aprobada") |
+| **4** | IA sugerida | Propuesta por módulo IA, requiere aprobación explícita, marcada como "sugerencia IA" |
+
+### 36.23 Algoritmo de sugerencia de sustituciones
+
+```
+1. Identificar grupo y subgrupo del alimento a sustituir.
+2. Aplicar filtros del paciente (alergias, intolerancias, preferencias, aversiones, presupuesto).
+3. Aplicar filtros clínicos (ej. ERC → restringir alimentos altos en potasio).
+4. Calcular candidatos:
+   - Primero, sustituciones del mismo subgrupo con kcal más cercana.
+   - Segundo, mismo grupo con kcal cercana.
+   - Tercero, candidatos validados por la nutrióloga previamente.
+   - Cuarto, sugerencias de IA (si está activada).
+5. Ordenar por similitud (kcal, macros, fibra, sodio, micronutrimentos clave).
+6. Mostrar al profesional con explicación de la diferencia nutricional.
+```
+
+### 36.24 Trazabilidad de sustitución
+
+Cada sustitución aplicada registra: alimento original, alimento sustituto, tipo (oficial/nivel 1/2/3/4), equivalentes aplicados, diferencia nutricional (antes/después), autor (nutrióloga o IA), fecha y hora, justificación clínica (opcional).
+
+### 36.25 Sustituciones en lote
+
+- "Sustituir todas las apariciones de X por Y" (validación previa de coherencia).
+- "Variar menú" (buscar diversidad automáticamente respetando macros y restricciones).
+
+### 36.26 Validaciones a nivel de menú
+
+- Total kcal vs objetivo.
+- Distribución de macros vs objetivo.
+- Fibra (g y g/1000 kcal).
+- Sodio total vs límite.
+- Azúcar añadida (% kcal).
+- Grasas saturadas y trans.
+- Cobertura de grupos SMAE.
+- Equivalentes diarios por grupo.
+- Micronutrimentos críticos.
+- Variedad (≤2 repeticiones del mismo alimento en un día).
+- Hidratación sugerida.
+
+### 36.27 Validaciones a nivel de paciente
+
+| Validación | Regla |
+|------------|-------|
+| Compatibilidad clínica | Ej. ERC + menú alto en potasio → alerta |
+| Alergias | Ningún alimento con alérgeno del paciente (bloqueante) |
+| Intolerancias | Evitar umbral o marcar advertencia |
+| Interacciones fármaco-alimento | Lista validada de medicamentos |
+| Embarazo/lactancia | Excluir alimentos de riesgo (pescado alto mercurio, lácteos no pasteurizados, embutidos crudos) |
+| Preferencia cultural/religiosa | Excluir según filtros del paciente |
+| Presupuesto | Advertencia si ingredientes exceden rango |
+
+### 36.28 Severidad de alertas
+
+- **Bloqueante (rojo)**: impide guardar el menú. Ej. alérgeno presente.
+- **Advertencia (amarillo)**: permite guardar con justificación obligatoria.
+- **Información (azul)**: nota no obligatoria.
+
+### 36.29 Búsqueda instantánea de alimentos (requisitos)
+
+- Latencia objetivo: **<50 ms** autocompletado, **<200 ms** búsqueda compleja.
+- Tolerancia a errores ortográficos.
+- Búsqueda por múltiples campos (nombre, sinónimos, grupo, subgrupo, alérgeno, etiqueta).
+- Filtrado contextual (por paciente, por tiempo de comida, por grupo).
+- Ranking inteligente (frecuencia de uso, favoritos).
+
+### 36.30 Índices de búsqueda
+
+- Índice textual sobre nombre + sinónimos + tokens.
+- Índice trigrama para búsqueda tolerante a errores.
+- Índice por grupo/subgrupo.
+- Índice por alérgenos/etiquetas.
+- Índice por frecuencia de uso (top N por paciente y global).
+
+### 36.31 Algoritmo de búsqueda (determinista, sin IA)
+
+```
+Entrada: texto del usuario, filtros activos
+  → 1. Normalizar texto (minúsculas, sin acentos opcional, tokenización)
+  → 2. Búsqueda exacta por prefijo (ranking alto)
+  → 3. Búsqueda por tokens (AND de tokens contenidos)
+  → 4. Búsqueda difusa (distancia Levenshtein) si hay pocos resultados
+  → 5. Aplicar filtros: grupo/subgrupo, alérgenos (excluir), etiquetas (incluir/excluir), calorías (rango), paciente (restricciones)
+  → 6. Re-rankear: frecuencia de uso, favoritos del profesional, similitud con el último seleccionado
+  → 7. Devolver top N (10-20) en <50 ms
+```
+
+### 36.32 Búsquedas especiales
+
+- "Verduras bajas en potasio": filtro por micronutrimento.
+- "Sin gluten, alta fibra": filtro combinado.
+- "Alimentos que pueden sustituir al pollo": usa el grafo de equivalencias.
+- "Todos los alimentos con manzana": por nombre + sinónimos.
+- "Lo que más uso": ranking por frecuencia.
+
+### 36.33 Cálculo automático de equivalencias (pipeline)
+
+```
+Cantidad ingresada (ej. 150 g de manzana)
+  → 1. Identificar alimento y medida
+  → 2. Determinar método de preparación (crudo/cocido/al vapor, aplicar factor de rendimiento si es cocido)
+  → 3. Obtener peso neto (g) = peso capturado
+  → 4. Calcular: número_de_equivalentes = peso_neto / porción_oficial
+  → 5. Multiplicar valores nutricionales por número de equivalentes
+  → 6. Devolver: equivalentes (con decimales: 1.5, 2.3, etc.), kcal, P, L, CHO, fibra, micros, alérgenos activos, restricciones aplicables al paciente
+```
+
+### 36.34 Medidas caseras
+
+- Catálogo de medidas caseras por alimento (pieza, taza, cucharada, rebanada, etc.).
+- Relación medida → gramos.
+- Si no existe, capturar manualmente y guardar como "medida personalizada".
+
+### 36.35 Redondeo de equivalentes
+
+- Por defecto: 2 decimales (1.50, 2.25, etc.).
+- Opcional: redondear a 0.5 (1, 1.5, 2) para simplificar el plan al paciente.
+- Configurable por la nutrióloga.
+
+### 36.36 Equivalencias mixtas (alimentos preparados)
+
+Caso especial: un alimento preparado es combinación de varios grupos (ej. tacos al pastor = tortilla + carne + grasa + verdura).
+
+- El sistema permite **descomposición** del alimento en sus ingredientes base.
+- Cada ingrediente se calcula por separado.
+- La suma conforma el aporte total.
+
+### 36.37 Cálculo inverso (objetivo → alimento)
+
+Dado un objetivo nutricio (ej. necesito 250 kcal de cereal en este tiempo), el sistema puede sugerir:
+
+- "X gramos de A (1.5 eq = 250 kcal)".
+- "Y gramos de B (1.2 eq = 248 kcal)".
+- "Z gramos de C (1.4 eq = 252 kcal)".
+
+Y se elige el más cercano.
+
+### 36.38 Estado actual
+
+✅ **MVP (Sprint 9)**: 2 entidades (Food, FoodGroup) con valores nutricionales inline, 30 alimentos canónicos hardcoded en `SYSTEM_FOODS.ts`, 16 grupos.
+⏳ **Fase 2 (Sprint 12)**: importador Excel/CSV, 5 entidades, versionamiento, búsqueda con ranking, equivalencias.
+⏳ **Fase 3**: importador PDF con OCR, parser por laboratorio.
+
+---
+
+## 37. Anexo: Motor de reglas propio (RETE-like, sin IA)
+
+> **Origen:** Plan Parte III §18-§25. **Fase objetivo:** 3.
+
+### 37.1 Filosofía
+
+- Reglas **declarativas**, editables, auditables.
+- Ejecución **determinista** y reproducible.
+- **Explicable**: "por qué se activó esta regla".
+- Tres categorías: validación, sugerencia, bloqueo.
+
+### 37.2 Arquitectura (pipeline)
+
+```
+HECHOS (estado del paciente, menú propuesto, contexto)
+  → MEMORIA DE TRABAJO (hechos activos)
+  → MOTOR DE INFERENCIA
+       - Algoritmo RETE-like o similar (en memoria, no recursivo)
+       - Prioridad de reglas
+       - Encadenamiento hacia adelante
+  → REGLAS (base de conocimiento)
+  → SALIDAS:
+       - Alertas (info, advertencia, bloqueo)
+       - Sugerencias (con justificación)
+       - Validaciones (cumple/no cumple)
+  → EXPLICACIÓN (qué reglas se aplicaron y por qué)
+```
+
+### 37.3 Estructura de una regla
+
+```ts
+{
+  id: "R-DBT-001",
+  nombre: "Alerta diabetes: azúcar añadida",
+  categoria: "validación clínica",
+  prioridad: 80,
+  condición: (paciente.tiene_condicion("diabetes")
+              AND menu.azucar_anadida_g > 0.10 * menu.kcal / 4),
+  acción: {
+    tipo: "alerta",
+    severidad: "advertencia",
+    mensaje: "El menú supera el 10% de kcal en azúcar añadida",
+    sugerencia: "Reducir equivalentes de azúcares o sustituir por frutas frescas"
+  },
+  fuente: "OMS 2015 / Guía de diabetes",
+  activa: true
+}
+```
+
+### 37.4 Categorías de reglas (5)
+
+#### 37.4.1 Seguridad alimentaria (críticas, no desactivables)
+
+- Alergia + alimento → bloqueo.
+- Embarazo + mercurio → alerta.
+- Embarazo + lácteos no pasteurizados → alerta.
+- Inmunocomprometido + alimentos crudos → alerta.
+
+#### 37.4.2 Ajuste por condición clínica
+
+- **ERC**: restricción de potasio, fósforo, proteína (según estadio).
+- **Diabetes**: control de CHO, fibra, índice glucémico.
+- **Hipertensión**: sodio <2000 mg, alcohol.
+- **Dislipidemia**: grasas saturadas <7%, trans=0.
+- **Obesidad**: déficit calórico seguro (no <1200 kcal en mujeres, 1500 en hombres).
+- **Bajo peso**: superávit, comidas pequeñas y frecuentes.
+- **Embarazo**: ácido fólico, hierro, calcio, evitar alcohol.
+- **Lactancia**: hidratación, calcio, yodo.
+- **Anemia**: hierro, B12, folato, vit C.
+- **Osteoporosis**: calcio, vit D, magnesio, proteínas adecuadas.
+- **Celiaquía**: cero gluten.
+- **Intolerancia a lactosa**: restricción o deslactosados.
+- **Hiperuricemia/gota**: restricción de purinas (mariscos, vísceras, alcohol).
+- **Gastroparesia**: comidas pequeñas, baja fibra insoluble, baja grasa.
+- **Reflujo**: evitar irritantes, fraccionar comidas.
+- **SII (FODMAP)**: restricción temporal según tolerancia.
+
+#### 37.4.3 Calidad nutricional
+
+- Cobertura de grupos SMAE.
+- Adecuación de fibra.
+- Distribución hídrica.
+- Micronutrimentos clave.
+- Azúcar añadida.
+- Sodio total.
+- Grasas saturadas y trans.
+- Variedad (≤2 repeticiones del mismo alimento en un día).
+- Distribución de macros vs objetivo.
+- Adecuación calórica ±5%.
+
+#### 37.4.4 Progresión (seguimiento)
+
+- Pérdida de peso máxima: 1% del peso corporal/semana.
+- Ganancia muscular: superávit moderado, proteína suficiente.
+- Regreso a mantenimiento: gradual, no abrupto.
+
+#### 37.4.5 Sustitución inteligente
+
+- Sugerir mismo grupo.
+- Marcar equivalencias validadas vs no validadas.
+- Bloquear sustituciones peligrosas (alergia cruzada).
+
+#### 37.4.6 Presentación al paciente
+
+- Lenguaje claro (sin tecnicismos en documentos para paciente).
+- Incluir lista de compras.
+- Incluir equivalencias visuales (mano, taza, etc.).
+
+### 37.5 Ciclo de vida de las reglas (7 etapas)
+
+1. **Alta**: nutrióloga o desarrollador crea la regla.
+2. **Prueba**: suite de casos clínicos.
+3. **Validación clínica**: revisión por comité asesor.
+4. **Activación**: entra a producción.
+5. **Monitoreo**: frecuencia de disparo, falsos positivos.
+6. **Refinamiento**: ajustes por retroalimentación.
+7. **Deprecación**: reemplazo por nueva versión.
+
+### 37.6 Explicación de decisiones
+
+Cada alerta o sugerencia incluye:
+
+- Regla aplicada (id y nombre).
+- Condición que se cumplió (qué valores del paciente/menú dispararon).
+- Mensaje claro en lenguaje profesional.
+- Recomendación de acción.
+- Fuente (guía, autor, fecha).
+- Severidad.
+
+La nutrióloga puede: **aceptar** la sugerencia, **rechazarla con justificación**, o **modificar la regla** (avanzado).
+
+### 37.7 Rendimiento del motor
+
+- **Evaluación incremental**: solo reglas afectadas por el cambio.
+- **Cache de resultados** durante una sesión de edición.
+- **Re-evaluación selectiva** tras cambios relevantes.
+- Tiempo objetivo: **<30 ms** para menú completo (<50 alimentos).
+- Concurrencia: el motor es **stateless** entre invocaciones; permite paralelismo futuro.
+
+### 37.8 Auditoría del motor
+
+Cada ejecución registra: contexto (paciente, menú, fecha), reglas evaluadas, reglas disparadas, salidas producidas, aceptaciones/rechazos del profesional, hash de integridad.
+
+### 37.9 Capas de seguridad (4)
+
+1. **Capa 1 - Bloqueante**: impide guardar el menú. Ej. alérgeno.
+2. **Capa 2 - Advertencia con justificación**: permite guardar con texto obligatorio.
+3. **Capa 3 - Información**: nota no obligatoria.
+4. **Capa 4 - Sugerencia de mejora**: la nutrióloga puede o no aplicar.
+
+### 37.10 Estado actual
+
+⏳ No implementado. Sprint candidato: **Sprint 15-16 (clinical-engine)**, en conjunto con la integración con los módulos 26 (objetivos) y 24 (laboratorio).
+
+---
+
+## 38. Anexo: Motor de menús (cálculo calorías/macros, ranking, flujo integrado)
+
+> **Origen:** Plan Parte II §9-§17. **Estado actual:** MVP con planCalculations (Sprint 6) y SlotProgress (Sprint 10).
+
+### 38.1 Principios del motor
+
+- **Determinista y auditable**: cada decisión es trazable.
+- **Tiempo real**: cualquier cambio actualiza totales en <100 ms.
+- **Sin cajas negras**: la nutrióloga ve por qué se sugirió cada cosa.
+- **Editable**: el profesional siempre tiene la última palabra.
+
+### 38.2 Cálculo de calorías (5 pasos)
+
+1. **TMB** (selección de fórmula por defecto o por la nutrióloga).
+2. **GET = TMB × factor de actividad**.
+3. **Ajuste por objetivo**:
+   - Mantener: 0%.
+   - Pérdida: -10% a -20% (configurable, ritmo seguro).
+   - Ganancia: +10% a +15%.
+4. **Ajuste por condición clínica**:
+   - Embarazo: +1T (1er), +340 kcal (2°), +452 kcal (3°) (IOM).
+   - Lactancia: +500 kcal.
+   - Lesión/cirugía: +10-20%.
+5. **GET ajustado = kcal objetivo diario**.
+
+### 38.3 Distribución por tiempo de comida
+
+Configuración por defecto (modificable):
+
+| Tiempo | Default | Pacientes con 3 tiempos |
+|--------|---------|-------------------------|
+| Desayuno | 25% | 25-30% |
+| Colación AM | 10% | — |
+| Comida | 35% | 35-40% |
+| Colación PM | 10% | — |
+| Cena | 20% | 25-30% |
+
+### 38.4 Cálculo por tiempo
+
+```
+kcal_tiempo = GET_ajustado × %_del_tiempo
+```
+
+El motor trabaja con el rango (mínimo-máximo) por tolerancia ±5%.
+
+### 38.5 Distribución de macronutrimentos (AMDR)
+
+| Macro | % AMDR | Ejemplos de ajuste |
+|-------|--------|---------------------|
+| Carbohidratos | 45-65% | 40% en diabetes con CHO controlados; 60% en atleta de resistencia |
+| Proteínas | 10-35% | 15-20% general; 20-25% en deporte; 10-15% en ERC avanzada |
+| Lípidos | 20-35% | 25-30% general; <30% en dislipidemia; 30% en keto (caso especial) |
+| Fibra | 14 g/1000 kcal | 25-30 g estándar; 38 g en hombres; 25 g en mujeres (IOM) |
+
+### 38.6 Cálculo en gramos
+
+```
+g_proteína = (GET_ajustado × %_P) / 4
+g_grasas = (GET_ajustado × %_L) / 9
+g_CHO = (GET_ajustado × %_CHO) / 4
+g_fibra = (GET_ajustado / 1000) × 14
+```
+
+### 38.7 Verificación de coherencia
+
+```
+kcal_calculadas = (g_P×4) + (g_L×9) + (g_CHO×4) + (g_Alcohol×7) - (g_fibra×2) [opcional]
+```
+
+Si difiere del GET_ajustado en más de ±5%, ajustar distribución.
+
+### 38.8 Equivalentes objetivo por grupo (default)
+
+| Grupo | Equivalentes/día |
+|-------|------------------|
+| Verduras | 3-5 |
+| Frutas | 2-4 |
+| Cereales (sin grasa) | 4-8 |
+| Cereales (con grasa) | 2-4 |
+| Leguminosas | 1-2 |
+| AOA muy bajo aporte graso | 2-3 |
+| AOA moderado aporte graso | 2-3 |
+| AOA alto aporte graso | 1-2 |
+| Leche descremada | 0-2 |
+| Leche entera | 0-1 |
+| Aceites y grasas | 3-6 |
+| Azúcares | 0-2 (limitar) |
+| Alimentos libres | ad libitum (no cuentan) |
+
+Rangos ajustables por edad, sexo, condición.
+
+### 38.9 Estructura del día (4 plantillas)
+
+- 3 tiempos (desayuno, comida, cena).
+- 4 tiempos (3 anteriores + 1 colación).
+- 5 tiempos (desayuno, colación AM, comida, colación PM, cena).
+- 6 tiempos (añadir colación nocturna, ej. diabetes o deporte nocturno).
+
+### 38.10 Distribución por grupo y tiempo
+
+El motor reparte los equivalentes diarios entre los tiempos respetando:
+
+- Concentración de carbohidratos en horas activas.
+- Proteína distribuida uniformemente.
+- Verduras presentes en comida y cena.
+- Grasas moderadas en cada tiempo.
+- Frutas preferentemente en desayunos y colaciones.
+
+### 38.11 Ranking de alimentos favoritos (determinista, sin IA)
+
+**Mecanismo:**
+- Marcador explícito: la nutrióloga marca alimentos como "favoritos" (estrella).
+- Contador de uso: cada vez que se agrega al menú, incrementa contador por profesional y por paciente.
+- Ranking ponderado:
+
+```ts
+score = (favorito ? 100 : 0)
+      + (uso_profesional_top10 ? 80 : uso_profesional_top50 ? 40 : 0)
+      + (uso_paciente_top10 ? 60 : 0)
+      + (preferencia_paciente_match ? 20 : 0)
+      + (grupo_objetivo_match ? 30 : 0)
+      - (filtro_clinico_bloqueante ? 1000 : filtro_advertencia ? 30 : 0)
+```
+
+**Favoritos por condición clínica**: la nutrióloga puede tener favoritos predefinidos por patología ("Favoritos para diabetes", "ERC", "embarazo").
+
+**Favoritos por presupuesto**: si el paciente tiene un presupuesto limitado, se priorizan alimentos económicos dentro del grupo.
+
+### 38.12 Lista negra dinámica por paciente (bloqueante)
+
+Por cada paciente, se construye una lista de bloqueo que combina:
+
+- Alergias (bloqueante, todas las severidades).
+- Intolerancias (según severidad: bloqueante o advertencia).
+- Aversiones explícitas (bloqueante).
+- Restricciones religiosas (bloqueante: cerdo en kosher/halal, carne en vegano).
+- Restricciones culturales.
+- Interacciones fármaco-alimento (advertencia/bloqueante según severidad).
+- Condición clínica + alimento contraindicado (ej. ERC + alto potasio, hiperuricemia + mariscos).
+
+**Mecanismo**: en la búsqueda, los alimentos bloqueados no aparecen por defecto. Existe un toggle "mostrar bloqueados" para casos donde la nutrióloga quiera revisar manualmente. Al intentar agregar un alimento bloqueado, el sistema bloquea la acción y muestra la razón.
+
+**Filtrado por tiempo de comida** (sugerencia, no bloqueo):
+- Frutas: desayuno, colaciones, comida, cena.
+- Cereales calientes: desayuno, cena.
+- Leguminosas: comida, cena (no colación).
+- Lácteos: desayuno, colación, cena.
+- Verduras: comida, cena, almuerzo.
+
+**Auditoría de bloqueo**: cada intento de agregar un alimento bloqueado queda registrado.
+
+### 38.13 Generación de menú en tiempo real (arquitectura <100 ms)
+
+```
+Acción del usuario (agregar/quitar alimento, cambiar cantidad)
+  → Capa de presentación: emite evento
+  → Capa de aplicación: handler del evento
+       1. Validar alimento contra perfil del paciente (<5 ms)
+       2. Calcular aporte del cambio (<10 ms)
+       3. Actualizar totales del menú (<10 ms)
+       4. Recalcular distribución por tiempo (<10 ms)
+       5. Ejecutar motor de reglas (<30 ms)
+       6. Actualizar UI (<20 ms)
+  → Total: <100 ms por interacción
+```
+
+### 38.14 Estado del menú en memoria
+
+```ts
+type MenuActivo = {
+  paciente_id: string;
+  fecha: string;
+  tiempos: Map<TiempoComida, List<AlimentoEnMenu>>;
+  totales: { kcal, P, L, CHO, fibra, sodio, ... };
+  alertas: List<Alerta>;
+  estado: "borrador" | "validado" | "firmado";
+  version_smae: string;
+};
+```
+
+### 38.15 Flujo de generación integrado (7 fases)
+
+1. **Apertura del paciente**: cargar perfil clínico, alergias, objetivos.
+2. **Definición del plan**: selección de fórmula de TMB, factor de actividad, ajuste por objetivo y condición, distribución de macros y tiempos.
+3. **Generación del esqueleto**: cálculo de kcal por tiempo, equivalentes por grupo/tiempo, selección inicial de alimentos (favoritos + grupo), vista previa con totales estimados.
+4. **Edición iterativa**: agregar/quitar/sustituir alimentos, ajustar cantidades, recálculo en tiempo real, alertas activas del motor.
+5. **Validación**: motor experto todas las reglas críticas, verificación de cobertura, verificación de macros, sugerencias finales.
+6. **Cierre**: justificaciones pendientes, firma de la nutrióloga, snapshot con versión SMAE, generación de PDF para paciente.
+7. **Seguimiento**: bitácora de adherencia en próximas consultas.
+
+### 38.16 Generación automática (esqueleto, algoritmo determinista)
+
+1. Para cada tiempo, para cada grupo prioritario, seleccionar alimento top-N.
+2. Verificar que cubra kcal objetivo del tiempo.
+3. Ajustar cantidades hasta cumplir.
+4. Validar cobertura.
+5. Devolver esqueleto sugerido.
+
+### 38.17 Soporte de undo/redo
+
+Cada cambio es reversible. Estado completo del menú en memoria con historial.
+
+### 38.18 Persistencia
+
+- Auto-guardado cada 5 segundos o tras cada cambio mayor.
+- Versiones del menú (no se pierde trabajo).
+- Al cerrar la app, se recupera el último estado.
+
+### 38.19 Recalculación automática (eventos que disparan recálculo)
+
+| Evento | Acción |
+|--------|--------|
+| Agregar alimento | Sumar aporte |
+| Quitar alimento | Restar aporte |
+| Cambiar cantidad | Recalcular diff |
+| Sustituir alimento | Comparar aportes |
+| Cambiar tiempo de comida | Mover ítem |
+| Cambiar objetivo calórico | Reajustar equivalentes |
+| Cambiar % de macros | Recalcular distribución |
+| Agregar/quitar restricción | Re-evaluar cobertura |
+
+### 38.20 Pipeline de recálculo
+
+```
+Evento
+  → 1. Identificar qué cambió
+  → 2. Obtener aporte nuevo del alimento (de SMAE)
+  → 3. Aplicar cambio al estado del menú
+  → 4. Recalcular totales del menú
+  → 5. Recalcular cobertura de grupos
+  → 6. Recalcular distribución por tiempo (% real)
+  → 7. Ejecutar motor de reglas (validaciones)
+  → 8. Emitir nuevo estado a la UI
+  → 9. Persistir (si pasa umbral)
+```
+
+### 38.21 Recálculo de impacto global
+
+Si se modifica el objetivo calórico o la distribución:
+
+- Reajustar equivalentes objetivo por grupo/tiempo.
+- Marcar qué alimentos exceden o faltan del nuevo objetivo.
+- Sugerir ajustes automáticos (que la nutrióloga puede aceptar o rechazar).
+
+### 38.22 Coherencia tras sustitución
+
+- Mostrar diff nutricional (antes/después).
+- Si la diferencia >10% en algún macro, mostrar advertencia.
+- Sugerir reequilibrio de otros alimentos si es necesario.
+
+### 38.23 Idempotencia y debouncing
+
+- El recálculo es **idempotente**: el mismo evento produce el mismo resultado.
+- No hay reentradas infinitas.
+- Eventos encolados si vienen en ráfaga (debouncing).
+
+### 38.24 Indicadores de calidad del menú (panel lateral en tiempo real)
+
+- kcal (real vs objetivo, con porcentaje).
+- Proteína (g, % kcal, g/kg de peso).
+- Lípidos (g, % kcal, saturadas, trans).
+- Carbohidratos (g, % kcal, fibra).
+- Sodio (mg, vs límite).
+- Cobertura SMAE (X/Y grupos).
+- Alertas activas (número, severidad).
+- Variedad (alimentos únicos vs total).
+- Distribución hídrica sugerida.
+
+### 38.25 Estado actual
+
+✅ **MVP (Sprint 6)**: MealPlan con 5 slots, 30 alimentos SMAE, `planCalculations`, `DEFAULT_KCAL_DISTRIBUTION`.
+✅ **Sprint 10**: SlotProgress con barras de kcal, delta vs distribución, drag&drop.
+⏳ **Fase 2**: motor de ranking, lista negra, undo/redo, generación de esqueleto, recálculo en tiempo real.
+⏳ **Fase 3**: motor de reglas completo, equivalencias mixtas, cálculo inverso.
+
+---
+
+## 39. Anexo: Navegación completa, layouts y estrategias de productividad
+
+> **Origen:** Plan Doc 48 §1-§3, §6-§9. **Fase objetivo:** 2-3.
+
+### 39.1 Jerarquía de información (5 niveles)
+
+1. **Nivel 1 - Identidad del paciente** (siempre visible, persistente).
+2. **Nivel 2 - Contexto clínico** (motivo, alertas, snapshot).
+3. **Nivel 3 - Acción actual** (formulario, captura, plan).
+4. **Nivel 4 - Datos derivados** (cálculos, tendencias, totales).
+5. **Nivel 5 - Detalle y auditoría** (a un clic de distancia, no por defecto).
+
+### 39.2 Estrategia de navegación (triple eje)
+
+1. **Sidebar principal** (módulos).
+2. **Pestañas superiores** (sub-sección dentro del módulo).
+3. **Command palette** (saltar a cualquier lugar).
+
+- URLs estables (deep linking, historial de navegador).
+- Búsqueda global siempre accesible (Cmd/Ctrl + K).
+- Recientes y favoritos en el sidebar.
+
+### 39.3 Estrategia de productividad
+
+- Atajos de teclado para todo lo crítico.
+- Autocompletado inteligente en formularios largos.
+- Plantillas reutilizables (consulta tipo, menú tipo, receta tipo).
+- Snapshots automáticos cada 5 s.
+- Command palette al estilo Raycast.
+- Quick actions contextuales (botones que aparecen según el objeto seleccionado).
+- Multi-selección para acciones en lote.
+- Drag & drop donde aplique (alimentos al menú, citas en agenda).
+
+### 39.4 Estrategia offline-first (UI)
+
+- Indicador siempre presente (estado de conexión).
+- Modo edición transparente: el usuario nunca nota que está offline.
+- Cola de cambios visible pero discreta.
+- Resolución de conflictos diferida y asistida.
+- Recuperación silenciosa al volver online.
+
+### 39.5 Estrategia para minimizar clics
+
+- Acciones primarias en la barra de herramientas del contexto, no en menús anidados.
+- Atajos mnemotécnicos: **P** (paciente), **A** (agenda), **M** (menú), **R** (receta).
+- Doble Enter para confirmar valores en formularios rápidos.
+- Vista de un solo panel con tabs para sub-flujos.
+- Modales solo para confirmaciones críticas, no para acciones rutinarias.
+- **In-place editing** en tablas y cards (no abrir drawers para editar).
+
+### 39.6 Árbol de navegación principal completo
+
+```
+Inicio
+  ├─ Dashboard
+  ├─ Pacientes
+  │   ├─ Listado
+  │   ├─ Nuevo paciente
+  │   └─ Ficha de paciente
+  │       ├─ Resumen
+  │       ├─ Expediente clínico
+  │       ├─ Antropometría
+  │       ├─ Laboratorios
+  │       ├─ Diagnósticos
+  │       ├─ Objetivos
+  │       ├─ Plan alimentario
+  │       ├─ Recetario asignado
+  │       ├─ Documentos
+  │       ├─ Adherencia
+  │       └─ Auditoría
+  │   └─ Importar / Exportar
+  ├─ Consultas
+  │   ├─ Agenda (día, semana, mes)
+  │   ├─ Nueva consulta
+  │   ├─ Consulta activa (workspace)
+  │   └─ Historial de consultas
+  ├─ Antropometría
+  │   ├─ Captura
+  │   ├─ Histórico
+  │   ├─ Comparativos
+  │   └─ Equipos
+  ├─ Laboratorios
+  │   ├─ Captura
+  │   ├─ Histórico
+  │   ├─ Catálogo de parámetros
+  │   └─ Reglas de correlación
+  ├─ Diagnóstico Nutricional
+  │   ├─ Constructor
+  │   ├─ Catálogo de diagnósticos
+  │   └─ Criterios
+  ├─ Objetivos Clínicos
+  │   ├─ Por paciente
+  │   ├─ Catálogo
+  │   ├─ Plantillas
+  │   └─ Métricas
+  ├─ Plan Alimentario
+  │   ├─ Generación
+  │   ├─ Edición
+  │   ├─ Historial
+  │   └─ Validación
+  ├─ Motor de Menús
+  │   ├─ Generador
+  │   ├─ Banco de alimentos (SMAE)
+  │   ├─ Sustituciones
+  │   ├─ Distribuidor
+  │   └─ Validación clínica
+  ├─ Recetario
+  │   ├─ Catálogo
+  │   ├─ Crear receta
+  │   ├─ Versiones
+  │   ├─ Costos
+  │   └─ Asignación a pacientes
+  ├─ Lista de Compras
+  │   ├─ Generador
+  │   ├─ Historial
+  │   └─ Plantillas
+  ├─ Adherencia
+  │   ├─ Registros
+  │   ├─ Bitácora de pacientes
+  │   ├─ Índice global
+  │   └─ Barreras
+  ├─ Catálogo SMAE
+  │   ├─ Grupos y subgrupos
+  │   ├─ Alimentos
+  │   ├─ Equivalentes
+  │   ├─ Sustituciones oficiales
+  │   ├─ Importación
+  │   └─ Versionamiento
+  ├─ Catálogo de Medicamentos
+  │   ├─ Principios activos
+  │   ├─ Interacciones
+  │   └─ Reglas clínicas
+  ├─ Documentos
+  │   ├─ Plantillas
+  │   ├─ Generador
+  │   ├─ Firmados
+  │   └─ Entregados
+  ├─ Reportes
+  │   ├─ Consultorio
+  │   ├─ Clínicos
+  │   ├─ Operativos
+  │   ├─ Financieros
+  │   ├─ Regulatorios
+  │   └─ Personalizados
+  ├─ Portal del Paciente (Fase 5)
+  │   ├─ Configuración
+  │   ├─ Pacientes activos
+  │   └─ Materiales
+  ├─ Configuración
+  │   ├─ Consultorio
+  │   ├─ Profesional
+  │   ├─ Usuarios y roles
+  │   ├─ Parámetros clínicos
+  │   ├─ Catálogos
+  │   ├─ Integraciones
+  │   └─ Preferencias
+  ├─ Seguridad
+  │   ├─ Bitácoras
+  │   ├─ Respaldos
+  │   ├─ Incidentes
+  │   ├─ Claves y certificados
+  │   └─ Cumplimiento
+  └─ Ayuda
+      ├─ Documentación
+      ├─ Atajos
+      ├─ Tutoriales
+      └─ Soporte
+```
+
+### 39.7 Navegación principal (sidebar)
+
+- Icono + etiqueta.
+- Items agrupados por dominio.
+- Reordenable por el usuario.
+- Colapsable (versión solo iconos).
+- Búsqueda rápida en el sidebar (filtrado fuzzy).
+- Indicador de alertas en cada item.
+
+### 39.8 Navegación secundaria (tabs)
+
+- Pestañas en la parte superior del workspace.
+- Cierre de pestañas con clic en X o swipe lateral.
+- Drag para reordenar.
+- Persistencia entre sesiones.
+- Pestaña activa destacada con línea inferior de color primario.
+
+### 39.9 Breadcrumbs
+
+`Inicio / Pacientes / María González Pérez / Consulta #4 / Plan alimentario`
+
+- Cada segmento es clickeable.
+- Truncamiento inteligente en rutas largas.
+- Dropdown en cada segmento con elementos hermanos.
+
+### 39.10 Navegación móvil/portal (PWA)
+
+- Bottom navigation bar (5 items principales).
+- Menú hamburguesa para el resto.
+- Gestures: swipe atrás, pull-to-refresh.
+- Sticky header con identidad del paciente.
+
+### 39.11 Estrategia para minimizar clics (reglas operativas)
+
+1. **Acciones primarias en toolbar del contexto**, no en menús anidados.
+2. **Atajos mnemotécnicos**: P (paciente), A (agenda), M (menú), R (receta).
+3. **Doble Enter** para confirmar valores en formularios rápidos.
+4. **Vista de un solo panel con tabs** para sub-flujos.
+5. **Modales solo para confirmaciones críticas** (no para acciones rutinarias).
+6. **In-place editing** en tablas y cards (no drawers para editar).
+
+### 39.12 Estado actual
+
+✅ **MVP**: sidebar con 11 secciones, command palette (Sprint 7), tabs en paciente/consulta.
+⏳ **Fase 2**: persistencia de tabs, reordenable por usuario, atajos mnemotécnicos, plantillas reutilizables.
+⏳ **Fase 3**: navegación contextual con IA, deep linking, navegación móvil/portal.
+
+---
+
+## 40. Anexo: Flujos detallados de sync offline, conflictos y casos especiales
+
+> **Origen:** Plan §47.9-§47.10, §5 del plan Parte V, §6.5 conflict resolver. **Fase objetivo:** 3.
+
+### 40.1 Sincronización: 3 modos
+
+- **Online-first**: el cliente consulta al servidor directamente (portal, app).
+- **Offline-first**: el cliente tiene copia local; sincroniza cuando hay conexión (desktop, app).
+- **Sync bidireccional**: cambios en cliente se propagan al servidor y viceversa.
+
+### 40.2 Estrategia de sincronización
+
+- Timestamps lógicos (Lamport clocks o version vectors).
+- Conflict resolution: último en guardar gana con advertencia y bitácora.
+- Campos especiales: `updated_at`, `version`, `client_id`.
+- Detección de cambios: dirty checking periódico.
+- Cola de cambios: outbox pattern.
+- Sincronización incremental: por timestamp o cursor.
+- Sincronización completa: periódica para reconciliación.
+
+### 40.3 Eventos del sistema
+
+- **Event bus interno** (Redis Streams, NATS, Kafka según escala).
+- **Eventos de dominio**: paciente creado, consulta cerrada, etc.
+- **Eventos técnicos**: sync solicitada, error, etc.
+- **Consumidores múltiples**: notificaciones, auditoría, IA.
+
+### 40.4 Manejo de conflictos
+
+- Detección por timestamp y versión.
+- Presentación al usuario cuando hay conflicto.
+- Merge automático para campos no críticos.
+- Log de todos los conflictos resueltos.
+
+### 40.5 Modo offline: principios
+
+- 100% funcional offline para consulta.
+- Sincronización transparente cuando vuelve la conexión.
+- Indicador visual de estado de conexión.
+- Cola local de cambios pendientes.
+- Resolución diferida de conflictos.
+
+### 40.6 Almacenamiento local
+
+- IndexedDB (frontend web).
+- SQLite (desktop).
+- Realm (móvil).
+- Datos sensibles cifrados localmente.
+- Cuota de almacenamiento gestionada.
+
+### 40.7 Datos en local (qué se mantiene offline)
+
+- Catálogo SMAE (versión actual).
+- Pacientes del profesional.
+- Expedientes activos.
+- Historial reciente (últimas N consultas).
+- Cola de cambios pendientes.
+
+### 40.8 Sincronización al reconectar (5 pasos)
+
+1. Subir cambios locales.
+2. Bajar cambios remotos.
+3. Reconciliar.
+4. Actualizar UI.
+5. Notificar al usuario.
+
+### 40.9 Sincronización al reconectar — UI
+
+1. Sistema detecta pérdida de conexión.
+2. Banner sutil aparece: "Modo sin conexión".
+3. Indicador en status bar: ⬤ Desconectado.
+4. Cambios se guardan localmente con timestamp.
+5. Indicador de cambios pendientes: "5 cambios por sincronizar".
+6. Conexión se restablece.
+7. Sistema sube cambios al servidor (con feedback).
+8. Sistema baja cambios remotos.
+9. Resolución de conflictos (si los hay):
+   a) Modal de resolución.
+   b) Diff lado a lado.
+   c) Elegir versión o merge.
+10. Banner "Sincronización completa".
+11. Indicador: ⬤ Sincronizado.
+
+### 40.10 Resolución de conflictos — UI (5 pasos)
+
+1. Al detectar conflicto, modal/drawer aparece.
+2. Lado a lado:
+   a) Versión local (mía).
+   b) Versión remota (del servidor).
+   c) Diff resaltado.
+3. Acciones:
+   a) Conservar mía.
+   b) Conservar remota.
+   c) Merge manual.
+4. Confirmación.
+5. Bitácora registra decisión.
+
+### 40.11 Caché multinivel (4 niveles)
+
+| Nivel | Tecnología | Uso |
+|-------|-----------|-----|
+| L1 | Memoria (LRU) | Sesión activa, calculados derivados |
+| L2 | IndexedDB (Dexie) / SQLite local | Datos del usuario, catálogo SMAE, configs |
+| L3 | Service Worker (futuro) | Assets estáticos, PWA offline |
+| L4 | Servidor (Fase 3) / CDN (Fase 4) | SMAE versionado, datos multi-puesto, assets |
+
+**Estrategia:**
+
+- Cache-aside para lecturas.
+- Write-through para escrituras críticas.
+- TTL configurable por tipo de dato.
+- Invalidación por evento.
+- Compresión de datos grandes.
+
+**Datos cacheados:**
+
+- Catálogo SMAE.
+- Lista de pacientes activos.
+- Configuración.
+- Permisos del usuario.
+- Datos derivados (cálculos).
+
+### 40.12 Cola de sincronización (SyncQueueItem)
+
+```
+├─ id
+├─ entity_type (patient, consultation, etc.)
+├─ entity_id
+├─ operation (create, update, delete)
+├─ payload (datos a sincronizar)
+├─ status (pending, syncing, completed, failed, conflict)
+├─ attempts INTEGER
+├─ max_attempts INTEGER (default 10)
+├─ next_retry_at TEXT
+├─ error NULL
+├─ created_at
+└─ completed_at
+```
+
+**Persistencia**: IndexedDB store `sync_queue`. Lectura al iniciar la app. Escritura en cada mutación. Lectura en cada ciclo de sync.
+
+### 40.13 Algoritmo de sincronización (5 pasos)
+
+1. Detectar estado de red.
+2. Si offline → mantener en cola.
+3. Si online:
+   a) Obtener `last_sync_timestamp`.
+   b) Pull: descargar cambios desde `last_sync_timestamp`.
+   c) Aplicar cambios remotos (resolviendo conflictos).
+   d) Push: enviar cambios locales pendientes.
+   e) Actualizar `last_sync_timestamp`.
+4. Si error: reintentar con backoff exponencial.
+
+### 40.14 Algoritmo de cola (Enqueue / Dequeue / Retry)
+
+**Enqueue:**
+1. Operación de escritura.
+2. Crear `SyncQueueItem` con payload.
+3. Persistir en IndexedDB.
+4. Notificar al SyncEngine.
+
+**Dequeue:**
+1. SyncEngine solicita siguiente batch.
+2. Items con `status=pending` OR (`status=failed` AND `next_retry_at <= now`).
+3. Ordenar por `created_at ASC`.
+4. Procesar batch (límite configurable, ej. 20 items).
+
+**Retry:**
+1. Si falla, `attempts++`.
+2. Si `attempts < max_attempts`: backoff exponencial (1min, 2min, 4min, 8min, ...).
+3. Si `attempts >= max_attempts`: marcar como `failed` definitivo + notificar.
+
+### 40.15 Tipos de conflicto (3)
+
+- **Mismo registro, cambios incompatibles**: dos usuarios editaron el mismo campo.
+- **Eliminación vs edición**: alguien eliminó mientras otro editaba.
+- **Versiones divergentes**: snapshots diferentes.
+
+### 40.16 Estrategias de resolución de conflictos (4)
+
+- **Last-write-wins (default)**: gana la última edición por timestamp.
+- **Field-level merge**: combinar campos no conflictivos.
+- **Manual**: presentar al usuario las versiones para decidir.
+- **Server-wins**: en caso de duda, el servidor prevalece.
+
+### 40.17 UI de resolución de conflictos
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Conflicto detectado — Consulta #8                         │
+├───────────────────────────┬────────────────────────────────┤
+│ Local (mía)               │ Remota (servidor)              │
+├───────────────────────────┼────────────────────────────────┤
+│ Peso: 72.4 kg             │ Peso: 71.8 kg                  │
+│ HbA1c: 8.5%               │ HbA1c: 8.7%                    │
+│ Notas: ...                │ Notas: ...                     │
+├───────────────────────────┴────────────────────────────────┤
+│ [Conservar mía] [Conservar remota] [Combinar] [Ver diff]  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 40.18 Manejo de errores de sync
+
+| Error | Acción |
+|-------|--------|
+| Sin red | Mantener en cola, reintentar al volver |
+| Timeout | Marcar como fallido, reintentar con backoff |
+| 4xx (cliente) | No reintentar, marcar como error, notificar al usuario |
+| 5xx (servidor) | Reintentar con backoff |
+| Conflicto | Encolar para resolución manual |
+| Datos corruptos | Marcar para revisión, aislar |
+| Cuota excedida | Backoff largo, alertar al usuario |
+
+### 40.19 Recuperación
+
+- **Re-sync completo**: ante inconsistencia, forzar sync desde cero.
+- **Restore desde snapshot**: si la BD se corrompe, restaurar último snapshot válido.
+- **Rebuild cola**: al iniciar, regenerar cola desde log de cambios si es necesario.
+
+### 40.20 Estado actual
+
+✅ **MVP**: 100% offline con IndexedDB; sync diferido a Fase 3.
+⏳ **Fase 3**: SyncEngine, SyncQueue, ConflictResolver, EventBus.
+
+---
+
 **Próximo paso recomendado:** reemplazar `README.md` con una versión corta (quickstart + links) y dejar `spec.md` como la fuente de verdad del producto y la arquitectura. Crear las ADRs formales en `docs/decisions/` siguiendo la plantilla de Michael Nygard.
