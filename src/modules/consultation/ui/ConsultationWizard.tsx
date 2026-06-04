@@ -15,6 +15,7 @@ import {
   Check,
   FileText,
   Heart,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -27,10 +28,13 @@ import {
 import { consultationService } from "@services/consultationService";
 import { anthropometryService } from "@services/anthropometryService";
 import { labPanelService } from "@services/labPanelService";
+import { clinicalSuggestionService } from "@services/clinicalSuggestionService";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import { Vitals } from "@modules/consultation/domain/Vitals";
+import type { DiagnosticSuggestion, PlanTargetSuggestion } from "@modules/clinical-engine/domain/Suggestion";
+import { ConfidenceLabel } from "@modules/clinical-engine/domain/Suggestion";
 import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
@@ -150,7 +154,7 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           {step === 2 && <StepSubjective errors={errors} />}
           {step === 3 && <StepObjective patientId={patientId} errors={errors} />}
           {step === 4 && <StepLab patientId={patientId} errors={errors} />}
-          {step === 5 && <StepPlan errors={errors} />}
+          {step === 5 && <StepPlan patientId={patientId} errors={errors} />}
           {step === 6 && <StepReview />}
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
@@ -545,10 +549,38 @@ function StepLab({
   );
 }
 
-function StepPlan({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
-  const { register } = useFormContextSafe();
+function StepPlan({
+  patientId,
+  errors,
+}: {
+  patientId: PatientId;
+  errors: FieldErrors<ConsultationFormValues>;
+}) {
+  const { register, watch, setValue } = useFormContextSafe();
+  const anthropometryId = watch("anthropometryId");
+  const labPanelId = watch("labPanelId");
+  const vitalsTaken = watch("vitalsTaken");
+  const vitals = watch("vitalSigns");
   return (
     <div className="space-y-4">
+      <ClinicalSuggestionCard
+        patientId={patientId}
+        anthropometryId={anthropometryId ?? null}
+        labPanelId={labPanelId ?? null}
+        vitalsTaken={!!vitalsTaken}
+        vitals={
+          vitalsTaken && vitals
+            ? Vitals.from({
+                systolicMmHg: vitals.systolicMmHg ?? null,
+                diastolicMmHg: vitals.diastolicMmHg ?? null,
+                heartRateBpm: vitals.heartRateBpm ?? null,
+                temperatureC: vitals.temperatureC ?? null,
+              })
+            : Vitals.empty()
+        }
+        onApplyAssessment={(text) => setValue("assessment", text, { shouldDirty: true })}
+        onApplyPlan={(text) => setValue("plan", text, { shouldDirty: true })}
+      />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -762,4 +794,148 @@ function Field({
 
 function useFormContextSafe() {
   return useFormContext();
+}
+
+interface ClinicalSuggestionCardProps {
+  patientId: PatientId;
+  anthropometryId: string | null;
+  labPanelId: string | null;
+  vitalsTaken: boolean;
+  vitals: Vitals;
+  onApplyAssessment: (text: string) => void;
+  onApplyPlan: (text: string) => void;
+}
+
+const CONFIDENCE_BADGE: Record<"low" | "medium" | "high", "secondary" | "default" | "destructive"> = {
+  low: "secondary",
+  medium: "default",
+  high: "destructive",
+};
+
+function ClinicalSuggestionCard({
+  patientId,
+  anthropometryId,
+  labPanelId,
+  vitalsTaken,
+  vitals,
+  onApplyAssessment,
+  onApplyPlan,
+}: ClinicalSuggestionCardProps) {
+  const [busy, setBusy] = React.useState(false);
+  const [diagnostics, setDiagnostics] = React.useState<DiagnosticSuggestion[] | null>(null);
+  const [plan, setPlan] = React.useState<PlanTargetSuggestion | null>(null);
+
+  const canCompute =
+    anthropometryId !== null || labPanelId !== null || (vitalsTaken && !vitals.isEmpty);
+
+  const onSuggest = async () => {
+    setBusy(true);
+    try {
+      const bundle = await clinicalSuggestionService.gather(patientId, {
+        anthropometryId,
+        labPanelId,
+        vitals: vitalsTaken ? vitals : Vitals.empty(),
+      });
+      setDiagnostics(bundle.diagnostics);
+      setPlan(bundle.plan);
+      if (bundle.diagnostics.length === 0 && bundle.plan === null) {
+        toast.info("Sin sugerencias", {
+          description: "Vincula antropometría o laboratorio para obtener sugerencias.",
+        });
+      } else {
+        toast.success(`${bundle.diagnostics.length} sugerencia(s) diagnóstica(s)`);
+      }
+    } catch (err) {
+      toast.error("No se pudieron generar sugerencias", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onApplyDiagnostics = () => {
+    if (!diagnostics || diagnostics.length === 0) return;
+    const text = diagnostics
+      .map((d) => `${d.label} (${ConfidenceLabel[d.confidence]}) — ${d.rationale}`)
+      .join("\n");
+    onApplyAssessment(text);
+    toast.success("Diagnóstico sugerido insertado en (A)");
+  };
+
+  const onApplyPlanTargets = () => {
+    if (!plan) return;
+    const text =
+      `Plan ${plan.goal === "loss" ? "hipocalórico" : plan.goal === "gain" ? "hipercalórico" : "de mantenimiento"} ` +
+      `${plan.kcalTarget} kcal/día ` +
+      `(proteína ${plan.proteinG} g · CHO ${plan.carbsG} g · grasa ${plan.fatG} g). ` +
+      `BMR ${plan.bmrKcal} kcal (${plan.bmrFormula}), TDEE ${plan.tdeeKcal} kcal (actividad ${plan.activityLevel}). ` +
+      `${plan.rationale}.`;
+    onApplyPlan(text);
+    toast.success("Objetivos de plan insertados en (P)");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Sparkles className="h-4 w-4 text-primary" />
+          Sugerencias del sistema
+        </CardTitle>
+        <CardDescription>
+          Basado en medición antropométrica, laboratorio y signos vitales. El sistema solo sugiere; la decisión clínica es tuya (RN-EXP-12).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="secondary" onClick={onSuggest} disabled={busy || !canCompute}>
+            <Sparkles className="mr-2 h-4 w-4" />
+            {busy ? "Analizando…" : "Sugerir diagnóstico y plan"}
+          </Button>
+          {diagnostics !== null && diagnostics.length > 0 && (
+            <Button type="button" variant="outline" size="sm" onClick={onApplyDiagnostics}>
+              Insertar diagnóstico en (A)
+            </Button>
+          )}
+          {plan !== null && (
+            <Button type="button" variant="outline" size="sm" onClick={onApplyPlanTargets}>
+              Insertar objetivos en (P)
+            </Button>
+          )}
+          {!canCompute && (
+            <p className="text-xs text-muted-foreground">
+              Vincula antropometría, laboratorio o captura signos vitales para habilitar.
+            </p>
+          )}
+        </div>
+
+        {diagnostics !== null && diagnostics.length > 0 && (
+          <ul className="space-y-1 text-sm">
+            {diagnostics.map((d) => (
+              <li key={d.code} className="flex items-start gap-2 rounded-md border bg-muted/20 px-2 py-1.5">
+                <Badge variant={CONFIDENCE_BADGE[d.confidence]} className="shrink-0 text-xs">
+                  {ConfidenceLabel[d.confidence]}
+                </Badge>
+                <div className="flex-1">
+                  <p className="font-medium">{d.label}</p>
+                  <p className="text-xs text-muted-foreground">{d.rationale}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {plan !== null && (
+          <div className="rounded-md border bg-primary/5 p-2 text-sm">
+            <p className="font-medium">
+              {plan.goal === "loss" ? "Déficit" : plan.goal === "gain" ? "Superávit" : "Mantenimiento"} · {plan.kcalTarget} kcal
+            </p>
+            <p className="text-xs text-muted-foreground">
+              P {plan.proteinG} g · CHO {plan.carbsG} g · G {plan.fatG} g · TDEE {plan.tdeeKcal} kcal
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }

@@ -1928,7 +1928,7 @@ Pendiente inmediato (siguiente sprint):
 
 ### Fase 3 — Engine, sync, security (PLANIFICADA)
 
-- ⏳ `clinical-engine` — motor de reglas para sugerir diagnóstico (SNOMED CT) y plan base (feedbacks #7, #8)
+- ✓ `clinical-engine` — motor de reglas para sugerir diagnóstico y plan base (Sprint 13, feedbacks #7, #8)
 - ⏳ Selección de alimentos vía equivalencias inversas (feedback #11)
 - ⏳ No permitir crear plan sin consulta previa (feedback #6)
 - ⏳ `services/sync/` — sync HTTP bidireccional con backend (cuando exista)
@@ -2068,8 +2068,8 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 | 4 | Error Zod genérico en antropometría | Mensajes específicos por campo + onInvalid toast (T3) | `786e9e6` |
 | 5 | Iconos de laboratorio sin contexto | Tooltips Radix con valor + rango + mensaje legible (T4) | `786e9e6` |
 | 6 | No permitir plan sin consulta | **Pendiente — Fase 3** (validación cross-module) | — |
-| 7 | Sistema sugiere diagnóstico | **Pendiente — Fase 3** (`clinical-engine/`) | — |
-| 8 | Plan sugerido por sistema | **Pendiente — Fase 3** (reglas desde consulta) | — |
+| 7 | Sistema sugiere diagnóstico | ✓ Sprint 13 (`clinical-engine/ClinicalSuggestionEngine.suggestDiagnoses`) | — |
+| 8 | Plan sugerido por sistema | ✓ Sprint 13 (`clinical-engine/ClinicalSuggestionEngine.suggestMealPlanTargets`) | — |
 | 9 | Mejor visual distribución de tiempos | **Pendiente — Fase 2** (meal plan UI) | — |
 | 10 | Catálogo SMAE | **Pendiente — Fase 2** (módulo `smae/`) | — |
 | 11 | Seleccionar alimento vía equivalencias SMAE | **Pendiente — Fase 3** (motor de equivalencias) | — |
@@ -2079,9 +2079,9 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 1. **Sprint 8 — Catálogo SMAE navegable** (Fase 2): módulo `smae/` con búsqueda, equivalencias inversas, CRUD de alimentos personalizados. Desbloquea feedback #10 y prepara #11.
 2. **Sprint 9 — Meal plan drag & drop + visual tiempos** (Fase 2): usa `@dnd-kit` ya instalado. Feedback #9 + #11 parcial.
 3. **Sprint 10 — Importer CSV + PDF export** (Fase 2): `services/importer/`, `services/pdf/`.
-4. **Sprint 11 — Backup cifrado** (Fase 2): `services/backup/`, `services/crypto/`.
+4. **Sprint 11 — Backup cifrado** ✅ (Fase 2, ab0f9f0): `services/backup/`, `services/crypto/`.
 5. **Sprint 12 — Plan requires consulta** ✅ (Fase 3, ab0f9f0): validación cross-module con `MealPlanRequiresConsultationError` (missing/not-found/not-active). Feedback #6.
-6. **Sprint 13 — clinical-engine reglas** (Fase 3): motor de diagnóstico y plan sugerido. Feedbacks #7, #8.
+6. **Sprint 13 — clinical-engine reglas** ✅ (Fase 3, Sprint 13): motor de sugerencias diagnósticas y plan base. Feedbacks #7, #8.
 7. **Sprint 14 — Sync queue + HTTP** (Fase 3): `services/sync/`, `services/queue/`, `services/api/`. Cuando exista backend.
 
 ---
@@ -2190,8 +2190,8 @@ pnpm build:tauri               # Empaqueta instalador nativo
 | 4 | Error Zod genérico | 8 | T3 | ✓ mensajes específicos por campo |
 | 5 | Iconos lab sin contexto | 8 | T4 | ✓ Radix Tooltip |
 | 6 | No permitir plan sin consulta | - | - | ✓ Sprint 12 (ab0f9f0) |
-| 7 | Sistema sugiere diagnóstico | - | - | ⏳ Sprint 13 (clinical-engine) |
-| 8 | Plan sugerido por sistema | - | - | ⏳ Sprint 13 |
+| 7 | Sistema sugiere diagnóstico | - | - | ✓ Sprint 13 |
+| 8 | Plan sugerido por sistema | - | - | ✓ Sprint 13 |
 | 9 | Mejor visual tiempos en plan | 9-10 | SlotProgress + barras kcal | ✓ Sprint 10 (`6b345e0`) |
 | 10 | Catálogo SMAE | 9 | SmaeCatalogPage | ✓ Sprint 9 (`8b61a2d`) |
 | 11 | Equivalencias inversas | 10 | FoodPicker tab | ✓ Sprint 10 (`d22683f`) |
@@ -2211,7 +2211,10 @@ pnpm build:tauri               # Empaqueta instalador nativo
 9. **Sprint 8:** integración de feedback v1. T1 (save), T2 (vitales), T3 (errores Zod), T4 (tooltips).
 10. **Sprint 9:** bounded context SMAE con catálogo navegable, equivalencias inversas, CRUD alimentos custom. Spec.md crece a 91KB con handbook completo.
 11. **Sprint 10:** UX del meal plan mejorada (FoodPicker, SlotProgress, drag&drop). **281 tests.**
-12. **Post-Sprint 10 (actual):** enriquecimiento de spec.md con plan completo de arquitectura (466KB → spec de 138KB). **Aquí estamos (pausa).**
+12. **Sprint 10b:** importer CSV de pacientes + export PDF de consulta. **493 tests.**
+13. **Sprint 11 (cleanup):** spec sync — backup cifrado e importer ya estaban en commits previos.
+14. **Sprint 12 (cleanup):** spec sync — `MealPlanRequiresConsultationError` ya integrado en `ab0f9f0`.
+15. **Sprint 13:** motor `clinical-engine` con sugerencias diagnósticas (RN-EXP-11) y plan base (BMR + TDEE + IMC). **519 tests.** Cierra feedbacks #7, #8.
 
 ---
 
