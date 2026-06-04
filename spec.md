@@ -2080,7 +2080,7 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 2. **Sprint 9 — Meal plan drag & drop + visual tiempos** (Fase 2): usa `@dnd-kit` ya instalado. Feedback #9 + #11 parcial.
 3. **Sprint 10 — Importer CSV + PDF export** (Fase 2): `services/importer/`, `services/pdf/`.
 4. **Sprint 11 — Backup cifrado** (Fase 2): `services/backup/`, `services/crypto/`.
-5. **Sprint 12 — Plan requires consulta** (Fase 3): validación cross-module, derivar plan base desde consulta. Feedback #6.
+5. **Sprint 12 — Plan requires consulta** ✅ (Fase 3, ab0f9f0): validación cross-module con `MealPlanRequiresConsultationError` (missing/not-found/not-active). Feedback #6.
 6. **Sprint 13 — clinical-engine reglas** (Fase 3): motor de diagnóstico y plan sugerido. Feedbacks #7, #8.
 7. **Sprint 14 — Sync queue + HTTP** (Fase 3): `services/sync/`, `services/queue/`, `services/api/`. Cuando exista backend.
 
@@ -2189,7 +2189,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 | 3 | Bug botón guardar | 7.5+8 | T1 + ADR-009 | ✓ Zod preprocess + onClick manual |
 | 4 | Error Zod genérico | 8 | T3 | ✓ mensajes específicos por campo |
 | 5 | Iconos lab sin contexto | 8 | T4 | ✓ Radix Tooltip |
-| 6 | No permitir plan sin consulta | - | - | ⏳ Sprint 12 |
+| 6 | No permitir plan sin consulta | - | - | ✓ Sprint 12 (ab0f9f0) |
 | 7 | Sistema sugiere diagnóstico | - | - | ⏳ Sprint 13 (clinical-engine) |
 | 8 | Plan sugerido por sistema | - | - | ⏳ Sprint 13 |
 | 9 | Mejor visual tiempos en plan | 9-10 | SlotProgress + barras kcal | ✓ Sprint 10 (`6b345e0`) |
