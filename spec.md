@@ -646,9 +646,9 @@ export const patientService = {
 | `ai/` | ⏳ planificado | motor de reglas, diagnósticos asistidos (Fase 3) |
 | `api/` | ⏳ planificado | cliente HTTP para sync (Fase 3) |
 | `audit/` | ⏳ planificado | log inmutable de acciones clínicas |
-| `backup/` | ⏳ planificado | export/import JSON cifrado |
-| `crypto/` | ⏳ planificado | cifrado en reposo (Web Crypto + Tauri stronghold) |
-| `importer/` | ⏳ planificado | importar pacientes desde CSV (Fase 2) |
+| `backup/` | ✓ Sprint 11 | export/import JSON cifrado (PBKDF2 600k + AES-GCM 256) |
+| `crypto/` | ✓ Sprint 11 | cifrado en reposo (Web Crypto PBKDF2 + AES-GCM) |
+| `importer/` | ✓ Sprint 10 | importar pacientes desde CSV (RN-IMP-01) |
 | `notification/` | ✓ | wrapper de sonner, centraliza toasts |
 | `pdf/` | ⏳ planificado | exportar consulta/plan a PDF (Fase 2) |
 | `queue/` | ⏳ planificado | cola de acciones offline-first (Fase 3) |
@@ -1920,7 +1920,7 @@ Pendiente inmediato (siguiente sprint):
 - ⏳ `smae` como módulo propio con buscador y equivalencias inversas (feedback #10)
 - ⏳ `services/importer/` — importar pacientes desde CSV
 - ⏳ `services/pdf/` — exportar consulta / plan a PDF
-- ⏳ `services/backup/` + `services/crypto/` — backup cifrado local
+- ✓ `services/backup/` + `services/crypto/` — backup cifrado local (Sprint 11)
 - ⏳ Tests E2E formales (Playwright en CI)
 - ⏳ Drag & drop en meal plan (preparado con @dnd-kit, no usado aún)
 - ⏳ Catálogo navegable de alimentos (feedback #10)
