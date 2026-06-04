@@ -140,4 +140,111 @@ describe("pdfService", () => {
       expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
     });
   });
+
+  describe("generateConsultationPdf", () => {
+    it("transforma Consultation + Patient en PdfConsultationData con vitals y secciones SOAP", () => {
+      const consultation = {
+        id: { toString: () => "c1" },
+        patientId: { toString: () => "p1" },
+        anthropometryId: null,
+        labPanelId: null,
+        consultationNumber: 3,
+        consultationDate: new Date("2026-06-04T10:00:00Z"),
+        status: "completed" as const,
+        reason: "Control mensual",
+        subjective: "Paciente refiere mejora",
+        objective: "Sin edema",
+        assessment: "Buena adherencia",
+        plan: "Continuar plan actual",
+        vitals: {
+          systolicMmHg: 120,
+          diastolicMmHg: 80,
+          heartRateBpm: 72,
+          temperatureC: 36.5,
+          toJSON: () => ({ systolicMmHg: 120, diastolicMmHg: 80, heartRateBpm: 72, temperatureC: 36.5 }),
+        },
+        nextVisitDate: new Date("2026-07-04T10:00:00Z"),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+      const patient = makeMockPatient();
+      const data = pdfService.generateConsultationPdf(consultation as unknown as never, patient as never);
+      expect(data.patientName).toBe("Mar\u00eda G\u00f3mez L\u00f3pez");
+      expect(data.consultationNumber).toBe(3);
+      expect(data.status).toBe("completed");
+      expect(data.reason).toBe("Control mensual");
+      expect(data.vitals.systolicMmHg).toBe(120);
+      expect(data.vitals.diastolicMmHg).toBe(80);
+      expect(data.vitals.heartRateBpm).toBe(72);
+      expect(data.vitals.temperatureC).toBe(36.5);
+      expect(data.nextVisitDate).toMatch(/julio/i);
+      expect(data.anthropometry).toBeNull();
+      expect(data.labPanel).toBeNull();
+    });
+
+    it("incluye resumen antropom\u00e9trico y de laboratorio cuando se pasan al servicio", () => {
+      const consultation = {
+        id: { toString: () => "c2" },
+        patientId: { toString: () => "p1" },
+        anthropometryId: null,
+        labPanelId: null,
+        consultationNumber: 4,
+        consultationDate: new Date("2026-06-04T10:00:00Z"),
+        status: "completed" as const,
+        reason: "Control",
+        subjective: null,
+        objective: null,
+        assessment: null,
+        plan: null,
+        vitals: {
+          systolicMmHg: null,
+          diastolicMmHg: null,
+          heartRateBpm: null,
+          temperatureC: null,
+          toJSON: () => ({ systolicMmHg: null, diastolicMmHg: null, heartRateBpm: null, temperatureC: null }),
+        },
+        nextVisitDate: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
+      };
+      const anthropometry = { weightKg: 70, heightCm: 170, bmi: 24.22, measuredAt: new Date("2026-06-01") };
+      const labPanel = { glucose: 95, cholesterol: 180, triglycerides: 120, takenAt: new Date("2026-05-30") };
+      const data = pdfService.generateConsultationPdf(
+        consultation as unknown as never,
+        makeMockPatient() as never,
+        anthropometry,
+        labPanel,
+      );
+      expect(data.anthropometry?.weightKg).toBe(70);
+      expect(data.anthropometry?.bmi).toBeCloseTo(24.22, 2);
+      expect(data.labPanel?.glucose).toBe(95);
+      expect(data.labPanel?.cholesterol).toBe(180);
+      expect(data.labPanel?.triglycerides).toBe(120);
+    });
+  });
+
+  describe("createConsultationPdfDocument", () => {
+    it("genera un PDF v\u00e1lido a partir de PdfConsultationData", () => {
+      const data = {
+        patientName: "Mar\u00eda G\u00f3mez",
+        consultationNumber: 5,
+        consultationDate: "4 de junio de 2026",
+        status: "completed" as const,
+        reason: "Control",
+        subjective: null,
+        objective: null,
+        assessment: null,
+        plan: null,
+        vitals: { systolicMmHg: 110, diastolicMmHg: 70, heartRateBpm: 68, temperatureC: 36.6 },
+        nextVisitDate: null,
+        anthropometry: null,
+        labPanel: null,
+      };
+      const doc = pdfService.createConsultationPdfDocument(data);
+      expect(doc).toBeDefined();
+      expect(doc.getNumberOfPages()).toBeGreaterThanOrEqual(1);
+    });
+  });
 });

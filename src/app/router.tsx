@@ -20,6 +20,7 @@ import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
 import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
 import { SettingsPage } from "@app/pages/SettingsPage";
 import { SmaeCatalogPage } from "@app/pages/SmaeCatalogPage";
+import { ImporterPage } from "@app/pages/ImporterPage";
 import { HelpPage } from "@app/pages/HelpPage";
 import { NotFoundPage } from "@app/pages/NotFoundPage";
 import { NotificationsPage } from "@app/pages/NotificationsPage";
@@ -85,6 +86,7 @@ const router = createHashRouter([
       { path: "laboratorio", element: <LaboratoryPage /> },
       { path: "calculos", element: <CalculationsPage /> },
       { path: "smae", element: <SmaeCatalogPage /> },
+      { path: "importar", element: <ImporterPage /> },
       {
         path: "planes",
         children: [

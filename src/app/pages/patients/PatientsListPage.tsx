@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   Mail,
   Phone,
+  Upload,
 } from "lucide-react";
 import {
   createColumnHelper,
@@ -149,12 +150,20 @@ export function PatientsListPage() {
         title="Pacientes"
         description={total > 0 ? `${total} paciente${total === 1 ? "" : "s"}` : "Gestiona los expedientes"}
         actions={
-          <Button asChild>
-            <Link to="/pacientes/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo paciente
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <Link to="/importar">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar CSV
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link to="/pacientes/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo paciente
+              </Link>
+            </Button>
+          </div>
         }
       />
       <PageContent>

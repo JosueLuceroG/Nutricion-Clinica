@@ -10,6 +10,7 @@ import {
   Activity,
   FlaskConical,
   Heart,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -22,6 +23,10 @@ import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { ConsultationStatusLabel } from "@modules/consultation/domain/ConsultationStatus";
 import type { Vitals } from "@modules/consultation/domain/Vitals";
 import { consultationService } from "@services/consultationService";
+import { patientService } from "@services/patientService";
+import { anthropometryService } from "@services/anthropometryService";
+import { labPanelService } from "@services/labPanelService";
+import { pdfService } from "@services/pdf/pdfService";
 
 export function ConsultationDetailPage() {
   const { consultationId } = useParams();
@@ -58,6 +63,50 @@ export function ConsultationDetailPage() {
       toast.error("No se pudo eliminar", {
         description: err instanceof Error ? err.message : String(err),
       });
+      setBusy(false);
+    }
+  };
+
+  const onExportPdf = async () => {
+    if (!consultation) return;
+    setBusy(true);
+    try {
+      const patient = await patientService.get.execute(consultation.patientId).catch(() => null);
+      if (!patient) {
+        toast.error("No se encontró el paciente");
+        return;
+      }
+      const anthropometry = consultation.anthropometryId
+        ? await anthropometryService.get.execute(consultation.anthropometryId).catch(() => null)
+        : null;
+      const labPanel = consultation.labPanelId
+        ? await labPanelService.get.execute(consultation.labPanelId).catch(() => null)
+        : null;
+      const pdfAnthropometry = anthropometry
+        ? {
+            weightKg: anthropometry.weight.toKg(),
+            heightCm: anthropometry.height.toCentimeters(),
+            bmi: anthropometry.bmi,
+            measuredAt: anthropometry.measuredAt,
+          }
+        : null;
+      const pdfLab = labPanel
+        ? {
+            glucose: labPanel.getValue("GLUCOSA"),
+            cholesterol: labPanel.getValue("COLESTEROL_TOTAL"),
+            triglycerides: labPanel.getValue("TRIGLICERIDOS"),
+            takenAt: labPanel.takenAt,
+          }
+        : null;
+      pdfService.downloadConsultation(
+        pdfService.generateConsultationPdf(consultation, patient, pdfAnthropometry, pdfLab),
+      );
+      toast.success("PDF descargado");
+    } catch (err) {
+      toast.error("No se pudo exportar el PDF", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
       setBusy(false);
     }
   };
@@ -150,6 +199,10 @@ export function ConsultationDetailPage() {
               </Link>
             </Button>
             {actions}
+            <Button variant="outline" onClick={onExportPdf} disabled={busy}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Exportar PDF
+            </Button>
             <Button variant="destructive" onClick={onDelete} disabled={busy}>
               <Trash2 className="mr-2 h-4 w-4" />
               Eliminar

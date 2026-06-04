@@ -1,4 +1,5 @@
 import type { MealSlot } from "@modules/mealplan/domain/MealSlot";
+import type { ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 
 export interface PdfFoodInfo {
   id: string;
@@ -33,3 +34,41 @@ export interface PdfMealPlanData {
   meals: PdfMeal[];
   notes: string | null;
 }
+
+export interface PdfVitals {
+  systolicMmHg: number | null;
+  diastolicMmHg: number | null;
+  heartRateBpm: number | null;
+  temperatureC: number | null;
+}
+
+export interface PdfAnthropometrySummary {
+  weightKg: number | null;
+  heightCm: number | null;
+  bmi: number | null;
+  measuredAt: string;
+}
+
+export interface PdfLabSummary {
+  glucose: number | null;
+  cholesterol: number | null;
+  triglycerides: number | null;
+  takenAt: string;
+}
+
+export interface PdfConsultationData {
+  patientName: string;
+  consultationNumber: number;
+  consultationDate: string;
+  status: ConsultationStatus;
+  reason: string;
+  subjective: string | null;
+  objective: string | null;
+  assessment: string | null;
+  plan: string | null;
+  vitals: PdfVitals;
+  nextVisitDate: string | null;
+  anthropometry: PdfAnthropometrySummary | null;
+  labPanel: PdfLabSummary | null;
+}
+

@@ -2,8 +2,19 @@ import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
 import { GroupNutrition, FoodGroupLabel, type FoodGroup } from "@modules/smae/domain/FoodGroup";
 import { Food, type FoodId } from "@modules/smae/domain/Food";
 import type { Patient } from "@modules/patient/domain/Patient";
+import type { Consultation } from "@modules/consultation/domain/Consultation";
 import { generateMealPlanPdf, downloadPdf } from "./generators/mealPlanPdf";
-import type { PdfMealPlanData, PdfMeal, PdfMealExchange, PdfFoodInfo } from "./types";
+import { generateConsultationPdf } from "./generators/consultationPdf";
+import type {
+  PdfMealPlanData,
+  PdfMeal,
+  PdfMealExchange,
+  PdfFoodInfo,
+  PdfConsultationData,
+  PdfVitals,
+  PdfAnthropometrySummary,
+  PdfLabSummary,
+} from "./types";
 
 type FoodLookupFn = (foodId: FoodId) => Food;
 
@@ -28,6 +39,18 @@ function toPdfFoodInfo(food: Food): PdfFoodInfo {
 function formatDate(d: Date): string {
   return d.toLocaleDateString("es-MX", { year: "numeric", month: "long", day: "numeric" });
 }
+
+function toPdfVitals(v: Consultation["vitals"]): PdfVitals {
+  return {
+    systolicMmHg: v.systolicMmHg,
+    diastolicMmHg: v.diastolicMmHg,
+    heartRateBpm: v.heartRateBpm,
+    temperatureC: v.temperatureC,
+  };
+}
+
+export type AnthropometryForPdf = { weightKg: number | null; heightCm: number | null; bmi: number | null; measuredAt: Date };
+export type LabPanelForPdf = { glucose: number | null; cholesterol: number | null; triglycerides: number | null; takenAt: Date };
 
 export const pdfService = {
   generateMealPlanPdf(
@@ -65,6 +88,59 @@ export const pdfService = {
     const doc = generateMealPlanPdf(data);
     downloadPdf(doc, fileName ?? `plan-alimentacion-${data.patientName.replace(/\s+/g, "-").toLowerCase()}.pdf`);
   },
+
+  generateConsultationPdf(
+    consultation: Consultation,
+    patient: Patient,
+    anthropometry: AnthropometryForPdf | null = null,
+    labPanel: LabPanelForPdf | null = null,
+  ): PdfConsultationData {
+    const pdfAnthropometry: PdfAnthropometrySummary | null = anthropometry
+      ? {
+          weightKg: anthropometry.weightKg,
+          heightCm: anthropometry.heightCm,
+          bmi: anthropometry.bmi,
+          measuredAt: formatDate(anthropometry.measuredAt),
+        }
+      : null;
+    const pdfLab: PdfLabSummary | null = labPanel
+      ? {
+          glucose: labPanel.glucose,
+          cholesterol: labPanel.cholesterol,
+          triglycerides: labPanel.triglycerides,
+          takenAt: formatDate(labPanel.takenAt),
+        }
+      : null;
+    return {
+      patientName: patient.fullName,
+      consultationNumber: consultation.consultationNumber,
+      consultationDate: formatDate(consultation.consultationDate),
+      status: consultation.status,
+      reason: consultation.reason,
+      subjective: consultation.subjective,
+      objective: consultation.objective,
+      assessment: consultation.assessment,
+      plan: consultation.plan,
+      vitals: toPdfVitals(consultation.vitals),
+      nextVisitDate: consultation.nextVisitDate ? formatDate(consultation.nextVisitDate) : null,
+      anthropometry: pdfAnthropometry,
+      labPanel: pdfLab,
+    };
+  },
+
+  createConsultationPdfDocument(data: PdfConsultationData) {
+    return generateConsultationPdf(data);
+  },
+
+  downloadConsultation(data: PdfConsultationData, fileName?: string) {
+    const doc = generateConsultationPdf(data);
+    const safeName = patientSafeName(data.patientName);
+    downloadPdf(doc, fileName ?? `consulta-${data.consultationNumber}-${safeName}.pdf`);
+  },
 };
+
+function patientSafeName(name: string): string {
+  return name.replace(/\s+/g, "-").toLowerCase();
+}
 
 export type PdfService = typeof pdfService;
