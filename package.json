@@ -70,6 +70,8 @@
     "dexie": "^4.0.10",
     "dexie-react-hooks": "^1.1.7",
     "framer-motion": "^11.15.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.469.0",
     "react": "^19.0.0",
     "react-day-picker": "^9.4.4",

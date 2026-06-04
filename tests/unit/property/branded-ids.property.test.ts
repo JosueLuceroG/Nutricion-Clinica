@@ -5,6 +5,9 @@ import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { MealPlanId } from "@modules/mealplan/domain/MealPlanId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
+import { AllergyId } from "@modules/clinical-record/domain/AllergyId";
+import { MedicationId } from "@modules/clinical-record/domain/MedicationId";
+import { ClinicalEventId } from "@modules/clinical-record/domain/ClinicalEventId";
 
 /**
  * Property tests para branded IDs (Q-06).
@@ -104,6 +107,27 @@ const idFactories: Record<string, IdConstructor<unknown>> = {
     fromUnsafe: (s) => AnthropometryId.fromUnsafe(s),
     equals: (a, b) => (a as AnthropometryId).equals(b as AnthropometryId),
     toString: (id) => (id as AnthropometryId).toString(),
+  },
+  AllergyId: {
+    generate: () => AllergyId.generate(),
+    from: (s) => AllergyId.from(s),
+    fromUnsafe: (s) => AllergyId.fromUnsafe(s),
+    equals: (a, b) => (a as AllergyId).equals(b as AllergyId),
+    toString: (id) => (id as AllergyId).toString(),
+  },
+  MedicationId: {
+    generate: () => MedicationId.generate(),
+    from: (s) => MedicationId.from(s),
+    fromUnsafe: (s) => MedicationId.fromUnsafe(s),
+    equals: (a, b) => (a as MedicationId).equals(b as MedicationId),
+    toString: (id) => (id as MedicationId).toString(),
+  },
+  ClinicalEventId: {
+    generate: () => ClinicalEventId.generate(),
+    from: (s) => ClinicalEventId.from(s),
+    fromUnsafe: (s) => ClinicalEventId.fromUnsafe(s),
+    equals: (a, b) => (a as ClinicalEventId).equals(b as ClinicalEventId),
+    toString: (id) => (id as ClinicalEventId).toString(),
   },
 };
 

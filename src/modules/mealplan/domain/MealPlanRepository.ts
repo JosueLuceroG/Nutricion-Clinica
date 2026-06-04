@@ -26,3 +26,15 @@ export class MealPlanNotFoundError extends Error {
     this.name = "MealPlanNotFoundError";
   }
 }
+
+export class MealPlanRequiresConsultationError extends Error {
+  constructor(reason: "missing" | "not-found" | "not-active") {
+    const messages: Record<typeof reason, string> = {
+      "missing": "RN-PLA-01: El plan alimentario debe asociarse a una consulta activa.",
+      "not-found": "RN-PLA-01: La consulta asociada al plan no existe.",
+      "not-active": "RN-PLA-01: La consulta asociada al plan debe estar activa (status != completed).",
+    };
+    super(messages[reason]);
+    this.name = "MealPlanRequiresConsultationError";
+  }
+}

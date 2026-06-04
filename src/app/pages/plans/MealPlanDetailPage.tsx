@@ -11,6 +11,7 @@ import {
   ClipboardList,
   UtensilsCrossed,
   Target,
+  FileDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -31,13 +32,19 @@ import {
   MEAL_SLOT_ORDER,
   MealSlotLabel,
 } from "@modules/mealplan/domain/MealSlot";
-import { FoodGroupLabel } from "@modules/smae/domain";
+import {
+  FoodGroupLabel,
+  Food,
+  SYSTEM_FOODS,
+} from "@modules/smae/domain";
 import {
   planDailyNutrition,
   planVsTarget,
   mealRows,
 } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
+import { pdfService } from "@services/pdf/pdfService";
+import { patientService } from "@services/patientService";
 
 export function MealPlanDetailPage() {
   const { planId } = useParams();
@@ -75,6 +82,43 @@ export function MealPlanDetailPage() {
         description: err instanceof Error ? err.message : String(err),
       });
       setBusy(false);
+    }
+  };
+
+  const onDownloadPdf = async () => {
+    if (!plan) return;
+    try {
+      const patient = await patientService.get.execute(plan.patientId);
+      if (!patient) {
+        toast.error("No se encontró el paciente");
+        return;
+      }
+      const systemFoods = SYSTEM_FOODS.reduce<Record<string, Food>>((acc, f) => {
+        acc[f.id] = f;
+        return acc;
+      }, {});
+      const customFoods = await (await import("@services/smaeService")).smaeService.search({});
+      const allFoods = { ...systemFoods };
+      for (const f of customFoods) {
+        allFoods[f.id] = f;
+      }
+      const lookupFn = (foodId: string) => allFoods[foodId] ?? Food.reconstitute({
+        id: foodId,
+        group: "verduras" as const,
+        name: foodId,
+        shortName: foodId,
+        serving: "1 ración",
+        servingGrams: 100,
+        keywords: [],
+        custom: false,
+      });
+      const data = pdfService.generateMealPlanPdf(plan, patient, lookupFn);
+      pdfService.download(data, `plan-alimentacion-${patient.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf`);
+      toast.success("PDF descargado");
+    } catch (err) {
+      toast.error("Error al generar PDF", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     }
   };
 
@@ -183,6 +227,10 @@ export function MealPlanDetailPage() {
               </Link>
             </Button>
             {actions}
+            <Button variant="outline" onClick={onDownloadPdf} disabled={busy}>
+              <FileDown className="mr-2 h-4 w-4" />
+              PDF
+            </Button>
             <Button variant="destructive" onClick={onDelete} disabled={busy}>
               <Trash2 className="mr-2 h-4 w-4" />
               Eliminar

@@ -5,13 +5,31 @@ import {
   type MealPlanQuery,
   type MealPlanRepository,
   MealPlanNotFoundError,
+  MealPlanRequiresConsultationError,
 } from "../domain/MealPlanRepository";
 import { canTransitionMealPlan } from "../domain/MealPlanStatus";
+import type { ConsultationRepository } from "@modules/consultation/domain/ConsultationRepository";
+import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 
 export class CreateMealPlanUseCase {
-  constructor(private readonly repo: MealPlanRepository) {}
+  constructor(
+    private readonly repo: MealPlanRepository,
+    private readonly consultationRepo?: ConsultationRepository,
+  ) {}
 
   async execute(input: MealPlanCreate): Promise<MealPlan> {
+    if (!input.consultationId) {
+      throw new MealPlanRequiresConsultationError("missing");
+    }
+    if (this.consultationRepo) {
+      const consultation = await this.consultationRepo.findById(ConsultationId.fromUnsafe(input.consultationId.toString()));
+      if (!consultation) {
+        throw new MealPlanRequiresConsultationError("not-found");
+      }
+      if (consultation.status === "completed" || consultation.status === "cancelled") {
+        throw new MealPlanRequiresConsultationError("not-active");
+      }
+    }
     const plan = MealPlan.create(input);
     await this.repo.save(plan);
     return plan;

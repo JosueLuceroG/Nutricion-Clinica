@@ -73,6 +73,7 @@ export class DexiePatientRepository implements PatientRepository {
         (row: PatientRow) =>
           row.first_name.toLowerCase().includes(needle) ||
           row.last_name.toLowerCase().includes(needle) ||
+          (row.second_last_name !== null && row.second_last_name.toLowerCase().includes(needle)) ||
           (row.email !== null && row.email.toLowerCase().includes(needle)),
       );
     }

@@ -41,6 +41,7 @@ import {
 import { getSystemFoodById, type FoodId } from "@modules/smae/domain";
 import { foodExchangeNutrition } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
+import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { PlanMeal } from "@modules/mealplan/domain/MealPlan";
 import { Button } from "@components/ui/button";
@@ -53,10 +54,11 @@ import { FoodPicker } from "./FoodPicker";
 
 interface MealPlanFormProps {
   patientId: PatientId;
+  consultationId: ConsultationId;
   onSaved?: (planId: string) => void;
 }
 
-export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
+export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFormProps) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
 
@@ -163,6 +165,7 @@ export function MealPlanForm({ patientId, onSaved }: MealPlanFormProps) {
 
       const plan = await mealPlanService.create.execute({
         patientId,
+        consultationId,
         name: values.name.trim(),
         description: values.description?.trim() ? values.description.trim() : null,
         startDate: new Date(values.startDate),

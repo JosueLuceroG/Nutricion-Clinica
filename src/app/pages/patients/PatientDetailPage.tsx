@@ -13,7 +13,11 @@ import {
   FlaskConical,
   ClipboardList,
   UtensilsCrossed,
+  Heart,
+  Tags,
+  FileText,
 } from "lucide-react";
+import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -24,6 +28,10 @@ import { ErrorState, EmptyState } from "@components/layout/EmptyState";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { SexLabel } from "@modules/patient/domain/Sex";
+import { GenderLabel } from "@modules/patient/domain/Gender";
+import { MaritalStatusLabel } from "@modules/patient/domain/MaritalStatus";
+import { EducationLevelLabel } from "@modules/patient/domain/EducationLevel";
+import { RecordStatusLabel } from "@modules/patient/domain/RecordStatus";
 import { PatientStatusLabel } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
 
@@ -151,17 +159,18 @@ export function PatientDetailPage() {
                 Información del paciente
               </CardTitle>
               <CardDescription>
-                Datos registrados el {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.createdAt)}
+                Expediente {RecordStatusLabel[patient.recordStatus]} · Creado el {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.createdAt)}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <DetailRow label="Nombre completo" value={patient.fullName} />
-              <DetailRow
-                label="Fecha de nacimiento"
-                value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)}
-              />
+              <DetailRow label="Fecha de nacimiento" value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)} />
               <DetailRow label="Edad" value={`${patient.age} años`} />
               <DetailRow label="Sexo biológico" value={SexLabel[patient.sex]} />
+              {patient.gender && <DetailRow label="Género" value={GenderLabel[patient.gender]} />}
+              {patient.maritalStatus && <DetailRow label="Estado civil" value={MaritalStatusLabel[patient.maritalStatus]} />}
+              {patient.occupation && <DetailRow label="Ocupación" value={patient.occupation} />}
+              {patient.education && <DetailRow label="Escolaridad" value={EducationLevelLabel[patient.education]} />}
               <DetailRow
                 label="Estado"
                 value={
@@ -173,44 +182,94 @@ export function PatientDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Contacto</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {patient.email ? (
-                <a
-                  href={`mailto:${patient.email.toString()}`}
-                  className="flex items-center gap-2 text-sm hover:underline"
-                >
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  {patient.email.toString()}
-                </a>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sin correo</p>
-              )}
-              {patient.phone ? (
-                <a
-                  href={`tel:${patient.phone.toString()}`}
-                  className="flex items-center gap-2 text-sm hover:underline"
-                >
-                  <Phone className="h-4 w-4 text-muted-foreground" />
-                  {patient.phone.toString()}
-                </a>
-              ) : (
-                <p className="text-sm text-muted-foreground">Sin teléfono</p>
-              )}
-              <div className="border-t pt-3 text-xs text-muted-foreground">
-                <p className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  Última actualización: {new Intl.DateTimeFormat("es-MX", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  }).format(patient.updatedAt)}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Contacto</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {patient.email ? (
+                  <a href={`mailto:${patient.email.toString()}`} className="flex items-center gap-2 text-sm hover:underline">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    {patient.email.toString()}
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin correo</p>
+                )}
+                {patient.phone ? (
+                  <a href={`tel:${patient.phone.toString()}`} className="flex items-center gap-2 text-sm hover:underline">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    {patient.phone.toString()}
+                  </a>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Sin teléfono</p>
+                )}
+                {patient.secondaryPhone && (
+                  <a href={`tel:${patient.secondaryPhone.toString()}`} className="flex items-center gap-2 text-sm hover:underline text-muted-foreground">
+                    <Phone className="h-4 w-4" />
+                    {patient.secondaryPhone.toString()} (sec.)
+                  </a>
+                )}
+                <div className="border-t pt-3 text-xs text-muted-foreground">
+                  <p className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    Última actualización: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(patient.updatedAt)}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {(patient.emergencyContactName || patient.emergencyContactPhone) && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Heart className="h-4 w-4 text-rose-500" />
+                    Contacto de emergencia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm">
+                  {patient.emergencyContactName && <p>{patient.emergencyContactName}</p>}
+                  {patient.emergencyContactRelationship && <p className="text-xs text-muted-foreground">{patient.emergencyContactRelationship}</p>}
+                  {patient.emergencyContactPhone && (
+                    <a href={`tel:${patient.emergencyContactPhone.toString()}`} className="flex items-center gap-2 text-sm hover:underline">
+                      <Phone className="h-3 w-3 text-muted-foreground" />
+                      {patient.emergencyContactPhone.toString()}
+                    </a>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {patient.generalNotes && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">
+                    <FileText className="mr-1 h-3 w-3 inline" />
+                    Notas generales
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm whitespace-pre-wrap">{patient.generalNotes}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {patient.clinicalTags.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <Tags className="h-4 w-4" />
+                    Etiquetas clínicas
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-1">
+                  {patient.clinicalTags.map((tag) => (
+                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
 
         <Card className="mt-4">
@@ -245,6 +304,8 @@ export function PatientDetailPage() {
             />
           </CardContent>
         </Card>
+
+        <ClinicalRecordCards patientId={patient.id.toString()} />
       </PageContent>
     </>
   );

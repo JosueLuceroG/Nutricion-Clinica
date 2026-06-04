@@ -9,13 +9,13 @@ import { Food, type FoodProps } from "./Food";
 
 const SYSTEM_FOODS_RAW: FoodProps[] = [
   // ── Verduras ─────────────────────────────────────────
-  { id: "verdura-acelga", group: "verduras", name: "Acelga", shortName: "Acelga", serving: "1 taza de hojas crudas", servingGrams: 50, keywords: ["hoja", "verde", "cocida"], custom: false },
-  { id: "verdura-brocoli", group: "verduras", name: "Brócoli", shortName: "Brócoli", serving: "1 taza de floretes cocidos", servingGrams: 90, keywords: ["florete", "verde", "cocido"], custom: false },
-  { id: "verdura-espinaca", group: "verduras", name: "Espinaca", shortName: "Espinaca", serving: "1 taza de hojas crudas", servingGrams: 50, keywords: ["hoja", "verde", "cocida"], custom: false },
-  { id: "verdura-jitomate", group: "verduras", name: "Jitomate", shortName: "Jitomate", serving: "1 pieza mediana", servingGrams: 120, keywords: ["rojo", "tomate", "ensalada"], custom: false },
-  { id: "verdura-zanahoria", group: "verduras", name: "Zanahoria", shortName: "Zanahoria", serving: "1/2 taza picada", servingGrams: 60, keywords: ["naranja", "cruda", "cocida"], custom: false },
-  { id: "verdura-nopales", group: "verduras", name: "Nopales", shortName: "Nopales", serving: "1 taza cocida", servingGrams: 100, keywords: ["mexicano", "asado", "verde"], custom: false },
-  { id: "verdura-calabacita", group: "verduras", name: "Calabacita", shortName: "Calabacita", serving: "1 taza cocida", servingGrams: 100, keywords: ["calabaza", "verde", "cocida"], custom: false },
+  { id: "verdura-acelga", group: "verduras", name: "Acelga", shortName: "Acelga", serving: "1 taza de hojas crudas", servingGrams: 50, keywords: ["hoja", "verde", "cocida", "vegetal"], custom: false },
+  { id: "verdura-brocoli", group: "verduras", name: "Brócoli", shortName: "Brócoli", serving: "1 taza de floretes cocidos", servingGrams: 90, keywords: ["florete", "verde", "cocido", "vegetal"], custom: false },
+  { id: "verdura-espinaca", group: "verduras", name: "Espinaca", shortName: "Espinaca", serving: "1 taza de hojas crudas", servingGrams: 50, keywords: ["hoja", "verde", "cocida", "vegetal"], custom: false },
+  { id: "verdura-jitomate", group: "verduras", name: "Jitomate", shortName: "Jitomate", serving: "1 pieza mediana", servingGrams: 120, keywords: ["rojo", "tomate", "ensalada", "vegetal"], custom: false },
+  { id: "verdura-zanahoria", group: "verduras", name: "Zanahoria", shortName: "Zanahoria", serving: "1/2 taza picada", servingGrams: 60, keywords: ["naranja", "cruda", "cocida", "vegetal"], custom: false },
+  { id: "verdura-nopales", group: "verduras", name: "Nopales", shortName: "Nopales", serving: "1 taza cocida", servingGrams: 100, keywords: ["mexicano", "asado", "verde", "vegetal"], custom: false },
+  { id: "verdura-calabacita", group: "verduras", name: "Calabacita", shortName: "Calabacita", serving: "1 taza cocida", servingGrams: 100, keywords: ["calabaza", "verde", "cocida", "vegetal"], custom: false },
 
   // ── Frutas ───────────────────────────────────────────
   { id: "fruta-manzana", group: "frutas", name: "Manzana", shortName: "Manzana", serving: "1 pieza mediana", servingGrams: 130, keywords: ["roja", "verde", "cruda"], custom: false },
@@ -26,15 +26,15 @@ const SYSTEM_FOODS_RAW: FoodProps[] = [
   { id: "fruta-mango", group: "frutas", name: "Mango", shortName: "Mango", serving: "1/2 pieza", servingGrams: 100, keywords: ["tropical", "maduro", "mexicano"], custom: false },
 
   // ── Cereales sin grasa ──────────────────────────────
-  { id: "cereal-tortilla-maiz", group: "cereales-sin-grasa", name: "Tortilla de maíz", shortName: "Tortilla", serving: "1 pieza (30g)", servingGrams: 30, keywords: ["maíz", "mexicana", "antojo", "básica"], custom: false },
+  { id: "cereal-tortilla-maiz", group: "cereales-sin-grasa", name: "Tortilla de maíz", shortName: "Tortilla", serving: "1 pieza (30g)", servingGrams: 30, keywords: ["maíz", "mexicana", "antojo", "básica", "gluten"], custom: false },
   { id: "cereal-arroz", group: "cereales-sin-grasa", name: "Arroz blanco cocido", shortName: "Arroz", serving: "1/3 taza", servingGrams: 60, keywords: ["blanco", "cocido", "guarnición"], custom: false },
-  { id: "cereal-pan-blanco", group: "cereales-sin-grasa", name: "Pan blanco", shortName: "Pan blanco", serving: "1 rebanada (25g)", servingGrams: 25, keywords: ["rebanada", "básico", "desayuno"], custom: false },
-  { id: "cereal-avena", group: "cereales-sin-grasa", name: "Avena", shortName: "Avena", serving: "1/3 taza cruda", servingGrams: 27, keywords: ["hojuela", "fibra", "desayuno"], custom: false },
+  { id: "cereal-pan-blanco", group: "cereales-sin-grasa", name: "Pan blanco", shortName: "Pan blanco", serving: "1 rebanada (25g)", servingGrams: 25, keywords: ["rebanada", "básico", "desayuno", "gluten", "trigo"], custom: false },
+  { id: "cereal-avena", group: "cereales-sin-grasa", name: "Avena", shortName: "Avena", serving: "1/3 taza cruda", servingGrams: 27, keywords: ["hojuela", "fibra", "desayuno", "gluten"], custom: false },
   { id: "cereal-papa", group: "cereales-sin-grasa", name: "Papa cocida", shortName: "Papa", serving: "1/2 pieza", servingGrams: 80, keywords: ["cocida", "puré", "guarnición"], custom: false },
 
   // ── Cereales con grasa ──────────────────────────────
-  { id: "cereal-bolillo", group: "cereales-con-grasa", name: "Bolillo", shortName: "Bolillo", serving: "1/3 pieza (25g)", servingGrams: 25, keywords: ["pan", "mexicano", "tortas"], custom: false },
-  { id: "cereal-pan-tostado", group: "cereales-con-grasa", name: "Pan tostado", shortName: "Pan tostado", serving: "1 rebanada", servingGrams: 25, keywords: ["crujiente", "desayuno"], custom: false },
+  { id: "cereal-bolillo", group: "cereales-con-grasa", name: "Bolillo", shortName: "Bolillo", serving: "1/3 pieza (25g)", servingGrams: 25, keywords: ["pan", "mexicano", "tortas", "gluten", "trigo"], custom: false },
+  { id: "cereal-pan-tostado", group: "cereales-con-grasa", name: "Pan tostado", shortName: "Pan tostado", serving: "1 rebanada", servingGrams: 25, keywords: ["crujiente", "desayuno", "gluten", "trigo"], custom: false },
 
   // ── Leguminosas ─────────────────────────────────────
   { id: "legum-frijol", group: "leguminosas", name: "Frijol cocido", shortName: "Frijol", serving: "1/2 taza", servingGrams: 90, keywords: ["negro", "mexicano", "básico", "proteína"], custom: false },
@@ -46,7 +46,7 @@ const SYSTEM_FOODS_RAW: FoodProps[] = [
   { id: "aoa-pescado-blanco", group: "aoa-muy-bajo", name: "Pescado blanco (tilapia, huachinango)", shortName: "Pescado", serving: "30 g", servingGrams: 30, keywords: ["tilapia", "huachinango", "proteína", "omega"], custom: false },
 
   // ── AOA: bajo aporte ────────────────────────────────
-  { id: "aoa-huevo", group: "aoa-bajo", name: "Huevo entero", shortName: "Huevo", serving: "1 pieza (50g)", servingGrams: 50, keywords: ["proteína", "desayuno", "básico"], custom: false },
+  { id: "aoa-huevo", group: "aoa-bajo", name: "Huevo entero", shortName: "Huevo", serving: "1 pieza (50g)", servingGrams: 50, keywords: ["proteína", "desayuno", "básico", "huevo"], custom: false },
   { id: "aoa-queso-panela", group: "aoa-bajo", name: "Queso panela", shortName: "Queso panela", serving: "30 g", servingGrams: 30, keywords: ["queso", "fresco", "mexicano"], custom: false },
 
   // ── AOA: moderado aporte ────────────────────────────
@@ -56,16 +56,16 @@ const SYSTEM_FOODS_RAW: FoodProps[] = [
   { id: "aoa-queso-amarillo", group: "aoa-alto", name: "Queso amarillo", shortName: "Queso amarillo", serving: "30 g", servingGrams: 30, keywords: ["queso", "procesado", "graso"], custom: false },
 
   // ── Leches ──────────────────────────────────────────
-  { id: "leche-descremada", group: "leche-descremada", name: "Leche descremada", shortName: "Leche desc.", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["light", "baja en grasa", "calcio"], custom: false },
-  { id: "leche-semidescremada", group: "leche-semidescremada", name: "Leche semidescremada", shortName: "Leche semi.", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["media grasa", "calcio"], custom: false },
-  { id: "leche-entera", group: "leche-entera", name: "Leche entera", shortName: "Leche entera", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["completa", "calcio", "niños"], custom: false },
+  { id: "leche-descremada", group: "leche-descremada", name: "Leche descremada", shortName: "Leche desc.", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["light", "baja en grasa", "calcio", "leche", "lactosa"], custom: false },
+  { id: "leche-semidescremada", group: "leche-semidescremada", name: "Leche semidescremada", shortName: "Leche semi.", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["media grasa", "calcio", "leche", "lactosa"], custom: false },
+  { id: "leche-entera", group: "leche-entera", name: "Leche entera", shortName: "Leche entera", serving: "1 taza (240ml)", servingGrams: 240, keywords: ["completa", "calcio", "niños", "leche", "lactosa"], custom: false },
 
   // ── Aceites sin proteína ────────────────────────────
   { id: "aceite-oliva", group: "aceites-sin-proteina", name: "Aceite de oliva", shortName: "Aceite oliva", serving: "1 cucharadita (5ml)", servingGrams: 5, keywords: ["extra virgen", "mediterráneo", "grasa buena"], custom: false },
   { id: "aceite-aguacate", group: "aceites-sin-proteina", name: "Aguacate", shortName: "Aguacate", serving: "1/3 pieza mediana", servingGrams: 35, keywords: ["mexicano", "grasa buena", "guacamole"], custom: false },
 
   // ── Aceites con proteína ────────────────────────────
-  { id: "aceite-nueces", group: "aceites-con-proteina", name: "Nueces", shortName: "Nueces", serving: "1 cucharada (10g)", servingGrams: 10, keywords: ["nuez", "omega 3", "fruto seco"], custom: false },
+  { id: "aceite-nueces", group: "aceites-con-proteina", name: "Nueces", shortName: "Nueces", serving: "1 cucharada (10g)", servingGrams: 10, keywords: ["nuez", "nueces", "omega 3", "fruto seco", "arbol"], custom: false },
 
   // ── Azúcares sin grasa ──────────────────────────────
   { id: "azucar-miel", group: "azucares-sin-grasa", name: "Miel de abeja", shortName: "Miel", serving: "2 cucharaditas", servingGrams: 10, keywords: ["endulzante", "natural"], custom: false },
