@@ -7,6 +7,7 @@ import type { MealPlanRow } from "@modules/mealplan/infrastructure/mealPlanMappe
 import type { SmaeCustomFoodRow } from "@modules/smae/infrastructure/smaeMapper";
 import type { AllergyRow, MedicationRow, ClinicalEventRow, FamilyHistoryRow, PersonalHistoryRow, HabitRow, PhysicalActivityRow, DietHistoryRow, IntoleranceRow, SurgeryRow, HospitalizationRow, SupplementRow, FoodFrequencyRow, GiSymptomRow, SnapshotExpedienteRow } from "@modules/clinical-record/infrastructure/clinicalRecordMapper";
 import type { AuditEventRow } from "@services/audit/infrastructure/auditEventMapper";
+import type { SyncQueueItem } from "@modules/sync/domain/SyncQueueItem";
 
 const PATIENT_STORES = [
   "id",
@@ -92,6 +93,7 @@ const FOOD_FREQUENCIES_STORES = "id, patient_id, frequency, created_at";
 const GI_SYMPTOMS_STORES = "id, patient_id, symptom_type, severity, created_at";
 const SNAPSHOT_EXPEDIENTES_STORES = "id, consulta_id, patient_id, fecha_snapshot, created_at";
 const AUDIT_EVENTS_STORES = "id, patient_id, user_id, module, action, resource_type, resource_id, created_at";
+const SYNC_QUEUE_STORES = "id, entity, status, enqueued_at";
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
@@ -116,6 +118,7 @@ export class NutriClinicaDB extends Dexie {
   supplements!: Table<SupplementRow, string>;
   food_frequencies!: Table<FoodFrequencyRow, string>;
   gi_symptoms!: Table<GiSymptomRow, string>;
+  sync_queue!: Table<SyncQueueItem, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -186,6 +189,10 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(11).stores({
       patients: PATIENT_STORES,
+    });
+
+    this.version(12).stores({
+      sync_queue: SYNC_QUEUE_STORES,
     });
   }
 }
