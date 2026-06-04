@@ -22,6 +22,7 @@ export default defineConfig({
       "@utils": path.resolve(__dirname, "./src/utils"),
       "@assets": path.resolve(__dirname, "./src/assets"),
       "@i18n": path.resolve(__dirname, "./src/i18n"),
+      "@nutriclinica/shared": path.resolve(__dirname, "./packages/shared/src"),
     },
   },
   clearScreen: false,

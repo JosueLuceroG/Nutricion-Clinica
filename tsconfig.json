@@ -33,7 +33,8 @@
       "@types/*": ["src/types/*"],
       "@utils/*": ["src/utils/*"],
       "@assets/*": ["src/assets/*"],
-      "@i18n/*": ["src/i18n/*"]
+      "@i18n/*": ["src/i18n/*"],
+      "@nutriclinica/shared": ["packages/shared/src/index.ts"]
     },
     "types": ["vite/client", "node", "@testing-library/jest-dom"]
   },

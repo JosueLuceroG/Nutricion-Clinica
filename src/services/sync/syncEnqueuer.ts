@@ -54,25 +54,31 @@ export class SyncEnqueuer {
   }
 
   private subscribe(): () => void {
-    const tables = Object.keys(TABLE_TO_ENTITY);
-    const handler = async (ctx: { table: string; mode: string; keys: unknown[] }): Promise<void> => {
+    const handler = async (change: { table: string; type: number; key?: unknown; keys?: unknown[]; obj?: unknown; oldObj?: unknown }): Promise<void> => {
       if (isSyncApplying()) return;
-      const entity = TABLE_TO_ENTITY[ctx.table];
+      const entity = TABLE_TO_ENTITY[change.table];
       if (!entity) return;
 
-      const op = mapModeToOp(ctx.mode);
+      const op = mapChangeTypeToOp(change.type);
       if (!op) return;
 
-      for (const key of ctx.keys) {
+      const keys: unknown[] = change.keys ?? (change.key !== undefined ? [change.key] : []);
+      for (const key of keys) {
         const id = String(key);
         let payload: unknown = null;
-        try {
-          const table = (this.db as unknown as Record<string, { get: (k: string) => Promise<unknown> }>)[ctx.table];
-          if (op !== 'delete' && table) {
-            payload = await table.get(id);
-          }
-        } catch {
+        if (op === 'update' && change.obj) {
+          payload = change.obj;
+        } else if (op === 'create' && change.obj) {
+          payload = change.obj;
+        } else if (op === 'delete') {
           payload = null;
+        } else {
+          try {
+            const table = (this.db as unknown as Record<string, { get: (k: string) => Promise<unknown> }>)[change.table];
+            if (table) payload = await table.get(id);
+          } catch {
+            payload = null;
+          }
         }
         try {
           await this.queue.enqueue({ entity, entityId: id, op, payload });
@@ -82,17 +88,24 @@ export class SyncEnqueuer {
       }
     };
 
-    // Dexie `db.use()` se invoca antes de cada transacción sobre las tablas
-    // observadas. Como la API de `use` no soporta filtrar por tabla en algunas
-    // versiones, dejamos que se dispare para todas y filtramos en el handler.
-    const subscription = this.db.use({ tables, handler });
-    return () => subscription.unsubscribe();
+    // Dexie 'changes' event: se dispara despu\u00e9s de cada commit. La firma
+    // exacta var\u00eda entre versiones; usamos un cast a la forma com\u00fan
+    // documentada (Dexie 3.x y 4.x son compatibles con este shape b\u00e1sico).
+    const dbWithChanges = this.db as unknown as { on: (event: string, cb: typeof handler) => unknown };
+    const subscription = dbWithChanges.on('changes', handler);
+    if (typeof subscription === 'function') {
+      return subscription as () => void;
+    }
+    return () => {
+      // Fallback: no expone unsubscribe; el handler se vuelve no-op al stop().
+    };
   }
 }
 
-function mapModeToOp(mode: string): SyncOp | null {
-  if (mode === 'create') return 'create';
-  if (mode === 'update') return 'update';
-  if (mode === 'delete') return 'delete';
+function mapChangeTypeToOp(type: number): SyncOp | null {
+  // Dexie change types: 1=create, 2=update, 3=delete.
+  if (type === 1) return 'create';
+  if (type === 2) return 'update';
+  if (type === 3) return 'delete';
   return null;
 }

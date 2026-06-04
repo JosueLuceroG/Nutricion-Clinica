@@ -103,9 +103,9 @@ export function Header() {
             >
               {user ? (
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                  {user.name
+                  {user.nombreCompleto
                     .split(" ")
-                    .map((p) => p[0])
+                    .map((p: string) => p[0])
                     .slice(0, 2)
                     .join("")}
                 </div>
@@ -119,8 +119,8 @@ export function Header() {
               <>
                 <DropdownMenuLabel>
                   <div className="flex flex-col">
-                    <span className="text-sm font-medium">{user.name}</span>
-                    <span className="text-xs text-muted-foreground">{user.role}</span>
+                    <span className="text-sm font-medium">{user.nombreCompleto}</span>
+                    <span className="text-xs text-muted-foreground">{user.rol}</span>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

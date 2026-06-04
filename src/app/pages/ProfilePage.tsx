@@ -4,6 +4,7 @@ import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { useAuthStore } from "@store/authStore";
+import { RoleLabel } from "@nutriclinica/shared";
 
 export function ProfilePage() {
   const user = useAuthStore((s) => s.user);
@@ -35,8 +36,8 @@ export function ProfilePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Row label="Nombre" value={user.name} />
-                <Row label="Rol" value={user.role} />
+                <Row label="Nombre" value={user.nombreCompleto} />
+                <Row label="Rol" value={RoleLabel[user.rol]} />
               </CardContent>
             </Card>
             <Card>
