@@ -131,3 +131,78 @@ export interface JwtPayload {
 
 export const SYNC_SCHEMA_VERSION = 1;
 export const API_VERSION = 'v1';
+
+// =====================================================================
+// Sync (Sprint 14A.7)
+// =====================================================================
+
+export const SYNCABLE_ENTITIES = [
+  'pacientes',
+  'consultas',
+  'antropometrias',
+  'lab_panels',
+  'planes_alimenticios',
+] as const;
+
+export type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];
+
+/** Operación individual que el cliente envía al servidor en /sync/push. */
+export interface SyncPushOperation {
+  entity: SyncableEntity;
+  id: string;
+  op: 'create' | 'update' | 'delete';
+  payload: unknown;
+  clientUpdatedAt: string;
+  /** row_version conocido por el cliente (opcional, para optimistic lock). */
+  expectedRowVersion?: string;
+}
+
+/** Lote de operaciones push del cliente. */
+export interface SyncPushBatch {
+  sucursalId: string;
+  operations: SyncPushOperation[];
+}
+
+/** Resultado del push por operación. */
+export interface SyncPushResultItem {
+  entity: SyncableEntity;
+  id: string;
+  status: 'applied' | 'skipped' | 'conflict' | 'error';
+  serverUpdatedAt?: string;
+  serverRowVersion?: string;
+  error?: string;
+}
+
+export interface SyncPushResponse {
+  results: SyncPushResultItem[];
+  serverTime: string;
+}
+
+/** Pull de cambios desde el servidor. */
+export interface SyncPullResponse {
+  serverTime: string;
+  changes: SyncPullChange[];
+  /** Indica si hay más cambios (cursor). */
+  hasMore: boolean;
+  /** Siguiente cursor para paginación. */
+  nextSince: string;
+}
+
+export interface SyncPullChange {
+  entity: SyncableEntity;
+  id: string;
+  op: 'create' | 'update' | 'delete';
+  payload: unknown;
+  serverUpdatedAt: string;
+  serverRowVersion: string;
+}
+
+/** Manifest de capacidades del servidor. */
+export interface SyncManifest {
+  apiVersion: string;
+  syncSchemaVersion: number;
+  serverTime: string;
+  entities: SyncableEntity[];
+  maxBatchSize: number;
+  supportsDelta: boolean;
+}

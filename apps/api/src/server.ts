@@ -9,6 +9,7 @@ import consultaRouter from "./modules/consultas/consultaRoutes.js";
 import antropometriaRouter from "./modules/antropometrias/antropometriaRoutes.js";
 import labPanelRouter from "./modules/lab/labPanelRoutes.js";
 import planRouter from "./modules/planes/planRoutes.js";
+import syncRouter from "./modules/sync/syncRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -24,9 +25,7 @@ app.use("/consultas", consultaRouter);
 app.use("/antropometrias", antropometriaRouter);
 app.use("/lab-panels", labPanelRouter);
 app.use("/planes", planRouter);
-
-// 14A.7+: sync, etc. se montarán aquí
-// app.use("/sync", syncRouter);
+app.use("/sync", syncRouter);
 
 app.use(errorHandler);
 
