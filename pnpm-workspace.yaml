@@ -1,4 +1,17 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
 allowBuilds:
-  core-js: set this to true or false
+  core-js: true
+  argon2: true
   esbuild: true
   msw: true
+
+onlyBuiltDependencies:
+  - argon2
+  - core-js
+  - esbuild
+  - msw
+
+ignorePnpmScripts: false

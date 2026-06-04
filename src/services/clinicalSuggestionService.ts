@@ -1,4 +1,4 @@
-import type { ClinicalSuggestionEngine } from "@modules/clinical-engine/application/ClinicalSuggestionEngine";
+import { ClinicalSuggestionEngine } from "@modules/clinical-engine/application/ClinicalSuggestionEngine";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { Vitals } from "@modules/consultation/domain/Vitals";
 import type { PatientId } from "@modules/patient/domain/PatientId";
