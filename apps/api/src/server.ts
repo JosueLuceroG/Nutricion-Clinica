@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { healthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
+import sucursalRouter from "./modules/sucursales/sucursalRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -12,9 +13,9 @@ app.use(express.json({ limit: "5mb" }));
 
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
+app.use("/sucursales", sucursalRouter);
 
-// 14B/14C: sucursales, sync, etc. se montarán aquí
-// app.use("/sucursales", sucursalesRouter);
+// 14A.6+: sync, etc. se montarán aquí
 // app.use("/sync", syncRouter);
 
 app.use(errorHandler);
