@@ -7,6 +7,20 @@ export class HttpError extends Error {
   }
 }
 
+export class UnauthorizedError extends HttpError {
+  constructor(message = "Unauthorized") {
+    super(401, message);
+    this.name = "UnauthorizedError";
+  }
+}
+
+export class ForbiddenError extends HttpError {
+  constructor(message = "Forbidden") {
+    super(403, message);
+    this.name = "ForbiddenError";
+  }
+}
+
 export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });

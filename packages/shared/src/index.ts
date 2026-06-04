@@ -14,17 +14,17 @@
 
 export const RoleSchema = {
   /** Superusuario cross-sucursal: ve todo, valida, edita precios globales. */
-  ADMIN: "admin",
-  /** Nutri\u00f3loga titular: due\u00f1a de pacientes en sus sucursales asignadas. */
-  NUTRIOLOGA: "nutriologa",
-  /** Asistente: agenda, cobra, no ve notas cl\u00ednicas completas. */
-  ASISTENTE: "asistente",
-  /** Soporte t\u00e9cnico: solo lectura para diagn\u00f3stico, sin datos sensibles. */
-  SOPORTE: "soporte_tecnico",
-  /** Auditor: solo bit\u00e1cora (NOM-024). */
-  AUDITOR: "auditor",
-  /** Facturaci\u00f3n: m\u00f3dulo econ\u00f3mico, sin acceso a historia cl\u00ednica. */
-  FACTURACION: "facturacion",
+  ADMIN: 'admin',
+  /** Nutrióloga titular: dueña de pacientes en sus sucursales asignadas. */
+  NUTRIOLOGA: 'nutriologa',
+  /** Asistente: agenda, cobra, no ve notas clínicas completas. */
+  ASISTENTE: 'asistente',
+  /** Soporte técnico: solo lectura para diagnóstico, sin datos sensibles. */
+  SOPORTE: 'soporte_tecnico',
+  /** Auditor: solo bitácora (NOM-024). */
+  AUDITOR: 'auditor',
+  /** Facturación: módulo económico, sin acceso a historia clínica. */
+  FACTURACION: 'facturacion',
 } as const;
 
 export type Role = (typeof RoleSchema)[keyof typeof RoleSchema];
@@ -32,12 +32,12 @@ export type Role = (typeof RoleSchema)[keyof typeof RoleSchema];
 export const ALL_ROLES: Role[] = Object.values(RoleSchema);
 
 export const RoleLabel: Record<Role, string> = {
-  admin: "Administrador",
-  nutriologa: "Nutri\u00f3loga titular",
-  asistente: "Asistente",
-  soporte_tecnico: "Soporte t\u00e9cnico",
-  auditor: "Auditor",
-  facturacion: "Facturaci\u00f3n",
+  admin: 'Administrador',
+  nutriologa: 'Nutrióloga titular',
+  asistente: 'Asistente',
+  soporte_tecnico: 'Soporte técnico',
+  auditor: 'Auditor',
+  facturacion: 'Facturación',
 };
 
 // =====================================================================
@@ -53,6 +53,13 @@ export interface SucursalDTO {
   activa: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Subset Sucursal para auth/me: solo lo necesario para la sesión. */
+export interface AuthSucursalDTO {
+  id: string;
+  nombre: string;
+  esTitular: boolean;
 }
 
 // =====================================================================
@@ -71,11 +78,19 @@ export interface ProfesionalDTO {
   updatedAt: string;
 }
 
+/** Subset Profesional para auth/me: solo lo necesario para la sesión. */
+export interface AuthProfesionalDTO {
+  id: string;
+  email: string;
+  nombreCompleto: string;
+  rol: Role;
+}
+
 export interface AuthResponse {
   token: string;
-  profesional: ProfesionalDTO;
-  sucursales: SucursalDTO[];
-  /** ID de la sucursal activa al login (la primera asignada o la \u00faltima usada). */
+  profesional: AuthProfesionalDTO;
+  sucursales: AuthSucursalDTO[];
+  /** ID de la sucursal activa al login (la primera asignada o la última usada). */
   sucursalActivaId: string | null;
 }
 
@@ -90,7 +105,8 @@ export interface RegisterRequest {
   password: string;
   nombreCompleto: string;
   cedulaProfesional?: string;
-  rol?: Role;
+  rol: Role;
+  telefono?: string;
   sucursalIds: string[];
 }
 
@@ -114,4 +130,4 @@ export interface JwtPayload {
 // =====================================================================
 
 export const SYNC_SCHEMA_VERSION = 1;
-export const API_VERSION = "v1";
+export const API_VERSION = 'v1';
