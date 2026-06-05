@@ -1,12 +1,11 @@
 -- =====================================================================
 -- 002-domain.sql
--- Mirror del dominio cl\u00ednico del cliente. Pacientes + consultas +
--- antropometr\u00eda + laboratorio + planes + snapshots + cat\u00e1logo SMAE.
+-- Mirror del dominio clínico del cliente. Pacientes + consultas +
+-- antropometría + laboratorio + planes + snapshots + catálogo SMAE.
 -- Cada tabla tenant tiene sucursal_id para multi-tenancy.
 -- =====================================================================
 
 -- Pacientes
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'pacientes')
 CREATE TABLE pacientes (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -36,7 +35,7 @@ CREATE TABLE pacientes (
   record_status NVARCHAR(20) NOT NULL DEFAULT 'open' CHECK (record_status IN ('open','closed')),
   record_closed_reason NVARCHAR(40) NULL,
   record_closed_at DATETIME2(3) NULL,
-  status NVARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','archived')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active','inactive','archived')),
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   deleted_at DATETIME2(3) NULL,
@@ -51,7 +50,6 @@ CREATE INDEX idx_pacientes_email ON pacientes(sucursal_id, email) WHERE deleted_
 CREATE INDEX idx_pacientes_updated ON pacientes(sucursal_id, updated_at DESC);
 
 -- Consultas (SOAP)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'consultas')
 CREATE TABLE consultas (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -59,12 +57,12 @@ CREATE TABLE consultas (
   profesional_id UNIQUEIDENTIFIER NOT NULL,
   consultation_number INT NOT NULL,
   consultation_date DATETIME2(3) NOT NULL,
-  status NVARCHAR(20) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','in-progress','completed','cancelled')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'scheduled' CHECK (status IN ('scheduled','in-progress','completed','cancelled')),
   reason NVARCHAR(500) NOT NULL,
   subjective NVARCHAR(MAX) NULL,
   objective NVARCHAR(MAX) NULL,
   assessment NVARCHAR(MAX) NULL,
-  plan NVARCHAR(MAX) NULL,
+  [plan] NVARCHAR(MAX) NULL,
   vitals_json NVARCHAR(MAX) NULL,
   anthropometry_id UNIQUEIDENTIFIER NULL,
   lab_panel_id UNIQUEIDENTIFIER NULL,
@@ -82,8 +80,7 @@ CREATE INDEX idx_consultas_paciente ON consultas(paciente_id, consultation_date 
 CREATE INDEX idx_consultas_profesional ON consultas(profesional_id, consultation_date DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_consultas_updated ON consultas(sucursal_id, updated_at DESC);
 
--- Antropometr\u00eda
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'antropometrias')
+-- Antropometría
 CREATE TABLE antropometrias (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -122,7 +119,6 @@ CREATE INDEX idx_antropometrias_paciente ON antropometrias(paciente_id, measured
 CREATE INDEX idx_antropometrias_sucursal ON antropometrias(sucursal_id, updated_at DESC);
 
 -- Paneles de laboratorio
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'lab_panels')
 CREATE TABLE lab_panels (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -143,15 +139,14 @@ CREATE TABLE lab_panels (
 CREATE INDEX idx_lab_panels_paciente ON lab_panels(paciente_id, taken_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_lab_panels_sucursal ON lab_panels(sucursal_id, updated_at DESC);
 
--- Planes de alimentaci\u00f3n
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'planes_alimenticios')
+-- Planes de alimentación
 CREATE TABLE planes_alimenticios (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
   consulta_id UNIQUEIDENTIFIER NOT NULL,
   profesional_id UNIQUEIDENTIFIER NOT NULL,
-  name NVARCHAR(200) NOT NULL,
+  [name] NVARCHAR(200) NOT NULL,
   description NVARCHAR(500) NULL,
   start_date DATE NOT NULL,
   end_date DATE NULL,
@@ -161,7 +156,7 @@ CREATE TABLE planes_alimenticios (
   fat_target_g INT NOT NULL,
   meals_json NVARCHAR(MAX) NOT NULL,
   notes NVARCHAR(MAX) NULL,
-  status NVARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','paused','completed','cancelled')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','paused','completed','cancelled')),
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   deleted_at DATETIME2(3) NULL,
@@ -176,7 +171,6 @@ CREATE INDEX idx_planes_consulta ON planes_alimenticios(consulta_id) WHERE delet
 CREATE INDEX idx_planes_sucursal ON planes_alimenticios(sucursal_id, updated_at DESC);
 
 -- Snapshots inmutables de expediente
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'expediente_snapshots')
 CREATE TABLE expediente_snapshots (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -198,8 +192,7 @@ CREATE INDEX idx_snapshots_consulta ON expediente_snapshots(consulta_id);
 CREATE INDEX idx_snapshots_sucursal ON expediente_snapshots(sucursal_id, created_at DESC);
 CREATE UNIQUE INDEX uq_snapshots_hash ON expediente_snapshots(contenido_hash);
 
--- Cat\u00e1logo SMAE: alimentos (system + custom por sucursal)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'alimentos')
+-- Catálogo SMAE: alimentos (system + custom por sucursal)
 CREATE TABLE alimentos (
   id NVARCHAR(80) NOT NULL,
   sucursal_id UNIQUEIDENTIFIER NULL,
@@ -219,7 +212,8 @@ CREATE TABLE alimentos (
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   deleted_at DATETIME2(3) NULL,
   row_version ROWVERSION NOT NULL,
-  PRIMARY KEY (id, ISNULL(sucursal_id, '00000000-0000-0000-0000-000000000000')),
+  _owner_key AS ISNULL(sucursal_id, '00000000-0000-0000-0000-000000000000') PERSISTED,
+  PRIMARY KEY (id, _owner_key),
   FOREIGN KEY (sucursal_id) REFERENCES sucursales(id) ON DELETE CASCADE
 );
 CREATE INDEX idx_alimentos_grupo ON alimentos(grupo) WHERE deleted_at IS NULL;

@@ -1,11 +1,10 @@
 -- =====================================================================
 -- 004-facturacion.sql
--- Cat\u00e1logo de servicios, presupuestos, pagos, comprobantes.
--- Base para Sprint 14D (facturaci\u00f3n).
+-- Catálogo de servicios, presupuestos, pagos, comprobantes.
+-- Base para Sprint 14D (facturación).
 -- =====================================================================
 
--- Cat\u00e1logo de servicios con precios (por sucursal)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'servicios')
+-- Catálogo de servicios con precios (por sucursal)
 CREATE TABLE servicios (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -27,8 +26,7 @@ CREATE TABLE servicios (
 CREATE UNIQUE INDEX uq_servicios_codigo ON servicios(sucursal_id, codigo) WHERE deleted_at IS NULL;
 CREATE INDEX idx_servicios_sucursal ON servicios(sucursal_id) WHERE activo = 1 AND deleted_at IS NULL;
 
--- \u00cdtems de presupuesto (l\u00edneas detalle de servicios a facturar)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'presupuesto_items')
+-- Ítems de presupuesto (líneas detalle de servicios a facturar)
 CREATE TABLE presupuesto_items (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   presupuesto_id UNIQUEIDENTIFIER NOT NULL,
@@ -39,7 +37,7 @@ CREATE TABLE presupuesto_items (
   descuento_porcentaje DECIMAL(5,2) NOT NULL DEFAULT 0,
   subtotal DECIMAL(12,2) NOT NULL,
   iva DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total DECIMAL(12,2) NOT NULL,
+  [total] DECIMAL(12,2) NOT NULL,
   orden INT NOT NULL DEFAULT 0,
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -50,7 +48,6 @@ CREATE TABLE presupuesto_items (
 CREATE INDEX idx_pres_items_presupuesto ON presupuesto_items(presupuesto_id) WHERE deleted_at IS NULL;
 
 -- Presupuestos (cotizaciones al paciente)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'presupuestos')
 CREATE TABLE presupuestos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -63,9 +60,9 @@ CREATE TABLE presupuestos (
   subtotal DECIMAL(12,2) NOT NULL,
   descuento DECIMAL(12,2) NOT NULL DEFAULT 0,
   iva DECIMAL(12,2) NOT NULL DEFAULT 0,
-  total DECIMAL(12,2) NOT NULL,
+  [total] DECIMAL(12,2) NOT NULL,
   moneda NVARCHAR(3) NOT NULL DEFAULT 'MXN',
-  status NVARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','accepted','rejected','expired','converted')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','accepted','rejected','expired','converted')),
   notas NVARCHAR(MAX) NULL,
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -81,7 +78,6 @@ CREATE INDEX idx_presupuestos_paciente ON presupuestos(paciente_id) WHERE delete
 CREATE INDEX idx_presupuestos_sucursal ON presupuestos(sucursal_id, status, fecha DESC);
 
 -- Pagos (vinculados a presupuestos o directos)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'pagos')
 CREATE TABLE pagos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -94,7 +90,7 @@ CREATE TABLE pagos (
   moneda NVARCHAR(3) NOT NULL DEFAULT 'MXN',
   metodo_pago NVARCHAR(40) NOT NULL CHECK (metodo_pago IN ('efectivo','tarjeta','transferencia','cheque','deposito','otro')),
   referencia NVARCHAR(120) NULL,
-  status NVARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending','completed','cancelled','refunded')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'completed' CHECK (status IN ('pending','completed','cancelled','refunded')),
   notas NVARCHAR(500) NULL,
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -111,7 +107,6 @@ CREATE INDEX idx_pagos_sucursal ON pagos(sucursal_id, fecha DESC) WHERE status =
 CREATE INDEX idx_pagos_presupuesto ON pagos(presupuesto_id) WHERE deleted_at IS NULL;
 
 -- Comprobantes (facturas/recibos emitidos)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'comprobantes')
 CREATE TABLE comprobantes (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   pago_id UNIQUEIDENTIFIER NOT NULL,
@@ -122,13 +117,13 @@ CREATE TABLE comprobantes (
   fecha_emision DATETIME2(3) NOT NULL,
   subtotal DECIMAL(12,2) NOT NULL,
   iva DECIMAL(12,2) NOT NULL,
-  total DECIMAL(12,2) NOT NULL,
+  [total] DECIMAL(12,2) NOT NULL,
   rfc_receptor NVARCHAR(20) NULL,
   razon_social_receptor NVARCHAR(200) NULL,
   uuid_sat NVARCHAR(40) NULL,
   pdf_url NVARCHAR(500) NULL,
   xml_url NVARCHAR(500) NULL,
-  status NVARCHAR(20) NOT NULL DEFAULT 'issued' CHECK (status IN ('issued','cancelled','pending')),
+  [status] NVARCHAR(20) NOT NULL DEFAULT 'issued' CHECK (status IN ('issued','cancelled','pending')),
   created_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   updated_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
   deleted_at DATETIME2(3) NULL,

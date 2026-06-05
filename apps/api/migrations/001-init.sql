@@ -4,7 +4,6 @@
 -- =====================================================================
 
 -- Tabla de sucursales (multi-tenancy)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'sucursales')
 CREATE TABLE sucursales (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   nombre NVARCHAR(120) NOT NULL,
@@ -22,7 +21,6 @@ CREATE INDEX idx_sucursales_activa ON sucursales(activa) WHERE deleted_at IS NUL
 CREATE UNIQUE INDEX uq_sucursales_nombre ON sucursales(nombre) WHERE deleted_at IS NULL;
 
 -- Tabla de profesionales (auth + RBAC)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'profesionales')
 CREATE TABLE profesionales (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   email NVARCHAR(200) NOT NULL,
@@ -45,7 +43,6 @@ CREATE UNIQUE INDEX uq_profesionales_email ON profesionales(email) WHERE deleted
 CREATE INDEX idx_profesionales_rol ON profesionales(rol) WHERE deleted_at IS NULL;
 
 -- N:M profesional <-> sucursal
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'profesional_sucursal')
 CREATE TABLE profesional_sucursal (
   profesional_id UNIQUEIDENTIFIER NOT NULL,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -58,7 +55,6 @@ CREATE TABLE profesional_sucursal (
 CREATE INDEX idx_prof_suc_sucursal ON profesional_sucursal(sucursal_id);
 
 -- Sync state: per (profesional, sucursal, entity_type) tracking
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'sync_state')
 CREATE TABLE sync_state (
   profesional_id UNIQUEIDENTIFIER NOT NULL,
   sucursal_id UNIQUEIDENTIFIER NOT NULL,
@@ -72,7 +68,6 @@ CREATE TABLE sync_state (
 );
 
 -- Audit log (NOM-024, retención 5 años)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'audit_log')
 CREATE TABLE audit_log (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   sucursal_id UNIQUEIDENTIFIER NULL,
@@ -90,10 +85,3 @@ CREATE INDEX idx_audit_sucursal ON audit_log(sucursal_id, occurred_at DESC);
 CREATE INDEX idx_audit_profesional ON audit_log(profesional_id, occurred_at DESC);
 CREATE INDEX idx_audit_entity ON audit_log(entity_type, entity_id);
 
--- Tabla de migraciones (control)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'schema_migrations')
-CREATE TABLE schema_migrations (
-  filename NVARCHAR(255) NOT NULL PRIMARY KEY,
-  applied_at DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
-  checksum NVARCHAR(64) NOT NULL
-);

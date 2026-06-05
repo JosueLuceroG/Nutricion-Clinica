@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { readdir, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -69,10 +70,31 @@ export async function applyMigrations(
       continue;
     }
 
-    log(`apply ${m.filename}`);
-    try {
-      const request = pool.request();
-      await request.batch(m.content);
+      log(`apply ${m.filename}`);
+      try {
+        // mssql@11's `request.batch()` falla con archivos grandes que
+        // contienen `IF NOT EXISTS ... CREATE TABLE` anidados. Como ya
+        // chequeamos `schema_migrations` arriba (idempotente), los
+        // statements son seguros de re-ejecutar. Dividimos por `;` y
+        // enviamos cada uno con `request.query()`.
+        const statements = m.content
+          .split(/;\s*(?=\n|$)/)
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0 && !/^(--\s*)+$/.test(s))
+          .map((s) => (s.endsWith(';') ? s : s + ';'));
+        for (let i = 0; i < statements.length; i++) {
+          const stmt = statements[i];
+          try {
+            await pool.request().query(stmt);
+          } catch (stmtErr) {
+            const e = stmtErr as Error & { precedingErrors?: Array<{ message: string }> };
+            log(`  stmt ${i} fail (len=${stmt.length}): ${e.message}`);
+            if (e.precedingErrors) {
+              for (const pe of e.precedingErrors) log(`    pre: ${pe.message}`);
+            }
+            throw e;
+          }
+        }
       await pool
         .request()
         .input('filename', sql.NVarChar(255), m.filename)

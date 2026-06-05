@@ -1,14 +1,13 @@
 -- =====================================================================
 -- 003-clinical-record.sql
--- Expediente cl\u00ednico completo (m\u00f3dulo 31 del spec).
+-- Expediente clínico completo (módulo 31 del spec).
 -- Sub-tables de pacientes: alergias, medicamentos, historia familiar,
--- historia personal, h\u00e1bitos, actividad f\u00edsica, intolerancias,
--- cirug\u00edas, hospitalizaciones, suplementos, frecuencias alimenticias,
--- s\u00edntomas GI, dieta historia, documentos adjuntos.
+-- historia personal, hábitos, actividad física, intolerancias,
+-- cirugías, hospitalizaciones, suplementos, frecuencias alimenticias,
+-- síntomas GI, dieta historia, documentos adjuntos.
 -- =====================================================================
 
 -- Alergias
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'alergias')
 CREATE TABLE alergias (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -26,7 +25,6 @@ CREATE TABLE alergias (
 CREATE INDEX idx_alergias_paciente ON alergias(paciente_id) WHERE deleted_at IS NULL;
 
 -- Medicamentos activos
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'medicamentos')
 CREATE TABLE medicamentos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -47,7 +45,6 @@ CREATE TABLE medicamentos (
 CREATE INDEX idx_medicamentos_paciente ON medicamentos(paciente_id) WHERE deleted_at IS NULL;
 
 -- Historia familiar
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'historia_familiar')
 CREATE TABLE historia_familiar (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -63,7 +60,6 @@ CREATE TABLE historia_familiar (
 CREATE INDEX idx_hist_fam_paciente ON historia_familiar(paciente_id) WHERE deleted_at IS NULL;
 
 -- Historia personal (enfermedades, condiciones preexistentes)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'historia_personal')
 CREATE TABLE historia_personal (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -80,8 +76,7 @@ CREATE TABLE historia_personal (
 );
 CREATE INDEX idx_hist_per_paciente ON historia_personal(paciente_id) WHERE deleted_at IS NULL;
 
--- H\u00e1bitos
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'habitos')
+-- Hábitos
 CREATE TABLE habitos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -100,8 +95,7 @@ CREATE TABLE habitos (
 );
 CREATE INDEX idx_habitos_paciente ON habitos(paciente_id) WHERE deleted_at IS NULL;
 
--- Actividad f\u00edsica
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'actividad_fisica')
+-- Actividad física
 CREATE TABLE actividad_fisica (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -122,7 +116,6 @@ CREATE TABLE actividad_fisica (
 CREATE INDEX idx_act_fisica_paciente ON actividad_fisica(paciente_id) WHERE deleted_at IS NULL;
 
 -- Intolerancias
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'intolerancias')
 CREATE TABLE intolerancias (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -138,8 +131,7 @@ CREATE TABLE intolerancias (
 );
 CREATE INDEX idx_intolerancias_paciente ON intolerancias(paciente_id) WHERE deleted_at IS NULL;
 
--- Cirug\u00edas
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cirugias')
+-- Cirugías
 CREATE TABLE cirugias (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -157,7 +149,6 @@ CREATE TABLE cirugias (
 CREATE INDEX idx_cirugias_paciente ON cirugias(paciente_id) WHERE deleted_at IS NULL;
 
 -- Hospitalizaciones
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'hospitalizaciones')
 CREATE TABLE hospitalizaciones (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -175,7 +166,6 @@ CREATE TABLE hospitalizaciones (
 CREATE INDEX idx_hosp_paciente ON hospitalizaciones(paciente_id) WHERE deleted_at IS NULL;
 
 -- Suplementos
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'suplementos')
 CREATE TABLE suplementos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -196,7 +186,6 @@ CREATE TABLE suplementos (
 CREATE INDEX idx_suplementos_paciente ON suplementos(paciente_id) WHERE deleted_at IS NULL;
 
 -- Frecuencias alimenticias
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'frecuencias_alimenticias')
 CREATE TABLE frecuencias_alimenticias (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -214,8 +203,7 @@ CREATE TABLE frecuencias_alimenticias (
 );
 CREATE INDEX idx_freq_alim_paciente ON frecuencias_alimenticias(paciente_id) WHERE deleted_at IS NULL;
 
--- S\u00edntomas gastrointestinales
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'sintomas_gi')
+-- Síntomas gastrointestinales
 CREATE TABLE sintomas_gi (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -233,7 +221,6 @@ CREATE TABLE sintomas_gi (
 CREATE INDEX idx_sintomas_gi_paciente ON sintomas_gi(paciente_id) WHERE deleted_at IS NULL;
 
 -- Dieta historia (dietas previas)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'dieta_historia')
 CREATE TABLE dieta_historia (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
@@ -251,8 +238,7 @@ CREATE TABLE dieta_historia (
 );
 CREATE INDEX idx_dieta_hist_paciente ON dieta_historia(paciente_id) WHERE deleted_at IS NULL;
 
--- Equivalencias inversas SMAE (tortillas <-> ma\u00edz, frijoles <-> leguminosas)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'equivalencias_inversas')
+-- Equivalencias inversas SMAE (tortillas <-> maíz, frijoles <-> leguminosas)
 CREATE TABLE equivalencias_inversas (
   alimento_id NVARCHAR(80) NOT NULL,
   grupo NVARCHAR(40) NOT NULL,
@@ -261,12 +247,11 @@ CREATE TABLE equivalencias_inversas (
   cantidad DECIMAL(6,1) NOT NULL,
   unidad NVARCHAR(20) NOT NULL,
   grupo_equivalente NVARCHAR(40) NOT NULL,
-  PRIMARY KEY (alimento_id, grupo, orden),
-  FOREIGN KEY (alimento_id) REFERENCES alimentos(id) ON DELETE CASCADE
+  PRIMARY KEY (alimento_id, grupo, orden)
 );
+CREATE INDEX idx_equivalencias_inversas_equiv ON equivalencias_inversas(alimento_equivalente_id);
 
--- Equivalentes est\u00e1ndar SMAE (tabla de consulta)
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'equivalentes_estandar')
+-- Equivalentes estándar SMAE (tabla de consulta)
 CREATE TABLE equivalentes_estandar (
   grupo NVARCHAR(40) NOT NULL,
   alimento_id NVARCHAR(80) NOT NULL,
@@ -281,7 +266,6 @@ CREATE TABLE equivalentes_estandar (
 );
 
 -- Documentos adjuntos
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'documentos')
 CREATE TABLE documentos (
   id UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
   paciente_id UNIQUEIDENTIFIER NOT NULL,
