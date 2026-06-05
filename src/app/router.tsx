@@ -26,14 +26,31 @@ import { NotFoundPage } from "@app/pages/NotFoundPage";
 import { NotificationsPage } from "@app/pages/NotificationsPage";
 import { ProfilePage } from "@app/pages/ProfilePage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
+import { LoginPage } from "@modules/auth/ui/LoginPage";
+import { useAuthStore } from "@store/authStore";
+import * as React from "react";
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+}
 
 const router = createHashRouter([
   {
+    path: "/login",
+    element: <LoginPage />,
+  },
+  {
     path: "/",
     element: (
-      <ErrorBoundary>
-        <AppLayout />
-      </ErrorBoundary>
+      <RequireAuth>
+        <ErrorBoundary>
+          <AppLayout />
+        </ErrorBoundary>
+      </RequireAuth>
     ),
     errorElement: <ErrorBoundaryRoute />,
     children: [

@@ -130,10 +130,17 @@ export function Header() {
               Mi perfil
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => navigate("/configuracion")}>
-              Configuración
+              Configuraci&oacute;n
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>Cerrar sesión</DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => {
+                useAuthStore.getState().logout();
+                navigate("/login", { replace: true });
+              }}
+            >
+              Cerrar sesi&oacute;n
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

@@ -8,8 +8,11 @@ import {
   WifiOff,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { useSyncStore, type SyncStatus } from "@store/syncStore";
+import { useSyncActions } from "@services/sync/useSyncActions";
+import { ConflictResolutionModal } from "@modules/sync/ui/ConflictResolutionModal";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
@@ -19,8 +22,8 @@ const STATUS_CONFIG: Record<
   { label: string; icon: React.ComponentType<{ className?: string }>; variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info" }
 > = {
   idle: { label: "Sincronizado", icon: CheckCircle2, variant: "success" },
-  syncing: { label: "Sincronizando…", icon: RefreshCw, variant: "info" },
-  offline: { label: "Sin conexión", icon: CloudOff, variant: "warning" },
+  syncing: { label: "Sincronizando\u2026", icon: RefreshCw, variant: "info" },
+  offline: { label: "Sin conexi\u00f3n", icon: CloudOff, variant: "warning" },
   error: { label: "Error de sync", icon: AlertCircle, variant: "destructive" },
 };
 
@@ -28,6 +31,9 @@ export function StatusBar() {
   const status = useSyncStore((s) => s.status);
   const pending = useSyncStore((s) => s.pendingChanges);
   const lastSync = useSyncStore((s) => s.lastSyncAt);
+  const lastError = useSyncStore((s) => s.lastError);
+  const { syncNow, conflictCount } = useSyncActions();
+  const [conflictOpen, setConflictOpen] = React.useState(false);
   const [isOnline, setIsOnline] = React.useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
@@ -52,46 +58,72 @@ export function StatusBar() {
         day: "2-digit",
         month: "short",
       })
-    : "—";
+    : "\u2014";
 
   return (
-    <footer
-      className="flex h-7 items-center gap-3 border-t bg-muted/30 px-3 text-[11px] text-muted-foreground"
-      role="contentinfo"
-    >
-      <Badge variant={cfg.variant} className="gap-1 px-1.5 py-0 text-[10px]">
-        <StatusIcon
-          className={cn("h-3 w-3", status === "syncing" && "animate-spin")}
-          aria-hidden
-        />
-        {cfg.label}
-      </Badge>
+    <>
+      <footer
+        className="flex h-7 items-center gap-3 border-t bg-muted/30 px-3 text-[11px] text-muted-foreground"
+        role="contentinfo"
+      >
+        <Badge
+          variant={cfg.variant}
+          className="gap-1 px-1.5 py-0 text-[10px]"
+          title={lastError ?? undefined}
+        >
+          <StatusIcon
+            className={cn("h-3 w-3", status === "syncing" && "animate-spin")}
+            aria-hidden
+          />
+          {cfg.label}
+        </Badge>
 
-      {pending > 0 && (
-        <span className="flex items-center gap-1" title="Cambios pendientes de sincronizar">
-          <Database className="h-3 w-3" aria-hidden />
-          {pending} pendiente{pending === 1 ? "" : "s"}
+        {pending > 0 && (
+          <span className="flex items-center gap-1" title="Cambios pendientes de sincronizar">
+            <Database className="h-3 w-3" aria-hidden />
+            {pending} pendiente{pending === 1 ? "" : "s"}
+          </span>
+        )}
+
+        {conflictCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setConflictOpen(true)}
+            className="flex items-center gap-1 rounded px-1 text-warning hover:bg-warning/10"
+            title="Resolver conflictos de sincronizaci\u00f3n"
+          >
+            <AlertTriangle className="h-3 w-3" aria-hidden />
+            {conflictCount} conflicto{conflictCount === 1 ? "" : "s"}
+          </button>
+        )}
+
+        <span className="flex items-center gap-1" title={`\u00daltima sync: ${lastSyncLabel}`}>
+          <Cloud className="h-3 w-3" aria-hidden />
+          {lastSyncLabel}
         </span>
-      )}
 
-      <span className="flex items-center gap-1" title={`Última sync: ${lastSyncLabel}`}>
-        <Cloud className="h-3 w-3" aria-hidden />
-        {lastSyncLabel}
-      </span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="flex items-center gap-1">
+            {isOnline ? (
+              <Wifi className="h-3 w-3 text-success" aria-hidden />
+            ) : (
+              <WifiOff className="h-3 w-3 text-warning" aria-hidden />
+            )}
+            {isOnline ? "En l\u00ednea" : "Desconectado"}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-5 px-2 text-[10px]"
+            onClick={() => void syncNow()}
+            disabled={status === "syncing"}
+          >
+            Sincronizar ahora
+          </Button>
+        </div>
+      </footer>
 
-      <div className="ml-auto flex items-center gap-2">
-        <span className="flex items-center gap-1">
-          {isOnline ? (
-            <Wifi className="h-3 w-3 text-success" aria-hidden />
-          ) : (
-            <WifiOff className="h-3 w-3 text-warning" aria-hidden />
-          )}
-          {isOnline ? "En línea" : "Desconectado"}
-        </span>
-        <Button variant="ghost" size="sm" className="h-5 px-2 text-[10px]">
-          Sincronizar ahora
-        </Button>
-      </div>
-    </footer>
+      <ConflictResolutionModal open={conflictOpen} onOpenChange={setConflictOpen} />
+    </>
   );
 }
