@@ -57,6 +57,22 @@ const CONSULTATIONS_STORES = [
   "consultation_date",
   "[patient_id+consultation_date]",
   "status",
+  "paid",
+  "anthropometry_id",
+  "lab_panel_id",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+].join(", ");
+
+const CONSULTATIONS_BILLING_STORES = [
+  "id",
+  "patient_id",
+  "consultation_date",
+  "[patient_id+consultation_date]",
+  "status",
+  "paid",
+  "[patient_id+paid+consultation_date]",
   "anthropometry_id",
   "lab_panel_id",
   "created_at",
@@ -193,6 +209,10 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(12).stores({
       sync_queue: SYNC_QUEUE_STORES,
+    });
+
+    this.version(13).stores({
+      consultations: CONSULTATIONS_BILLING_STORES,
     });
   }
 }

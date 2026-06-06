@@ -196,3 +196,82 @@ describe('dbRowToClient', () => {
     expect(() => getColumnMap('inventado')).toThrow();
   });
 });
+
+describe('entityColumnMaps — consultas: campos de pago (Sprint 14D)', () => {
+  it('prepareColumnsForWrite: traduce cost/paid/payment_method/paid_at/reference/invoice_number/billing_notes', () => {
+    const cols = prepareColumnsForWrite('consultas', {
+      cost: 1200.5,
+      paid: true,
+      payment_method: 'transfer',
+      paid_at: '2026-06-01T15:30:00.000Z',
+      reference: 'TRF-123',
+      invoice_number: 'INV-99',
+      billing_notes: 'pagado en mostrador',
+    });
+    const byName = Object.fromEntries(cols.map((c) => [c.dbColumn, c]));
+    expect(byName.cost?.value).toBe(1200.5);
+    expect(byName.paid?.value).toBe(true);
+    expect(byName.payment_method?.value).toBe('transfer');
+    expect(byName.paid_at?.value).toBeInstanceOf(Date);
+    expect(byName.reference?.value).toBe('TRF-123');
+    expect(byName.invoice_number?.value).toBe('INV-99');
+    expect(byName.billing_notes?.value).toBe('pagado en mostrador');
+  });
+
+  it('consultas: cost como Decimal(12,2) sin transformación', () => {
+    const cols = prepareColumnsForWrite('consultas', { cost: 999.99 });
+    const col = cols.find((c) => c.dbColumn === 'cost');
+    expect(col?.value).toBe(999.99);
+  });
+
+  it('consultas: paid como Bit acepta boolean directo', () => {
+    const cols = prepareColumnsForWrite('consultas', { paid: true });
+    const col = cols.find((c) => c.dbColumn === 'paid');
+    expect(col?.value).toBe(true);
+  });
+
+  it('consultas: paid_at null pasa como null', () => {
+    const cols = prepareColumnsForWrite('consultas', { paid_at: null });
+    const col = cols.find((c) => c.dbColumn === 'paid_at');
+    expect(col?.value).toBeNull();
+  });
+
+  it('dbRowToClient: traduce fila de DB con campos de pago a objeto cliente', () => {
+    const client = dbRowToClient('consultas', {
+      id: 'cid-1',
+      paciente_id: 'pid-1',
+      profesional_id: 'pro-1',
+      consultation_number: 1,
+      consultation_date: new Date('2026-06-01'),
+      status: 'completed',
+      reason: 'Control',
+      cost: 1500,
+      paid: true,
+      payment_method: 'cash',
+      paid_at: new Date('2026-06-01T10:30:00Z'),
+      reference: 'CAJA-7',
+      invoice_number: null,
+      billing_notes: null,
+      created_at: '2026-06-01',
+      updated_at: '2026-06-01',
+      deleted_at: null,
+    });
+    expect(client.cost).toBe(1500);
+    expect(client.paid).toBe(true);
+    expect(client.payment_method).toBe('cash');
+    expect(client.reference).toBe('CAJA-7');
+    expect(client.invoice_number).toBeNull();
+    expect(client.billing_notes).toBeNull();
+  });
+
+  it('getColumnMap("consultas").writableDbColumns incluye las 7 nuevas columnas de pago', () => {
+    const map = getColumnMap('consultas');
+    expect(map.writableDbColumns.has('cost')).toBe(true);
+    expect(map.writableDbColumns.has('paid')).toBe(true);
+    expect(map.writableDbColumns.has('payment_method')).toBe(true);
+    expect(map.writableDbColumns.has('paid_at')).toBe(true);
+    expect(map.writableDbColumns.has('reference')).toBe(true);
+    expect(map.writableDbColumns.has('invoice_number')).toBe(true);
+    expect(map.writableDbColumns.has('billing_notes')).toBe(true);
+  });
+});

@@ -3,6 +3,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import type { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import type { ConsultationStatus } from "./ConsultationStatus";
+import type { PaymentMethod } from "./PaymentMethod";
 import { Vitals } from "./Vitals";
 
 /**
@@ -34,6 +35,13 @@ export class Consultation {
     public readonly labPanelId: LabPanelId | null,
     public readonly nextVisitDate: Date | null,
     public readonly status: ConsultationStatus,
+    public readonly cost: number,
+    public readonly paid: boolean,
+    public readonly paymentMethod: PaymentMethod | null,
+    public readonly paidAt: Date | null,
+    public readonly reference: string | null,
+    public readonly invoiceNumber: string | null,
+    public readonly billingNotes: string | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
     public readonly deletedAt: Date | null,
@@ -45,6 +53,14 @@ export class Consultation {
 
   get isActive(): boolean {
     return this.status === "scheduled" || this.status === "in-progress";
+  }
+
+  get isPaid(): boolean {
+    return this.paid;
+  }
+
+  get isPendingPayment(): boolean {
+    return !this.paid && this.cost > 0;
   }
 
   withStatus(newStatus: ConsultationStatus, now: Date = new Date()): Consultation {
@@ -95,6 +111,59 @@ export class Consultation {
     });
   }
 
+  /**
+   * Registra o actualiza el pago de la consulta.
+   * Reglas (RN-ECO-03/04, Sprint 14D MVP):
+   *  - Si `paid=true` se exige `paymentMethod` y `paidAt`.
+   *  - `cost` debe ser >= 0.
+   *  - No se puede pagar una consulta eliminada.
+   *  - Permite re-registrar (cambiar método o corregir referencia).
+   */
+  withPayment(
+    input: {
+      cost?: number;
+      paid: boolean;
+      paymentMethod?: PaymentMethod | null;
+      paidAt?: Date | null;
+      reference?: string | null;
+      invoiceNumber?: string | null;
+      billingNotes?: string | null;
+    },
+    now: Date = new Date(),
+  ): Consultation {
+    if (this.deletedAt) {
+      throw new Error("No se puede modificar el pago de una consulta eliminada.");
+    }
+    if (input.cost !== undefined && (input.cost < 0 || !Number.isFinite(input.cost))) {
+      throw new Error("El costo de la consulta debe ser un número >= 0.");
+    }
+    if (input.paid) {
+      if (!input.paymentMethod) {
+        throw new Error("Para marcar como pagada se requiere el método de pago.");
+      }
+      if (!input.paidAt) {
+        throw new Error("Para marcar como pagada se requiere la fecha de pago.");
+      }
+    }
+    const refTrim = input.reference?.trim();
+    const ref = refTrim ? refTrim.slice(0, 120) : null;
+    const invTrim = input.invoiceNumber?.trim();
+    const inv = invTrim ? invTrim.slice(0, 40) : null;
+    const notesTrim = input.billingNotes?.trim();
+    const notes = notesTrim ? notesTrim.slice(0, 500) : null;
+    return Consultation.reconstitute({
+      ...this.toProps(),
+      cost: input.cost !== undefined ? input.cost : this.cost,
+      paid: input.paid,
+      paymentMethod: input.paid ? (input.paymentMethod ?? null) : null,
+      paidAt: input.paid ? (input.paidAt ?? null) : null,
+      reference: input.paid ? ref : null,
+      invoiceNumber: input.paid ? inv : null,
+      billingNotes: notes,
+      updatedAt: now,
+    });
+  }
+
   softDelete(now: Date = new Date()): Consultation {
     if (this.deletedAt) return this;
     return Consultation.reconstitute({
@@ -120,6 +189,13 @@ export class Consultation {
       labPanelId: this.labPanelId,
       nextVisitDate: this.nextVisitDate,
       status: this.status,
+      cost: this.cost,
+      paid: this.paid,
+      paymentMethod: this.paymentMethod,
+      paidAt: this.paidAt,
+      reference: this.reference,
+      invoiceNumber: this.invoiceNumber,
+      billingNotes: this.billingNotes,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       deletedAt: this.deletedAt,
@@ -138,6 +214,10 @@ export class Consultation {
         noFuture: true,
       });
     }
+    const cost = input.cost ?? 0;
+    if (cost < 0 || !Number.isFinite(cost)) {
+      throw new Error("El costo de la consulta debe ser un número >= 0.");
+    }
     return new Consultation(
       input.id ?? ConsultationId.generate(),
       input.patientId,
@@ -153,6 +233,13 @@ export class Consultation {
       input.labPanelId ?? null,
       input.nextVisitDate ?? null,
       input.status ?? "scheduled",
+      cost,
+      false,
+      null,
+      null,
+      null,
+      null,
+      null,
       new Date(),
       new Date(),
       null,
@@ -175,6 +262,13 @@ export class Consultation {
       props.labPanelId,
       props.nextVisitDate,
       props.status,
+      props.cost,
+      props.paid,
+      props.paymentMethod,
+      props.paidAt,
+      props.reference,
+      props.invoiceNumber,
+      props.billingNotes,
       props.createdAt,
       props.updatedAt,
       props.deletedAt,
@@ -224,6 +318,13 @@ export interface ConsultationProps {
   labPanelId: LabPanelId | null;
   nextVisitDate: Date | null;
   status: ConsultationStatus;
+  cost: number;
+  paid: boolean;
+  paymentMethod: PaymentMethod | null;
+  paidAt: Date | null;
+  reference: string | null;
+  invoiceNumber: string | null;
+  billingNotes: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -244,4 +345,11 @@ export interface ConsultationCreate {
   labPanelId?: LabPanelId | null;
   nextVisitDate?: Date | null;
   status?: ConsultationStatus;
+  cost?: number;
+  paid?: boolean;
+  paymentMethod?: PaymentMethod | null;
+  paidAt?: Date | null;
+  reference?: string | null;
+  invoiceNumber?: string | null;
+  billingNotes?: string | null;
 }
