@@ -6,7 +6,7 @@
  * - start() arranca el ciclo peri\u00f3dico; stop() lo cancela.
  */
 
-import { NutriClinicaDB } from '@services/db/dexieSchema';
+import { type NutriClinicaDB } from '@services/db/dexieSchema';
 import { SyncQueueRepository } from './syncQueueRepository.js';
 import { SyncEngine, type SyncEngineDeps, type SyncEvent } from './syncEngine.js';
 import { syncApi } from './syncApiClient.js';

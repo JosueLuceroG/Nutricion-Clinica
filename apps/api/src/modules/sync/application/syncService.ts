@@ -10,7 +10,7 @@ import {
   type SyncPushResultItem,
   type SyncManifest,
 } from '@nutriclinica/shared';
-import { clientPayloadToDb, dbRowToClient, getColumnMap, prepareColumnsForWrite } from './entityColumnMaps.js';
+import { dbRowToClient, prepareColumnsForWrite } from './entityColumnMaps.js';
 
 const MAX_BATCH_SIZE = 500;
 const PULL_PAGE_SIZE = 1000;

@@ -70,7 +70,7 @@ router.get('/', requireAuth, async (req: Request, res: Response, next: NextFunct
     } else {
       result = await pool
         .request()
-        .input('ids', require('mssql').default.NVarChar(2000), req.user.sucursalIds.join(','))
+        .input('ids', sql.NVarChar(2000), req.user.sucursalIds.join(','))
         .query<SucursalRow>(
           `SELECT id, nombre, direccion, telefono, email, activa, created_at, updated_at
              FROM sucursales

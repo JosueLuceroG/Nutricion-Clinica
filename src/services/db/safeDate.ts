@@ -32,7 +32,7 @@ function warnOnce(key: string, received: unknown, fallback: "now" | "null"): voi
   // Solo advertimos una vez por clave para no spammear en producción.
   if (warnedKeys.has(key)) return;
   warnedKeys.add(key);
-  // eslint-disable-next-line no-console
+   
   console.warn(
     `[safeDate] Dato de fecha inválido en "${key}":`,
     received,

@@ -15,7 +15,7 @@
  */
 
 import type { NutriClinicaDB } from '@services/db/dexieSchema';
-import { SyncQueueRepository } from './syncQueueRepository.js';
+import { type SyncQueueRepository } from './syncQueueRepository.js';
 import type { SyncOp } from '@modules/sync/domain/SyncQueueItem';
 import type { SyncableEntity } from '@nutriclinica/shared';
 
@@ -28,7 +28,7 @@ const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
 };
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __syncApplying: boolean | undefined;
 }
 

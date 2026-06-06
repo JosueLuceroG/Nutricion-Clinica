@@ -1,6 +1,6 @@
 import { Router as ExpressRouter, type Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
-import { LoginRequest, RegisterRequest, type Role, type AuthSucursalDTO } from '@nutriclinica/shared';
+import { type LoginRequest, type RegisterRequest, type Role, type AuthSucursalDTO } from '@nutriclinica/shared';
 import { login, register, findProfesionalById, listSucursalesForProfesional } from './application/authService.js';
 import { requireAuth } from './middleware/requireAuth.js';
 

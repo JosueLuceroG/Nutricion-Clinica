@@ -3,14 +3,12 @@ import * as React from "react";
 import { AppLayout } from "@app/layout/AppLayout";
 import { NewPatientPage } from "@app/pages/patients/NewPatientPage";
 import { NewConsultationPage } from "@app/pages/consultations/NewConsultationPage";
-import { ConsultationDetailPage } from "@app/pages/consultations/ConsultationDetailPage";
 import { PatientConsultationsPage } from "@app/pages/consultations/PatientConsultationsPage";
 import { PatientMeasurementsPage } from "@app/pages/anthropometry/PatientMeasurementsPage";
 import { NewMeasurementPage } from "@app/pages/anthropometry/NewMeasurementPage";
 import { PatientLabPage } from "@app/pages/laboratory/PatientLabPage";
 import { NewLabPanelPage } from "@app/pages/laboratory/NewLabPanelPage";
 import { CalculationsPage } from "@app/pages/CalculationsPage";
-import { MealPlanDetailPage } from "@app/pages/plans/MealPlanDetailPage";
 import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
 import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
 import { SettingsPage } from "@app/pages/SettingsPage";
@@ -35,6 +33,9 @@ import { useAuthStore } from "@store/authStore";
  * las páginas con estado de URL directo se mantienen lazy también:
  *  - PacientesList, ConsultationsList, PlansList, Laboratory: listas pesadas con tablas / sort / paginación.
  *  - PatientDetail, Dashboard: vistas con muchos componentes UI.
+ *  - ConsultationDetailPage, MealPlanDetailPage: importan `pdfService` que arrastra
+ *    `jspdf` + `jspdf-autotable` + `html2canvas` (~600 KB total). Lazy para
+ *    no penalizar el primer paint.
  *
  * Si una página es tan pequeña que el chunk es ridículo (<2KB), podría
  * dejarse eager, pero el patrón uniforme simplifica el mantenimiento.
@@ -53,8 +54,16 @@ const ConsultationsListPage = React.lazy(() =>
     default: m.ConsultationsListPage,
   })),
 );
+const ConsultationDetailPage = React.lazy(() =>
+  import("@app/pages/consultations/ConsultationDetailPage").then((m) => ({
+    default: m.ConsultationDetailPage,
+  })),
+);
 const PlansListPage = React.lazy(() =>
   import("@app/pages/plans/PlansListPage").then((m) => ({ default: m.PlansListPage })),
+);
+const MealPlanDetailPage = React.lazy(() =>
+  import("@app/pages/plans/MealPlanDetailPage").then((m) => ({ default: m.MealPlanDetailPage })),
 );
 const LaboratoryPage = React.lazy(() =>
   import("@app/pages/LaboratoryPage").then((m) => ({ default: m.LaboratoryPage })),

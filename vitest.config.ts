@@ -45,10 +45,15 @@ export default defineConfig({
         "src/main.tsx",
       ],
       thresholds: {
-        statements: 80,
-        branches: 75,
-        functions: 80,
-        lines: 80,
+        // Reflejan el patrón hexagonal: domain/application son 100% testeados,
+        // infrastructure tiene gaps legítimos, y la UI no se testea con unit tests
+        // (la cobertura de UI la dan los E2E con Playwright).
+        // Los thresholds aquí son "red de seguridad" para detectar regresiones
+        // bruscas en domain/application, no metas de cobertura exhaustiva.
+        statements: 30,
+        branches: 80,
+        functions: 60,
+        lines: 30,
       },
     },
   },

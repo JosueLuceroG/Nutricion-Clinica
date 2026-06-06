@@ -165,7 +165,7 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
     } catch (err) {
       // Si una tabla falla, seguimos con las demás para que el usuario
       // pueda reparar lo que sí se pueda.
-      // eslint-disable-next-line no-console
+       
       console.error(`[repair] tabla ${t.name} falló:`, err);
       result.byTable[t.name] = {
         scanned: 0,

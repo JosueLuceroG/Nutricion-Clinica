@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { type Request, type Response, type NextFunction } from "express";
 
 export class HttpError extends Error {
   constructor(public readonly status: number, message: string) {
