@@ -12,7 +12,10 @@ const queue = new SyncQueueRepository(db.sync_queue);
  *
  * - syncNow(): dispara un ciclo de sync (engine reusa la inFlight si hay una en curso).
  * - refreshCounts(): actualiza los contadores de pendientes y conflictos.
- * - conflictCount / pendingCount: derivados del syncStore + Dexie.
+ * - conflictCount: reactivo desde Dexie.
+ *
+ * La reconciliación (empujar datos offline no encolados) corre automáticamente
+ * al login vía syncBootstrap, no necesita acción manual.
  */
 export function useSyncActions() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -40,7 +43,7 @@ export function useSyncActions() {
     try {
       await engine.sync();
     } catch {
-      /* el engine ya actualiz\u00f3 el syncStore con el error */
+      /* el engine ya actualizó el syncStore con el error */
     } finally {
       await refreshCounts();
     }

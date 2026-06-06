@@ -1,12 +1,17 @@
 /**
- * SyncEnqueuer: hook sobre Dexie que encola mutaciones en sync_queue.
+ * SyncEnqueuer: registra hooks en cada tabla sincronizable para encolar
+ * mutaciones en sync_queue.
  *
  * Estrategia:
- *  - Suscribe `db.use()` a los tables sincronizables.
- *  - Cuando una mutación ocurre (create/update/delete) en una tabla mapeada,
- *    encola el cambio.
- *  - Si la mutación viene del SyncEngine (round-trip), se ignora: el SyncEngine
- *    setea `__syncApplying = true` durante la transacción.
+ *  - En `start()` se llama `table.hook('creating'|'updating'|'deleting')` para
+ *    cada tabla sincronizable. Dexie 4.x ejecuta estos hooks antes/después
+ *    de cada commit.
+ *  - Si la mutación viene del SyncEngine (round-trip), se ignora via el
+ *    sentinel `__syncApplying` que el engine setea durante la transacción.
+ *  - `stop()` no expone unsubscribe de hooks (Dexie no lo soporta), por lo
+ *    que la bandera se chequea en cada hook; cuando el componente se
+ *    desmonta, simplemente dejamos de encolar (no quedan referencias
+ *    circulares porque queue es un repositorio Dexie vivo, no un closure).
  */
 
 import type { NutriClinicaDB } from '@services/db/dexieSchema';
@@ -35,8 +40,15 @@ export function isSyncApplying(): boolean {
   return globalThis.__syncApplying === true;
 }
 
+interface HookableTable {
+  hook: (
+    event: 'creating' | 'updating' | 'deleting',
+    subscriber: (primKey: unknown, obj: unknown) => void,
+  ) => void;
+}
+
 export class SyncEnqueuer {
-  private unsubscribe: (() => void) | null = null;
+  private active = false;
 
   constructor(
     private readonly db: NutriClinicaDB,
@@ -44,68 +56,50 @@ export class SyncEnqueuer {
   ) {}
 
   start(): void {
-    if (this.unsubscribe) return;
-    this.unsubscribe = this.subscribe();
+    if (this.active) return;
+    this.active = true;
+
+    for (const [tableName, entity] of Object.entries(TABLE_TO_ENTITY)) {
+      const table = (this.db as unknown as Record<string, HookableTable>)[tableName];
+      if (!table) {
+        console.warn(`[sync] table ${tableName} not found, skipping enqueuer`);
+        continue;
+      }
+      const enqueue = (op: SyncOp) => (primKey: unknown, obj: unknown) => {
+        if (!this.active || isSyncApplying()) return;
+        const id = String(primKey);
+        const payload = op === 'delete' ? null : obj;
+        // La transacción del hook sólo contiene la tabla mutada
+        // (e.g. `patients`); `sync_queue` no está en su scope, por lo
+        // que encolar dentro del hook tira NotFoundError. Diferimos
+        // el enqueue dos microtasks más allá: para entonces la
+        // transacción ya hizo commit y podemos abrir una nueva sobre
+        // `sync_queue` sin chocar.
+        queueMicrotask(() => {
+          queueMicrotask(() => {
+            // Deduplicación: si ya hay un item activo (pending/syncing)
+            // para esta misma (entity, entityId, op), no encolamos otro.
+            // Protege contra múltiples instancias del enqueuer enganchadas
+            // a la misma tabla (HMR de Vite + React StrictMode en dev).
+            this.queue
+              .findActiveByEntityId(entity, id, op)
+              .then((existing) => {
+                if (existing) return;
+                return this.queue.enqueue({ entity, entityId: id, op, payload });
+              })
+              .catch((err: unknown) => {
+                console.error('[sync] enqueue failed', err);
+              });
+          });
+        });
+      };
+      table.hook('creating', enqueue('create'));
+      table.hook('updating', enqueue('update'));
+      table.hook('deleting', enqueue('delete'));
+    }
   }
 
   stop(): void {
-    this.unsubscribe?.();
-    this.unsubscribe = null;
+    this.active = false;
   }
-
-  private subscribe(): () => void {
-    const handler = async (change: { table: string; type: number; key?: unknown; keys?: unknown[]; obj?: unknown; oldObj?: unknown }): Promise<void> => {
-      if (isSyncApplying()) return;
-      const entity = TABLE_TO_ENTITY[change.table];
-      if (!entity) return;
-
-      const op = mapChangeTypeToOp(change.type);
-      if (!op) return;
-
-      const keys: unknown[] = change.keys ?? (change.key !== undefined ? [change.key] : []);
-      for (const key of keys) {
-        const id = String(key);
-        let payload: unknown = null;
-        if (op === 'update' && change.obj) {
-          payload = change.obj;
-        } else if (op === 'create' && change.obj) {
-          payload = change.obj;
-        } else if (op === 'delete') {
-          payload = null;
-        } else {
-          try {
-            const table = (this.db as unknown as Record<string, { get: (k: string) => Promise<unknown> }>)[change.table];
-            if (table) payload = await table.get(id);
-          } catch {
-            payload = null;
-          }
-        }
-        try {
-          await this.queue.enqueue({ entity, entityId: id, op, payload });
-        } catch (err) {
-          console.error('[sync] enqueue failed', err);
-        }
-      }
-    };
-
-    // Dexie 'changes' event: se dispara despu\u00e9s de cada commit. La firma
-    // exacta var\u00eda entre versiones; usamos un cast a la forma com\u00fan
-    // documentada (Dexie 3.x y 4.x son compatibles con este shape b\u00e1sico).
-    const dbWithChanges = this.db as unknown as { on: (event: string, cb: typeof handler) => unknown };
-    const subscription = dbWithChanges.on('changes', handler);
-    if (typeof subscription === 'function') {
-      return subscription as () => void;
-    }
-    return () => {
-      // Fallback: no expone unsubscribe; el handler se vuelve no-op al stop().
-    };
-  }
-}
-
-function mapChangeTypeToOp(type: number): SyncOp | null {
-  // Dexie change types: 1=create, 2=update, 3=delete.
-  if (type === 1) return 'create';
-  if (type === 2) return 'update';
-  if (type === 3) return 'delete';
-  return null;
 }

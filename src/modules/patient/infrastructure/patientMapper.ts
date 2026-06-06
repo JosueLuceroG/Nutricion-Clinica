@@ -8,6 +8,7 @@ import type { EducationLevel } from "../domain/EducationLevel";
 import type { RecordStatus } from "../domain/RecordStatus";
 import { Email, Phone } from "../domain/Contact";
 import type { PatientStatus } from "../domain/PatientStatus";
+import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface PatientRow {
   id: string;
@@ -45,7 +46,7 @@ export const patientRowToDomain = (row: PatientRow): Patient => {
     firstName: row.first_name,
     lastName: row.last_name,
     secondLastName: row.second_last_name,
-    birthDate: new Date(row.birth_date),
+    birthDate: safeDate(row.birth_date, undefined, "patient.birth_date")!,
     sex: row.sex,
     gender: row.gender,
     maritalStatus: row.marital_status,
@@ -58,16 +59,16 @@ export const patientRowToDomain = (row: PatientRow): Patient => {
     emergencyContactRelationship: row.emergency_contact_relationship,
     emergencyContactPhone: row.emergency_contact_phone ? Phone.from(row.emergency_contact_phone) : null,
     recordStatus: row.record_status,
-    recordOpenedAt: new Date(row.record_opened_at),
+    recordOpenedAt: safeDate(row.record_opened_at, undefined, "patient.record_opened_at")!,
     generalNotes: row.general_notes,
     consentimientoInformadoId: row.consentimiento_informado_id ? ConsentId.fromUnsafe(row.consentimiento_informado_id) : null,
-    fechaFirmaConsentimiento: row.fecha_firma_consentimiento ? new Date(row.fecha_firma_consentimiento) : null,
+    fechaFirmaConsentimiento: safeDate(row.fecha_firma_consentimiento, null, "patient.fecha_firma_consentimiento"),
     versionPoliticaPrivacidad: row.version_politica_privacidad,
     clinicalTags: row.clinical_tags ? JSON.parse(row.clinical_tags) : [],
     status: row.status,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    createdAt: safeDate(row.created_at, undefined, "patient.created_at")!,
+    updatedAt: safeDate(row.updated_at, undefined, "patient.updated_at")!,
+    deletedAt: safeDate(row.deleted_at, null, "patient.deleted_at"),
   });
 };
 
@@ -77,7 +78,7 @@ export const patientDomainToRow = (patient: Patient): PatientRow => {
     first_name: patient.firstName,
     last_name: patient.lastName,
     second_last_name: patient.secondLastName,
-    birth_date: patient.birthDate.toISOString(),
+    birth_date: toIsoStringSafe(patient.birthDate, new Date().toISOString(), "patient.birth_date")!,
     sex: patient.sex,
     gender: patient.gender,
     marital_status: patient.maritalStatus,
@@ -90,16 +91,16 @@ export const patientDomainToRow = (patient: Patient): PatientRow => {
     emergency_contact_relationship: patient.emergencyContactRelationship,
     emergency_contact_phone: patient.emergencyContactPhone?.toString() ?? null,
     record_status: patient.recordStatus,
-    record_opened_at: patient.recordOpenedAt.toISOString(),
+    record_opened_at: toIsoStringSafe(patient.recordOpenedAt, new Date().toISOString(), "patient.record_opened_at")!,
     general_notes: patient.generalNotes,
     consentimiento_informado_id: patient.consentimientoInformadoId?.toString() ?? null,
-    fecha_firma_consentimiento: patient.fechaFirmaConsentimiento?.toISOString() ?? null,
+    fecha_firma_consentimiento: toIsoStringSafe(patient.fechaFirmaConsentimiento, null, "patient.fecha_firma_consentimiento"),
     version_politica_privacidad: patient.versionPoliticaPrivacidad,
     clinical_tags: JSON.stringify(patient.clinicalTags),
     status: patient.status,
-    created_at: patient.createdAt.toISOString(),
-    updated_at: patient.updatedAt.toISOString(),
-    deleted_at: patient.deletedAt?.toISOString() ?? null,
+    created_at: toIsoStringSafe(patient.createdAt, new Date().toISOString(), "patient.created_at")!,
+    updated_at: toIsoStringSafe(patient.updatedAt, new Date().toISOString(), "patient.updated_at")!,
+    deleted_at: toIsoStringSafe(patient.deletedAt, null, "patient.deleted_at"),
   };
 };
 

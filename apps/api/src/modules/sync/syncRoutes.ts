@@ -62,7 +62,7 @@ router.post('/push', requireAuth, async (req: Request, res: Response, next: Next
       res.status(403).json({ error: 'No tienes acceso a esa sucursal' });
       return;
     }
-    const result = await pushBatch(body);
+    const result = await pushBatch(body, req.user.sub);
     res.json(result);
   } catch (err) {
     next(err);

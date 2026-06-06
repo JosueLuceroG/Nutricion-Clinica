@@ -3,6 +3,7 @@ import { LabPanelId } from "../domain/LabPanelId";
 import { LabResult } from "../domain/LabResult";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import type { LabTestCode } from "../domain/LabTest";
+import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface LabResultRow {
   test: LabTestCode;
@@ -31,13 +32,13 @@ export const labPanelRowToDomain = (row: LabPanelRow): LabPanel => {
   return LabPanel.reconstitute({
     id: LabPanelId.fromUnsafe(row.id),
     patientId: PatientId.fromUnsafe(row.patient_id),
-    takenAt: new Date(row.taken_at),
+    takenAt: safeDate(row.taken_at, undefined, "lab_panel.taken_at")!,
     labName: row.lab_name,
     notes: row.notes,
     results: rowToResults(row.results),
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    createdAt: safeDate(row.created_at, undefined, "lab_panel.created_at")!,
+    updatedAt: safeDate(row.updated_at, undefined, "lab_panel.updated_at")!,
+    deletedAt: safeDate(row.deleted_at, null, "lab_panel.deleted_at"),
   });
 };
 
@@ -45,12 +46,12 @@ export const labPanelDomainToRow = (panel: LabPanel): LabPanelRow => {
   return {
     id: panel.id.toString(),
     patient_id: panel.patientId.toString(),
-    taken_at: panel.takenAt.toISOString(),
+    taken_at: toIsoStringSafe(panel.takenAt, new Date().toISOString(), "lab_panel.taken_at")!,
     lab_name: panel.labName,
     notes: panel.notes,
     results: resultsToRows(panel.results),
-    created_at: panel.createdAt.toISOString(),
-    updated_at: panel.updatedAt.toISOString(),
-    deleted_at: panel.deletedAt ? panel.deletedAt.toISOString() : null,
+    created_at: toIsoStringSafe(panel.createdAt, new Date().toISOString(), "lab_panel.created_at")!,
+    updated_at: toIsoStringSafe(panel.updatedAt, new Date().toISOString(), "lab_panel.updated_at")!,
+    deleted_at: toIsoStringSafe(panel.deletedAt, null, "lab_panel.deleted_at"),
   };
 };

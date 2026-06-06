@@ -18,17 +18,20 @@ import { Button } from "@components/ui/button";
 import { Separator } from "@components/ui/separator";
 import { Badge } from "@components/ui/badge";
 import { cn } from "@utils/cn";
+import { db } from "@services/db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 interface NavItem {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
+  /** Si está, se suscribe al live count desde Dexie. */
+  liveCountFrom?: "patients" | "consultations" | "anthropometry" | "lab_panels" | "meal_plans";
 }
 
 const primaryNav: NavItem[] = [
   { to: "/", label: "Panel", icon: LayoutDashboard },
-  { to: "/pacientes", label: "Pacientes", icon: Users, badge: "12" },
+  { to: "/pacientes", label: "Pacientes", icon: Users, liveCountFrom: "patients" },
   { to: "/consultas", label: "Consultas", icon: ClipboardList },
   { to: "/agenda", label: "Agenda", icon: Calendar },
 ];
@@ -135,6 +138,31 @@ function NavSection({
 
 function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const Icon = item.icon;
+  // Switch explícito (en vez de `db[item.liveCountFrom]`) para que Dexie
+  // pueda observar correctamente cada tabla y para que filtremos
+  // soft-deleted (que es la causa del "número fijo" en el badge: el
+  // count sin filtro incluye filas con deletedAt seteado).
+  const count = useLiveQuery(
+    async () => {
+      switch (item.liveCountFrom) {
+        case "patients":
+          return db.patients.filter((r) => r.deleted_at === null).count();
+        case "consultations":
+          return db.consultations.filter((r) => r.deleted_at === null).count();
+        case "anthropometry":
+          return db.anthropometry.filter((r) => r.deleted_at === null).count();
+        case "lab_panels":
+          return db.lab_panels.filter((r) => r.deleted_at === null).count();
+        case "meal_plans":
+          return db.meal_plans.filter((r) => r.deleted_at === null).count();
+        default:
+          return 0;
+      }
+    },
+    [item.liveCountFrom],
+    null,
+  );
+  const badge = count !== null && count !== undefined ? String(count) : undefined;
   return (
     <NavLink
       to={item.to}
@@ -152,9 +180,9 @@ function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
       {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
-      {!collapsed && item.badge && (
+      {!collapsed && badge && (
         <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px]">
-          {item.badge}
+          {badge}
         </Badge>
       )}
     </NavLink>

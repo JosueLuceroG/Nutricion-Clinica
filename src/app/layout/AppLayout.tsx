@@ -8,6 +8,15 @@ import { ContextPanel } from "./ContextPanel";
 import { useUIStore } from "@store/uiStore";
 import { cn } from "@utils/cn";
 
+const PageFallback = (
+  <div className="flex h-full items-center justify-center p-12 text-sm text-muted-foreground">
+    <div className="flex flex-col items-center gap-3">
+      <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+      Cargando…
+    </div>
+  </div>
+);
+
 export function AppLayout() {
   const contextOpen = useUIStore((s) => s.contextPanelOpen);
 
@@ -25,7 +34,9 @@ export function AppLayout() {
             tabIndex={-1}
             aria-label="Contenido principal"
           >
-            <Outlet />
+            <React.Suspense fallback={PageFallback}>
+              <Outlet />
+            </React.Suspense>
           </main>
 
           {contextOpen && <ContextPanel />}

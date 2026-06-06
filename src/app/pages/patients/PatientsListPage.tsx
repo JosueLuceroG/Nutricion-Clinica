@@ -9,6 +9,8 @@ import {
   Mail,
   Phone,
   Upload,
+  Archive,
+  Trash2,
 } from "lucide-react";
 import {
   createColumnHelper,
@@ -21,12 +23,14 @@ import {
   type SortingState,
 } from "@tanstack/react-table";
 import * as React from "react";
+import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Badge } from "@components/ui/badge";
 import { Skeleton } from "@components/ui/skeleton";
 import { EmptyState, NoResultsFound, ErrorState } from "@components/layout/EmptyState";
+import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,22 +48,90 @@ import {
   TableRow,
 } from "@components/ui/table";
 import { usePatients } from "@modules/patient/ui/usePatientHooks";
+import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
+import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
 import { usePatientsUIStore } from "@store/patientsUIStore";
 import type { Patient } from "@modules/patient/domain/Patient";
 import { SexLabel } from "@modules/patient/domain/Sex";
 import { PatientStatusLabel } from "@modules/patient/domain/PatientStatus";
+import { patientService } from "@services/patientService";
 
 const columnHelper = createColumnHelper<Patient>();
 
 export function PatientsListPage() {
   const navigate = useNavigate();
   const { search, statusFilter, setSearch, setStatusFilter, reset } = usePatientsUIStore();
-  const { data, loading, error, reload } = usePatients({
-    search: search || undefined,
-    status: statusFilter === "all" ? undefined : statusFilter,
-    limit: 50,
-  });
+  const isDeletedView = statusFilter === "deleted";
+  const { data, loading, error, reload } = usePatients(
+    isDeletedView
+      ? { search: search || undefined, includeDeleted: true, status: undefined, limit: 50 }
+      : {
+          search: search || undefined,
+          status: statusFilter === "all" ? undefined : statusFilter,
+          limit: 50,
+        },
+  );
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [busy, setBusy] = React.useState(false);
+  const [archiveTarget, setArchiveTarget] = React.useState<Patient | null>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<Patient | null>(null);
+  const [restoreTarget, setRestoreTarget] = React.useState<Patient | null>(null);
+
+  // Flujo de eliminación: si el paciente tiene entidades vinculadas
+  // abre el modal de cascada con dos opciones (Archivar / Eliminar todo).
+  // Si no tiene, ejecuta el borrado simple directamente.
+  const cascade = useCascadeDeletePatient({
+    onComplete: (outcome) => {
+      if (deleteTarget) {
+        if (outcome === "deleted") {
+          toast.success(`${deleteTarget.fullName} eliminado`);
+        } else if (outcome === "archived") {
+          toast.success(`${deleteTarget.fullName} archivado`);
+        }
+      }
+      setDeleteTarget(null);
+      void reload();
+    },
+    onError: (err) => {
+      toast.error("No se pudo completar la operación", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    },
+  });
+
+  const executeArchive = async () => {
+    if (!archiveTarget) return;
+    setBusy(true);
+    try {
+      await patientService.archive.execute(archiveTarget.id);
+      toast.success(`${archiveTarget.fullName} archivado`);
+      setArchiveTarget(null);
+      void reload();
+    } catch (err) {
+      toast.error("No se pudo archivar", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const executeRestore = async () => {
+    if (!restoreTarget) return;
+    setBusy(true);
+    try {
+      await patientService.restore.execute(restoreTarget.id);
+      toast.success(`${restoreTarget.fullName} restaurado`);
+      setRestoreTarget(null);
+      void reload();
+    } catch (err) {
+      toast.error("No se pudo restaurar", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const columns = React.useMemo(
     () => [
@@ -113,19 +185,28 @@ export function PatientsListPage() {
       }),
       columnHelper.accessor("status", {
         header: "Estado",
-        cell: (info) => <StatusBadge status={info.getValue()} />,
+        cell: (info) => (
+          <StatusBadge status={info.getValue()} deletedAt={info.row.original.deletedAt} />
+        ),
       }),
       columnHelper.display({
         id: "actions",
         cell: (info) => (
           <RowActions
-            patientId={info.row.original.id.toString()}
+            patient={info.row.original}
+            isDeletedView={isDeletedView}
             onView={() => navigate(`/pacientes/${info.row.original.id.toString()}`)}
+            onArchive={(p) => setArchiveTarget(p)}
+            onDelete={(p) => {
+              setDeleteTarget(p);
+              void cascade.requestDelete(p.id);
+            }}
+            onRestore={(p) => setRestoreTarget(p)}
           />
         ),
       }),
     ],
-    [navigate],
+    [navigate, cascade, isDeletedView],
   );
 
   const table = useReactTable({
@@ -147,8 +228,14 @@ export function PatientsListPage() {
   return (
     <>
       <PageHeader
-        title="Pacientes"
-        description={total > 0 ? `${total} paciente${total === 1 ? "" : "s"}` : "Gestiona los expedientes"}
+        title={isDeletedView ? "Pacientes eliminados" : "Pacientes"}
+        description={
+          isDeletedView
+            ? "Pacientes soft-deleted. Usa Restaurar para devolverlos al listado activo."
+            : total > 0
+              ? `${total} paciente${total === 1 ? "" : "s"}`
+              : "Gestiona los expedientes"
+        }
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline">
@@ -182,7 +269,7 @@ export function PatientsListPage() {
             />
           </div>
           <div className="flex gap-1 rounded-md border bg-background p-0.5">
-            {(["all", "active", "inactive", "archived"] as const).map((s) => (
+            {(["all", "active", "inactive", "archived", "deleted"] as const).map((s) => (
               <Button
                 key={s}
                 variant={statusFilter === s ? "secondary" : "ghost"}
@@ -190,7 +277,7 @@ export function PatientsListPage() {
                 onClick={() => setStatusFilter(s)}
                 className="h-7 px-3 text-xs"
               >
-                {s === "all" ? "Todos" : PatientStatusLabel[s]}
+                {s === "all" ? "Todos" : s === "deleted" ? "Eliminados" : PatientStatusLabel[s]}
               </Button>
             ))}
           </div>
@@ -277,11 +364,50 @@ export function PatientsListPage() {
           </>
         )}
       </PageContent>
+
+      <ConfirmDialog
+        open={archiveTarget !== null}
+        onOpenChange={(o) => !o && setArchiveTarget(null)}
+        title={archiveTarget ? `¿Archivar a ${archiveTarget.fullName}?` : ""}
+        description="El paciente se ocultará de los listados activos, pero su expediente clínico se conserva. Podés revertir esta acción más tarde."
+        confirmLabel="Archivar"
+        tone="warning"
+        busy={busy}
+        onConfirm={executeArchive}
+      />
+
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        onOpenChange={(o) => !o && setRestoreTarget(null)}
+        title={restoreTarget ? `¿Restaurar a ${restoreTarget.fullName}?` : ""}
+        description="El paciente volverá al listado activo y podrá editarse / recibir consultas y planes. El cambio se sincroniza con el servidor."
+        confirmLabel="Restaurar"
+        tone="info"
+        busy={busy}
+        onConfirm={executeRestore}
+      />
+
+      <CascadeDeletePatientDialog
+        open={cascade.dialogOpen}
+        patientName={deleteTarget?.fullName ?? ""}
+        counts={cascade.counts}
+        loading={cascade.loadingCounts}
+        busy={cascade.busy}
+        onCancel={() => {
+          cascade.cancel();
+          setDeleteTarget(null);
+        }}
+        onArchive={cascade.archive}
+        onDeleteAll={cascade.deleteAll}
+      />
     </>
   );
 }
 
-function StatusBadge({ status }: { status: Patient["status"] }) {
+function StatusBadge({ status, deletedAt }: { status: Patient["status"]; deletedAt: Date | null }) {
+  if (deletedAt !== null) {
+    return <Badge variant="destructive">Eliminado</Badge>;
+  }
   const map: Record<Patient["status"], { variant: "success" | "secondary" | "warning" | "outline" }> = {
     active: { variant: "success" },
     inactive: { variant: "secondary" },
@@ -291,7 +417,22 @@ function StatusBadge({ status }: { status: Patient["status"] }) {
   return <Badge variant={map[status].variant}>{PatientStatusLabel[status]}</Badge>;
 }
 
-function RowActions({ patientId, onView }: { patientId: string; onView: () => void }) {
+function RowActions({
+  patient,
+  isDeletedView,
+  onView,
+  onArchive,
+  onDelete,
+  onRestore,
+}: {
+  patient: Patient;
+  isDeletedView: boolean;
+  onView: () => void;
+  onArchive: (p: Patient) => void;
+  onDelete: (p: Patient) => void;
+  onRestore: (p: Patient) => void;
+}) {
+  const isDeleted = patient.deletedAt !== null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
@@ -301,13 +442,46 @@ function RowActions({ patientId, onView }: { patientId: string; onView: () => vo
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+          <DropdownMenuLabel>{patient.fullName}</DropdownMenuLabel>
           <DropdownMenuItem onClick={onView}>Ver detalle</DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to={`/pacientes/${patientId}/editar`}>Editar</Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem>Nueva consulta</DropdownMenuItem>
+          {!isDeleted && (
+            <>
+              <DropdownMenuItem asChild>
+                <Link to={`/pacientes/${patient.id.toString()}/editar`}>Editar</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to={`/pacientes/${patient.id.toString()}/consultas`}>Nueva consulta</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {patient.status !== "archived" && (
+                <DropdownMenuItem onClick={() => onArchive(patient)}>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivar
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                onClick={() => onDelete(patient)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Eliminar
+              </DropdownMenuItem>
+            </>
+          )}
+          {isDeleted && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => onRestore(patient)}
+                className="text-primary focus:text-primary"
+                data-testid="restore-patient-menu-item"
+              >
+                <Archive className="mr-2 h-4 w-4" />
+                Restaurar
+              </DropdownMenuItem>
+            </>
+          )}
+          {isDeletedView && !isDeleted && null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

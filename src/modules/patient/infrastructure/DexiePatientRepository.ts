@@ -26,9 +26,13 @@ export class DexiePatientRepository implements PatientRepository {
   async findAll(query: PatientQuery = {}): Promise<Patient[]> {
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
     const offset = query.offset ?? 0;
+    const includeDeleted = query.includeDeleted === true;
 
-    const rows = await this.applyFilters(this.dbInstance.patients.orderBy("last_name"), query)
-      .filter((row: PatientRow) => row.deleted_at === null)
+    const filtered = this.applyFilters(this.dbInstance.patients.orderBy("last_name"), query);
+    const rows = await (includeDeleted
+      ? filtered
+      : filtered.filter((row: PatientRow) => row.deleted_at === null)
+    )
       .offset(offset)
       .limit(limit)
       .toArray();
@@ -37,9 +41,33 @@ export class DexiePatientRepository implements PatientRepository {
   }
 
   async count(query: PatientQuery = {}): Promise<number> {
-    return this.applyFilters(this.dbInstance.patients.toCollection(), query)
-      .filter((row: PatientRow) => row.deleted_at === null)
-      .count();
+    const includeDeleted = query.includeDeleted === true;
+    return (includeDeleted
+      ? this.applyFilters(this.dbInstance.patients.toCollection(), query)
+      : this.applyFilters(this.dbInstance.patients.toCollection(), query).filter(
+          (row: PatientRow) => row.deleted_at === null,
+        )
+    ).count();
+  }
+
+  async findDeleted(query: { limit?: number; offset?: number } = {}): Promise<Patient[]> {
+    const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
+    const offset = query.offset ?? 0;
+    const rows = await this.dbInstance.patients
+      .filter((row: PatientRow) => row.deleted_at !== null)
+      .toArray();
+    return rows
+      .sort((a, b) => {
+        const at = a.deleted_at ? new Date(a.deleted_at).getTime() : 0;
+        const bt = b.deleted_at ? new Date(b.deleted_at).getTime() : 0;
+        return bt - at; // desc: más reciente primero
+      })
+      .slice(offset, offset + limit)
+      .map(patientRowToDomain);
+  }
+
+  async countDeleted(): Promise<number> {
+    return this.dbInstance.patients.filter((row: PatientRow) => row.deleted_at !== null).count();
   }
 
   async delete(id: PatientId, soft = true): Promise<void> {

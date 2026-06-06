@@ -13,6 +13,7 @@ import {
 import { useSyncStore, type SyncStatus } from "@store/syncStore";
 import { useSyncActions } from "@services/sync/useSyncActions";
 import { ConflictResolutionModal } from "@modules/sync/ui/ConflictResolutionModal";
+import { SyncQueueDiagnosticModal } from "@modules/sync/ui/SyncQueueDiagnosticModal";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
@@ -34,6 +35,7 @@ export function StatusBar() {
   const lastError = useSyncStore((s) => s.lastError);
   const { syncNow, conflictCount } = useSyncActions();
   const [conflictOpen, setConflictOpen] = React.useState(false);
+  const [queueOpen, setQueueOpen] = React.useState(false);
   const [isOnline, setIsOnline] = React.useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
@@ -79,10 +81,15 @@ export function StatusBar() {
         </Badge>
 
         {pending > 0 && (
-          <span className="flex items-center gap-1" title="Cambios pendientes de sincronizar">
+          <button
+            type="button"
+            onClick={() => setQueueOpen(true)}
+            className="flex items-center gap-1 rounded px-1 hover:bg-muted"
+            title="Ver detalles de la cola de sincronización"
+          >
             <Database className="h-3 w-3" aria-hidden />
             {pending} pendiente{pending === 1 ? "" : "s"}
-          </span>
+          </button>
         )}
 
         {conflictCount > 0 && (
@@ -117,13 +124,16 @@ export function StatusBar() {
             className="h-5 px-2 text-[10px]"
             onClick={() => void syncNow()}
             disabled={status === "syncing"}
+            title="Forzar un ciclo de sync ahora"
           >
-            Sincronizar ahora
+            <RefreshCw className="h-3 w-3" aria-hidden />
+            Sincronizar
           </Button>
         </div>
       </footer>
 
       <ConflictResolutionModal open={conflictOpen} onOpenChange={setConflictOpen} />
+      <SyncQueueDiagnosticModal open={queueOpen} onOpenChange={setQueueOpen} />
     </>
   );
 }

@@ -162,4 +162,94 @@ describe("DexiePatientRepository", () => {
     const found = await repo.findById(p.id);
     expect(found).toBeNull();
   });
+
+  it("soft delete sobrevive a fila con fecha corrupta en IndexedDB (no lanza 'Invalid time value')", async () => {
+    const p = makePatient({ firstName: "Malichita" });
+    await repo.save(p);
+
+    // Simulamos corrupción: alguien escribió string vacío en un campo
+    // de fecha (e.g. una mutación a medio commit, o un pull side con
+    // un campo faltante). La fila queda en IndexedDB con birth_date=""
+    // y deleted_at="".
+    await db.patients.update(p.id.toString(), {
+      birth_date: "" as unknown as string,
+      record_opened_at: "" as unknown as string,
+      fecha_firma_consentimiento: "" as unknown as string,
+    });
+
+    // El soft delete debe sobrevivir: el mapper hace fallback a `new Date()`
+    // en campos requeridos y a `null` en opcionales, en vez de lanzar.
+    await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
+
+    const found = await repo.findById(p.id);
+    expect(found).not.toBeNull();
+    expect(found?.deletedAt).not.toBeNull();
+    expect(found?.status).toBe("inactive");
+    // birthDate fue reparado a una fecha válida (el fallback `new Date()`)
+    expect(found?.birthDate).toBeInstanceOf(Date);
+    expect(Number.isNaN(found?.birthDate.getTime() ?? NaN)).toBe(false);
+  });
+
+  it("soft delete sobrevive a birth_date como Date object (caso del pull del servidor)", async () => {
+    const p = makePatient({ firstName: "Servidor" });
+    await repo.save(p);
+
+    // El pull del servidor guarda Date objects en IndexedDB en vez de
+    // strings ISO. El mapper debe parsearlos correctamente.
+    await db.patients.update(p.id.toString(), {
+      birth_date: new Date("1990-05-15") as unknown as string,
+      created_at: new Date() as unknown as string,
+      updated_at: new Date() as unknown as string,
+    });
+
+    await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
+
+    const found = await repo.findById(p.id);
+    expect(found?.status).toBe("inactive");
+  });
+
+  it("findDeleted devuelve solo pacientes soft-deleted, ordenados por deletedAt desc", async () => {
+    const a = makePatient({ firstName: "Ana" });
+    const b = makePatient({ firstName: "Bea" });
+    const c = makePatient({ firstName: "Cris" });
+    await repo.save(a);
+    await repo.save(b);
+    await repo.save(c);
+
+    // Soft-delete a y c, pero NO a b.
+    await repo.delete(a.id, true);
+    await new Promise((r) => setTimeout(r, 5));
+    await repo.delete(c.id, true);
+
+    const deleted = await repo.findDeleted();
+    expect(deleted.length).toBe(2);
+    // c fue borrado más recientemente → primero
+    expect(deleted[0]?.firstName).toBe("Cris");
+    expect(deleted[1]?.firstName).toBe("Ana");
+  });
+
+  it("countDeleted cuenta solo soft-deleted", async () => {
+    const a = makePatient({ firstName: "Ana" });
+    const b = makePatient({ firstName: "Bea" });
+    await repo.save(a);
+    await repo.save(b);
+    await repo.delete(a.id, true);
+    expect(await repo.countDeleted()).toBe(1);
+    expect(await repo.count()).toBe(1);
+  });
+
+  it("findAll con includeDeleted=true incluye soft-deleted en el resultado", async () => {
+    const a = makePatient({ firstName: "Ana" });
+    const b = makePatient({ firstName: "Bea" });
+    await repo.save(a);
+    await repo.save(b);
+    await repo.delete(a.id, true);
+
+    const allIncludingDeleted = await repo.findAll({ includeDeleted: true });
+    expect(allIncludingDeleted.length).toBe(2);
+
+    const onlyActive = await repo.findAll();
+    expect(onlyActive.length).toBe(1);
+    expect(onlyActive[0]?.firstName).toBe("Bea");
+  });
 });

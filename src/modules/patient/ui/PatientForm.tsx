@@ -10,9 +10,6 @@ import {
   type PatientFormValues,
 } from "@modules/patient/application/patientFormSchema";
 import { SexLabel, type Sex } from "@modules/patient/domain/Sex";
-import { GenderLabel, type Gender } from "@modules/patient/domain/Gender";
-import { MaritalStatusLabel, type MaritalStatus } from "@modules/patient/domain/MaritalStatus";
-import { EducationLevelLabel, type EducationLevel } from "@modules/patient/domain/EducationLevel";
 import { Email, Phone as PhoneVO } from "@modules/patient/domain/Contact";
 import { patientService } from "@services/patientService";
 import { Button } from "@components/ui/button";
@@ -41,6 +38,11 @@ const selectClass = "flex h-9 w-full rounded-md border border-input bg-transpare
 export function PatientForm({ mode, patientId, initialPatient }: PatientFormProps) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
+  // Ref-based lock: protege contra dos `onSubmit` consecutivos dentro del
+  // mismo tick (doble-click o Enter repetido) antes de que React procese
+  // el `setSubmitting(true)` y deshabilite el botón. Sin este ref, dos
+  // submits rápidos crearían DOS pacientes con IDs distintos.
+  const submitLockRef = React.useRef(false);
 
   const {
     register,
@@ -77,6 +79,8 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
   }, [initialPatient, reset]);
 
   const onSubmit = async (values: PatientFormValues) => {
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setSubmitting(true);
     try {
       const parseStr = (v: string | undefined): string | null =>
@@ -120,6 +124,7 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
       });
     } finally {
       setSubmitting(false);
+      submitLockRef.current = false;
     }
   };
 
@@ -153,30 +158,6 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
             <select {...register("sex")} className={selectClass} aria-invalid={!!errors.sex}>
               {(Object.keys(SexLabel) as Sex[]).map((s) => (
                 <option key={s} value={s}>{SexLabel[s]}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Género autodeclarado" error={errors.gender?.message}>
-            <select {...register("gender")} className={selectClass}>
-              <option value="">Seleccionar…</option>
-              {(Object.keys(GenderLabel) as Gender[]).map((g) => (
-                <option key={g} value={g}>{GenderLabel[g]}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Estado civil" error={errors.maritalStatus?.message}>
-            <select {...register("maritalStatus")} className={selectClass}>
-              <option value="">Seleccionar…</option>
-              {(Object.keys(MaritalStatusLabel) as MaritalStatus[]).map((s) => (
-                <option key={s} value={s}>{MaritalStatusLabel[s]}</option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Escolaridad" error={errors.education?.message}>
-            <select {...register("education")} className={selectClass}>
-              <option value="">Seleccionar…</option>
-              {(Object.keys(EducationLevelLabel) as EducationLevel[]).map((e) => (
-                <option key={e} value={e}>{EducationLevelLabel[e]}</option>
               ))}
             </select>
           </FormField>

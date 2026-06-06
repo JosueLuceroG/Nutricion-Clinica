@@ -82,6 +82,8 @@ const makeFakePatientRepo = (overrides: Partial<PatientRepository> = {}): Patien
   findById: async () => null,
   findAll: async () => [],
   count: async () => 0,
+  findDeleted: async () => [],
+  countDeleted: async () => 0,
   delete: async () => {},
   ...overrides,
 });

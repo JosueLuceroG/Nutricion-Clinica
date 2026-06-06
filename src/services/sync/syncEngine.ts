@@ -124,10 +124,29 @@ export class SyncEngine {
     try {
       for (const change of changes) {
         const tableName = ENTITY_TO_TABLE[change.entity];
-        const table = (this.deps.db as unknown as Record<string, { put: (v: unknown) => Promise<unknown>; delete: (k: string) => Promise<unknown> }>)[tableName];
+        const table = (this.deps.db as unknown as Record<string, {
+          put: (v: unknown) => Promise<unknown>;
+          update: (k: string, patch: object) => Promise<unknown>;
+          get: (k: string) => Promise<unknown>;
+        }>)[tableName];
         if (!table) continue;
         if (change.op === 'delete') {
-          await table.delete(change.id);
+          // Soft-delete local en vez de hard-delete: preservamos la fila con
+          // `deleted_at` setteado para que la UI pueda mostrarla en una vista
+          // de "papelera" y permitir restaurarla. El server ya hizo el mismo
+          // soft-delete (ver syncService.applyOperation), así que la fila es
+          // recuperable en ambos lados.
+          //
+          // Si la fila no existe localmente (caso normal: server borró algo
+          // que nunca existió en este cliente), no hacemos nada — el delete
+          // ya es idempotente.
+          const existing = await table.get(change.id).catch(() => null);
+          if (existing) {
+            await table.update(change.id, {
+              deleted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+          }
         } else {
           // cast: SyncPayload es unknown; la fila destino es responsabilidad del caller
           await table.put(change.payload as object);
@@ -182,8 +201,11 @@ export class SyncEngine {
         await this.deps.queue.markConflict(item.id, result.error ?? 'row_version mismatch');
         conflicts++;
       } else if (result.status === 'skipped') {
-        await this.deps.queue.markError(item.id, result.error ?? 'skipped by server');
-        errors++;
+        // Idempotencia: si el server ya tiene la fila o no la encuentra,
+        // el push es funcionalmente exitoso. Marcamos applied para limpiar
+        // la cola y avanzar.
+        await this.deps.queue.markApplied(item.id);
+        applied++;
       } else {
         await this.deps.queue.markError(item.id, result.error ?? 'unknown error');
         errors++;

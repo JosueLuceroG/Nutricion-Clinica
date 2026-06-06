@@ -1,10 +1,12 @@
 import { create } from "zustand";
 
+type StatusFilter = "all" | "active" | "inactive" | "archived" | "deleted";
+
 interface PatientsUIState {
   search: string;
-  statusFilter: "all" | "active" | "inactive" | "archived";
+  statusFilter: StatusFilter;
   setSearch: (q: string) => void;
-  setStatusFilter: (s: PatientsUIState["statusFilter"]) => void;
+  setStatusFilter: (s: StatusFilter) => void;
   reset: () => void;
 }
 

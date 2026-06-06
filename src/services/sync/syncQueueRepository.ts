@@ -17,25 +17,41 @@ export interface EnqueueInput {
   expectedRowVersion?: string | null;
 }
 
+function buildItem(input: EnqueueInput): SyncQueueItem {
+  const now = new Date().toISOString();
+  return {
+    id: crypto.randomUUID(),
+    entity: input.entity,
+    entityId: input.entityId,
+    op: input.op,
+    payload: JSON.stringify(input.payload),
+    status: 'pending',
+    retryCount: 0,
+    lastError: null,
+    expectedRowVersion: input.expectedRowVersion ?? null,
+    enqueuedAt: now,
+    updatedAt: now,
+  };
+}
+
 export class SyncQueueRepository {
   constructor(private readonly table: Table<SyncQueueItem, string>) {}
 
   async enqueue(input: EnqueueInput): Promise<SyncQueueItem> {
-    const now = new Date().toISOString();
-    const item: SyncQueueItem = {
-      id: crypto.randomUUID(),
-      entity: input.entity,
-      entityId: input.entityId,
-      op: input.op,
-      payload: JSON.stringify(input.payload),
-      status: 'pending',
-      retryCount: 0,
-      lastError: null,
-      expectedRowVersion: input.expectedRowVersion ?? null,
-      enqueuedAt: now,
-      updatedAt: now,
-    };
+    const item = buildItem(input);
     await this.table.add(item);
+    return item;
+  }
+
+  /**
+   * Variante para usar dentro de un hook de Dexie: enqueue reutiliza la
+   * transacción que disparó el hook en lugar de iniciar una nueva. Sin
+   * esto, el `add` choca con la transacción abierta y la cola nunca
+   * se llena.
+   */
+  enqueueInTransaction(input: EnqueueInput, transaction: { table: (name: string) => Table<SyncQueueItem, string> }): SyncQueueItem {
+    const item = buildItem(input);
+    void transaction.table('sync_queue').add(item);
     return item;
   }
 
@@ -49,6 +65,29 @@ export class SyncQueueRepository {
 
   async listPending(): Promise<SyncQueueItem[]> {
     return this.table.where('status').anyOf(['pending', 'error']).toArray();
+  }
+
+  /**
+   * Busca items con status activo para (entity, entityId). Si se pasa `op`,
+   * filtra también por operación.
+   *
+   * Usado por el SyncEnqueuer para deduplicar: si ya hay un item
+   * pendiente (pending/syncing) para la misma fila, no encola otro.
+   * Protege contra múltiples instancias del enqueuer enganchadas a
+   * la misma tabla (e.g. HMR de Vite + React StrictMode en dev).
+   */
+  async findActiveByEntityId(
+    entity: SyncableEntity,
+    entityId: string,
+    op?: SyncOp,
+  ): Promise<SyncQueueItem | undefined> {
+    const all = await this.table
+      .where('status')
+      .anyOf(['pending', 'syncing'])
+      .toArray();
+    return all.find(
+      (i) => i.entity === entity && i.entityId === entityId && (op === undefined || i.op === op),
+    );
   }
 
   async countPending(): Promise<number> {

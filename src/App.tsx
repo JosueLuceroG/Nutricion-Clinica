@@ -6,16 +6,15 @@ import { Toaster } from "sonner";
 import { TooltipProvider } from "@components/ui/tooltip";
 import { db } from "@services/db";
 import { startSync, stopSync } from "@services/sync/syncBootstrap";
-import { SyncEnqueuer } from "@services/sync/syncEnqueuer";
-import { SyncQueueRepository } from "@services/sync/syncQueueRepository";
+import { getSyncEnqueuer } from "@services/sync/syncEnqueuerBootstrap";
 
 export function App() {
   React.useEffect(() => {
-    const enqueuer = new SyncEnqueuer(db, new SyncQueueRepository(db.sync_queue));
-    enqueuer.start();
+    // Singleton a nivel de módulo: una sola instancia para toda la vida
+    // del bundle. Evita que StrictMode/HMR acumulen hooks de Dexie.
+    getSyncEnqueuer();
     startSync(db, { intervalMs: 30_000, runOnStart: false });
     return () => {
-      enqueuer.stop();
       stopSync();
     };
   }, []);

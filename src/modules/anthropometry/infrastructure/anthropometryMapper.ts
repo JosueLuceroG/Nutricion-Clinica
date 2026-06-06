@@ -3,6 +3,7 @@ import { Anthropometry as AnthropometryEntity } from "../domain/Anthropometry";
 import { AnthropometryId } from "../domain/AnthropometryId";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { Weight, Height, Circumference, Skinfold } from "../domain/Measurements";
+import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface AnthropometryRow {
   id: string;
@@ -68,15 +69,15 @@ export const anthropometryRowToDomain = (row: AnthropometryRow): Anthropometry =
   return AnthropometryEntity.reconstitute({
     id: AnthropometryId.fromUnsafe(row.id),
     patientId: PatientId.fromUnsafe(row.patient_id),
-    measuredAt: new Date(row.measured_at),
+    measuredAt: safeDate(row.measured_at, undefined, "anthropometry.measured_at")!,
     weight: Weight.fromKg(row.weight_kg),
     height: Height.fromMeters(row.height_m),
     circumferences: deserializeCircumferences(row.circumferences),
     skinfolds: deserializeSkinfolds(row.skinfolds),
     notes: row.notes,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    createdAt: safeDate(row.created_at, undefined, "anthropometry.created_at")!,
+    updatedAt: safeDate(row.updated_at, undefined, "anthropometry.updated_at")!,
+    deletedAt: safeDate(row.deleted_at, null, "anthropometry.deleted_at"),
   });
 };
 
@@ -84,15 +85,15 @@ export const anthropometryDomainToRow = (a: Anthropometry): AnthropometryRow => 
   return {
     id: a.id.toString(),
     patient_id: a.patientId.toString(),
-    measured_at: a.measuredAt.toISOString(),
+    measured_at: toIsoStringSafe(a.measuredAt, new Date().toISOString(), "anthropometry.measured_at")!,
     weight_kg: a.weight.toKg(),
     height_m: a.height.toMeters(),
     circumferences: serializeCircumferences(a.circumferences),
     skinfolds: serializeSkinfolds(a.skinfolds),
     notes: a.notes,
-    created_at: a.createdAt.toISOString(),
-    updated_at: a.updatedAt.toISOString(),
-    deleted_at: a.deletedAt?.toISOString() ?? null,
+    created_at: toIsoStringSafe(a.createdAt, new Date().toISOString(), "anthropometry.created_at")!,
+    updated_at: toIsoStringSafe(a.updatedAt, new Date().toISOString(), "anthropometry.updated_at")!,
+    deleted_at: toIsoStringSafe(a.deletedAt, null, "anthropometry.deleted_at"),
   };
 };
 

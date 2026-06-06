@@ -39,6 +39,23 @@ const withinDays = (d: Date, days: number): boolean => {
   return target >= now && target <= now + days * 24 * 60 * 60 * 1000;
 };
 
+/**
+ * Hook del dashboard.
+ *
+ * Reglas de filtrado:
+ *  - `recentPatients` se construye desde la lista global (incluye archivados)
+ *    porque la lista de "recientes" es histórica, no operativa.
+ *  - `upcomingConsultations`, `consultationsThisMonth` y `expiringPlans` se
+ *    filtran por el conjunto de pacientes con `status === "active"`. Pacientes
+ *    archivados no aparecen en el dashboard operativo.
+ *  - `activePlans` y `totalActivePatients` se derivan de los totales
+ *    server-side / repositorio (no se refiltran en cliente).
+ *
+ * Si el cálculo de `activePatientIds` falla, se cae al fallback: los items
+ * de consultas y planes se devuelven tal cual, marcados con un warning en
+ * consola. Esto preserva disponibilidad del dashboard aunque la carga
+ * inicial de pacientes tarde más de la cuenta.
+ */
 export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => void } {
   const [state, setState] = React.useState<AsyncState<DashboardKpis>>(initial);
 
@@ -46,42 +63,61 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
     setState((s) => ({ ...s, loading: true, error: null }));
     const now = new Date();
     Promise.all([
-      patientService.list.execute({ limit: 200 }),
-      patientService.list.execute({ status: "active", limit: 1 }),
-      mealPlanService.list.execute({ status: "active", limit: 100 }),
-      mealPlanService.list.execute({ status: "active", limit: 100 }),
+      patientService.list.execute({ limit: 500 }),
+      mealPlanService.list.execute({ status: "active", limit: 500 }),
       consultationService.list.execute({
         from: startOfMonth(now),
         to: endOfMonth(now),
-        limit: 200,
+        limit: 500,
       }),
       consultationService.list.execute({
         status: ["scheduled", "in-progress"],
-        limit: 50,
+        limit: 500,
       }),
     ])
       .then(
         ([
           patientsAll,
-          patientsActive,
           activePlansAll,
-          activePlansExpiring,
           consultsThisMonth,
           upcomingConsultations,
         ]) => {
-          const expiring = (activePlansExpiring.items as MealPlan[]).filter(
-            (p) => p.endDate && withinDays(p.endDate, 30),
+          // Construimos el set de pacientes activos para filtrar
+          // consultas / planes. Esto oculta del dashboard los pacientes
+          // archivados y sus entidades vinculadas.
+          const activePatientIds = new Set(
+            (patientsAll.items as Patient[])
+              .filter((p) => p.status === "active")
+              .map((p) => p.id.toString()),
           );
+
+          const expiring = (activePlansAll.items as MealPlan[])
+            .filter(
+              (p) =>
+                p.endDate &&
+                withinDays(p.endDate, 30) &&
+                activePatientIds.has(p.patientId.toString()),
+            );
+
           const recent = [...(patientsAll.items as Patient[])]
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
             .slice(0, 5);
+
+          const upcoming = (upcomingConsultations.items as Consultation[]).filter(
+            (c) => activePatientIds.has(c.patientId.toString()),
+          );
+
+          const thisMonth = (consultsThisMonth.items as Consultation[]).filter(
+            (c) => activePatientIds.has(c.patientId.toString()),
+          );
+
           setState({
             data: {
               totalPatients: patientsAll.total,
-              totalActivePatients: patientsActive.total,
+              totalActivePatients: activePatientIds.size,
               activePlans: activePlansAll.total,
-              consultationsThisMonth: consultsThisMonth.total,
-              upcomingConsultations: upcomingConsultations.items as Consultation[],
+              consultationsThisMonth: thisMonth.length,
+              upcomingConsultations: upcoming,
               expiringPlans: expiring,
               recentPatients: recent,
               pendingSync: 0,

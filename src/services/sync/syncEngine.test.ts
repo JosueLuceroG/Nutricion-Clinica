@@ -123,7 +123,7 @@ describe('SyncEngine', () => {
     expect(lastPullAt).toBe('2026-06-04T00:00:01.000Z');
   });
 
-  it('pull: op=delete elimina del Dexie', async () => {
+  it('pull: op=delete hace soft-delete local (preserva la fila con deleted_at)', async () => {
     await db.patients.put({ id: 'p1', first_name: 'X' } as unknown as Parameters<typeof db.patients.put>[0]);
     mockPull.mockResolvedValueOnce({
       serverTime: '2026-06-04T00:00:01.000Z',
@@ -135,7 +135,22 @@ describe('SyncEngine', () => {
     });
     mockPush.mockResolvedValueOnce({ results: [], serverTime: '2026-06-04T00:00:02.000Z' });
     await engine.sync();
-    expect(await db.patients.get('p1')).toBeUndefined();
+    const stored = await db.patients.get('p1');
+    expect(stored).toBeTruthy();
+    expect((stored as { deleted_at: string | null }).deleted_at).toBeTruthy();
+  });
+
+  it('pull: op=delete sobre fila inexistente es idempotente (no falla)', async () => {
+    mockPull.mockResolvedValueOnce({
+      serverTime: '2026-06-04T00:00:01.000Z',
+      changes: [
+        { entity: 'pacientes', id: 'p-doesnt-exist', op: 'delete', payload: null, serverUpdatedAt: '2026-06-04T00:00:01.000Z', serverRowVersion: 'AAA' },
+      ],
+      hasMore: false,
+      nextSince: '2026-06-04T00:00:01.000Z',
+    });
+    mockPush.mockResolvedValueOnce({ results: [], serverTime: '2026-06-04T00:00:02.000Z' });
+    await expect(engine.sync()).resolves.toBeUndefined();
   });
 
   it('push: items pending se env\u00edan y marcan applied', async () => {

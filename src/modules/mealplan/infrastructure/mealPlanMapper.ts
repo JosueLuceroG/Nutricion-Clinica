@@ -5,6 +5,7 @@ import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
 import type { MealPlanStatus } from "../domain/MealPlanStatus";
 import type { FoodId } from "@modules/smae/domain";
+import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface MealPlanRow {
   id: string;
@@ -66,8 +67,8 @@ export const mealPlanRowToDomain = (row: MealPlanRow): MealPlan => {
     consultationId: row.consultation_id ? ConsultationId.fromUnsafe(row.consultation_id) : null,
     name: row.name,
     description: row.description,
-    startDate: new Date(row.start_date),
-    endDate: row.end_date ? new Date(row.end_date) : null,
+    startDate: safeDate(row.start_date, undefined, "meal_plan.start_date")!,
+    endDate: safeDate(row.end_date, null, "meal_plan.end_date"),
     kcalTarget: row.kcal_target,
     proteinTargetG: row.protein_target_g,
     carbsTargetG: row.carbs_target_g,
@@ -75,9 +76,9 @@ export const mealPlanRowToDomain = (row: MealPlanRow): MealPlan => {
     meals: decodeMeals(row.meals_json),
     notes: row.notes,
     status: row.status,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-    deletedAt: row.deleted_at ? new Date(row.deleted_at) : null,
+    createdAt: safeDate(row.created_at, undefined, "meal_plan.created_at")!,
+    updatedAt: safeDate(row.updated_at, undefined, "meal_plan.updated_at")!,
+    deletedAt: safeDate(row.deleted_at, null, "meal_plan.deleted_at"),
   };
   return MealPlan.reconstitute(props);
 };
@@ -89,8 +90,8 @@ export const mealPlanDomainToRow = (plan: MealPlan): MealPlanRow => {
     consultation_id: plan.consultationId?.toString() ?? null,
     name: plan.name,
     description: plan.description,
-    start_date: plan.startDate.toISOString(),
-    end_date: plan.endDate ? plan.endDate.toISOString() : null,
+    start_date: toIsoStringSafe(plan.startDate, new Date().toISOString(), "meal_plan.start_date")!,
+    end_date: toIsoStringSafe(plan.endDate, null, "meal_plan.end_date"),
     kcal_target: plan.kcalTarget,
     protein_target_g: plan.proteinTargetG,
     carbs_target_g: plan.carbsTargetG,
@@ -98,8 +99,8 @@ export const mealPlanDomainToRow = (plan: MealPlan): MealPlanRow => {
     meals_json: encodeMeals(plan.meals as PlanMeal[]),
     notes: plan.notes,
     status: plan.status,
-    created_at: plan.createdAt.toISOString(),
-    updated_at: plan.updatedAt.toISOString(),
-    deleted_at: plan.deletedAt ? plan.deletedAt.toISOString() : null,
+    created_at: toIsoStringSafe(plan.createdAt, new Date().toISOString(), "meal_plan.created_at")!,
+    updated_at: toIsoStringSafe(plan.updatedAt, new Date().toISOString(), "meal_plan.updated_at")!,
+    deleted_at: toIsoStringSafe(plan.deletedAt, null, "meal_plan.deleted_at"),
   };
 };

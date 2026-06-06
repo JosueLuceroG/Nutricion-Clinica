@@ -25,12 +25,12 @@ import { Badge } from "@components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState, EmptyState } from "@components/layout/EmptyState";
+import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
+import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
+import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { SexLabel } from "@modules/patient/domain/Sex";
-import { GenderLabel } from "@modules/patient/domain/Gender";
-import { MaritalStatusLabel } from "@modules/patient/domain/MaritalStatus";
-import { EducationLevelLabel } from "@modules/patient/domain/EducationLevel";
 import { RecordStatusLabel } from "@modules/patient/domain/RecordStatus";
 import { PatientStatusLabel } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
@@ -42,38 +42,53 @@ export function PatientDetailPage() {
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
   );
-  const { data: patient, loading, error, reload } = usePatient(id);
+  const { data: patient, loading, error, reload, deleted } = usePatient(id);
   const [busy, setBusy] = React.useState(false);
+  const [archiveOpen, setArchiveOpen] = React.useState(false);
+
+  // Flujo de eliminación: si el paciente tiene entidades vinculadas
+  // (consultas, planes, labs, antropometrias) abre el modal de cascada
+  // con dos opciones (Archivar / Eliminar todo). Si no tiene, ejecuta
+  // el borrado simple directamente.
+  const cascade = useCascadeDeletePatient({
+    onComplete: (outcome) => {
+      if (outcome === "deleted") {
+        toast.success("Paciente y entidades vinculadas eliminadas");
+      } else if (outcome === "archived") {
+        toast.success("Paciente archivado");
+      }
+      // `replace: true` evita que el botón "atrás" del navegador traiga
+      // de vuelta al paciente eliminado. Si por alguna razón el
+      // navigate tarda, el hook usePatient ya marcó `deleted: true` y
+      // la UI muestra el empty state "Paciente no existe" en vez de
+      // datos viejos.
+      navigate("/pacientes", { replace: true });
+    },
+    onError: (err) => {
+      toast.error("No se pudo completar la operación", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    },
+  });
 
   const onArchive = async () => {
     if (!id || !patient) return;
-    if (!confirm(`¿Archivar a ${patient.fullName}?`)) return;
+    setArchiveOpen(true);
+  };
+
+  const executeArchive = async () => {
+    if (!id) return;
     setBusy(true);
     try {
       await patientService.archive.execute(id);
       toast.success("Paciente archivado");
-      reload();
+      setArchiveOpen(false);
+      navigate("/pacientes", { replace: true });
     } catch (err) {
       toast.error("No se pudo archivar", {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const onDelete = async () => {
-    if (!id || !patient) return;
-    if (!confirm(`¿Eliminar a ${patient.fullName}? Esta acción se puede revertir.`)) return;
-    setBusy(true);
-    try {
-      await patientService.delete.execute(id, true);
-      toast.success("Paciente eliminado");
-      navigate("/pacientes");
-    } catch (err) {
-      toast.error("No se pudo eliminar", {
-        description: err instanceof Error ? err.message : String(err),
-      });
       setBusy(false);
     }
   };
@@ -110,7 +125,11 @@ export function PatientDetailPage() {
         <PageContent>
           <EmptyState
             title="El paciente no existe"
-            description="Es posible que haya sido eliminado o el enlace sea incorrecto."
+            description={
+              deleted
+                ? "Este paciente fue eliminado. La acción se puede revertir desde la cola de sincronización."
+                : "Es posible que haya sido eliminado o el enlace sea incorrecto."
+            }
             action={{ label: "Volver a pacientes", onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
@@ -138,14 +157,19 @@ export function PatientDetailPage() {
               </Link>
             </Button>
             {patient.status === "active" && (
-              <Button variant="outline" onClick={onArchive} disabled={busy}>
+              <Button variant="outline" onClick={onArchive} disabled={busy || cascade.busy || cascade.loadingCounts}>
                 <Archive className="mr-2 h-4 w-4" />
                 Archivar
               </Button>
             )}
-            <Button variant="destructive" onClick={onDelete} disabled={busy}>
+            <Button
+              variant="destructive"
+              onClick={() => id && cascade.requestDelete(id)}
+              disabled={busy || cascade.busy || cascade.loadingCounts}
+              data-testid="delete-patient-button"
+            >
               <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
+              {cascade.loadingCounts ? "Contando…" : "Eliminar"}
             </Button>
           </>
         }
@@ -167,10 +191,7 @@ export function PatientDetailPage() {
               <DetailRow label="Fecha de nacimiento" value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)} />
               <DetailRow label="Edad" value={`${patient.age} años`} />
               <DetailRow label="Sexo biológico" value={SexLabel[patient.sex]} />
-              {patient.gender && <DetailRow label="Género" value={GenderLabel[patient.gender]} />}
-              {patient.maritalStatus && <DetailRow label="Estado civil" value={MaritalStatusLabel[patient.maritalStatus]} />}
               {patient.occupation && <DetailRow label="Ocupación" value={patient.occupation} />}
-              {patient.education && <DetailRow label="Escolaridad" value={EducationLevelLabel[patient.education]} />}
               <DetailRow
                 label="Estado"
                 value={
@@ -307,6 +328,28 @@ export function PatientDetailPage() {
 
         <ClinicalRecordCards patientId={patient.id.toString()} />
       </PageContent>
+
+      <ConfirmDialog
+        open={archiveOpen}
+        onOpenChange={setArchiveOpen}
+        title={`¿Archivar a ${patient.fullName}?`}
+        description="El paciente se ocultará de los listados activos, pero su expediente clínico se conserva. Podés revertir esta acción más tarde."
+        confirmLabel="Archivar"
+        tone="warning"
+        busy={busy}
+        onConfirm={executeArchive}
+      />
+
+      <CascadeDeletePatientDialog
+        open={cascade.dialogOpen}
+        patientName={patient.fullName}
+        counts={cascade.counts}
+        loading={cascade.loadingCounts}
+        busy={cascade.busy}
+        onCancel={cascade.cancel}
+        onArchive={cascade.archive}
+        onDeleteAll={cascade.deleteAll}
+      />
     </>
   );
 }

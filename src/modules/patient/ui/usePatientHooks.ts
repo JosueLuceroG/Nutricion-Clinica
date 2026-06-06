@@ -8,6 +8,8 @@ interface AsyncState<T> {
   data: T | null;
   error: Error | null;
   loading: boolean;
+  /** true si el paciente existe en Dexie pero está soft-deleted (deletedAt != null). */
+  deleted?: boolean;
 }
 
 const initial: AsyncState<never> = { data: null, error: null, loading: true };
@@ -75,7 +77,19 @@ export function usePatient(id: PatientId | null) {
     patientService.get
       .execute(id)
       .then((patient) => {
-        if (!cancelled) setState({ data: patient, error: null, loading: false });
+        if (cancelled) return;
+        if (!patient) {
+          setState({ data: null, error: null, loading: false });
+          return;
+        }
+        // Detección de soft-delete: el paciente existe en Dexie pero tiene
+        // deletedAt seteado. Devolvemos `deleted: true` y `data: null` para
+        // que la UI muestre el estado "Eliminado" en vez de los datos viejos.
+        if (patient.deletedAt !== null) {
+          setState({ data: null, error: null, loading: false, deleted: true });
+          return;
+        }
+        setState({ data: patient, error: null, loading: false });
       })
       .catch((err) => {
         if (!cancelled) {
@@ -97,7 +111,17 @@ export function usePatient(id: PatientId | null) {
     setState((s) => ({ ...s, loading: true, error: null }));
     patientService.get
       .execute(id)
-      .then((patient) => setState({ data: patient, error: null, loading: false }))
+      .then((patient) => {
+        if (!patient) {
+          setState({ data: null, error: null, loading: false });
+          return;
+        }
+        if (patient.deletedAt !== null) {
+          setState({ data: null, error: null, loading: false, deleted: true });
+          return;
+        }
+        setState({ data: patient, error: null, loading: false });
+      })
       .catch((err) =>
         setState({
           data: null,

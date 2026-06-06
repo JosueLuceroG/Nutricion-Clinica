@@ -7,6 +7,12 @@ export interface PatientQuery {
   sex?: Patient["sex"];
   limit?: number;
   offset?: number;
+  /**
+   * Por defecto los soft-deleted (`deleted_at != null`) se excluyen.
+   * Si `true`, se incluyen en los resultados. Útil para la vista de
+   * "papelera" / pacientes eliminados.
+   */
+  includeDeleted?: boolean;
 }
 
 /**
@@ -19,6 +25,12 @@ export interface PatientRepository {
   findById(id: PatientId): Promise<Patient | null>;
   findAll(query?: PatientQuery): Promise<Patient[]>;
   count(query?: PatientQuery): Promise<number>;
+  /**
+   * Devuelve solo los pacientes soft-deleted, ordenados por deletedAt desc
+   * (más reciente primero). Limit/offset para paginación.
+   */
+  findDeleted(query?: { limit?: number; offset?: number }): Promise<Patient[]>;
+  countDeleted(): Promise<number>;
   delete(id: PatientId, soft?: boolean): Promise<void>;
 }
 

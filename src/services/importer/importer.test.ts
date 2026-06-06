@@ -237,6 +237,12 @@ function makeFakeRepo(): PatientRepository {
     async count(): Promise<number> {
       return stored.length;
     },
+    async findDeleted(): Promise<Patient[]> {
+      return stored.filter((p) => p.deletedAt !== null);
+    },
+    async countDeleted(): Promise<number> {
+      return stored.filter((p) => p.deletedAt !== null).length;
+    },
     async delete(): Promise<void> {
       /* noop */
     },

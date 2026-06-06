@@ -1,10 +1,7 @@
 import { Outlet, RouterProvider, createHashRouter, Navigate } from "react-router-dom";
+import * as React from "react";
 import { AppLayout } from "@app/layout/AppLayout";
-import { DashboardPage } from "@app/pages/DashboardPage";
-import { PatientsListPage } from "@app/pages/patients/PatientsListPage";
-import { PatientDetailPage } from "@app/pages/patients/PatientDetailPage";
 import { NewPatientPage } from "@app/pages/patients/NewPatientPage";
-import { ConsultationsListPage } from "@app/pages/consultations/ConsultationsListPage";
 import { NewConsultationPage } from "@app/pages/consultations/NewConsultationPage";
 import { ConsultationDetailPage } from "@app/pages/consultations/ConsultationDetailPage";
 import { PatientConsultationsPage } from "@app/pages/consultations/PatientConsultationsPage";
@@ -12,9 +9,7 @@ import { PatientMeasurementsPage } from "@app/pages/anthropometry/PatientMeasure
 import { NewMeasurementPage } from "@app/pages/anthropometry/NewMeasurementPage";
 import { PatientLabPage } from "@app/pages/laboratory/PatientLabPage";
 import { NewLabPanelPage } from "@app/pages/laboratory/NewLabPanelPage";
-import { LaboratoryPage } from "@app/pages/LaboratoryPage";
 import { CalculationsPage } from "@app/pages/CalculationsPage";
-import { PlansListPage } from "@app/pages/plans/PlansListPage";
 import { MealPlanDetailPage } from "@app/pages/plans/MealPlanDetailPage";
 import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
 import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
@@ -28,7 +23,40 @@ import { ProfilePage } from "@app/pages/ProfilePage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
 import { LoginPage } from "@modules/auth/ui/LoginPage";
 import { useAuthStore } from "@store/authStore";
-import * as React from "react";
+
+/**
+ * Code-splitting con `React.lazy`.
+ *
+ * Cada chunk se carga on-demand al navegar a la ruta, lo que reduce
+ * dramáticamente el bundle inicial y acelera el primer paint del
+ * Dashboard / Login. Las páginas críticas de creación (NewXxxPage) y
+ * las páginas con estado de URL directo se mantienen lazy también:
+ *  - PacientesList, ConsultationsList, PlansList, Laboratory: listas pesadas con tablas / sort / paginación.
+ *  - PatientDetail, Dashboard: vistas con muchos componentes UI.
+ *
+ * Si una página es tan pequeña que el chunk es ridículo (<2KB), podría
+ * dejarse eager, pero el patrón uniforme simplifica el mantenimiento.
+ */
+const DashboardPage = React.lazy(() =>
+  import("@app/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const PatientsListPage = React.lazy(() =>
+  import("@app/pages/patients/PatientsListPage").then((m) => ({ default: m.PatientsListPage })),
+);
+const PatientDetailPage = React.lazy(() =>
+  import("@app/pages/patients/PatientDetailPage").then((m) => ({ default: m.PatientDetailPage })),
+);
+const ConsultationsListPage = React.lazy(() =>
+  import("@app/pages/consultations/ConsultationsListPage").then((m) => ({
+    default: m.ConsultationsListPage,
+  })),
+);
+const PlansListPage = React.lazy(() =>
+  import("@app/pages/plans/PlansListPage").then((m) => ({ default: m.PlansListPage })),
+);
+const LaboratoryPage = React.lazy(() =>
+  import("@app/pages/LaboratoryPage").then((m) => ({ default: m.LaboratoryPage })),
+);
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
