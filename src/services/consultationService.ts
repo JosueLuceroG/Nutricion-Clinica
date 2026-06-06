@@ -7,13 +7,17 @@ import {
   GetConsultationUseCase,
   ListConsultationsUseCase,
   DeleteConsultationUseCase,
+  RegisterPaymentUseCase,
+  type RegisterPaymentInput,
 } from "@modules/consultation/application/consultationUseCases";
 import type { ConsultationRepository } from "@modules/consultation/domain/ConsultationRepository";
+import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import type { ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 import { clinicalRecordService } from "@services/clinicalRecordService";
 
 const repository: ConsultationRepository = new DexieConsultationRepository(db);
 const originalTransition = new TransitionConsultationStatusUseCase(repository);
+const registerPayment = new RegisterPaymentUseCase(repository);
 
 export const consultationService = {
   schedule: new ScheduleConsultationUseCase(repository),
@@ -48,6 +52,10 @@ export const consultationService = {
   get: new GetConsultationUseCase(repository),
   list: new ListConsultationsUseCase(repository),
   delete: new DeleteConsultationUseCase(repository),
+  payment: {
+    register: async (id: ConsultationId, input: RegisterPaymentInput) =>
+      registerPayment.execute(id, input),
+  },
 };
 
 export type ConsultationService = typeof consultationService;

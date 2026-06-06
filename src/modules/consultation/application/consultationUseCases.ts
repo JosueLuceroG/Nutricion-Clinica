@@ -1,6 +1,7 @@
 import { Consultation, type ConsultationCreate } from "../domain/Consultation";
 import type { ConsultationId } from "../domain/ConsultationId";
 import type { ConsultationStatus } from "../domain/ConsultationStatus";
+import type { PaymentMethod } from "../domain/PaymentMethod";
 import {
   type ConsultationQuery,
   type ConsultationRepository,
@@ -82,5 +83,35 @@ export class DeleteConsultationUseCase {
     const existing = await this.repo.findById(id);
     if (!existing) throw new ConsultationNotFoundError(id);
     await this.repo.delete(id, soft);
+  }
+}
+
+/* ------------------------- pagos (Sprint 14D) ------------------------- */
+
+export interface RegisterPaymentInput {
+  cost?: number;
+  paid: boolean;
+  paymentMethod?: PaymentMethod | null;
+  paidAt?: Date | null;
+  reference?: string | null;
+  invoiceNumber?: string | null;
+  billingNotes?: string | null;
+}
+
+/**
+ * Registra o actualiza el pago de una consulta (Sprint 14D).
+ * - Si `paid=true` se exige `paymentMethod` y `paidAt` (validación de dominio).
+ * - Si `paid=false` se limpian método/referencia/fecha (regla de dominio).
+ * - No permite pagar consultas eliminadas (validación de dominio).
+ */
+export class RegisterPaymentUseCase {
+  constructor(private readonly repo: ConsultationRepository) {}
+
+  async execute(id: ConsultationId, input: RegisterPaymentInput): Promise<Consultation> {
+    const existing = await this.repo.findById(id);
+    if (!existing) throw new ConsultationNotFoundError(id);
+    const updated = existing.withPayment(input);
+    await this.repo.save(updated);
+    return updated;
   }
 }

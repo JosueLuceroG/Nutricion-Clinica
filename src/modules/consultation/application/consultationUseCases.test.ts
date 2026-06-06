@@ -7,6 +7,7 @@ import {
   GetConsultationUseCase,
   ListConsultationsUseCase,
   DeleteConsultationUseCase,
+  RegisterPaymentUseCase,
 } from "./consultationUseCases";
 import { DexieConsultationRepository } from "../infrastructure/DexieConsultationRepository";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
@@ -23,6 +24,7 @@ describe("consultationUseCases", () => {
   let get: GetConsultationUseCase;
   let list: ListConsultationsUseCase;
   let del: DeleteConsultationUseCase;
+  let registerPayment: RegisterPaymentUseCase;
   const pid = PatientId.generate();
 
   beforeEach(async () => {
@@ -35,6 +37,7 @@ describe("consultationUseCases", () => {
     get = new GetConsultationUseCase(repo);
     list = new ListConsultationsUseCase(repo);
     del = new DeleteConsultationUseCase(repo);
+    registerPayment = new RegisterPaymentUseCase(repo);
   });
 
   it("Schedule asigna consultationNumber incremental y status=scheduled", async () => {
@@ -106,5 +109,77 @@ describe("consultationUseCases", () => {
     const result = await list.execute({ patientId: pid });
     expect(result.items).toHaveLength(2);
     expect(result.total).toBe(2);
+  });
+
+  /* ------------------------- RegisterPayment (Sprint 14D) ------------------------- */
+
+  it("RegisterPayment: marca consulta como pagada con método y referencia", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    const paid = await registerPayment.execute(c.id, {
+      cost: 1200,
+      paid: true,
+      paymentMethod: "cash",
+      paidAt: new Date("2026-06-01T10:30:00Z"),
+      reference: "CAJA-7",
+    });
+    expect(paid.paid).toBe(true);
+    expect(paid.paymentMethod).toBe("cash");
+    expect(paid.cost).toBe(1200);
+    expect(paid.reference).toBe("CAJA-7");
+
+    // Persistido
+    const stored = await get.execute(c.id);
+    expect(stored.paid).toBe(true);
+    expect(stored.isPaid).toBe(true);
+    expect(stored.isPendingPayment).toBe(false);
+  });
+
+  it("RegisterPayment: paid=false limpia método/referencia/fecha", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    await registerPayment.execute(c.id, {
+      paid: true,
+      paymentMethod: "transfer",
+      paidAt: new Date(),
+      reference: "X",
+    });
+    const unpaid = await registerPayment.execute(c.id, { paid: false });
+    expect(unpaid.paid).toBe(false);
+    expect(unpaid.paymentMethod).toBeNull();
+    expect(unpaid.paidAt).toBeNull();
+    expect(unpaid.reference).toBeNull();
+  });
+
+  it("RegisterPayment: paid=true sin paymentMethod lanza error de dominio", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    await expect(registerPayment.execute(c.id, { paid: true })).rejects.toThrow(/método de pago/);
+  });
+
+  it("RegisterPayment: paid=true sin paidAt lanza error de dominio", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    await expect(
+      registerPayment.execute(c.id, { paid: true, paymentMethod: "cash" }),
+    ).rejects.toThrow(/fecha de pago/);
+  });
+
+  it("RegisterPayment: id inexistente lanza ConsultationNotFoundError", async () => {
+    await expect(
+      registerPayment.execute(ConsultationId.generate(), { paid: true, paymentMethod: "cash", paidAt: new Date() }),
+    ).rejects.toBeInstanceOf(ConsultationNotFoundError);
+  });
+
+  it("RegisterPayment: rechaza pago en consulta eliminada", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    await del.execute(c.id, true);
+    await expect(
+      registerPayment.execute(c.id, { paid: true, paymentMethod: "cash", paidAt: new Date() }),
+    ).rejects.toThrow(/eliminada/);
+  });
+
+  it("RegisterPayment: puede actualizar solo el cost sin cambiar paid", async () => {
+    const c = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control" });
+    const updated = await registerPayment.execute(c.id, { paid: false, cost: 1500 });
+    expect(updated.cost).toBe(1500);
+    expect(updated.paid).toBe(false);
+    expect(updated.isPendingPayment).toBe(true);
   });
 });

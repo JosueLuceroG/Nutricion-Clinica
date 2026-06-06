@@ -12,21 +12,24 @@ import {
   HelpCircle,
   ChevronsLeft,
   ChevronsRight,
+  Receipt,
 } from "lucide-react";
 import { useUIStore } from "@store/uiStore";
+import { useAuthStore } from "@store/authStore";
 import { Button } from "@components/ui/button";
 import { Separator } from "@components/ui/separator";
 import { Badge } from "@components/ui/badge";
 import { cn } from "@utils/cn";
 import { db } from "@services/db";
 import { useLiveQuery } from "dexie-react-hooks";
+import { isBillingRole } from "@modules/auth/authRoles";
 
 interface NavItem {
   to: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Si está, se suscribe al live count desde Dexie. */
-  liveCountFrom?: "patients" | "consultations" | "anthropometry" | "lab_panels" | "meal_plans";
+  liveCountFrom?: "patients" | "consultations" | "anthropometry" | "lab_panels" | "meal_plans" | "pending_payments";
 }
 
 const primaryNav: NavItem[] = [
@@ -53,6 +56,19 @@ const secondaryNav: NavItem[] = [
 export function Sidebar() {
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggle = useUIStore((s) => s.toggleSidebar);
+  const userRole = useAuthStore((s) => s.user?.rol ?? null);
+  const showBilling = isBillingRole(userRole);
+
+  const billingNav: NavItem[] = showBilling
+    ? [
+        {
+          to: "/billing",
+          label: "Facturación",
+          icon: Receipt,
+          liveCountFrom: "pending_payments",
+        },
+      ]
+    : [];
 
   return (
     <aside
@@ -83,6 +99,12 @@ export function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto p-2">
         <NavSection title="General" items={primaryNav} collapsed={collapsed} />
+        {billingNav.length > 0 && (
+          <>
+            <Separator className="my-3" />
+            <NavSection title="Finanzas" items={billingNav} collapsed={collapsed} />
+          </>
+        )}
         <Separator className="my-3" />
         <NavSection title="Clínica" items={clinicalNav} collapsed={collapsed} />
         <Separator className="my-3" />
@@ -155,6 +177,10 @@ function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
           return db.lab_panels.filter((r) => r.deleted_at === null).count();
         case "meal_plans":
           return db.meal_plans.filter((r) => r.deleted_at === null).count();
+        case "pending_payments":
+          return db.consultations
+            .filter((r) => r.deleted_at === null && !r.paid && r.cost > 0)
+            .count();
         default:
           return 0;
       }

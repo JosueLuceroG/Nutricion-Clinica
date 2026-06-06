@@ -22,6 +22,8 @@ import { NotificationsPage } from "@app/pages/NotificationsPage";
 import { ProfilePage } from "@app/pages/ProfilePage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
 import { LoginPage } from "@modules/auth/ui/LoginPage";
+import { RequireRole } from "@modules/auth/RequireRole";
+import { BILLING_ROLES, BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
 import { useAuthStore } from "@store/authStore";
 
 /**
@@ -56,6 +58,15 @@ const PlansListPage = React.lazy(() =>
 );
 const LaboratoryPage = React.lazy(() =>
   import("@app/pages/LaboratoryPage").then((m) => ({ default: m.LaboratoryPage })),
+);
+const BillingPage = React.lazy(() =>
+  import("@app/pages/billing/BillingPage").then((m) => ({ default: m.BillingPage })),
+);
+const BillingReportPage = React.lazy(() =>
+  import("@app/pages/billing/BillingReportPage").then((m) => ({ default: m.BillingReportPage })),
+);
+const ReceiptPage = React.lazy(() =>
+  import("@app/pages/billing/ReceiptPage").then((m) => ({ default: m.ReceiptPage })),
 );
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -129,6 +140,31 @@ const router = createHashRouter([
         ],
       },
       { path: "laboratorio", element: <LaboratoryPage /> },
+      {
+        path: "billing",
+        children: [
+          {
+            index: true,
+            element: (
+              <RequireRole roles={BILLING_ROLES} redirectTo="/">
+                <BillingPage />
+              </RequireRole>
+            ),
+          },
+          {
+            path: "report",
+            element: (
+              <RequireRole roles={BILLING_REPORT_ROLES} redirectTo="/billing">
+                <BillingReportPage />
+              </RequireRole>
+            ),
+          },
+          {
+            path: ":consultationId/receipt",
+            element: <ReceiptPage />,
+          },
+        ],
+      },
       { path: "calculos", element: <CalculationsPage /> },
       { path: "smae", element: <SmaeCatalogPage /> },
       { path: "importar", element: <ImporterPage /> },

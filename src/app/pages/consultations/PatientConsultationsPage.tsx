@@ -1,6 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as React from "react";
-import { ArrowLeft, Plus, ClipboardList, Calendar, Activity, Trash2, User } from "lucide-react";
+import { ArrowLeft, Plus, ClipboardList, Calendar, Activity, Trash2, User, DollarSign, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -11,10 +11,14 @@ import { EmptyState, ErrorState } from "@components/layout/EmptyState";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { usePatientConsultations } from "@modules/consultation/ui/useConsultationHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { ConsultationStatusLabel, ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
+import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
 import { consultationService } from "@services/consultationService";
 import { useUIStore } from "@store/uiStore";
+import { hasAnyRole, BILLING_ROLES } from "@modules/auth/authRoles";
+import { useAuthStore } from "@store/authStore";
 
 export function PatientConsultationsPage() {
   const { patientId } = useParams();
@@ -26,6 +30,10 @@ export function PatientConsultationsPage() {
   const { data: patient, loading: patientLoading } = usePatient(id);
   const { data, loading, error, reload } = usePatientConsultations(id);
   const sidebarCollapsed = useUIStore((s) => s.sidebarCollapsed);
+  const user = useAuthStore((s) => s.user);
+  const canManagePayment = hasAnyRole(user?.rol ?? null, BILLING_ROLES);
+
+  const [paidTarget, setPaidTarget] = React.useState<Consultation | null>(null);
 
   const onDelete = async (consultationId: ConsultationId) => {
     if (!confirm("¿Eliminar esta consulta? Esta acción no se puede deshacer.")) return;
@@ -138,6 +146,17 @@ export function PatientConsultationsPage() {
                       <Badge variant={ConsultationStatusColor[c.status] as never}>
                         {ConsultationStatusLabel[c.status]}
                       </Badge>
+                      {c.isPaid ? (
+                        <Badge variant="success">
+                          <DollarSign className="mr-1 h-3 w-3" />
+                          Pagada
+                        </Badge>
+                      ) : c.cost > 0 ? (
+                        <Badge variant="warning">
+                          <DollarSign className="mr-1 h-3 w-3" />
+                          Pendiente
+                        </Badge>
+                      ) : null}
                       <Button
                         variant="ghost"
                         size="icon-sm"
@@ -191,9 +210,30 @@ export function PatientConsultationsPage() {
                       <User className="h-3 w-3" />
                       Paciente: {patient.fullName}
                     </p>
-                    <Button asChild variant="outline" size="sm">
-                      <Link to={`/consultas/${c.id.toString()}`}>Ver detalle completo</Link>
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {canManagePayment && (
+                        <Button
+                          variant={c.isPaid ? "outline" : "default"}
+                          size="sm"
+                          onClick={() => setPaidTarget(c)}
+                          data-testid={`mark-paid-${c.id.toString()}`}
+                        >
+                          <DollarSign className="mr-1 h-4 w-4" />
+                          {c.isPaid ? "Editar pago" : "Marcar pagada"}
+                        </Button>
+                      )}
+                      {c.isPaid && (
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={`/billing/${c.id.toString()}/receipt`}>
+                            <Receipt className="mr-1 h-4 w-4" />
+                            Recibo
+                          </Link>
+                        </Button>
+                      )}
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/consultas/${c.id.toString()}`}>Ver detalle completo</Link>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -201,6 +241,16 @@ export function PatientConsultationsPage() {
           </div>
         )}
       </PageContent>
+      <MarkAsPaidDialog
+        open={!!paidTarget}
+        consultation={paidTarget}
+        onClose={() => setPaidTarget(null)}
+        onSaved={() => {
+          setPaidTarget(null);
+          toast.success("Pago registrado");
+          reload();
+        }}
+      />
     </>
   );
 }
