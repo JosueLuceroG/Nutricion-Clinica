@@ -5,11 +5,10 @@ import { SyncQueueRepository } from './syncQueueRepository.js';
 import { NutriClinicaDB } from '@services/db/dexieSchema';
 import { useAuthStore } from '@store/authStore';
 import { useSyncStore } from '@store/syncStore';
-// Los imports se referencian solo dentro de vi.mock factories (hoisted);
-// TS marca "no used" para los imports est\u00e1ticos.
 void useAuthStore; void useSyncStore;
 import { HttpError, NetworkError } from '../api/httpClient.js';
 import { SYNC_SCHEMA_VERSION } from '@nutriclinica/shared';
+
 
 const { mockManifest, mockPull, mockPush } = vi.hoisted(() => ({
   mockManifest: vi.fn(),
@@ -235,5 +234,193 @@ describe('SyncEngine', () => {
     await Promise.all([p1, p2]);
     expect(mockManifest).toHaveBeenCalledTimes(1);
     expect(mockPush).toHaveBeenCalledTimes(1);
+  });
+
+  describe('toLocalRow — JSON columns del pull se guardan como strings en Dexie', () => {
+    it('consultas: vitals={object} se almacena como vitals_json: string', async () => {
+      await db.patients.put({
+        id: 'pid-1', first_name: 'Test', last_name: 'Pac',
+        clinical_tags: '[]', status: 'active', created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(), deleted_at: null,
+      } as unknown as Parameters<typeof db.patients.put>[0]);
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'consultas', id: 'c1', op: 'update',
+            payload: {
+              id: 'c1', patient_id: 'pid-1', consultation_date: '2026-06-07T00:00:00.000Z',
+              consultation_number: 1, reason: 'test', subjective: null, objective: null,
+              assessment: null, plan: null, status: 'completed',
+              anthropometry_id: null, lab_panel_id: null, next_visit_date: null,
+              cost: 0, paid: false, payment_method: null, paid_at: null,
+              reference: null, invoice_number: null, billing_notes: null,
+              vitals: { systolicMmHg: 120, diastolicMmHg: 80, heartRateBpm: 72, temperatureC: 36.5 },
+              deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.consultations.get('c1');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(r.vitals_json).toBeTypeOf('string');
+      expect(r.vitals).toBeUndefined();
+      const parsed = JSON.parse(r.vitals_json as string);
+      expect(parsed.systolicMmHg).toBe(120);
+      expect(parsed.diastolicMmHg).toBe(80);
+    });
+
+    it('consultas: vitals=null se almacena como vitals_json: null', async () => {
+      await db.patients.put({
+        id: 'pid-2', first_name: 'Test', last_name: 'Pac',
+        clinical_tags: '[]', status: 'active', created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(), deleted_at: null,
+      } as unknown as Parameters<typeof db.patients.put>[0]);
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'consultas', id: 'c2', op: 'update',
+            payload: {
+              id: 'c2', patient_id: 'pid-2', consultation_date: '2026-06-07T00:00:00.000Z',
+              consultation_number: 2, reason: 'test', subjective: null, objective: null,
+              assessment: null, plan: null, status: 'completed',
+              anthropometry_id: null, lab_panel_id: null, next_visit_date: null,
+              cost: 0, paid: false, payment_method: null, paid_at: null,
+              reference: null, invoice_number: null, billing_notes: null,
+              vitals: null,
+              deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.consultations.get('c2');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(r.vitals_json).toBeNull();
+      expect(r.vitals).toBeUndefined();
+    });
+
+    it(`pacientes: clinical_tags=string[] → clinical_tags: "string[]"`, async () => {
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'pacientes', id: 'p-tag', op: 'update',
+            payload: {
+              id: 'p-tag', first_name: 'Tag', last_name: 'Test',
+              clinical_tags: ['embarazado', 'diabético'],
+              status: 'active', deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.patients.get('p-tag');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(r.clinical_tags).toBeTypeOf('string');
+      const parsed = JSON.parse(r.clinical_tags as string);
+      expect(parsed).toEqual(['embarazado', 'diabético']);
+    });
+
+    it('pacientes: clinical_tags=[] (vacío) → clinical_tags: "[]"', async () => {
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'pacientes', id: 'p-empty', op: 'update',
+            payload: {
+              id: 'p-empty', first_name: 'Empty', last_name: 'Tags',
+              clinical_tags: [],
+              status: 'active', deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.patients.get('p-empty');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(r.clinical_tags).toBe('[]');
+    });
+
+    it('planes_alimenticios: meals=[{slot,...}] → meals_json: string', async () => {
+      await db.patients.put({
+        id: 'pid-3', first_name: 'Meal', last_name: 'Plan',
+        clinical_tags: '[]', status: 'active', created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(), deleted_at: null,
+      } as unknown as Parameters<typeof db.patients.put>[0]);
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'planes_alimenticios', id: 'mp1', op: 'update',
+            payload: {
+              id: 'mp1', patient_id: 'pid-3', start_date: '2026-06-07T00:00:00.000Z',
+              end_date: null, status: 'active', total_daily_calories: 2000,
+              meals: [
+                { slot: 'desayuno', exchanges: [{ foodId: 'a1b2c3d4-0000-0000-0000-000000000001', count: 2 }] },
+              ],
+              deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.meal_plans.get('mp1');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(r.meals_json).toBeTypeOf('string');
+      expect(r.meals).toBeUndefined();
+      const parsed = JSON.parse(r.meals_json as string);
+      expect(parsed[0].slot).toBe('desayuno');
+      expect(parsed[0].exchanges[0].foodId).toBe('a1b2c3d4-0000-0000-0000-000000000001');
+    });
+
+    it('lab_panels: results como array se almacena tal cual (el mapper ya lo lee como array)', async () => {
+      await db.patients.put({
+        id: 'pid-4', first_name: 'Lab', last_name: 'Panel',
+        clinical_tags: '[]', status: 'active', created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(), deleted_at: null,
+      } as unknown as Parameters<typeof db.patients.put>[0]);
+      mockPull.mockResolvedValueOnce({
+        serverTime: 't1', changes: [
+          {
+            entity: 'lab_panels', id: 'lp1', op: 'update',
+            payload: {
+              id: 'lp1', patient_id: 'pid-4', taken_at: '2026-06-07T00:00:00.000Z',
+              lab_name: null, notes: null,
+              results: [
+                { labPanelId: 'lp1', test: 'GLUCOSA', value: 95, unit: 'mg/dL' },
+              ],
+              deleted_at: null, created_at: 't0', updated_at: 't0',
+            },
+            serverUpdatedAt: 't0', serverRowVersion: 'AAA',
+          },
+        ],
+        hasMore: false, nextSince: 't1',
+      });
+      mockPush.mockResolvedValueOnce({ results: [], serverTime: 't2' });
+      await engine.sync();
+      const row = await db.lab_panels.get('lp1');
+      expect(row).toBeTruthy();
+      const r = row as unknown as Record<string, unknown>;
+      expect(Array.isArray(r.results)).toBe(true);
+      expect((r.results as Array<{test: string}>)[0].test).toBe('GLUCOSA');
+    });
   });
 });

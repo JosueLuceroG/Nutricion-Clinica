@@ -38,6 +38,37 @@ const ENTITY_TO_TABLE: Record<SyncableEntity, keyof NutriClinicaDB & string> = {
   planes_alimenticios: 'meal_plans',
 };
 
+/**
+ * Convierte un payload de pull del servidor (campo camelCase, JSON columns
+ * como objetos parseados) al formato de row local que el mapper espera
+ * (snake_case, JSON columns como strings).
+ *
+ * El servidor aplica `parse: jsonParse` en ColumnSpec para devolver
+ * objetos/arrays, pero el cliente guarda esas mismas columnas como strings
+ * (JSON.stringify) en Dexie. Sin esta conversión, los mappers leen
+ * `undefined` y los datos JSON se pierden.
+ */
+const PULL_JSON_COLUMNS: Record<string, Array<{ serverKey: string; localKey: string }>> = {
+  consultas: [{ serverKey: 'vitals', localKey: 'vitals_json' }],
+  planes_alimenticios: [{ serverKey: 'meals', localKey: 'meals_json' }],
+  pacientes: [{ serverKey: 'clinical_tags', localKey: 'clinical_tags' }],
+  // lab_panels: { results } ya se almacena como array, el mapper LabPanelRow
+  // lee `row.results` directamente sin JSON.parse → correcto.
+};
+
+function toLocalRow(entity: SyncableEntity, payload: Record<string, unknown>): object {
+  const jsonCols = PULL_JSON_COLUMNS[entity];
+  if (!jsonCols) return payload;
+  const row = { ...payload };
+  for (const { serverKey, localKey } of jsonCols) {
+    if (!(serverKey in row)) continue;
+    const val = row[serverKey];
+    row[localKey] = val !== null && val !== undefined ? JSON.stringify(val) : null;
+    if (serverKey !== localKey) delete row[serverKey];
+  }
+  return row;
+}
+
 export interface SyncEngineDeps {
   db: NutriClinicaDB;
   queue: SyncQueueRepository;
@@ -148,8 +179,8 @@ export class SyncEngine {
             });
           }
         } else {
-          // cast: SyncPayload es unknown; la fila destino es responsabilidad del caller
-          await table.put(change.payload as object);
+          const localRow = toLocalRow(change.entity, change.payload as Record<string, unknown>);
+          await table.put(localRow);
         }
       }
     } finally {

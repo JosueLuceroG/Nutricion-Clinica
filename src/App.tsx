@@ -17,6 +17,8 @@ export function App() {
     return () => {
       stopSync();
     };
+    // Si aparece en consola "Cannot update a component while rendering",
+    // ver docs/development/setState-during-render.md.
   }, []);
 
   return (
