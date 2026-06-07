@@ -35,3 +35,15 @@ Thumbs.db
 
 # TypeScript
 *.tsbuildinfo
+
+# Ad-hoc dev scripts (migrations checks, db state probes, etc.)
+# Útil para tirar código rápido sin contaminar el repo. NO son tests:
+# son one-shots que se corren con `npx tsx scripts-tmp/foo.mjs` y luego se borran.
+**/scripts-tmp/
+**/scripts-tmp/**
+!apps/api/scripts-tmp/.gitkeep
+
+# commit-msg.txt al root — archivo temporal para `git commit -F`.
+# Se crea en el root y se limpia con `git reset HEAD commit-msg.txt` antes del commit.
+# Si queda en el árbol al hacer `git add -A`, contaminaría el commit.
+/commit-msg.txt
