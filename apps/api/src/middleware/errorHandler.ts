@@ -26,6 +26,9 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
     res.status(err.status).json({ error: err.message });
     return;
   }
-  console.error("[nutriclinica-api] unhandled error:", err);
+  console.error("[nutriclinica-api] unhandled error:", err instanceof Error ? err.message : err);
+  if (err instanceof Error && err.stack) {
+    console.error(err.stack);
+  }
   res.status(500).json({ error: "Internal server error" });
 }
