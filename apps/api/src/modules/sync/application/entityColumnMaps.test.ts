@@ -274,4 +274,15 @@ describe('entityColumnMaps — consultas: campos de pago (Sprint 14D)', () => {
     expect(map.writableDbColumns.has('invoice_number')).toBe(true);
     expect(map.writableDbColumns.has('billing_notes')).toBe(true);
   });
+
+  it('todas las entidades sincronizables tienen deleted_at en writableDbColumns (fix resurrección post-soft-delete)', () => {
+    const entities = ['pacientes', 'consultas', 'antropometrias', 'lab_panels', 'planes_alimenticios'] as const;
+    for (const entity of entities) {
+      const map = getColumnMap(entity);
+      expect(
+        map.writableDbColumns.has('deleted_at'),
+        `entity ${entity} no expone deleted_at como writable — el server ignorará el soft-delete y la fila volverá en la próxima pull`,
+      ).toBe(true);
+    }
+  });
 });
