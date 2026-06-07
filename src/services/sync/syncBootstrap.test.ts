@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 import { NutriClinicaDB } from '@services/db/dexieSchema';
 import { SyncQueueRepository } from '@services/sync/syncQueueRepository';
-import { reconcileAllPendingChanges } from '@services/sync/syncBootstrap';
+import { reconcileAllPendingChanges, startSync, stopSync, resetSyncEngine } from '@services/sync/syncBootstrap';
+import { useAuthStore } from '@store/authStore';
 
 function uuid(): string {
   return crypto.randomUUID();
@@ -124,5 +125,81 @@ describe('reconcileAllPendingChanges', () => {
     const items = await db.sync_queue.toArray();
     expect(items.length).toBe(1);
     expect(items[0]!.entityId).toBe(activeId);
+  });
+});
+
+describe('startSync / stopSync — cleanup de subs Zustand', () => {
+  let db: NutriClinicaDB;
+
+  beforeEach(async () => {
+    db = new NutriClinicaDB(`test-startstop-${Math.random().toString(36).slice(2)}`);
+    await db.open();
+    await db.sync_queue.clear();
+    useAuthStore.setState({
+      token: 't',
+      user: null,
+      sucursales: [],
+      sucursalActivaId: null,
+      isAuthenticated: false,
+    });
+  });
+
+  afterEach(async () => {
+    stopSync();
+    resetSyncEngine();
+    useAuthStore.setState({ isAuthenticated: false });
+    await db.delete();
+  });
+
+  it('startSync idempotente: el handler de sucursal corre UNA vez por cambio de estado (no N veces)', async () => {
+    // Simulamos el bug original: en StrictMode dev, useEffect hace
+    // mount→unmount→mount. El primer cleanup llama stopSync() que sólo
+    // limpiaba el interval, dejando las suscripciones de Zustand vivas.
+    // El segundo startSync añadía OTRA copia de los handlers. Resultado:
+    // cambiar sucursalActivaId disparaba 2 actualizaciones a syncStore.
+    //
+    // Con el fix, startSync limpia sus suscripciones previas antes de
+    // re-registrarlas. Verificamos que tras el ciclo mount/unmount/mount,
+    // el handler corre EXACTAMENTE 1 vez por cambio.
+    const { useSyncStore } = await import('@store/syncStore');
+    useSyncStore.getState().setSucursalId(null);
+
+    // Primer mount.
+    startSync(db, { intervalMs: 0, runOnStart: false });
+    // Simular unmount (cleanup de useEffect).
+    stopSync();
+    // Segundo mount (StrictMode).
+    startSync(db, { intervalMs: 0, runOnStart: false });
+
+    // Spy: contamos cuántas veces setSucursalId del syncStore se llama.
+    const setSyncSucursal = vi.spyOn(useSyncStore.getState(), 'setSucursalId');
+    // Dispara el handler.
+    useAuthStore.setState({ sucursalActivaId: 's-1' });
+    useAuthStore.setState({ sucursalActivaId: 's-2' });
+    useAuthStore.setState({ sucursalActivaId: 's-3' });
+    // 3 cambios → 3 invocaciones del handler (no 6).
+    expect(setSyncSucursal).toHaveBeenCalledTimes(3);
+    setSyncSucursal.mockRestore();
+  });
+
+  it('stopSync limpia interval y suscripciones (sin crash tras varios ciclos)', () => {
+    for (let i = 0; i < 10; i++) {
+      startSync(db, { intervalMs: 0, runOnStart: false });
+      stopSync();
+    }
+    expect(true).toBe(true);
+  });
+
+  it('start/stop repetido no acumula setInterval handles', () => {
+    const setSpy = vi.spyOn(globalThis, 'setInterval');
+    const clearSpy = vi.spyOn(globalThis, 'clearInterval');
+    for (let i = 0; i < 5; i++) {
+      startSync(db, { intervalMs: 30_000, runOnStart: false });
+      stopSync();
+    }
+    expect(setSpy.mock.calls.length).toBeGreaterThanOrEqual(5);
+    expect(clearSpy.mock.calls.length).toBeGreaterThanOrEqual(4);
+    setSpy.mockRestore();
+    clearSpy.mockRestore();
   });
 });

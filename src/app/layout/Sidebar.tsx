@@ -158,7 +158,7 @@ function NavSection({
   );
 }
 
-function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
   const Icon = item.icon;
   // Switch explícito (en vez de `db[item.liveCountFrom]`) para que Dexie
   // pueda observar correctamente cada tabla y para que filtremos
@@ -214,3 +214,11 @@ function NavItemLink({ item, collapsed }: { item: NavItem; collapsed: boolean })
     </NavLink>
   );
 }
+
+// React.memo: el sidebar tiene ~5-6 NavItemLink suscritos a useLiveQuery.
+// Sin memo, cualquier re-render del Sidebar (e.g. al cambiar el tema o
+// al actualizarse el syncStore cada 5s) re-renderiza TODOS los items y
+// dispara 5-6 queries nuevas contra Dexie aunque sus inputs no hayan
+// cambiado. Con memo, cada item sólo re-renderiza si su `item` o
+// `collapsed` cambian, y useLiveQuery se queda con su valor cacheado.
+const NavItemLink = React.memo(NavItemLinkImpl);

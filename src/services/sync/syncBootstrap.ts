@@ -44,6 +44,7 @@ function setLastPullAt(iso: string): void {
 
 let engineInstance: SyncEngine | null = null;
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
+let authUnsubscribers: Array<() => void> = [];
 
 export function getSyncEngine(db: NutriClinicaDB): SyncEngine {
   if (engineInstance) return engineInstance;
@@ -76,42 +77,54 @@ export function startSync(db: NutriClinicaDB, options: StartOptions = {}): void 
   const engine = getSyncEngine(db);
   const { intervalMs = 30_000, runOnStart = true, onEvent } = options;
 
+  // Importante: limpiar subscripciones previas antes de re-registrarlas.
+  // En React 18 dev (StrictMode) el useEffect de App.tsx corre el
+  // cleanup (stopSync) y luego setup (startSync) otra vez; sin esto
+  // acumulamos N copias del mismo handler y cada cambio de estado
+  // dispara trabajo duplicado (causa visible de lentitud al navegar).
+  for (const unsub of authUnsubscribers) unsub();
+  authUnsubscribers = [];
+
   // Cuando el usuario cambia de sucursal, refrescar.
-  useAuthStore.subscribe((state) => {
-    const newId = state.sucursalActivaId;
-    const prevId = useSyncStore.getState().sucursalId;
-    if (newId && newId !== prevId) {
-      useSyncStore.getState().setSucursalId(newId);
-    }
-  });
+  authUnsubscribers.push(
+    useAuthStore.subscribe((state) => {
+      const newId = state.sucursalActivaId;
+      const prevId = useSyncStore.getState().sucursalId;
+      if (newId && newId !== prevId) {
+        useSyncStore.getState().setSucursalId(newId);
+      }
+    }),
+  );
 
   // Auto-reconciliación al login: si el usuario creó datos offline
   // (Dexie tiene filas pero sync_queue no las tiene porque el enqueuer
   // no estaba montado o por un bug), las encolamos y empujamos.
   // Se ejecuta UNA VEZ por sesión (false→true en isAuthenticated).
   let wasAuthenticated = useAuthStore.getState().isAuthenticated;
-  useAuthStore.subscribe((state) => {
-    const isAuth = state.isAuthenticated;
-    if (isAuth && !wasAuthenticated) {
-      wasAuthenticated = true;
-      void (async () => {
-        try {
-          const result = await reconcileAllPendingChanges(db);
-          if (result.enqueued > 0) {
-            toast.info(
-              `${result.enqueued} cambio${result.enqueued === 1 ? '' : 's'} detectado${result.enqueued === 1 ? '' : 's'} offline`,
-              { description: 'Sincronizando con el servidor…' },
-            );
-            await engine.sync();
+  authUnsubscribers.push(
+    useAuthStore.subscribe((state) => {
+      const isAuth = state.isAuthenticated;
+      if (isAuth && !wasAuthenticated) {
+        wasAuthenticated = true;
+        void (async () => {
+          try {
+            const result = await reconcileAllPendingChanges(db);
+            if (result.enqueued > 0) {
+              toast.info(
+                `${result.enqueued} cambio${result.enqueued === 1 ? '' : 's'} detectado${result.enqueued === 1 ? '' : 's'} offline`,
+                { description: 'Sincronizando con el servidor…' },
+              );
+              await engine.sync();
+            }
+          } catch {
+            /* el error ya queda en el syncStore */
           }
-        } catch {
-          /* el error ya queda en el syncStore */
-        }
-      })();
-    } else if (!isAuth) {
-      wasAuthenticated = false;
-    }
-  });
+        })();
+      } else if (!isAuth) {
+        wasAuthenticated = false;
+      }
+    }),
+  );
 
   if (runOnStart && useAuthStore.getState().isAuthenticated) {
     void engine.sync();
@@ -137,6 +150,8 @@ export function stopSync(): void {
     clearInterval(intervalHandle);
     intervalHandle = null;
   }
+  for (const unsub of authUnsubscribers) unsub();
+  authUnsubscribers = [];
 }
 
 export interface ReconcileResult {
