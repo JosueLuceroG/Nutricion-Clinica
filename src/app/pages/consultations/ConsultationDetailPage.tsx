@@ -11,22 +11,30 @@ import {
   FlaskConical,
   Heart,
   FileDown,
+  DollarSign,
+  Receipt,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
+import { Badge } from "@components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState, EmptyState } from "@components/layout/EmptyState";
 import { useConsultation } from "@modules/consultation/ui/useConsultationHooks";
 import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { ConsultationStatusLabel } from "@modules/consultation/domain/ConsultationStatus";
+import { PAYMENT_METHOD_LABELS } from "@modules/consultation/domain/PaymentMethod";
+import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
+import { isBillingRole, useCurrentRole } from "@modules/auth/authRoles";
+import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { Vitals } from "@modules/consultation/domain/Vitals";
 import { consultationService } from "@services/consultationService";
 import { patientService } from "@services/patientService";
 import { anthropometryService } from "@services/anthropometryService";
 import { labPanelService } from "@services/labPanelService";
 import { pdfService } from "@services/pdf/pdfService";
+import { formatCurrency } from "@utils/formatCurrency";
 
 export function ConsultationDetailPage() {
   const { consultationId } = useParams();
@@ -34,6 +42,9 @@ export function ConsultationDetailPage() {
   const id = consultationId ? ConsultationId.fromUnsafe(consultationId) : null;
   const { data: consultation, loading, error, reload } = useConsultation(id);
   const [busy, setBusy] = React.useState(false);
+  const [paidTarget, setPaidTarget] = React.useState<Consultation | null>(null);
+  const userRole = useCurrentRole();
+  const canManagePayment = isBillingRole(userRole);
 
   const onTransition = async (to: "in-progress" | "completed" | "cancelled" | "scheduled") => {
     if (!id) return;
@@ -199,6 +210,25 @@ export function ConsultationDetailPage() {
               </Link>
             </Button>
             {actions}
+            {canManagePayment && (
+              <Button
+                variant={consultation.isPaid ? "outline" : "default"}
+                onClick={() => setPaidTarget(consultation)}
+                disabled={busy}
+                data-testid="mark-paid-detail"
+              >
+                <DollarSign className="mr-2 h-4 w-4" />
+                {consultation.isPaid ? "Editar pago" : "Marcar pagada"}
+              </Button>
+            )}
+            {consultation.isPaid && (
+              <Button asChild variant="outline">
+                <Link to={`/billing/${consultation.id.toString()}/receipt`}>
+                  <Receipt className="mr-2 h-4 w-4" />
+                  Recibo
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" onClick={onExportPdf} disabled={busy}>
               <FileDown className="mr-2 h-4 w-4" />
               Exportar PDF
@@ -290,6 +320,75 @@ export function ConsultationDetailPage() {
 
             <Card>
               <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <DollarSign className="h-4 w-4" />
+                  Pago
+                </CardTitle>
+                <CardDescription>
+                  {consultation.isPaid
+                    ? "Consulta liquidada"
+                    : consultation.cost > 0
+                      ? "Pago pendiente"
+                      : "Sin costo asignado"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Costo</span>
+                  <span className="text-sm font-medium">
+                    {consultation.cost > 0 ? formatCurrency(consultation.cost) : "—"}
+                  </span>
+                </div>
+                {consultation.isPaid && consultation.paymentMethod && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Método</span>
+                    <span className="text-sm">{PAYMENT_METHOD_LABELS[consultation.paymentMethod]}</span>
+                  </div>
+                )}
+                {consultation.isPaid && consultation.paidAt && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Fecha</span>
+                    <span className="text-sm">
+                      {new Intl.DateTimeFormat("es-MX", { dateStyle: "short" }).format(consultation.paidAt)}
+                    </span>
+                  </div>
+                )}
+                {consultation.isPaid && consultation.reference && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Referencia</span>
+                    <span className="text-sm font-mono">{consultation.reference}</span>
+                  </div>
+                )}
+                {consultation.isPaid && consultation.invoiceNumber && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Factura</span>
+                    <span className="text-sm font-mono">{consultation.invoiceNumber}</span>
+                  </div>
+                )}
+                {consultation.isPaid && (
+                  <Badge variant="success" className="mt-2">
+                    <DollarSign className="mr-1 h-3 w-3" />
+                    Pagada
+                  </Badge>
+                )}
+                {canManagePayment && (
+                  <Button
+                    variant={consultation.isPaid ? "outline" : "default"}
+                    size="sm"
+                    className="mt-2 w-full"
+                    onClick={() => setPaidTarget(consultation)}
+                    disabled={busy}
+                    data-testid="mark-paid-card"
+                  >
+                    <DollarSign className="mr-2 h-4 w-4" />
+                    {consultation.isPaid ? "Editar pago" : "Marcar pagada"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle className="text-base">Auditoría</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-xs text-muted-foreground">
@@ -300,6 +399,15 @@ export function ConsultationDetailPage() {
           </div>
         </div>
       </PageContent>
+      <MarkAsPaidDialog
+        open={!!paidTarget}
+        consultation={paidTarget}
+        onClose={() => setPaidTarget(null)}
+        onSaved={() => {
+          setPaidTarget(null);
+          reload();
+        }}
+      />
     </>
   );
 }
