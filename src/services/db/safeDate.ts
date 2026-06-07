@@ -60,7 +60,15 @@ export function safeDate(value: unknown, fallback?: Date | null, key?: string): 
     return fallback;
   };
 
-  if (value == null || value === "") {
+  // `null` y `undefined` NO son "datos corruptos" — son el sentinel
+  // legítimo para "sin valor" (campos opcionales, soft-delete, etc.).
+  // Advertir aquí es spam falso-positivo. Solo advertimos cuando el
+  // valor está presente pero es inválido (string vacío, fecha inválida,
+  // tipo inesperado).
+  if (value == null) {
+    return resolveFallback();
+  }
+  if (value === "") {
     if (key) warnOnce(key, value, fallback === null ? "null" : "now");
     return resolveFallback();
   }
