@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   prepareColumnsForWrite,
   dbRowToClient,
@@ -284,5 +284,104 @@ describe('entityColumnMaps — consultas: campos de pago (Sprint 14D)', () => {
         `entity ${entity} no expone deleted_at como writable — el server ignorará el soft-delete y la fila volverá en la próxima pull`,
       ).toBe(true);
     }
+  });
+});
+
+describe('dbRowToClient — parse de columnas JSON (read direction)', () => {
+  it('pacientes.clinical_tags: string JSON en DB → array en cliente', () => {
+    const client = dbRowToClient('pacientes', {
+      id: 'p-1',
+      nombres: 'Ana',
+      apellido_paterno: 'Pérez',
+      clinical_tags_json: '["embarazada","diabetes-t2"]',
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.clinical_tags).toEqual(['embarazada', 'diabetes-t2']);
+  });
+
+  it('consultas.vitals: string JSON en DB → objeto en cliente', () => {
+    const client = dbRowToClient('consultas', {
+      id: 'c-1',
+      consultation_date: new Date('2026-01-15'),
+      cost: 500,
+      paid: false,
+      vitals_json: JSON.stringify({ weight_kg: 70.5, height_cm: 165, bp: '120/80' }),
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.vitals).toEqual({ weight_kg: 70.5, height_cm: 165, bp: '120/80' });
+  });
+
+  it('lab_panels.results: string JSON en DB → array en cliente', () => {
+    const client = dbRowToClient('lab_panels', {
+      id: 'l-1',
+      lab_name: 'BH',
+      taken_at: new Date('2026-01-15'),
+      results_json: JSON.stringify([
+        { analyte: 'hemoglobina', value: 14.2, unit: 'g/dL' },
+        { analyte: 'hematocrito', value: 42, unit: '%' },
+      ]),
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.results).toEqual([
+      { analyte: 'hemoglobina', value: 14.2, unit: 'g/dL' },
+      { analyte: 'hematocrito', value: 42, unit: '%' },
+    ]);
+  });
+
+  it('planes_alimenticios.meals: string JSON en DB → array en cliente', () => {
+    const client = dbRowToClient('planes_alimenticios', {
+      id: 'pl-1',
+      name: 'Plan Hipocalórico',
+      start_date: new Date('2026-01-01'),
+      end_date: new Date('2026-01-31'),
+      meals_json: JSON.stringify([
+        { time: '08:00', kcal: 350, items: [] },
+        { time: '14:00', kcal: 500, items: [] },
+      ]),
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.meals).toEqual([
+      { time: '08:00', kcal: 350, items: [] },
+      { time: '14:00', kcal: 500, items: [] },
+    ]);
+  });
+
+  it('JSON column null en DB → null en cliente (no explota)', () => {
+    const client = dbRowToClient('consultas', {
+      id: 'c-2',
+      consultation_date: new Date('2026-01-15'),
+      cost: 0,
+      paid: false,
+      vitals_json: null,
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.vitals).toBeNull();
+  });
+
+  it('JSON column con string corrupto en DB → string crudo (defensivo, no rompe el pull)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = dbRowToClient('consultas', {
+      id: 'c-3',
+      consultation_date: new Date('2026-01-15'),
+      cost: 0,
+      paid: false,
+      vitals_json: 'no es json válido {{{',
+      created_at: '2026-01-01',
+      updated_at: '2026-01-01',
+      deleted_at: null,
+    });
+    expect(client.vitals).toBe('no es json válido {{{');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

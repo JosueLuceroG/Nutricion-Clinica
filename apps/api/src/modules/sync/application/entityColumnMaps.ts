@@ -25,7 +25,12 @@ export interface ColumnSpec {
   dbColumn: string;
   sqlType: () => sql.ISqlType;
   nullable: boolean;
+  /** Pre-procesa el valor JS antes de mandarlo a mssql (write direction). */
   transform?: (value: unknown) => unknown;
+  /** Post-procesa el valor crudo de la DB antes de mandarlo al cliente (read direction).
+   *  Si no se especifica, el valor pasa tal cual. Útil para *_json columns: server
+   *  almacena string, cliente espera objeto. */
+  parse?: (value: unknown) => unknown;
 }
 
 export type EntityColumnMap = {
@@ -43,6 +48,25 @@ function jsonStringify(value: unknown): unknown {
   if (value == null) return null;
   if (typeof value === 'string') return value;
   return JSON.stringify(value);
+}
+
+/**
+ * Inverso de `jsonStringify` para el read direction (pull).
+ * El server almacena el JSON como string en columnas `*_json NVARCHAR(MAX)`.
+ * El cliente espera el objeto/array. Si el valor ya es objeto (no debería
+ * pasar con mssql, pero defensivo), lo pasamos tal cual. Si el parseo
+ * falla (string corrupto), devolvemos el string crudo y logueamos una
+ * vez por columna — preferimos no romper el pull por un campo sucio.
+ */
+function jsonParse(value: unknown): unknown {
+  if (value == null) return null;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch (err) {
+    console.warn('[sync] jsonParse falló; devolviendo string crudo', { error: err });
+    return value;
+  }
 }
 
 function toDate(value: unknown): unknown {
@@ -95,7 +119,7 @@ const pacientesMap: EntityColumnMap = {
     consentimiento_informado_id: { dbColumn: 'consentimiento_informado_id', sqlType: () => sql.UniqueIdentifier(), nullable: true },
     fecha_firma_consentimiento: { dbColumn: 'fecha_firma_consentimiento', sqlType: () => sql.DateTime2(), nullable: true, transform: toDate },
     version_politica_privacidad: { dbColumn: 'version_politica_privacidad', sqlType: () => sql.NVarChar(40), nullable: true },
-    clinical_tags: { dbColumn: 'clinical_tags_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: true, transform: jsonStringify },
+    clinical_tags: { dbColumn: 'clinical_tags_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: true, transform: jsonStringify, parse: jsonParse },
     record_status: { dbColumn: 'record_status', sqlType: () => sql.NVarChar(20), nullable: false, transform: recordStatusClientToDb },
     record_closed_reason: { dbColumn: 'record_closed_reason', sqlType: () => sql.NVarChar(40), nullable: true },
     record_closed_at: { dbColumn: 'record_closed_at', sqlType: () => sql.DateTime2(), nullable: true, transform: toDate },
@@ -124,7 +148,7 @@ const consultasMap: EntityColumnMap = {
     objective: { dbColumn: 'objective', sqlType: () => sql.NVarChar(sql.MAX), nullable: true },
     assessment: { dbColumn: 'assessment', sqlType: () => sql.NVarChar(sql.MAX), nullable: true },
     plan: { dbColumn: 'plan', sqlType: () => sql.NVarChar(sql.MAX), nullable: true },
-    vitals: { dbColumn: 'vitals_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: true, transform: jsonStringify },
+    vitals: { dbColumn: 'vitals_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: true, transform: jsonStringify, parse: jsonParse },
     anthropometry_id: { dbColumn: 'anthropometry_id', sqlType: () => sql.UniqueIdentifier(), nullable: true },
     lab_panel_id: { dbColumn: 'lab_panel_id', sqlType: () => sql.UniqueIdentifier(), nullable: true },
     next_visit_date: { dbColumn: 'next_visit_date', sqlType: () => sql.Date(), nullable: true, transform: toDate },
@@ -187,7 +211,7 @@ const labPanelsMap: EntityColumnMap = {
     profesional_id: { dbColumn: 'profesional_id', sqlType: () => sql.UniqueIdentifier(), nullable: false },
     taken_at: { dbColumn: 'taken_at', sqlType: () => sql.DateTime2(), nullable: false, transform: toDate },
     lab_name: { dbColumn: 'lab_name', sqlType: () => sql.NVarChar(200), nullable: true },
-    results: { dbColumn: 'results_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: false, transform: jsonStringify },
+    results: { dbColumn: 'results_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: false, transform: jsonStringify, parse: jsonParse },
     notes: { dbColumn: 'notes', sqlType: () => sql.NVarChar(sql.MAX), nullable: true },
     deleted_at: { dbColumn: 'deleted_at', sqlType: () => sql.DateTime2(), nullable: true, transform: toDate },
   },
@@ -212,7 +236,7 @@ const planesMap: EntityColumnMap = {
     protein_target_g: { dbColumn: 'protein_target_g', sqlType: () => sql.Int(), nullable: false },
     carbs_target_g: { dbColumn: 'carbs_target_g', sqlType: () => sql.Int(), nullable: false },
     fat_target_g: { dbColumn: 'fat_target_g', sqlType: () => sql.Int(), nullable: false },
-    meals: { dbColumn: 'meals_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: false, transform: jsonStringify },
+    meals: { dbColumn: 'meals_json', sqlType: () => sql.NVarChar(sql.MAX), nullable: false, transform: jsonStringify, parse: jsonParse },
     notes: { dbColumn: 'notes', sqlType: () => sql.NVarChar(sql.MAX), nullable: true },
     status: { dbColumn: 'status', sqlType: () => sql.NVarChar(20), nullable: false },
     deleted_at: { dbColumn: 'deleted_at', sqlType: () => sql.DateTime2(), nullable: true, transform: toDate },
@@ -320,7 +344,10 @@ export function dbRowToClient(entity: SyncableEntity, row: Record<string, unknow
   for (const spec of Object.values(map.byClientField)) {
     if (!(spec.dbColumn in row)) continue;
     const clientField = Object.entries(map.byClientField).find(([, s]) => s.dbColumn === spec.dbColumn)?.[0];
-    if (clientField) out[clientField] = row[spec.dbColumn];
+    if (clientField) {
+      const raw = row[spec.dbColumn];
+      out[clientField] = spec.parse ? spec.parse(raw) : raw;
+    }
   }
   // system columns: pasar tal cual
   for (const dbCol of SYSTEM_PASSTHROUGH_COLUMNS) {
