@@ -8,7 +8,7 @@ import type { EducationLevel } from "../domain/EducationLevel";
 import type { RecordStatus } from "../domain/RecordStatus";
 import { Email, Phone } from "../domain/Contact";
 import type { PatientStatus } from "../domain/PatientStatus";
-import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
+import { safeDate, toIsoStringSafe, safeJsonParse } from "@services/db/safeDate";
 
 export interface PatientRow {
   id: string;
@@ -64,7 +64,7 @@ export const patientRowToDomain = (row: PatientRow): Patient => {
     consentimientoInformadoId: row.consentimiento_informado_id ? ConsentId.fromUnsafe(row.consentimiento_informado_id) : null,
     fechaFirmaConsentimiento: safeDate(row.fecha_firma_consentimiento, null, "patient.fecha_firma_consentimiento"),
     versionPoliticaPrivacidad: row.version_politica_privacidad,
-    clinicalTags: row.clinical_tags ? JSON.parse(row.clinical_tags) : [],
+    clinicalTags: safeJsonParse<string[]>(row.clinical_tags, []),
     status: row.status,
     createdAt: safeDate(row.created_at, undefined, "patient.created_at")!,
     updatedAt: safeDate(row.updated_at, undefined, "patient.updated_at")!,

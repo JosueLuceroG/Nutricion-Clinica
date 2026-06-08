@@ -7,7 +7,7 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import { Vitals } from "../domain/Vitals";
-import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
+import { safeDate, toIsoStringSafe, safeJsonParse } from "@services/db/safeDate";
 
 export interface ConsultationRow {
   id: string;
@@ -48,7 +48,7 @@ export const consultationRowToDomain = (row: ConsultationRow): Consultation => {
     reason: row.reason,
     subjective: row.subjective,
     objective: row.objective,
-    vitals: Vitals.fromJSON(row.vitals_json ? JSON.parse(row.vitals_json) : null),
+    vitals: Vitals.fromJSON(safeJsonParse(row.vitals_json, null)),
     assessment: row.assessment,
     plan: row.plan,
     anthropometryId: row.anthropometry_id ? AnthropometryId.fromUnsafe(row.anthropometry_id) : null,

@@ -5,7 +5,7 @@ import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
 import type { MealPlanStatus } from "../domain/MealPlanStatus";
 import type { FoodId } from "@modules/smae/domain";
-import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
+import { safeDate, toIsoStringSafe, safeJsonParse } from "@services/db/safeDate";
 
 export interface MealPlanRow {
   id: string;
@@ -36,19 +36,15 @@ interface MealRow {
   exchanges: MealExchangeRow[];
 }
 
-const decodeMeals = (json: string): PlanMeal[] => {
-  try {
-    const raw = JSON.parse(json) as MealRow[];
-    return MEAL_SLOT_ORDER.map((slot) => {
-      const found = raw.find((m) => m.slot === slot);
-      return {
-        slot,
-        exchanges: found?.exchanges ?? [],
-      };
-    });
-  } catch {
-    return MEAL_SLOT_ORDER.map((slot) => ({ slot, exchanges: [] }));
-  }
+const decodeMeals = (json: unknown): PlanMeal[] => {
+  const raw = safeJsonParse<MealRow[]>(json, []);
+  return MEAL_SLOT_ORDER.map((slot) => {
+    const found = raw.find((m) => m.slot === slot);
+    return {
+      slot,
+      exchanges: found?.exchanges ?? [],
+    };
+  });
 };
 
 const encodeMeals = (meals: PlanMeal[]): string => {

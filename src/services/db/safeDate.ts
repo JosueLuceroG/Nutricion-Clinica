@@ -114,6 +114,26 @@ export function toIsoStringSafe(
 }
 
 /**
+ * Parsea un valor que puede ser un string JSON o un objeto/array ya parseado.
+ *
+ * Sirve para mapear JSON columns de vuelta de Dexie: después del fix
+ * `toLocalRow` en syncEngine, las columnas se guardan como strings.
+ * Pero filas existentes (anteriores al fix) pueden tener el valor directo
+ * (objeto/array) — esta función maneja ambos casos sin crashear.
+ *
+ * Si el valor es string → JSON.parse.
+ * Si es null/undefined → fallback.
+ * Si ya es objeto/array → se devuelve tal cual (legacy data).
+ */
+export function safeJsonParse<T>(val: unknown, fallback: T): T {
+  if (typeof val === 'string') {
+    try { return JSON.parse(val) as T; } catch { return fallback; }
+  }
+  if (val === null || val === undefined) return fallback;
+  return val as T;
+}
+
+/**
  * Devuelve `true` si el valor, al ser pasado por `safeDate`, produciría
  * una fecha inválida. Útil para escanear tablas y reparar datos corruptos
  * sin tocar filas sanas.
