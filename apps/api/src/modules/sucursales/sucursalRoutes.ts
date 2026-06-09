@@ -1,5 +1,6 @@
 import { Router as ExpressRouter, type Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
+import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { listSucursalesForProfesional, type SucursalAsignada } from '../auth/application/authService.js';

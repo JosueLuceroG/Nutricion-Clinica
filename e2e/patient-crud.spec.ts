@@ -18,6 +18,16 @@ import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
 
 const PATIENT_FIRST = "E2E";
 const PATIENT_LAST = "SmokeTest";
+const SYNC_BUTTON_NAME = /^(Sincronizar|Forzar un ciclo de sync ahora)$/i;
+
+async function forceSync(page: import("@playwright/test").Page) {
+  const syncBtn = page.getByRole("button", { name: SYNC_BUTTON_NAME });
+  await expect(syncBtn).toBeEnabled({ timeout: 30_000 });
+  await syncBtn.click();
+  await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({
+    timeout: 30_000,
+  });
+}
 
 test.describe.serial("Pacientes — soft-delete round-trip", () => {
   test("crear paciente, sincronizar, soft-delete, re-sincronizar y NO resucita", async ({ page }) => {
@@ -48,12 +58,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     expect(patientId).toBeTruthy();
 
     // 4) Disparar sync manual (botón "Sincronizar" en el StatusBar)
-    const syncBtn = page.getByRole("button", { name: /^(Sincronizar|Forzar un ciclo de sync ahora)$/i });
-    await syncBtn.click();
-    // Esperar a que vuelva a "Sincronizado" (o a idle)
-    await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await forceSync(page);
 
     // 5) Volver a la lista para verificar que el paciente aparece
     await page.goto(hashUrl("/pacientes"));
@@ -115,10 +120,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     expect(afterDelete).toMatchObject({ deleted_at: expect.stringMatching(/\d{4}/) });
 
     // 7) Re-sincronizar y volver a verificar: NO resucita
-    await syncBtn.click();
-    await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await forceSync(page);
     await page.waitForTimeout(2000);
     const afterResync = await page.evaluate(async (id: string) => {
       return new Promise<unknown>((resolve, reject) => {

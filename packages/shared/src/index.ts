@@ -142,6 +142,7 @@ export const SYNCABLE_ENTITIES = [
   'antropometrias',
   'lab_panels',
   'planes_alimenticios',
+  'adherence_records',
 ] as const;
 
 export type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];

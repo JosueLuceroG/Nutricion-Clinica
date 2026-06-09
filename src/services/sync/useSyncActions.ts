@@ -21,12 +21,21 @@ export function useSyncActions() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setPending = useSyncStore((s) => s.setPendingChanges);
   const [conflictCount, setConflictCount] = React.useState(0);
+  const mountedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const refreshCounts = React.useCallback(async () => {
     const [pending, conflicts] = await Promise.all([
       queue.countPending(),
       queue.countConflicts(),
     ]);
+    if (!mountedRef.current) return;
     setPending(pending);
     setConflictCount(conflicts);
   }, [setPending]);

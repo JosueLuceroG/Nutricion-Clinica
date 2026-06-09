@@ -9,6 +9,8 @@ import consultaRouter from "./modules/consultas/consultaRoutes.js";
 import antropometriaRouter from "./modules/antropometrias/antropometriaRoutes.js";
 import labPanelRouter from "./modules/lab/labPanelRoutes.js";
 import planRouter from "./modules/planes/planRoutes.js";
+import adherenceRouter from "./modules/adherence/adherenceRoutes.js";
+import patientPortalRouter from "./modules/patientPortal/patientPortalRoutes.js";
 import syncRouter from "./modules/sync/syncRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
@@ -25,6 +27,8 @@ app.use("/consultas", consultaRouter);
 app.use("/antropometrias", antropometriaRouter);
 app.use("/lab-panels", labPanelRouter);
 app.use("/planes", planRouter);
+app.use("/adherence", adherenceRouter);
+app.use("/patient-portal", patientPortalRouter);
 app.use("/sync", syncRouter);
 
 app.use(errorHandler);

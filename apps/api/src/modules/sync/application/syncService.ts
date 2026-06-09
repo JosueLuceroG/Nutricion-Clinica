@@ -21,6 +21,7 @@ const ENTITY_TABLES: Record<SyncableEntity, string> = {
   antropometrias: 'antropometrias',
   lab_panels: 'lab_panels',
   planes_alimenticios: 'planes_alimenticios',
+  adherence_records: 'adherence_records',
 };
 
 export async function getManifest(): Promise<SyncManifest> {
@@ -147,6 +148,7 @@ const SERVER_INJECTED_COLUMNS: Record<SyncableEntity, Record<string, (op: { payl
   planes_alimenticios: {
     profesional_id: ({ profesionalId }) => profesionalId,
   },
+  adherence_records: {},
 };
 
 async function applyOperation(
@@ -242,7 +244,7 @@ async function applyCreate(
 async function applyUpdate(
   pool: sql.ConnectionPool,
   sucursalId: string,
-  profesionalId: string,
+  _profesionalId: string,
   op: { entity: SyncableEntity; id: string; payload: unknown; expectedRowVersion?: string },
 ): Promise<SyncPushResultItem> {
   const table = ENTITY_TABLES[op.entity];

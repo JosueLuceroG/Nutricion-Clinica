@@ -13,12 +13,15 @@ import {
   Activity,
   FlaskConical,
   ClipboardList,
+  ClipboardCheck,
   UtensilsCrossed,
   Heart,
   Tags,
   FileText,
 } from "lucide-react";
 import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
+import { PatientPortalLinksCard } from "./PatientPortalLinksCard";
+import { PatientPortalAdherenceCard } from "./PatientPortalAdherenceCard";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -252,6 +255,10 @@ export function PatientDetailPage() {
               </CardContent>
             </Card>
 
+            <PatientPortalLinksCard patientId={patient.id.toString()} />
+
+            <PatientPortalAdherenceCard patientId={patient.id.toString()} />
+
             {(patient.emergencyContactName || patient.emergencyContactPhone) && (
               <Card>
                 <CardHeader>
@@ -334,6 +341,12 @@ export function PatientDetailPage() {
               icon={UtensilsCrossed}
               label={t("mealplan.title")}
               hint={t("patient.module_meal_plans_hint")}
+            />
+            <ModuleLink
+              to={`/pacientes/${patient.id.toString()}/adherencia`}
+              icon={ClipboardCheck}
+              label={t("adherence.title")}
+              hint={t("adherence.record_desc")}
             />
           </CardContent>
         </Card>

@@ -19,6 +19,7 @@ import { DocumentsPage } from "@app/pages/documents/DocumentsPage";
 import { MealPlannerPage } from "@app/pages/meal-planner/MealPlannerPage";
 import { GoalsPage } from "@app/pages/goals/GoalsPage";
 import { AdherencePage } from "@app/pages/adherence/AdherencePage";
+import { PatientAdherencePage } from "@app/pages/patients/PatientAdherencePage";
 import { MedicationsPage } from "@app/pages/medications/MedicationsPage";
 import { ReportsPage } from "@app/pages/reports/ReportsPage";
 import { ImporterPage } from "@app/pages/ImporterPage";
@@ -27,6 +28,7 @@ import { NotFoundPage } from "@app/pages/NotFoundPage";
 import { NotificationsPage } from "@app/pages/NotificationsPage";
 import { ProfilePage } from "@app/pages/ProfilePage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
+import { PatientPortalPage } from "@app/pages/patient-portal/PatientPortalPage";
 import { LoginPage } from "@modules/auth/ui/LoginPage";
 import { RequireRole } from "@modules/auth/RequireRole";
 import { BILLING_ROLES, BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
@@ -100,6 +102,14 @@ const router = createHashRouter([
     element: <LoginPage />,
   },
   {
+    path: "/portal/:token",
+    element: (
+      <ErrorBoundary>
+        <PatientPortalPage />
+      </ErrorBoundary>
+    ),
+  },
+  {
     path: "/",
     element: (
       <RequireAuth>
@@ -144,6 +154,12 @@ const router = createHashRouter([
             children: [
               { index: true, element: <PatientMealPlansPage /> },
               { path: "nuevo", element: <NewMealPlanPage /> },
+            ],
+          },
+          {
+            path: ":patientId/adherencia",
+            children: [
+              { index: true, element: <PatientAdherencePage /> },
             ],
           },
         ],

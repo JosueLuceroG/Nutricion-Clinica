@@ -276,7 +276,7 @@ describe('entityColumnMaps — consultas: campos de pago (Sprint 14D)', () => {
   });
 
   it('todas las entidades sincronizables tienen deleted_at en writableDbColumns (fix resurrección post-soft-delete)', () => {
-    const entities = ['pacientes', 'consultas', 'antropometrias', 'lab_panels', 'planes_alimenticios'] as const;
+    const entities = ['pacientes', 'consultas', 'antropometrias', 'lab_panels', 'planes_alimenticios', 'adherence_records'] as const;
     for (const entity of entities) {
       const map = getColumnMap(entity);
       expect(

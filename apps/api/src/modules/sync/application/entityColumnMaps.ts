@@ -247,6 +247,37 @@ const planesMap: EntityColumnMap = {
 planesMap.byDbColumn = invertByClientField(planesMap.byClientField);
 planesMap.writableDbColumns = new Set(Object.values(planesMap.byClientField).map((c) => c.dbColumn));
 
+/* ------------------------- adherence_records ------------------------- */
+
+const adherenceRecordsMap: EntityColumnMap = {
+  byClientField: {
+    patient_id: { dbColumn: 'paciente_id', sqlType: () => sql.UniqueIdentifier(), nullable: false },
+    consultation_id: { dbColumn: 'consulta_id', sqlType: () => sql.UniqueIdentifier(), nullable: true },
+    source: { dbColumn: 'source', sqlType: () => sql.NVarChar(20), nullable: false },
+    date: { dbColumn: 'record_date', sqlType: () => sql.Date(), nullable: false, transform: toDate },
+    adherence_menu: { dbColumn: 'adherence_menu', sqlType: () => sql.Decimal(5, 2), nullable: false },
+    adherence_water: { dbColumn: 'adherence_water', sqlType: () => sql.Decimal(5, 2), nullable: false },
+    adherence_activity: { dbColumn: 'adherence_activity', sqlType: () => sql.Decimal(5, 2), nullable: false },
+    adherence_supplements: { dbColumn: 'adherence_supplements', sqlType: () => sql.Decimal(5, 2), nullable: false },
+    adherence_sleep: { dbColumn: 'adherence_sleep', sqlType: () => sql.Decimal(5, 2), nullable: false },
+    hunger_avg: { dbColumn: 'hunger_avg', sqlType: () => sql.Decimal(4, 1), nullable: true },
+    satiety_avg: { dbColumn: 'satiety_avg', sqlType: () => sql.Decimal(4, 1), nullable: true },
+    mood_avg: { dbColumn: 'mood_avg', sqlType: () => sql.Decimal(4, 1), nullable: true },
+    energy_avg: { dbColumn: 'energy_avg', sqlType: () => sql.Decimal(4, 1), nullable: true },
+    intercurrent_events: { dbColumn: 'intercurrent_events', sqlType: () => sql.NVarChar(1000), nullable: false },
+    barriers: { dbColumn: 'barriers', sqlType: () => sql.NVarChar(1000), nullable: false },
+    facilitators: { dbColumn: 'facilitators', sqlType: () => sql.NVarChar(1000), nullable: false },
+    meals_logged: { dbColumn: 'meals_logged', sqlType: () => sql.NVarChar(2000), nullable: false },
+    notes: { dbColumn: 'notes', sqlType: () => sql.NVarChar(2000), nullable: false },
+    submitted_by_token_id: { dbColumn: 'submitted_by_token_id', sqlType: () => sql.UniqueIdentifier(), nullable: true },
+    deleted_at: { dbColumn: 'deleted_at', sqlType: () => sql.DateTime2(), nullable: true, transform: toDate },
+  },
+  byDbColumn: {},
+  writableDbColumns: new Set(),
+};
+adherenceRecordsMap.byDbColumn = invertByClientField(adherenceRecordsMap.byClientField);
+adherenceRecordsMap.writableDbColumns = new Set(Object.values(adherenceRecordsMap.byClientField).map((c) => c.dbColumn));
+
 /* ----------------------------- registry ----------------------------- */
 
 function invertByClientField(byClient: Readonly<Record<string, ColumnSpec>>): Readonly<Record<string, ColumnSpec>> {
@@ -263,6 +294,7 @@ const MAPS: Record<SyncableEntity, EntityColumnMap> = {
   antropometrias: antropometriasMap,
   lab_panels: labPanelsMap,
   planes_alimenticios: planesMap,
+  adherence_records: adherenceRecordsMap,
 };
 
 export function getColumnMap(entity: SyncableEntity): EntityColumnMap {

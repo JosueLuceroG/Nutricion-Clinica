@@ -71,6 +71,7 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] })  // entity 3 antropometrias
       .mockResolvedValueOnce({ recordset: [] })  // entity 4 lab_panels
       .mockResolvedValueOnce({ recordset: [] })  // entity 5 planes
+      .mockResolvedValueOnce({ recordset: [] })  // entity 6 adherence_records
       .mockResolvedValueOnce(time);                // final time
 
     const r = await pullChanges('s1', new Date(0), null);
@@ -93,6 +94,7 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] })  // entity 3 antropometrias
       .mockResolvedValueOnce({ recordset: [] })  // entity 4 lab_panels
       .mockResolvedValueOnce({ recordset: [] })  // entity 5 planes
+      .mockResolvedValueOnce({ recordset: [] })  // entity 6 adherence_records
       .mockResolvedValueOnce(time);                // final time
 
     const r = await pullChanges('s1', new Date(0), null);
@@ -426,7 +428,7 @@ describe('syncService.pushBatch', () => {
           expectedRowVersion: 'AAA=',
         },
       ],
-    });
+    }, TEST_PROFESIONAL);
     expect(r.results[0]!.status).toBe('conflict');
   });
 
@@ -447,7 +449,7 @@ describe('syncService.pushBatch', () => {
           clientUpdatedAt: '2026-06-04T00:00:00.000Z',
         },
       ],
-    });
+    }, TEST_PROFESIONAL);
     expect(r.results[0]!.status).toBe('applied');
     const updateSql = mockRequestQuery.mock.calls[1]![0] as string;
     expect(updateSql).toContain('UPDATE pacientes');
@@ -563,4 +565,3 @@ describe('syncService.pushBatch', () => {
     expect(r.results[0]!.error).toContain('not found');
   });
 });
-
