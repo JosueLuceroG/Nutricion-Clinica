@@ -38,7 +38,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     await page.locator('input[name="email"]').fill(email);
 
     // 3) Submit
-    const submit = page.getByRole("button", { name: /guardar|crear|siguiente/i }).first();
+    const submit = page.getByRole("button", { name: /guardar|crear paciente|create patient|siguiente/i }).first();
     await submit.click();
 
     // Tras crear, redirige al detalle del paciente
@@ -48,7 +48,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     expect(patientId).toBeTruthy();
 
     // 4) Disparar sync manual (botón "Sincronizar" en el StatusBar)
-    const syncBtn = page.getByRole("button", { name: /^Sincronizar$/i });
+    const syncBtn = page.getByRole("button", { name: /^(Sincronizar|Forzar un ciclo de sync ahora)$/i });
     await syncBtn.click();
     // Esperar a que vuelva a "Sincronizado" (o a idle)
     await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({

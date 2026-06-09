@@ -88,7 +88,7 @@ test.describe.serial("Billing — marcar consulta como pagada desde el detalle",
 
     // 2) Login en la UI y disparar sync para bajarla
     await loginAsAdmin(page);
-    const syncBtn = page.getByRole("button", { name: /^Sincronizar$/i });
+    const syncBtn = page.getByRole("button", { name: /^(Sincronizar|Forzar un ciclo de sync ahora)$/i });
 
     // Esperar a que la pull request termine y verificar que incluye nuestra consulta
     const pullPromise = page.waitForResponse(
@@ -111,13 +111,13 @@ test.describe.serial("Billing — marcar consulta como pagada desde el detalle",
     // 4) Verificar que el botón "Marcar pagada" está visible
     const markPaid = page.getByTestId("mark-paid-detail");
     await expect(markPaid).toBeVisible({ timeout: 10_000 });
-    await expect(markPaid).toHaveText(/Marcar pagada/i);
+    await expect(markPaid).toHaveText(/Marcar( como)? pagada/i);
 
     // 5) Click → dialog abre
     await markPaid.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/Marcar pagada/i).first()).toBeVisible();
+    await expect(dialog.getByText(/Registrar pago|Marcar( como)? pagada/i).first()).toBeVisible();
 
     // 6) Llenar método de pago (requerido) y referencia
     const methodTrigger = page.getByTestId("paid-method");
@@ -126,7 +126,7 @@ test.describe.serial("Billing — marcar consulta como pagada desde el detalle",
     await page.getByTestId("paid-reference").fill("E2E-001");
 
     // 7) Submit
-    await dialog.getByRole("button", { name: /Marcar pagada|Guardando/i }).click();
+    await dialog.getByRole("button", { name: /Marcar( como)? pagada|Guardando/i }).click();
 
     // 8) Dialog cierra y la UI refleja el pago
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });

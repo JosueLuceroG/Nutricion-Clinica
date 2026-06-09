@@ -44,7 +44,7 @@ export function useAI() {
         setBusy(false);
       }
     },
-    [],
+    [i18n.language],
   );
 
   const cancel = React.useCallback(() => {

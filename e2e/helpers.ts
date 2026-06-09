@@ -31,13 +31,11 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     timeout: 15_000,
   });
   await page.getByLabel(/Correo electr[oó]nico/i).fill(ADMIN_EMAIL);
-  await page.getByLabel(/Contrase[ñn]a/i).fill(ADMIN_PASSWORD);
-  // Botón "Ingresar" / "Ingresando…" — match exacto para no chocar con "Mostrar/Ocultar" de password.
-  await page.getByRole("button", { name: /^Ingresar/i }).click();
+  await page.getByRole("textbox", { name: /Contrase[ñn]a/i }).fill(ADMIN_PASSWORD);
+  await page.getByRole("button", { name: /^(Iniciar sesión|Log in)$/i }).click();
   // El router redirige al Panel tras login OK
   await page.waitForURL((url) => url.hash !== "#/login", { timeout: 15_000 });
-  // El Dashboard tiene un header "Panel" en el PageHeader (también es div, usamos text).
-  await expect(page.getByText(/^Panel$/).first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole("heading", { name: /^(Dashboard|Panel)$/i })).toBeVisible({ timeout: 10_000 });
 }
 
 /** Genera un email único para no chocar con datos existentes en la DB. */

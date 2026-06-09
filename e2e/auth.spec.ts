@@ -4,8 +4,7 @@ import { loginAsAdmin, hashUrl, ADMIN_EMAIL } from "./helpers";
 test.describe("Auth", () => {
   test("flujo de login con credenciales válidas redirige al Panel", async ({ page }) => {
     await loginAsAdmin(page);
-    // El Sidebar tiene el link "Panel" y el PageHeader del Dashboard dice "Panel"
-    await expect(page.getByText(/^Panel$/).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^(Dashboard|Panel)$/i })).toBeVisible();
     // La URL debe cambiar a #
     expect(page.url()).toContain("#/");
     expect(page.url()).not.toContain("#/login");
@@ -17,8 +16,8 @@ test.describe("Auth", () => {
       timeout: 15_000,
     });
     await page.getByLabel(/Correo electr[oó]nico/i).fill(ADMIN_EMAIL);
-    await page.getByLabel(/Contrase[ñn]a/i).fill("WRONG-PASSWORD-1234!");
-    await page.getByRole("button", { name: /^Ingresar/i }).click();
+    await page.getByRole("textbox", { name: /Contrase[ñn]a/i }).fill("WRONG-PASSWORD-1234!");
+    await page.getByRole("button", { name: /^(Iniciar sesión|Log in)$/i }).click();
     // El alert de error aparece (role=alert) y la URL sigue siendo /login.
     await expect(page.getByRole("alert")).toBeVisible({ timeout: 5_000 });
     expect(page.url()).toContain("#/login");
