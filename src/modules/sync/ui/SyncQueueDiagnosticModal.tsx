@@ -11,6 +11,7 @@
 import * as React from "react";
 import { Clipboard, RefreshCw, Trash2, X, AlertCircle, Database, XCircle, Wrench } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ export function SyncQueueDiagnosticModal({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = React.useState<QueueItemView[]>([]);
   const [loading, setLoading] = React.useState(false);
 
@@ -80,12 +82,12 @@ export function SyncQueueDiagnosticModal({
   }, [open, refresh]);
 
   const handleClearAll = async () => {
-    if (!window.confirm("¿Vaciar la cola? Los datos en Dexie NO se borran, solo los items pendientes del push.")) {
+    if (!window.confirm(t("sync.clear_queue_confirm"))) {
       return;
     }
     await db.sync_queue.clear();
     useSyncStore.getState().setPendingChanges(0);
-    toast.success("Cola vaciada");
+    toast.success(t("sync.queue_cleared"));
     void refresh();
   };
 
@@ -94,16 +96,16 @@ export function SyncQueueDiagnosticModal({
     for (const it of errorItems) {
       await db.sync_queue.update(it.id, { status: "pending", lastError: null });
     }
-    toast.info(`${errorItems.length} item(s) puestos en pending`, {
-      description: "Ejecutá \"Sincronizar\" para reintentar.",
+    toast.info(t("sync.items_pending", { count: errorItems.length }), {
+      description: t("sync.retry_hint"),
     });
     void refresh();
   };
 
   const handleDiscard = async (itemId: string, entity: string) => {
     await db.sync_queue.delete(itemId);
-    toast.success(`${entity} descartado`, {
-      description: "El item se eliminó de la cola. La fila en Dexie NO se borró.",
+    toast.success(t("sync.item_discarded", { entity }), {
+      description: t("sync.discard_desc"),
     });
     void refresh();
   };
@@ -117,15 +119,15 @@ export function SyncQueueDiagnosticModal({
       .join("\n");
     try {
       await navigator.clipboard.writeText(text || "(cola vacía)");
-      toast.success("Copiado al portapapeles");
+      toast.success(t("sync.clipboard_copied"));
     } catch {
-      toast.error("No se pudo copiar", { description: "Seleccioná manualmente y copiá." });
+      toast.error(t("sync.copy_error"), { description: t("sync.copy_manually") });
     }
   };
 
   const handleSyncNow = async () => {
     if (!useAuthStore.getState().isAuthenticated) {
-      toast.error("No autenticado");
+      toast.error(t("sync.not_authenticated"));
       return;
     }
     const engine = getSyncEngine(db);
@@ -139,20 +141,20 @@ export function SyncQueueDiagnosticModal({
     try {
       const result = await repairCorruptDateRows();
       if (result.repaired === 0) {
-        toast.info("Sin fechas corruptas", {
-          description: `Escaneadas ${result.scanned} filas en ${Object.keys(result.byTable).length} tablas.`,
+        toast.info(t("sync.no_corrupt_dates"), {
+          description: t("sync.rows_scanned", { count: result.scanned, tables: Object.keys(result.byTable).length }),
         });
       } else {
         const byTable = Object.entries(result.byTable)
           .filter(([, v]) => v.repaired > 0)
           .map(([k, v]) => `${k}: ${v.repaired}`)
           .join(", ");
-        toast.success(`Reparadas ${result.repaired} fila(s)`, {
+        toast.success(t("sync.rows_repaired", { count: result.repaired }), {
           description: byTable,
         });
       }
     } catch (err) {
-      toast.error("No se pudo reparar", {
+      toast.error(t("sync.repair_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -170,39 +172,39 @@ export function SyncQueueDiagnosticModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
-            Cola de sincronización
+            {t("sync.queue_title")}
           </DialogTitle>
           <DialogDescription>
-            {items.length} item{items.length === 1 ? "" : "s"} total
-            {pendingCount > 0 && ` · ${pendingCount} pendiente${pendingCount === 1 ? "" : "s"}`}
-            {errorCount > 0 && ` · ${errorCount} con error`}
-            {conflictCount > 0 && ` · ${conflictCount} conflicto${conflictCount === 1 ? "" : "s"}`}
+            {t("sync.queue_total", { total: items.length })}
+            {pendingCount > 0 && ` · ${t("sync.queue_pending", { count: pendingCount })}`}
+            {errorCount > 0 && ` · ${t("sync.queue_errors", { count: errorCount })}`}
+            {conflictCount > 0 && ` · ${t("sync.queue_conflicts", { count: conflictCount })}`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2 border-b pb-3">
           <Button size="sm" variant="default" onClick={handleSyncNow} disabled={loading}>
             <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} />
-            Sincronizar
+            {t("sync.sync_now")}
           </Button>
           <Button size="sm" variant="outline" onClick={handleRetryAll} disabled={errorCount + conflictCount === 0}>
-            Reintentar errores
+            {t("sync.retry_errors")}
           </Button>
           <Button size="sm" variant="outline" onClick={handleCopy} disabled={items.length === 0}>
             <Clipboard className="h-3.5 w-3.5 mr-1.5" />
-            Copiar
+            {t("sync.copy")}
           </Button>
           <Button size="sm" variant="ghost" onClick={refresh} disabled={loading}>
-            Refrescar
+            {t("sync.refresh")}
           </Button>
           <Button size="sm" variant="outline" onClick={handleRepairDates} disabled={repairing}>
             <Wrench className={cn("h-3.5 w-3.5 mr-1.5", repairing && "animate-spin")} />
-            Reparar fechas
+            {t("sync.repair_dates")}
           </Button>
           <div className="ml-auto">
             <Button size="sm" variant="destructive" onClick={handleClearAll} disabled={items.length === 0}>
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              Vaciar cola
+              {t("sync.clear_queue")}
             </Button>
           </div>
         </div>
@@ -210,7 +212,7 @@ export function SyncQueueDiagnosticModal({
         <div className="flex-1 overflow-y-auto -mx-2 px-2">
           {items.length === 0 ? (
             <div className="py-12 text-center text-sm text-muted-foreground">
-              Cola vacía. Todos los cambios están sincronizados.
+              {t("sync.queue_empty_synced")}
             </div>
           ) : (
             <ul className="space-y-2 py-2">
@@ -254,7 +256,7 @@ export function SyncQueueDiagnosticModal({
                       type="button"
                       onClick={() => void handleDiscard(i.id, i.entity)}
                       className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      title="Descartar este item (lo borra de la cola; la fila en Dexie NO se borra)"
+                      title={t("sync.discard_item_title")}
                     >
                       <XCircle className="h-4 w-4" />
                     </button>
@@ -268,7 +270,7 @@ export function SyncQueueDiagnosticModal({
         <div className="flex justify-end border-t pt-3">
           <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
             <X className="h-3.5 w-3.5 mr-1.5" />
-            Cerrar
+            {t("common.close")}
           </Button>
         </div>
       </DialogContent>

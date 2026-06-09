@@ -16,7 +16,8 @@
 
 import type { NutriClinicaDB } from '@services/db/dexieSchema';
 import type { SyncQueueItem, SyncOp } from '@modules/sync/domain/SyncQueueItem';
-import { SYNCABLE_ENTITIES, type SyncableEntity, type SyncPushOperation, type SyncPullChange, type SyncPushResultItem } from '@nutriclinica/shared';
+import { SYNCABLE_ENTITIES, type SyncableEntity } from '@nutriclinica/shared';
+import type { SyncPullChange, SyncPushOperation, SyncPushResultItem } from '@nutriclinica/shared';
 import { SYNC_SCHEMA_VERSION } from '@nutriclinica/shared';
 import { type SyncQueueRepository } from './syncQueueRepository.js';
 import { setSyncApplying } from './syncEnqueuer.js';
@@ -140,10 +141,13 @@ export class SyncEngine {
       });
       this.emit({ type: 'done', durationMs: Date.now() - start });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
+      const syncErr = err instanceof HttpError && err.status === 401
+        ? new SyncAuthError('Sesión expirada. Inicia sesión de nuevo.')
+        : err;
+      const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
       this.setSyncStore({ status: 'error', lastError: msg });
       this.emit({ type: 'error', error: msg });
-      throw err;
+      throw syncErr;
     } finally {
       this.running = false;
     }
@@ -189,6 +193,10 @@ export class SyncEngine {
   }
 
   private async pushPending(sucursalId: string): Promise<{ sent: number; applied: number; conflicts: number; errors: number }> {
+    // Limpieza automática de items con entityId malformado ([object)
+    // que quedaron de versiones anteriores del enqueuer.
+    await this.deps.queue.clearStale();
+
     const pending = await this.deps.queue.listPending();
     if (pending.length === 0) {
       return { sent: 0, applied: 0, conflicts: 0, errors: 0 };

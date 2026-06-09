@@ -2,6 +2,7 @@ import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Plus, Activity, Trash2, Calendar } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
@@ -17,6 +18,7 @@ import { calculateBMI, BMICategoryLabel, BMICategoryColor } from "@utils/calcula
 import { bodyFatFromBMI, waistHipRisk } from "@utils/calculations/bodyComposition";
 
 export function PatientMeasurementsPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const id = React.useMemo(
@@ -27,13 +29,13 @@ export function PatientMeasurementsPage() {
   const { data, loading, error, reload } = usePatientMeasurements(id);
 
   const onDelete = async (anthropometryId: AnthropometryId) => {
-    if (!confirm("¿Eliminar esta medición? Esta acción no se puede deshacer.")) return;
+    if (!confirm(`${t("anthropometry.delete_confirm")} ${t("anthropometry.delete_warning")}`)) return;
     try {
       await anthropometryService.delete.execute(anthropometryId, true);
-      toast.success("Medición eliminada");
+      toast.success(t("anthropometry.delete"));
       reload();
     } catch (err) {
-      toast.error("No se pudo eliminar", {
+      toast.error(t("common.error_occurred"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -42,7 +44,7 @@ export function PatientMeasurementsPage() {
   if (patientLoading || loading) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -57,7 +59,7 @@ export function PatientMeasurementsPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_occurred")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -68,11 +70,11 @@ export function PatientMeasurementsPage() {
   if (!patient) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.title_single") + " " + t("common.no_results")} />
         <PageContent>
           <EmptyState
-            title="El paciente no existe"
-            action={{ label: "Volver", onClick: () => navigate("/pacientes") }}
+            title={t("patient.detail") + " " + t("common.no_results")}
+            action={{ label: t("common.previous"), onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
       </>
@@ -85,20 +87,20 @@ export function PatientMeasurementsPage() {
   return (
     <>
       <PageHeader
-        title={`Mediciones · ${patient.fullName}`}
-        description={`${items.length} registro${items.length === 1 ? "" : "s"}`}
+        title={`${t("anthropometry.measurements")} · ${patient.fullName}`}
+        description={`${items.length} ${t("anthropometry.column_date")}${items.length === 1 ? "" : "s"}`}
         actions={
           <>
             <Button asChild variant="outline">
               <Link to={`/pacientes/${patient.id.toString()}`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al paciente
+                {t("common.previous")}
               </Link>
             </Button>
             <Button asChild>
               <Link to={`/pacientes/${patient.id.toString()}/antropometria/nueva`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nueva medición
+                {t("anthropometry.new")}
               </Link>
             </Button>
           </>
@@ -108,10 +110,10 @@ export function PatientMeasurementsPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={Activity}
-            title="Sin mediciones registradas"
-            description="Registra la primera toma antropométrica para iniciar el seguimiento."
+            title={t("anthropometry.no_measurements")}
+            description={t("anthropometry.no_measurements")}
             action={{
-              label: "Registrar primera medición",
+              label: t("anthropometry.new"),
               onClick: () => navigate(`/pacientes/${patient.id.toString()}/antropometria/nueva`),
             }}
           />
@@ -134,13 +136,13 @@ export function PatientMeasurementsPage() {
                           {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(m.measuredAt)}
                         </CardTitle>
                         <CardDescription>
-                          Peso {m.weight.toKg().toFixed(1)} kg · Talla {m.height.toCentimeters()} cm
+                          {t("anthropometry.column_weight")} {m.weight.toKg().toFixed(1)} kg · {t("anthropometry.height_cm")} {m.height.toCentimeters()} cm
                         </CardDescription>
                       </div>
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="Eliminar"
+                        aria-label={t("anthropometry.delete")}
                         onClick={() => onDelete(m.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -150,7 +152,7 @@ export function PatientMeasurementsPage() {
                   <CardContent>
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <Metric
-                        label="BMI"
+                        label={t("anthropometry.bmi")}
                         value={bmi.value.toFixed(1)}
                         badge={
                           <Badge variant={BMICategoryColor[bmi.category] as never}>

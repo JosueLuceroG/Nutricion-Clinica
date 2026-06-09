@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Pencil,
@@ -30,12 +31,23 @@ import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
 import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
 import { PatientId } from "@modules/patient/domain/PatientId";
-import { SexLabel } from "@modules/patient/domain/Sex";
-import { RecordStatusLabel } from "@modules/patient/domain/RecordStatus";
-import { PatientStatusLabel } from "@modules/patient/domain/PatientStatus";
+import type { RecordStatus } from "@modules/patient/domain/RecordStatus";
+import type { PatientStatus } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
 
+function patientStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: PatientStatus) {
+  if (status === "deceased") return t("patient.status_deceased");
+  return t(`common.${status}`);
+}
+
+function recordStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: RecordStatus) {
+  if (status === "discharged") return t("patient.record_discharged");
+  if (status === "referred") return t("patient.record_referred");
+  return t(`common.${status}`);
+}
+
 export function PatientDetailPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const id = React.useMemo(
@@ -53,9 +65,9 @@ export function PatientDetailPage() {
   const cascade = useCascadeDeletePatient({
     onComplete: (outcome) => {
       if (outcome === "deleted") {
-        toast.success("Paciente y entidades vinculadas eliminadas");
+        toast.success(t("patient.deleted_with_entities_success"));
       } else if (outcome === "archived") {
-        toast.success("Paciente archivado");
+        toast.success(t("patient.archived"));
       }
       // `replace: true` evita que el botón "atrás" del navegador traiga
       // de vuelta al paciente eliminado. Si por alguna razón el
@@ -65,7 +77,7 @@ export function PatientDetailPage() {
       navigate("/pacientes", { replace: true });
     },
     onError: (err) => {
-      toast.error("No se pudo completar la operación", {
+      toast.error(t("patient.operation_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     },
@@ -81,11 +93,11 @@ export function PatientDetailPage() {
     setBusy(true);
     try {
       await patientService.archive.execute(id);
-      toast.success("Paciente archivado");
+      toast.success(t("patient.archived"));
       setArchiveOpen(false);
       navigate("/pacientes", { replace: true });
     } catch (err) {
-      toast.error("No se pudo archivar", {
+      toast.error(t("patient.archive_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -96,7 +108,7 @@ export function PatientDetailPage() {
   if (loading && !patient) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-4">
             <Skeleton className="h-32 w-full" />
@@ -110,7 +122,7 @@ export function PatientDetailPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_title")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -121,16 +133,16 @@ export function PatientDetailPage() {
   if (!patient) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.not_found_title")} />
         <PageContent>
           <EmptyState
-            title="El paciente no existe"
+            title={t("patient.not_exists")}
             description={
               deleted
-                ? "Este paciente fue eliminado. La acción se puede revertir desde la cola de sincronización."
-                : "Es posible que haya sido eliminado o el enlace sea incorrecto."
+                ? t("patient.not_found_deleted_desc")
+                : t("patient.not_found_desc")
             }
-            action={{ label: "Volver a pacientes", onClick: () => navigate("/pacientes") }}
+            action={{ label: t("patient.back_to_patients"), onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
       </>
@@ -141,25 +153,25 @@ export function PatientDetailPage() {
     <>
       <PageHeader
         title={patient.fullName}
-        description={`Expediente ${patient.id.toString().slice(0, 8)}…`}
+        description={t("patient.record_short", { id: patient.id.toString().slice(0, 8) })}
         actions={
           <>
             <Button asChild variant="outline">
               <Link to="/pacientes">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver
+                {t("common.back")}
               </Link>
             </Button>
             <Button asChild variant="outline">
               <Link to={`/pacientes/${patient.id.toString()}/editar`}>
                 <Pencil className="mr-2 h-4 w-4" />
-                Editar
+                {t("common.edit")}
               </Link>
             </Button>
             {patient.status === "active" && (
               <Button variant="outline" onClick={onArchive} disabled={busy || cascade.busy || cascade.loadingCounts}>
                 <Archive className="mr-2 h-4 w-4" />
-                Archivar
+                {t("common.archive")}
               </Button>
             )}
             <Button
@@ -169,7 +181,7 @@ export function PatientDetailPage() {
               data-testid="delete-patient-button"
             >
               <Trash2 className="mr-2 h-4 w-4" />
-              {cascade.loadingCounts ? "Contando…" : "Eliminar"}
+              {cascade.loadingCounts ? t("common.counting") : t("common.delete")}
             </Button>
           </>
         }
@@ -180,23 +192,23 @@ export function PatientDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-4 w-4" />
-                Información del paciente
+                {t("layout.context_patient_title")}
               </CardTitle>
               <CardDescription>
-                Expediente {RecordStatusLabel[patient.recordStatus]} · Creado el {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.createdAt)}
+                {t("patient.record_created", { status: recordStatusLabel(t, patient.recordStatus), date: new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.createdAt) })}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <DetailRow label="Nombre completo" value={patient.fullName} />
-              <DetailRow label="Fecha de nacimiento" value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)} />
-              <DetailRow label="Edad" value={`${patient.age} años`} />
-              <DetailRow label="Sexo biológico" value={SexLabel[patient.sex]} />
-              {patient.occupation && <DetailRow label="Ocupación" value={patient.occupation} />}
+              <DetailRow label={t("patient.full_name")} value={patient.fullName} />
+              <DetailRow label={t("patient.birth_date")} value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)} />
+              <DetailRow label={t("patient.age")} value={t("patient.age_value", { age: patient.age })} />
+              <DetailRow label={t("patient.sex")} value={t(`patient.sex_${patient.sex}`)} />
+              {patient.occupation && <DetailRow label={t("patient.occupation")} value={patient.occupation} />}
               <DetailRow
-                label="Estado"
+                label={t("common.status")}
                 value={
                   <Badge variant={patient.isActive ? "success" : "secondary"}>
-                    {PatientStatusLabel[patient.status]}
+                    {patientStatusLabel(t, patient.status)}
                   </Badge>
                 }
               />
@@ -206,7 +218,7 @@ export function PatientDetailPage() {
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Contacto</CardTitle>
+                <CardTitle>{t("patient.contact")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {patient.email ? (
@@ -215,7 +227,7 @@ export function PatientDetailPage() {
                     {patient.email.toString()}
                   </a>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin correo</p>
+                  <p className="text-sm text-muted-foreground">{t("patient.no_email")}</p>
                 )}
                 {patient.phone ? (
                   <a href={`tel:${patient.phone.toString()}`} className="flex items-center gap-2 text-sm hover:underline">
@@ -223,18 +235,18 @@ export function PatientDetailPage() {
                     {patient.phone.toString()}
                   </a>
                 ) : (
-                  <p className="text-sm text-muted-foreground">Sin teléfono</p>
+                  <p className="text-sm text-muted-foreground">{t("patient.no_phone")}</p>
                 )}
                 {patient.secondaryPhone && (
                   <a href={`tel:${patient.secondaryPhone.toString()}`} className="flex items-center gap-2 text-sm hover:underline text-muted-foreground">
                     <Phone className="h-4 w-4" />
-                    {patient.secondaryPhone.toString()} (sec.)
+                    {t("patient.secondary_phone_value", { phone: patient.secondaryPhone.toString() })}
                   </a>
                 )}
                 <div className="border-t pt-3 text-xs text-muted-foreground">
                   <p className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Última actualización: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(patient.updatedAt)}
+                    {t("patient.last_update", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(patient.updatedAt) })}
                   </p>
                 </div>
               </CardContent>
@@ -245,7 +257,7 @@ export function PatientDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-sm">
                     <Heart className="h-4 w-4 text-rose-500" />
-                    Contacto de emergencia
+                    {t("patient.emergency_contact")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
@@ -266,7 +278,7 @@ export function PatientDetailPage() {
                 <CardHeader>
                   <CardTitle className="text-sm">
                     <FileText className="mr-1 h-3 w-3 inline" />
-                    Notas generales
+                    {t("patient.general_notes")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -280,7 +292,7 @@ export function PatientDetailPage() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-sm">
                     <Tags className="h-4 w-4" />
-                    Etiquetas clínicas
+                    {t("patient.clinical_tags")}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-wrap gap-1">
@@ -295,33 +307,33 @@ export function PatientDetailPage() {
 
         <Card className="mt-4">
           <CardHeader>
-            <CardTitle>Módulos clínicos</CardTitle>
-            <CardDescription>Información estructurada del paciente</CardDescription>
+            <CardTitle>{t("patient.clinical_modules")}</CardTitle>
+            <CardDescription>{t("patient.structured_info")}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:grid-cols-3">
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/consultas`}
               icon={ClipboardList}
-              label="Consultas"
-              hint="Historial clínico y wizard SOAP"
+              label={t("consultation.title")}
+              hint={t("patient.module_consultations_hint")}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/antropometria`}
               icon={Activity}
-              label="Antropometría"
-              hint="Mediciones, BMI, composición corporal"
+              label={t("anthropometry.title")}
+              hint={t("patient.module_anthropometry_hint")}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/laboratorio`}
               icon={FlaskConical}
-              label="Laboratorio"
-              hint="Indicadores bioquímicos y cálculos derivados"
+              label={t("lab.title")}
+              hint={t("patient.module_lab_hint")}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/planes`}
               icon={UtensilsCrossed}
-              label="Planes alimentarios"
-              hint="Diseño basado en SMAE 5ª edición"
+              label={t("mealplan.title")}
+              hint={t("patient.module_meal_plans_hint")}
             />
           </CardContent>
         </Card>
@@ -332,9 +344,9 @@ export function PatientDetailPage() {
       <ConfirmDialog
         open={archiveOpen}
         onOpenChange={setArchiveOpen}
-        title={`¿Archivar a ${patient.fullName}?`}
-        description="El paciente se ocultará de los listados activos, pero su expediente clínico se conserva. Podés revertir esta acción más tarde."
-        confirmLabel="Archivar"
+        title={t("patient.archive_title", { name: patient.fullName })}
+        description={t("patient.archive_desc")}
+        confirmLabel={t("common.archive")}
         tone="warning"
         busy={busy}
         onConfirm={executeArchive}

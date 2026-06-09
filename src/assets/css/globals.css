@@ -32,7 +32,7 @@
 
     /* === Muted === */
     --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
+    --muted-foreground: 240 4% 40%;
 
     /* === Accent === */
     --accent: 240 5% 96%;
@@ -45,7 +45,7 @@
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 84% 50%;
     --destructive-foreground: 0 0% 100%;
 
     /* === Borders & inputs === */

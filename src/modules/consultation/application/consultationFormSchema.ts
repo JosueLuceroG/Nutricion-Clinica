@@ -1,4 +1,5 @@
 import { z } from "zod";
+import i18n from "../../../i18n/config";
 
 /**
  * Esquema Zod para el wizard de consulta.
@@ -20,7 +21,7 @@ const optionalText = (max: number) =>
       z
         .string()
         .trim()
-        .max(max, `Máximo ${max} caracteres`)
+        .max(max, i18n.t("errors.max_chars_field", { max }))
         .optional()
         .or(z.literal(""))
         .transform((v) => (v && v.length > 0 ? v : null)),
@@ -47,17 +48,17 @@ export const ConsultationFormSchema = z
   .object({
     consultationDate: z
       .string()
-      .min(1, "Requerido")
-      .refine((v) => !Number.isNaN(new Date(v).getTime()), "Fecha inválida")
+      .min(1, i18n.t("errors.required"))
+      .refine((v) => !Number.isNaN(new Date(v).getTime()), i18n.t("errors.invalid_date"))
       .refine(
         (v) => new Date(v).getTime() <= Date.now() + 24 * 60 * 60 * 1000,
-        "No puede estar más de 1 día en el futuro",
+        i18n.t("errors.future_date_limit"),
       ),
     reason: z
       .string()
       .trim()
-      .min(3, "Mínimo 3 caracteres")
-      .max(500, "Máximo 500 caracteres"),
+      .min(3, i18n.t("errors.min_chars", { n: 3 }))
+      .max(500, i18n.t("errors.max_chars", { n: 500 })),
     subjective: optionalText(4000),
     objective: optionalText(4000),
     vitalsTaken: z.boolean().default(false),
@@ -71,10 +72,10 @@ export const ConsultationFormSchema = z
       z
         .string()
         .optional()
-        .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Fecha inválida")
+        .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), i18n.t("errors.invalid_date"))
         .refine(
           (v) => !v || new Date(v).getTime() >= Date.now() - 24 * 60 * 60 * 1000,
-          "La próxima cita no puede estar en el pasado",
+          i18n.t("errors.past_date"),
         ),
     ),
   })
@@ -97,12 +98,12 @@ export const consultationFormDefaultValues: ConsultationFormValues = {
 };
 
 export const WIZARD_STEPS = [
-  { id: 1, key: "basics", title: "Datos básicos", fields: ["consultationDate", "reason"] as const },
-  { id: 2, key: "subjective", title: "Subjetivo", fields: ["subjective"] as const },
-  { id: 3, key: "objective", title: "Objetivo", fields: ["vitalsTaken", "objective"] as const },
-  { id: 4, key: "lab", title: "Laboratorio", fields: ["labPanelId"] as const },
-  { id: 5, key: "plan", title: "Diagnóstico y plan", fields: ["assessment", "plan", "nextVisitDate"] as const },
-  { id: 6, key: "review", title: "Revisión", fields: [] as readonly string[] },
+  { id: 1, key: "basics", title: i18n.t("consultation.step_basic_data"), fields: ["consultationDate", "reason"] as const },
+  { id: 2, key: "subjective", title: i18n.t("consultation.step_subjective"), fields: ["subjective"] as const },
+  { id: 3, key: "objective", title: i18n.t("consultation.step_objective"), fields: ["vitalsTaken", "objective"] as const },
+  { id: 4, key: "lab", title: i18n.t("consultation.step_lab"), fields: ["labPanelId"] as const },
+  { id: 5, key: "plan", title: i18n.t("consultation.step_diagnosis"), fields: ["assessment", "plan", "nextVisitDate"] as const },
+  { id: 6, key: "review", title: i18n.t("consultation.step_review"), fields: [] as readonly string[] },
 ] as const;
 
 export type WizardStepKey = (typeof WIZARD_STEPS)[number]["key"];

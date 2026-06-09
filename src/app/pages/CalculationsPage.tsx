@@ -1,25 +1,25 @@
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
+import { useTranslation } from "react-i18next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 
 export function CalculationsPage() {
+  const { t } = useTranslation();
   return (
     <>
       <PageHeader
-        title="Cálculos clínicos"
-        description="Calculadoras nutricionales validadas"
+        title={t("calculations.clinical_title")}
+        description={t("calculations.page_description")}
       />
       <PageContent>
         <Card>
           <CardHeader>
-            <CardTitle>Calculadoras</CardTitle>
+            <CardTitle>{t("calculations.calculators")}</CardTitle>
             <CardDescription>
-              BMI, BMR (Harris-Benedict, Mifflin-St Jeor), TDEE, distribución
-              de macronutrientes. Pendiente de UI.
+              {t("calculations.pending_ui_description")}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            Las funciones puras están en <code>src/utils/calculations/</code> con
-            pruebas unitarias.
+            {t("calculations.pure_functions_hint", { path: "src/utils/calculations/" })}
           </CardContent>
         </Card>
       </PageContent>

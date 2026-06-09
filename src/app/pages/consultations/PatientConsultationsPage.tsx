@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Plus, ClipboardList, Calendar, Activity, Trash2, User, DollarSign, Receipt } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -13,14 +14,19 @@ import { usePatientConsultations } from "@modules/consultation/ui/useConsultatio
 import { PatientId } from "@modules/patient/domain/PatientId";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
-import { ConsultationStatusLabel, ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
+import { ConsultationStatusColor, type ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
 import { consultationService } from "@services/consultationService";
 import { useUIStore } from "@store/uiStore";
 import { hasAnyRole, BILLING_ROLES } from "@modules/auth/authRoles";
 import { useAuthStore } from "@store/authStore";
 
+function consultationStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: ConsultationStatus) {
+  return t(`consultation.status_${status.replace("-", "_")}`);
+}
+
 export function PatientConsultationsPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const id = React.useMemo(
@@ -36,13 +42,13 @@ export function PatientConsultationsPage() {
   const [paidTarget, setPaidTarget] = React.useState<Consultation | null>(null);
 
   const onDelete = async (consultationId: ConsultationId) => {
-    if (!confirm("¿Eliminar esta consulta? Esta acción no se puede deshacer.")) return;
+    if (!confirm(t("consultation.delete_confirm"))) return;
     try {
       await consultationService.delete.execute(consultationId, true);
-      toast.success("Consulta eliminada");
+      toast.success(t("consultation.deleted_success"));
       reload();
     } catch (err) {
-      toast.error("No se pudo eliminar", {
+      toast.error(t("consultation.delete_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -51,7 +57,7 @@ export function PatientConsultationsPage() {
   if (patientLoading || loading) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -66,7 +72,7 @@ export function PatientConsultationsPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_title")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -77,11 +83,11 @@ export function PatientConsultationsPage() {
   if (!patient) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.not_found_title")} />
         <PageContent>
           <EmptyState
-            title="El paciente no existe"
-            action={{ label: "Volver", onClick: () => navigate("/pacientes") }}
+            title={t("patient.not_exists")}
+            action={{ label: t("common.back"), onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
       </>
@@ -94,20 +100,20 @@ export function PatientConsultationsPage() {
   return (
     <>
       <PageHeader
-        title={`Consultas · ${patient.fullName}`}
-        description={`${items.length} consulta${items.length === 1 ? "" : "s"} registrada${items.length === 1 ? "" : "s"}`}
+        title={t("consultation.patient_consultations", { patientName: patient.fullName })}
+        description={t("consultation.count_registered", { count: items.length })}
         actions={
           <>
             <Button asChild variant="outline">
               <Link to={`/pacientes/${patient.id.toString()}`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al paciente
+                {t("patient.back_to_patient")}
               </Link>
             </Button>
             <Button asChild>
               <Link to={`/pacientes/${patient.id.toString()}/consultas/nueva`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nueva consulta
+                {t("consultation.new")}
               </Link>
             </Button>
           </>
@@ -117,10 +123,10 @@ export function PatientConsultationsPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title="Sin consultas registradas"
-            description="Inicia el historial clínico del paciente con su primera consulta nutricional."
+            title={t("consultation.no_patient_consultations")}
+            description={t("consultation.first_consultation_desc")}
             action={{
-              label: "Registrar primera consulta",
+              label: t("consultation.register_first"),
               onClick: () => navigate(`/pacientes/${patient.id.toString()}/consultas/nueva`),
             }}
           />
@@ -135,7 +141,7 @@ export function PatientConsultationsPage() {
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                         {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(c.consultationDate)}
                         <span className="ml-2 text-xs text-muted-foreground">
-                          · Consulta #{c.consultationNumber}
+                          · {t("consultation.consultation_number", { number: c.consultationNumber })}
                         </span>
                       </CardTitle>
                       <CardDescription>
@@ -144,23 +150,23 @@ export function PatientConsultationsPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant={ConsultationStatusColor[c.status] as never}>
-                        {ConsultationStatusLabel[c.status]}
+                        {consultationStatusLabel(t, c.status)}
                       </Badge>
                       {c.isPaid ? (
                         <Badge variant="success">
                           <DollarSign className="mr-1 h-3 w-3" />
-                          Pagada
+                          {t("consultation.paid")}
                         </Badge>
                       ) : c.cost > 0 ? (
                         <Badge variant="warning">
                           <DollarSign className="mr-1 h-3 w-3" />
-                          Pendiente
+                          {t("consultation.unpaid")}
                         </Badge>
                       ) : null}
                       <Button
                         variant="ghost"
                         size="icon-sm"
-                        aria-label="Eliminar"
+                        aria-label={t("common.delete")}
                         onClick={() => onDelete(c.id)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -171,27 +177,27 @@ export function PatientConsultationsPage() {
                 <CardContent>
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {c.subjective && (
-                      <DetailPreview label="Subjetivo" value={c.subjective} />
+                      <DetailPreview label={t("consultation.subjective")} value={c.subjective} />
                     )}
                     {c.assessment && (
-                      <DetailPreview label="Diagnóstico" value={c.assessment} />
+                      <DetailPreview label={t("consultation.assessment")} value={c.assessment} />
                     )}
                     {c.plan && (
-                      <DetailPreview label="Plan" value={c.plan} />
+                      <DetailPreview label={t("consultation.plan")} value={c.plan} />
                     )}
                     <div className="flex flex-col gap-1.5">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Vínculos</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{t("consultation.links_title")}</p>
                       <div className="flex flex-wrap gap-1.5">
                         {c.anthropometryId && (
                           <Badge variant="info">
                             <Activity className="mr-1 h-3 w-3" />
-                            Antropometría
+                            {t("anthropometry.title")}
                           </Badge>
                         )}
                         {c.labPanelId && (
                           <Badge variant="info">
                             <ClipboardList className="mr-1 h-3 w-3" />
-                            Laboratorio
+                            {t("lab.title")}
                           </Badge>
                         )}
                         {!c.anthropometryId && !c.labPanelId && (
@@ -200,7 +206,7 @@ export function PatientConsultationsPage() {
                       </div>
                       {c.nextVisitDate && (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Próxima: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short" }).format(c.nextVisitDate)}
+                          {t("consultation.next_visit_short", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "short" }).format(c.nextVisitDate) })}
                         </p>
                       )}
                     </div>
@@ -208,7 +214,7 @@ export function PatientConsultationsPage() {
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                     <p className="flex items-center gap-1 text-xs text-muted-foreground">
                       <User className="h-3 w-3" />
-                      Paciente: {patient.fullName}
+                      {t("patient.label_with_name", { name: patient.fullName })}
                     </p>
                     <div className="flex flex-wrap items-center gap-2">
                       {canManagePayment && (
@@ -219,19 +225,19 @@ export function PatientConsultationsPage() {
                           data-testid={`mark-paid-${c.id.toString()}`}
                         >
                           <DollarSign className="mr-1 h-4 w-4" />
-                          {c.isPaid ? "Editar pago" : "Marcar pagada"}
+                          {c.isPaid ? t("consultation.edit_payment") : t("consultation.mark_as_paid")}
                         </Button>
                       )}
                       {c.isPaid && (
                         <Button asChild variant="ghost" size="sm">
                           <Link to={`/billing/${c.id.toString()}/receipt`}>
                             <Receipt className="mr-1 h-4 w-4" />
-                            Recibo
+                            {t("billing.receipt_title")}
                           </Link>
                         </Button>
                       )}
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/consultas/${c.id.toString()}`}>Ver detalle completo</Link>
+                        <Link to={`/consultas/${c.id.toString()}`}>{t("consultation.view_full_detail")}</Link>
                       </Button>
                     </div>
                   </div>
@@ -247,7 +253,7 @@ export function PatientConsultationsPage() {
         onClose={() => setPaidTarget(null)}
         onSaved={() => {
           setPaidTarget(null);
-          toast.success("Pago registrado");
+          toast.success(t("consultation.payment_registered"));
           reload();
         }}
       />

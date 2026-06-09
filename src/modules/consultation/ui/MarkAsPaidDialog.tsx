@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -20,7 +21,6 @@ import { Textarea } from "@components/ui/textarea";
 import { Label } from "@components/ui/label";
 import {
   PAYMENT_METHODS,
-  PAYMENT_METHOD_LABELS,
   type PaymentMethod,
 } from "@modules/consultation/domain/PaymentMethod";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
@@ -70,6 +70,7 @@ export const MarkAsPaidDialog = ({
   onClose,
   onSaved,
 }: MarkAsPaidDialogProps) => {
+  const { t } = useTranslation();
   const [form, setForm] = useState<FormState>(() => defaultForm(consultation));
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -91,18 +92,18 @@ export const MarkAsPaidDialog = ({
 
       const costRaw = form.cost.trim();
       if (costRaw === "") {
-        setError("Indica el costo de la consulta.");
+        setError(t("consultation.cost") + " " + t("errors.required").toLowerCase());
         return;
       }
       const cost = Number(costRaw);
       if (!Number.isFinite(cost) || cost < 0) {
-        setError("El costo debe ser un número >= 0.");
+        setError(t("consultation.cost") + " " + t("errors.must_be_integer").toLowerCase());
         return;
       }
 
       const paidAtDate = form.paidAt ? new Date(form.paidAt) : null;
       if (!paidAtDate || Number.isNaN(paidAtDate.getTime())) {
-        setError("Indica la fecha de pago.");
+        setError(t("consultation.payment_date") + " " + t("errors.required").toLowerCase());
         return;
       }
 
@@ -118,7 +119,7 @@ export const MarkAsPaidDialog = ({
       });
       onSaved(updated);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "No se pudo registrar el pago.";
+      const msg = err instanceof Error ? err.message : t("common.error_occurred");
       setError(msg);
     } finally {
       setBusy(false);
@@ -135,17 +136,17 @@ export const MarkAsPaidDialog = ({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Registrar pago</DialogTitle>
+          <DialogTitle>{t("consultation.register_payment")}</DialogTitle>
           <DialogDescription>
             {consultation
-              ? `Consulta #${consultation.consultationNumber} — ${consultation.reason}`
+              ? `${t("consultation.consultation_number", { number: consultation.consultationNumber })} — ${consultation.reason}`
               : ""}
           </DialogDescription>
         </DialogHeader>
         <form id="mark-paid-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="paid-cost">Costo (MXN)</Label>
+              <Label htmlFor="paid-cost">{t("consultation.cost")} (MXN)</Label>
               <Input
                 id="paid-cost"
                 type="number"
@@ -158,7 +159,7 @@ export const MarkAsPaidDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="paid-method">Método de pago</Label>
+              <Label htmlFor="paid-method">{t("consultation.payment_method")}</Label>
               <Select
                 value={form.paymentMethod}
                 onValueChange={(v) =>
@@ -171,7 +172,7 @@ export const MarkAsPaidDialog = ({
                 <SelectContent>
                   {PAYMENT_METHODS.map((m) => (
                     <SelectItem key={m} value={m}>
-                      {PAYMENT_METHOD_LABELS[m]}
+                      {t(`consultation.method_${m}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -181,7 +182,7 @@ export const MarkAsPaidDialog = ({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="paid-at">Fecha de pago</Label>
+              <Label htmlFor="paid-at">{t("consultation.payment_date")}</Label>
               <Input
                 id="paid-at"
                 type="date"
@@ -192,7 +193,7 @@ export const MarkAsPaidDialog = ({
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="paid-reference">Referencia</Label>
+              <Label htmlFor="paid-reference">{t("common.description")}</Label>
               <Input
                 id="paid-reference"
                 value={form.reference}
@@ -204,20 +205,20 @@ export const MarkAsPaidDialog = ({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="paid-invoice">Nº de factura (opcional)</Label>
+            <Label htmlFor="paid-invoice">{t("common.optional")} ({t("common.type")})</Label>
             <Input
               id="paid-invoice"
               value={form.invoiceNumber}
               onChange={(e) =>
                 setForm((f) => ({ ...f, invoiceNumber: e.target.value }))
               }
-              placeholder="CFDI no se emite automáticamente"
+              placeholder={t("consultation.invoice_placeholder")}
               data-testid="paid-invoice"
             />
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="paid-notes">Notas (opcional)</Label>
+            <Label htmlFor="paid-notes">{t("consultation.payment_notes_optional")}</Label>
             <Textarea
               id="paid-notes"
               value={form.billingNotes}
@@ -236,8 +237,7 @@ export const MarkAsPaidDialog = ({
           )}
 
           <p className="text-xs text-gray-500">
-            Este documento <strong>no es un CFDI</strong>. La facturación
-            electrónica ante el SAT es responsabilidad del profesional.
+            {t("consultation.cfdi_disclaimer_prefix")} <strong>{t("consultation.cfdi_disclaimer_strong")}</strong>. {t("consultation.cfdi_disclaimer_suffix")}
           </p>
         </form>
         <DialogFooter>
@@ -247,7 +247,7 @@ export const MarkAsPaidDialog = ({
             onClick={onClose}
             disabled={busy}
           >
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
@@ -255,10 +255,10 @@ export const MarkAsPaidDialog = ({
             disabled={busy}
           >
             {busy
-              ? "Guardando…"
+              ? t("common.saving")
               : consultation?.paid
-                ? "Actualizar pago"
-                : "Marcar pagada"}
+                ? t("consultation.update_payment")
+                : t("consultation.mark_as_paid")}
           </Button>
         </DialogFooter>
       </DialogContent>

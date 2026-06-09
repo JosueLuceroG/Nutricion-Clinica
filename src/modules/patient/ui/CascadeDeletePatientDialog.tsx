@@ -6,6 +6,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@components/ui/dialog";
+import { useTranslation } from "react-i18next";
 import { Button } from "@components/ui/button";
 import { Archive, Trash2, AlertTriangle } from "lucide-react";
 import type { LinkedCounts } from "../application/patientUseCases";
@@ -47,6 +48,7 @@ export function CascadeDeletePatientDialog({
   onArchive,
   onDeleteAll,
 }: CascadeDeletePatientDialogProps) {
+  const { t } = useTranslation();
   const total = totalCounts(counts);
 
   return (
@@ -61,41 +63,38 @@ export function CascadeDeletePatientDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-amber-500" aria-hidden />
-            Eliminar paciente
+            {t("patient.cascade_delete_title")}
           </DialogTitle>
           <DialogDescription>
-            <span className="font-medium text-foreground">{patientName}</span> tiene entidades
-            vinculadas. Decide qué hacer con su historial clínico.
+            {t("patient.cascade_dialog_desc", { name: patientName })}
           </DialogDescription>
         </DialogHeader>
 
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
           {loading ? (
-            <p className="text-muted-foreground">Contando entidades vinculadas…</p>
+            <p className="text-muted-foreground">{t("patient.counting_linked_entities")}</p>
           ) : counts ? (
             <ul className="space-y-1">
-              <li>• {counts.consultations} consulta{counts.consultations === 1 ? "" : "s"}</li>
-              <li>• {counts.mealPlans} plan{counts.mealPlans === 1 ? "" : "es"} alimenticio{counts.mealPlans === 1 ? "" : "s"}</li>
-              <li>• {counts.labPanels} panel{counts.labPanels === 1 ? "" : "es"} de laboratorio</li>
-              <li>• {counts.anthropometry} registro{counts.anthropometry === 1 ? "" : "s"} de antropometría</li>
+              <li>• {t("patient.linked_consultations", { count: counts.consultations })}</li>
+              <li>• {t("patient.linked_meal_plans", { count: counts.mealPlans })}</li>
+              <li>• {t("patient.linked_lab_panels", { count: counts.labPanels })}</li>
+              <li>• {t("patient.linked_anthropometry", { count: counts.anthropometry })}</li>
               <li className="pt-1 font-medium text-amber-900 dark:text-amber-200">
-                Total: {total} entidad{total === 1 ? "" : "es"}
+                {t("patient.linked_total", { count: total })}
               </li>
             </ul>
           ) : (
-            <p className="text-muted-foreground">No se pudo contar las entidades vinculadas.</p>
+            <p className="text-muted-foreground">{t("patient.count_linked_error")}</p>
           )}
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Archivar preserva el historial clínico (el paciente y sus entidades quedan ocultos
-          del panel). Eliminar todo borra lógicamente el paciente y todas sus entidades; el
-          cambio se sincroniza con el servidor.
+          {t("patient.cascade_explanation")}
         </p>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={onCancel} disabled={busy}>
-            Cancelar
+            {t("common.cancel")}
           </Button>
           <Button
             variant="secondary"
@@ -104,7 +103,7 @@ export function CascadeDeletePatientDialog({
             data-testid="cascade-archive"
           >
             <Archive className="mr-2 h-4 w-4" aria-hidden />
-            Archivar
+            {t("common.archive")}
           </Button>
           <Button
             variant="destructive"
@@ -113,7 +112,7 @@ export function CascadeDeletePatientDialog({
             data-testid="cascade-delete-all"
           >
             <Trash2 className="mr-2 h-4 w-4" aria-hidden />
-            Eliminar todo
+            {t("patient.delete_all")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import i18n from "../../../i18n/config";
 import { FoodExchangeSchema } from "../domain/MealPlan";
 import { MEAL_SLOT_ORDER, MealSlotSchema, type MealSlot } from "../domain/MealSlot";
 
@@ -9,30 +10,30 @@ const mealSchema = z.object({
 
 export const MealPlanFormSchema = z
   .object({
-    name: z.string().trim().min(3, "Mínimo 3 caracteres").max(200, "Máximo 200 caracteres"),
-    description: z.string().max(1000, "Máximo 1000 caracteres").optional().or(z.literal("")),
+    name: z.string().trim().min(3, i18n.t("errors.min_chars", { n: 3 })).max(200, i18n.t("errors.max_chars", { n: 200 })),
+    description: z.string().max(1000, i18n.t("errors.max_chars", { n: 1000 })).optional().or(z.literal("")),
     startDate: z
       .string()
-      .min(1, "Requerido")
-      .refine((v) => !Number.isNaN(new Date(v).getTime()), "Fecha inválida"),
+      .min(1, i18n.t("errors.required"))
+      .refine((v) => !Number.isNaN(new Date(v).getTime()), i18n.t("errors.invalid_date")),
     endDate: z
       .string()
       .optional()
-      .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Fecha inválida"),
+      .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), i18n.t("errors.invalid_date")),
     kcalTarget: z.coerce
-      .number({ invalid_type_error: "Requerido" })
-      .int("Debe ser entero")
-      .min(800, "Mínimo 800 kcal")
-      .max(5000, "Máximo 5000 kcal"),
+      .number({ invalid_type_error: i18n.t("errors.required") })
+      .int(i18n.t("errors.must_be_integer"))
+      .min(800, i18n.t("errors.min_kcal"))
+      .max(5000, i18n.t("errors.max_kcal")),
     proteinTargetG: z.coerce.number().min(0).max(400),
     carbsTargetG: z.coerce.number().min(0).max(600),
     fatTargetG: z.coerce.number().min(0).max(300),
     meals: z
       .array(mealSchema)
       .refine((arr) => new Set(arr.map((m) => m.slot)).size === MEAL_SLOT_ORDER.length, {
-        message: "Debe haber exactamente 5 tiempos de comida",
+        message: i18n.t("errors.exactly_5_meals"),
       }),
-    notes: z.string().max(2000, "Máximo 2000 caracteres").optional().or(z.literal("")),
+    notes: z.string().max(2000, i18n.t("errors.max_chars", { n: 2000 })).optional().or(z.literal("")),
   })
   .strict();
 

@@ -1,20 +1,22 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Button } from "@components/ui/button";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { UtensilsCrossed, ArrowRight, User } from "lucide-react";
 
 export function PlansListPage() {
+  const { t } = useTranslation();
   return (
     <>
       <PageHeader
-        title="Planes alimentarios"
-        description="Diseño y seguimiento basados en SMAE 5ª edición"
+        title={t("mealplan.title")}
+        description={t("mealplan.overview_description")}
         actions={
           <Button asChild variant="outline">
             <Link to="/pacientes">
               <User className="mr-2 h-4 w-4" />
-              Ir a pacientes
+              {t("command.go_patients")}
             </Link>
           </Button>
         }
@@ -25,23 +27,23 @@ export function PlansListPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <UtensilsCrossed className="h-4 w-4 text-primary" />
-                ¿Cómo funcionan los planes?
+                {t("mealplan.how_it_works")}
               </CardTitle>
               <CardDescription>
-                Los planes se crean desde el expediente del paciente, donde se conoce el contexto clínico.
+                {t("mealplan.how_it_works_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ol className="ml-5 list-decimal space-y-1.5 text-sm text-muted-foreground">
-                <li>Selecciona un paciente de la lista</li>
-                <li>Abre su expediente clínico</li>
-                <li>Ve a la sección "Planes alimentarios"</li>
-                <li>Crea un plan basado en equivalentes SMAE</li>
-                <li>Actívalo cuando esté listo para entrega al paciente</li>
+                <li>{t("mealplan.step_select_patient")}</li>
+                <li>{t("mealplan.step_open_record")}</li>
+                <li>{t("mealplan.step_go_to_plans")}</li>
+                <li>{t("mealplan.step_create_smae")}</li>
+                <li>{t("mealplan.step_activate")}</li>
               </ol>
               <Button asChild className="mt-4">
                 <Link to="/pacientes">
-                  Seleccionar paciente
+                  {t("mealplan.select_patient_action")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -50,14 +52,14 @@ export function PlansListPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Estados del plan</CardTitle>
-              <CardDescription>Ciclo de vida de un plan alimentario</CardDescription>
+              <CardTitle className="text-base">{t("mealplan.plan_states")}</CardTitle>
+              <CardDescription>{t("mealplan.plan_lifecycle")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <StateRow color="secondary" label="Borrador" desc="En construcción, no se entrega al paciente" />
-              <StateRow color="success" label="Activo" desc="Vigente, es el plan actual del paciente" />
-              <StateRow color="info" label="Completado" desc="Paciente egresado del plan" />
-              <StateRow color="destructive" label="Cancelado" desc="Sustituido por otro plan" />
+              <StateRow color="secondary" label={t("mealplan.status_draft")} desc={t("mealplan.state_draft_desc")} />
+              <StateRow color="success" label={t("mealplan.status_active")} desc={t("mealplan.state_active_desc")} />
+              <StateRow color="info" label={t("mealplan.status_completed")} desc={t("mealplan.state_completed_desc")} />
+              <StateRow color="destructive" label={t("mealplan.status_cancelled")} desc={t("mealplan.state_cancelled_desc")} />
             </CardContent>
           </Card>
         </div>

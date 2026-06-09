@@ -4,37 +4,44 @@ import { useAuthStore } from "@store/authStore";
 import { hasAnyRole } from "./authRoles";
 
 export interface RequireRoleProps {
-  roles: readonly Role[];
-  /** A dónde redirigir si el rol no es válido. Default: '/'. */
+  /**
+   * Roles permitidos para acceder al contenido.
+   * @deprecated Usa `allowedRoles` en su lugar.
+   */
+  roles?: readonly Role[];
+  /**
+   * Roles permitidos. Si es undefined, cualquier usuario autenticado puede acceder.
+   */
+  allowedRoles?: readonly Role[];
+  /**
+   * A dónde redirigir si no está autenticado. Default: '/login'.
+   */
   redirectTo?: string;
   /** Contenido alternativo si el usuario está autenticado pero sin el rol. */
   fallback?: ReactNode;
   children: ReactNode;
 }
 
-/**
- * Route guard: solo renderiza `children` si el usuario actual tiene alguno
- * de los `roles` permitidos. Si no, redirige a `redirectTo` o muestra
- * `fallback` si se proporciona.
- *
- * Usar en componentes top-level de páginas (no en layout) para que el
- * router pueda navegar al redirect.
- */
 export const RequireRole = ({
   roles,
-  redirectTo = "/",
+  allowedRoles,
+  redirectTo = "/login",
   fallback,
   children,
 }: RequireRoleProps): ReactNode => {
   const user = useAuthStore((s) => s.user);
+  const effectiveRoles = allowedRoles ?? roles;
+
   if (!user) {
     if (typeof window !== "undefined") {
       window.location.replace(redirectTo);
     }
     return null;
   }
-  if (!hasAnyRole(user.rol, roles)) {
+
+  if (effectiveRoles && !hasAnyRole(user.rol, effectiveRoles)) {
     return fallback ?? null;
   }
+
   return <>{children}</>;
 };

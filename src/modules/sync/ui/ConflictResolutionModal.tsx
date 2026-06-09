@@ -1,5 +1,6 @@
 import * as React from "react";
 import { AlertTriangle, CheckCircle2, Server, HardDrive, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@components/ui/dialog";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
@@ -16,6 +17,7 @@ interface ConflictResolutionModalProps {
 }
 
 export function ConflictResolutionModal({ open, onOpenChange }: ConflictResolutionModalProps) {
+  const { t } = useTranslation();
   const [conflicts, setConflicts] = React.useState<SyncQueueItem[]>([]);
   const [resolving, setResolving] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -49,9 +51,9 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
         setStatus("syncing");
       }
       await refresh();
-      toast.success(side === "local" ? "Cambio local reaplicado" : "Cambio remoto aceptado");
+      toast.success(side === "local" ? t("sync.local_reapplied") : t("sync.remote_accepted"));
     } catch (err) {
-      toast.error("Error al resolver conflicto", {
+      toast.error(t("sync.resolve_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -65,20 +67,19 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" aria-hidden />
-            Conflictos de sincronizaci&oacute;n
+            {t("sync.conflicts_title")}
           </DialogTitle>
           <DialogDescription>
-            Estos cambios locales no pudieron aplicarse porque la versi&oacute;n del servidor cambi&oacute; desde la
-            &uacute;ltima sincronizaci&oacute;n. Elige cu&aacute;l conservar.
+            {t("sync.conflicts_desc")}
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">Cargando conflictos\u2026</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">{t("sync.loading_conflicts")}</div>
         ) : conflicts.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
             <CheckCircle2 className="h-8 w-8 text-success" aria-hidden />
-            No hay conflictos pendientes.
+            {t("sync.no_conflicts")}
           </div>
         ) : (
           <ScrollArea className="max-h-96 pr-2">
@@ -96,10 +97,10 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
                         <Badge variant="secondary">{item.op}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Encolado: {new Date(item.enqueuedAt).toLocaleString("es-MX")}
+                        {t("sync.queued")}: {new Date(item.enqueuedAt).toLocaleString("es-MX")}
                       </p>
                       {item.lastError && (
-                        <p className="text-xs text-warning">Motivo: {item.lastError}</p>
+                        <p className="text-xs text-warning">{t("sync.reason")}: {item.lastError}</p>
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
@@ -111,7 +112,7 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
                         onClick={() => resolve(item, "remote")}
                       >
                         <Server className="h-3 w-3" aria-hidden />
-                        Conservar servidor
+                        {t("sync.keep_server")}
                       </Button>
                       <Button
                         size="sm"
@@ -121,7 +122,7 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
                         onClick={() => resolve(item, "local")}
                       >
                         <HardDrive className="h-3 w-3" aria-hidden />
-                        Conservar local
+                        {t("sync.keep_local")}
                       </Button>
                     </div>
                   </div>
@@ -134,7 +135,7 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
         <DialogFooter>
           <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="gap-1.5">
             <X className="h-3.5 w-3.5" aria-hidden />
-            Cerrar
+            {t("common.close")}
           </Button>
         </DialogFooter>
       </DialogContent>

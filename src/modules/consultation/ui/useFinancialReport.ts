@@ -1,6 +1,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { db as defaultDb, type NutriClinicaDB } from "@services/db/dexieSchema";
 import { consultationRowToDomain } from "@modules/consultation/infrastructure/consultationMapper";
+import i18n from "@i18n/config";
 
 export interface MonthlyBucket {
   /** YYYY-MM */
@@ -34,8 +35,8 @@ export interface FinancialReport {
 }
 
 const MONTH_LABELS = [
-  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
-  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+  i18n.t("billing.month_jan"), i18n.t("billing.month_feb"), i18n.t("billing.month_mar"), i18n.t("billing.month_apr"), i18n.t("billing.month_may"), i18n.t("billing.month_jun"),
+  i18n.t("billing.month_jul"), i18n.t("billing.month_aug"), i18n.t("billing.month_sep"), i18n.t("billing.month_oct"), i18n.t("billing.month_nov"), i18n.t("billing.month_dec"),
 ];
 
 const monthKeyOf = (d: Date): string => {

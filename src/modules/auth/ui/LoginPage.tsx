@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useNavigate, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { authApi } from "@services/api/authApi";
@@ -13,6 +14,7 @@ import { RoleLabel, type AuthSucursalDTO } from "@nutriclinica/shared";
 import { cn } from "@utils/cn";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setSession = useAuthStore((s) => s.setSession);
@@ -79,7 +81,7 @@ export function LoginPage() {
       <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>Elige una sucursal</CardTitle>
+            <CardTitle>{t("auth.select_branch")}</CardTitle>
             <CardDescription>
               Tienes acceso a m&uacute;ltiples sucursales. Selecciona con cu&aacute;l quieres iniciar.
             </CardDescription>
@@ -106,10 +108,10 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <LogIn className="h-5 w-5" aria-hidden />
-            Iniciar sesi&oacute;n
-          </CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <LogIn className="h-5 w-5" aria-hidden />
+              {t("auth.login_title")}
+            </CardTitle>
           <CardDescription>
             NutriClinica \u2014 expediente cl&iacute;nico nutricional
           </CardDescription>
@@ -117,7 +119,7 @@ export function LoginPage() {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="email">Correo electr&oacute;nico</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -129,7 +131,7 @@ export function LoginPage() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password">Contrase&ntilde;a</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <div className="relative">
                 <Input
                   id="password"
@@ -144,7 +146,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? "Ocultar" : "Mostrar"}
+                  aria-label={showPassword ? t("auth.hide_password") : t("auth.show_password")}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -164,7 +166,7 @@ export function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={loading || !email || !password}>
-              {loading ? "Ingresando\u2026" : "Ingresar"}
+              {loading ? t("auth.logging_in") : t("auth.login_button")}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">

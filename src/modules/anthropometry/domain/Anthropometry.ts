@@ -1,6 +1,7 @@
 import { AnthropometryId } from "./AnthropometryId";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { Weight, Height, Circumference, Skinfold } from "./Measurements";
+import type { BiaReading } from "./BiaReading";
 
 /**
  * Mediciones opcionales que pueden capturarse en una toma antropométrica.
@@ -36,6 +37,7 @@ export interface AnthropometryProps {
   height: Height;
   circumferences: CircumferenceSet;
   skinfolds: SkinfoldSet;
+  bia: BiaReading | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -51,6 +53,7 @@ export interface AnthropometryCreate {
   circumferences?: CircumferenceSet;
   skinfolds?: SkinfoldSet;
   notes?: string | null;
+  bia?: BiaReading | null;
 }
 
 /**
@@ -80,6 +83,9 @@ export class Anthropometry {
   }
   get skinfolds(): SkinfoldSet {
     return this.props.skinfolds;
+  }
+  get bia(): BiaReading | null {
+    return this.props.bia ?? null;
   }
   get notes(): string | null {
     return this.props.notes;
@@ -119,6 +125,7 @@ export class Anthropometry {
       height: updates.height ?? this.props.height,
       circumferences: updates.circumferences ?? this.props.circumferences,
       skinfolds: updates.skinfolds ?? this.props.skinfolds,
+      bia: updates.bia !== undefined ? updates.bia : this.props.bia,
       notes: updates.notes !== undefined ? updates.notes : this.props.notes,
       measuredAt: updates.measuredAt ?? this.props.measuredAt,
       updatedAt: new Date(),
@@ -146,6 +153,7 @@ export class Anthropometry {
       height: input.height,
       circumferences: input.circumferences ?? {},
       skinfolds: input.skinfolds ?? {},
+      bia: input.bia ?? null,
       notes: input.notes ?? null,
       createdAt: new Date(),
       updatedAt: new Date(),

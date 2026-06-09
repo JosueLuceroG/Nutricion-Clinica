@@ -136,4 +136,20 @@ export class SyncQueueRepository {
   async clearApplied(): Promise<number> {
     return this.table.where('status').equals('applied').delete();
   }
+
+  async clearAll(): Promise<number> {
+    const all = await this.table.toArray();
+    const ids = all.map((i) => i.id);
+    if (ids.length === 0) return 0;
+    await this.table.bulkDelete(ids);
+    return ids.length;
+  }
+
+  async clearStale(): Promise<number> {
+    const all = await this.table.toArray();
+    const stale = all.filter((i) => i.entityId.startsWith('[object'));
+    if (stale.length === 0) return 0;
+    await this.table.bulkDelete(stale.map((i) => i.id));
+    return stale.length;
+  }
 }

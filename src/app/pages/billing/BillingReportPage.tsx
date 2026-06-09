@@ -1,3 +1,5 @@
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/config";
 import {
   Bar,
   BarChart,
@@ -18,7 +20,7 @@ import { Skeleton } from "@components/ui/skeleton";
 import { useFinancialReport } from "@modules/consultation/ui/useFinancialReport";
 import { formatCurrency } from "@utils/formatCurrency";
 
-const MXN = (n: number) => formatCurrency(n, "MXN", "es-MX");
+const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
 /**
  * Reporte financiero (Sprint 14D).
@@ -29,12 +31,13 @@ const MXN = (n: number) => formatCurrency(n, "MXN", "es-MX");
  * Restringido a roles `admin` y `facturacion` (RequireRole en el router).
  */
 export const BillingReportPage = () => {
+  const { t } = useTranslation();
   const report = useFinancialReport(180, 6, 5);
 
   if (report === null) {
     return (
       <>
-        <PageHeader title="Reporte financiero" />
+        <PageHeader title={t("billing.report_title")} />
         <PageContent>
           <div className="grid gap-4 sm:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -49,13 +52,13 @@ export const BillingReportPage = () => {
 
   const onExport = () => {
     const lines = [
-      ["Mes", "Ingresos", "Pendientes", "# Pagadas", "# Pendientes"].join(","),
+      [t("billing.csv_month"), t("billing.income_total"), t("billing.pending"), t("billing.csv_paid_count"), t("billing.csv_pending_count")].join(","),
       ...report.monthly.map((m) =>
         [m.monthKey, m.income.toFixed(2), m.pending.toFixed(2), m.paidCount, m.pendingCount].join(","),
       ),
       [],
-      ["Top pacientes"].join(","),
-      ["Paciente", "Consultas", "Total pagado"].join(","),
+      [t("billing.top_patients")].join(","),
+      [t("common.patient"), t("consultation.title"), t("billing.column_total_paid")].join(","),
       ...report.topPatients.map((p) =>
         [`"${p.patientName.replace(/"/g, '""')}"`, p.consultations, p.totalPaid.toFixed(2)].join(","),
       ),
@@ -64,7 +67,7 @@ export const BillingReportPage = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `reporte-financiero-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `${t("billing.report_filename")}-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -72,35 +75,35 @@ export const BillingReportPage = () => {
   return (
     <>
       <PageHeader
-        title="Reporte financiero"
-        description={`Últimos 6 meses · ${new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(report.rangeStart)} → ${new Intl.DateTimeFormat("es-MX", { dateStyle: "medium" }).format(report.rangeEnd)}`}
+        title={t("billing.report_title")}
+        description={`${t("billing.filter_by_date")} · ${new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(report.rangeStart)} → ${new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(report.rangeEnd)}`}
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <Link to="/billing">
                 <TrendingUp className="mr-2 h-4 w-4" />
-                Pendientes
+                {t("billing.pending")}
               </Link>
             </Button>
             <Button onClick={onExport} variant="outline">
               <Download className="mr-2 h-4 w-4" />
-              Exportar CSV
+              {t("billing.export_csv")}
             </Button>
           </div>
         }
       />
       <PageContent>
         <div className="grid gap-4 sm:grid-cols-4">
-          <Kpi title="Ingresos" value={MXN(report.totalIncome)} tone="success" />
-          <Kpi title="Pendiente" value={MXN(report.totalPending)} tone="warning" />
-          <Kpi title="Consultas pagadas" value={String(report.paidCount)} tone="info" />
-          <Kpi title="Pacientes activos" value={String(report.activePatients)} tone="info" />
+          <Kpi title={t("billing.income_total")} value={MXN(report.totalIncome)} tone="success" />
+          <Kpi title={t("billing.pending_collection")} value={MXN(report.totalPending)} tone="warning" />
+          <Kpi title={t("billing.paid_consultations")} value={String(report.paidCount)} tone="info" />
+          <Kpi title={t("billing.active_patients")} value={String(report.activePatients)} tone="info" />
         </div>
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Tendencia mensual</CardTitle>
-            <CardDescription>Ingresos vs pendiente (últimos 6 meses)</CardDescription>
+            <CardTitle>{t("billing.monthly_income")}</CardTitle>
+            <CardDescription>{`${t("billing.income_total")} vs ${t("billing.pending")}`}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-72 w-full">
@@ -122,8 +125,8 @@ export const BillingReportPage = () => {
                     labelStyle={{ fontWeight: 600 }}
                   />
                   <Legend />
-                  <Bar dataKey="income" name="Ingresos" fill="#10b981" stackId="a" />
-                  <Bar dataKey="pending" name="Pendiente" fill="#f59e0b" stackId="a" />
+                  <Bar dataKey="income" name={t("billing.income_total")} fill="#10b981" stackId="a" />
+                  <Bar dataKey="pending" name={t("billing.pending")} fill="#f59e0b" stackId="a" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -132,13 +135,13 @@ export const BillingReportPage = () => {
 
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Top pacientes</CardTitle>
-            <CardDescription>Los 5 pacientes con mayor ingreso pagado</CardDescription>
+            <CardTitle>{t("billing.top_patients")}</CardTitle>
+            <CardDescription>{`${t("billing.column_total_paid")} - ${t("billing.top_patients")}`}</CardDescription>
           </CardHeader>
           <CardContent>
             {report.topPatients.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No hay pagos registrados en el rango.
+                {t("billing.no_pending")}
               </p>
             ) : (
               <ol className="space-y-2">
@@ -152,7 +155,7 @@ export const BillingReportPage = () => {
                       <div>
                         <p className="font-medium">{p.patientName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {p.consultations} consulta{p.consultations === 1 ? "" : "s"}
+                          {p.consultations} {t("consultation.title_single", { count: p.consultations }).toLowerCase()}
                         </p>
                       </div>
                     </div>

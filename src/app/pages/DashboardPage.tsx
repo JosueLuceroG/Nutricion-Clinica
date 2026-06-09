@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Plus,
   Users as UsersIcon,
@@ -18,30 +19,30 @@ import { Badge } from "@components/ui/badge";
 import { Skeleton } from "@components/ui/skeleton";
 import { EmptyState } from "@components/layout/EmptyState";
 import { useDashboardKpis } from "@app/hooks/useDashboardKpis";
-import { ConsultationStatusLabel, ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
-import { SexLabel } from "@modules/patient/domain/Sex";
+import { ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
 
 export function DashboardPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, loading, error, reload } = useDashboardKpis();
 
   return (
     <>
       <PageHeader
-        title="Panel"
-        description="Resumen general de tu consultorio nutricional"
+        title={t("nav.dashboard")}
+        description={t("dashboard.description")}
         actions={
           <>
-            <Button variant="ghost" size="icon-sm" onClick={reload} aria-label="Actualizar">
+            <Button variant="ghost" size="icon-sm" onClick={reload} aria-label={t("common.refresh")}>
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={() => navigate("/pacientes")}>
               <UsersIcon className="mr-2 h-4 w-4" />
-              Ver pacientes
+              {t("patient.title")}
             </Button>
             <Button onClick={() => navigate("/pacientes/nuevo")}>
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo paciente
+              {t("patient.new")}
             </Button>
           </>
         }
@@ -50,40 +51,40 @@ export function DashboardPage() {
       <PageContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
-            label="Pacientes activos"
+            label={t("billing.active_patients")}
             value={data?.totalActivePatients ?? null}
             total={data?.totalPatients ?? null}
             icon={UsersIcon}
             to="/pacientes"
-            hint="Total registrados"
+            hint={t("dashboard.total_registered")}
           />
           <KpiCard
-            label="Consultas este mes"
+            label={t("dashboard.consultations_this_month")}
             value={data?.consultationsThisMonth ?? null}
             icon={Calendar}
             to="/consultas"
-            hint="Agenda del mes en curso"
+            hint={t("dashboard.current_month_agenda")}
           />
           <KpiCard
-            label="Planes activos"
+            label={t("dashboard.active_plans")}
             value={data?.activePlans ?? null}
             icon={UtensilsCrossed}
             to="/planes"
-            hint="En seguimiento"
+            hint={t("dashboard.in_follow_up")}
           />
           <KpiCard
-            label="Pendientes sync"
+            label={t("dashboard.pending_sync")}
             value={data?.pendingSync ?? 0}
             icon={Activity}
             to="/configuracion"
-            hint="Cambios sin enviar"
+            hint={t("dashboard.unsent_changes")}
           />
         </div>
 
         {error && (
           <Card className="mt-4 border-destructive">
             <CardContent className="p-4 text-sm text-destructive">
-              No se pudieron cargar las métricas: {error.message}
+              {t("dashboard.metrics_error", { message: error.message })}
             </CardContent>
           </Card>
         )}
@@ -92,11 +93,11 @@ export function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                Próximas consultas
+                {t("dashboard.upcoming_consultations")}
                 <Badge variant="secondary">{data?.upcomingConsultations.length ?? 0}</Badge>
               </CardTitle>
               <CardDescription>
-                Programadas o en curso. Continúa con el wizard SOAP desde el expediente del paciente.
+                {t("dashboard.upcoming_consultations_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -109,10 +110,10 @@ export function DashboardPage() {
               ) : !data || data.upcomingConsultations.length === 0 ? (
                 <EmptyState
                   icon={Calendar}
-                  title="Sin consultas pendientes"
-                  description="Agenda o inicia una nueva consulta desde el expediente del paciente."
+                  title={t("consultation.no_consultations")}
+                  description={t("dashboard.schedule_consultation_desc")}
                   action={{
-                    label: "Ir a pacientes",
+                    label: t("patient.title"),
                     onClick: () => navigate("/pacientes"),
                   }}
                 />
@@ -132,12 +133,12 @@ export function DashboardPage() {
                             }).format(c.consultationDate)}
                           </p>
                           <p className="truncate text-xs text-muted-foreground">
-                            Paciente: {c.patientId.toString().slice(0, 8)}… · #{c.consultationNumber}
+                            {t("dashboard.patient_short", { id: c.patientId.toString().slice(0, 8), number: c.consultationNumber })}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Badge variant={ConsultationStatusColor[c.status] as never}>
-                            {ConsultationStatusLabel[c.status]}
+                            {t(`consultation.status_${c.status.replace("-", "_")}`)}
                           </Badge>
                           <ArrowRight className="h-3 w-3 text-muted-foreground" />
                         </div>
@@ -152,11 +153,11 @@ export function DashboardPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                Planes por vencer
+                {t("dashboard.expiring_plans")}
                 <Badge variant="secondary">{data?.expiringPlans.length ?? 0}</Badge>
               </CardTitle>
               <CardDescription>
-                Planes activos con fecha de conclusión en los próximos 30 días.
+                {t("dashboard.expiring_plans_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -169,8 +170,8 @@ export function DashboardPage() {
               ) : !data || data.expiringPlans.length === 0 ? (
                 <EmptyState
                   icon={UtensilsCrossed}
-                  title="Sin planes por vencer"
-                  description="Los planes activos con fecha de fin próxima aparecerán aquí."
+                  title={t("mealplan.no_plans")}
+                  description={t("dashboard.expiring_plans_empty")}
                 />
               ) : (
                 <ul className="divide-y">
@@ -203,8 +204,8 @@ export function DashboardPage() {
         <div className="mt-6 grid gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Pacientes recientes</CardTitle>
-              <CardDescription>Últimos 5 pacientes registrados</CardDescription>
+              <CardTitle>{t("dashboard.recent_patients")}</CardTitle>
+              <CardDescription>{t("dashboard.recent_patients_desc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -216,10 +217,10 @@ export function DashboardPage() {
               ) : !data || data.recentPatients.length === 0 ? (
                 <EmptyState
                   icon={UsersIcon}
-                  title="Sin pacientes"
-                  description="Crea el primer paciente para empezar."
+                  title={t("patient.no_patients")}
+                  description={t("dashboard.create_first_patient")}
                   action={{
-                    label: "Crear paciente",
+                    label: t("patient.new"),
                     onClick: () => navigate("/pacientes/nuevo"),
                   }}
                 />
@@ -234,7 +235,7 @@ export function DashboardPage() {
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">{p.fullName}</p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {p.age} años · {SexLabel[p.sex]}
+                            {t("dashboard.patient_age_sex", { age: p.age, sex: t(`patient.sex_${p.sex}`) })}
                           </p>
                         </div>
                         <ArrowRight className="h-3 w-3 text-muted-foreground" />
@@ -248,33 +249,33 @@ export function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Accesos rápidos</CardTitle>
-              <CardDescription>Atajos a módulos clínicos</CardDescription>
+              <CardTitle className="text-base">{t("dashboard.quick_access")}</CardTitle>
+              <CardDescription>{t("dashboard.quick_access_desc")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-1.5">
               <QuickLink
                 to="/consultas"
                 icon={ClipboardList}
-                label="Consultas"
+                label={t("consultation.title")}
                 hint="Wizard SOAP"
               />
               <QuickLink
                 to="/laboratorio"
                 icon={FlaskConical}
-                label="Laboratorio"
-                hint="Cálculos bioquímicos"
+                label={t("lab.title")}
+                hint={t("dashboard.biochemical_calculations")}
               />
               <QuickLink
                 to="/calculos"
                 icon={Activity}
-                label="Calculadora"
+                label={t("calculations.title")}
                 hint="BMI, TDEE, eGFR, HOMA-IR"
               />
               <QuickLink
                 to="/planes"
                 icon={UtensilsCrossed}
-                label="Planes"
-                hint="SMAE 5ª edición"
+                label={t("mealplan.title")}
+                hint={t("dashboard.smae_edition")}
               />
             </CardContent>
           </Card>

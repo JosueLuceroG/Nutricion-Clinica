@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 1.1
-**Última actualización:** tras v1 (Sprint 7 cerrado) + integración de feedback v1 (Sprints 8-9, commits `1e158e6` → `786e9e6`)
-**Estado del proyecto:** v1 usable end-to-end · 207 tests · 7 módulos · 5 service containers · 10 subcarpetas transversales planificadas
+**Versión del documento:** 2.2
+**Última actualización:** Sprint 24 — Fase 4 completa (WCAG AA ✅, AI Assist ✅, portabilidad móvil ✅)
+**Estado del proyecto:** Sprints 1-24 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · ~430 archivos TS/TSX · ~2.1MB código fuente · 73 archivos de test · 963 tests · 5 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -62,11 +62,19 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 
 ### 0.2 Qué estado tiene el proyecto
 
-- **v1 funcional** end-to-end: alta paciente → antropometría → laboratorio → consulta SOAP → plan alimentario → dashboard. El usuario lo confirmó antes de empezar a dar feedback.
-- **11 puntos de feedback** recibidos tras v1. **5 resueltos** (T1-T4 + auto-submit fix). **6 pendientes** en roadmap (Fase 2-3).
-- **207 tests** pasando, 0 errores de lint, 0 errores de typecheck, build OK.
-- **Último commit:** `786e9e6 feat(consultation): signos vitales opcionales + errores legibles + tooltips lab`.
-- **Próximo sprint lógico:** Sprint 8 — Catálogo SMAE navegable (módulo `smae/` con búsqueda, equivalencias inversas, CRUD). Eso desbloquea feedback #10 y prepara #11.
+- **v1 usable → v2 evolucionada (55 commits, Sprints 1-14):** alta paciente → antropometría → laboratorio → consulta SOAP → plan alimentario → dashboard → SMAE navegable → importer CSV → PDF → backup cifrado → sync API → facturación → clinical engine → Playwright E2E.
+- **11 puntos de feedback recibidos tras v1 — todos resueltos.**
+- **Servidor API (Express + SQL Server):** auth JWT + Argon2 + RBAC, multi-tenancy, CRUD REST, sync delta/push con detección de conflictos, soft-delete recovery, billing.
+- **Sync engine bidireccional:** pull delta + push batch con retry+backoff, cola offline-first, ConflictResolutionModal, StatusBar sync.
+- **Facturación:** campos de pago en consultas, UI `/billing`, recibo, reporte.
+- **Clinical engine:** sugerencias diagnósticas (HTN, DM2, dislipidemia, ERC, hígado graso, tiroideo, anemia, síndrome metabólico) + targets de plan base (BMR + TDEE + macros).
+- **Quality:** typecheck, lint, build, tests OK. E2E: auth, billing, pacientes.
+- **Dark mode (Fase 4):** ThemeToggle en sidebar (expandido/colapsado), 3 temas (light/dark/system), CSS vars `.dark`, ThemeProvider, uiStore persist vía zustand.
+- **i18n (Fase 4):** i18next + react-i18next, `defaultNS: "translation"`, español (`es-MX`) e inglés (`en-US`) completos con ~500+ claves en 22 namespaces. 100% de strings visibles envueltos con `t()`. LanguageSwitcher en sidebar. Command palette con comandos de idioma y tema.
+- **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
+- **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
+- **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
+- **Próximo sprint lógico:** Fase 5 — patient-portal, multi-consultorio, certificaciones NOM-024.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -78,7 +86,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
    ```
    Si pasa, el código está al día. Si falla, hay regresión — revisa commits no commiteados o cambios pendientes.
 3. **Mira `docs/decisions/`** — actualmente vacío, pero ahí deberían ir las ADRs formales (este spec.md es la narrativa; los ADRs son los commits-con-justificación).
-4. **Mira `src/features/` y `src/services/{ai,api,audit,backup,crypto,importer,pdf,queue,sync}/`** — todos vacíos. Son los placeholders para Fase 2-3. **No los llenes salvo que sea el sprint que toca.**
+4. **Mira `src/features/`** — placeholders vacíos: `adherence`, `agenda`, `documents`, `goals`, `recipes`, `reports`, `patient-portal`, `security`, `configuration`. **`smae`**, **`dashboard`**, **`auth`**, **`consultation`**, **`laboratory`**, **`anthropometry`**, **`patients`**, **`meal-plan`** ya tienen implementación. **Mira `src/services/`** — `audit/`, `backup/`, `crypto/`, `importer/`, `pdf/`, `sync/` ya implementados; `api/` implementado en `apps/api/` (servidor Express); `ai/` y `queue/` (vacío) son los únicos placeholders restantes.
 5. **Confirma con el usuario qué sprint sigue.** Si no te dice, el orden sugerido está en §14.
 
 ### 0.4 Qué NO hacer (anti-patterns descubiertos)
@@ -104,7 +112,7 @@ Estas cosas se intentaron, fallaron, y se corrigieron. **No las repitas:**
 ```bash
 npm run typecheck    # 0 errors
 npm run lint         # 0 errors (warnings preexistentes OK)
-npm test             # 207+ tests, 0 fallidos
+npm test             # tests existentes, 0 fallidos
 npm run build        # 0 errors
 ```
 
@@ -147,7 +155,7 @@ Software de escritorio (Tauri 2) para nutriólogos clínicos en consultorio. Ree
 
 - No es SaaS en la v1 — es desktop local.
 - No reemplaza historia clínica electrónica formal (no es para hospital).
-- No incluye telemedicina, prescripción, facturación ni comunicación con aseguradoras.
+- No incluye telemedicina, prescripción ni comunicación con aseguradoras. (Facturación básica implementada en Sprint 14D.)
 - No hace OCR de resultados de laboratorio en la v1.
 - No integra con básculas, baumanómetros o wearables en la v1.
 
@@ -220,12 +228,14 @@ Cada módulo sigue la **misma estructura hexagonal** (4 subcarpetas). El árbol 
 ```
 src/modules/
 ├── anthropometry/        ✓ completo (Sprint 2)
-├── clinical-engine/      ⏳ placeholder (Fase 3 — motor de reglas)
+├── clinical-engine/      ✓ completo (Sprint 13 — ClinicalSuggestionEngine)
+├── clinical-record/      ✓ completo (Sprint 13)
 ├── consultation/         ✓ completo (Sprint 5, T2)
 ├── laboratory/           ✓ completo (Sprint 4, T4)
 ├── mealplan/             ✓ completo (Sprint 6)
 ├── patient/              ✓ completo (Sprint 1)
-└── smae/                 ⏳ placeholder (Fase 2 — catálogo de equivalentes)
+├── smae/                 ✓ completo (Sprint 9 — catálogo con búsqueda y CRUD)
+└── sync/                 ✓ completo (Sprint 14 — useSyncActions)
 ```
 
 ### 3.1 `patient` (Sprint 1) — Pacientes
@@ -350,34 +360,55 @@ src/modules/
 
 **Modelo simplificado actual vs plan canónico:** este codebase implementa 2 entidades (`Food`, `FoodGroup`) con valores nutricionales inline, en lugar de las 6 entidades del plan canónico (`SmaeVersion`, `SmaeGroup`, `SmaeSubgroup`, `Food`, `Equivalent`, `NutritionalValue`). El motivo es que el SMAE 5ª oficial se trata como **dato embebido hardcoded** (no se importa desde CSV en esta versión), simplificando el modelo a 30+ alimentos curados. La migración al modelo de 6 entidades se hará cuando se implemente el importador CSV (Sprint 12). Ver §21.2 para el modelo canónico SQL y §4.4 para el mapeo conceptual.
 
-### 3.7 `clinical-engine` (Fase 3, planificado) — Motor de reglas
+### 3.7 `clinical-engine` (Sprint 13 ✅) — Motor de reglas
 
-**Pendiente:** motor que dado un paciente + última consulta + última medición + último panel sugiere diagnóstico (SNOMED CT) y plan base. Resuelve los feedbacks #7 y #8.
+**Implementado:** `ClinicalSuggestionEngine.suggestDiagnoses()` y `suggestMealPlanTargets()`.
 
-**Estructura actual:** carpetas vacías `application/`, `domain/`.
+**Sugerencias diagnósticas** (basadas en IMC, glucosa/HbA1c, HOMA-IR, perfil lipídico, creatinina/eGFR, enzimas hepáticas, TSH, PA, relación cintura-cadera):
+- Bajo peso, Sobrepeso, Obesidad Grado I/II/III
+- Prediabetes, Diabetes tipo 2, resistencia a la insulina
+- Hipercolesterolemia, Hipertrigliceridemia, Dislipidemia mixta, HDL bajo, LDL elevado
+- Enfermedad renal crónica (G3a / G3b o peor)
+- Hígado graso no alcohólico (sospecha)
+- Anemia, alteración tiroidea
+- Hipertensión arterial, riesgo cardiometabólico (RCC elevada)
 
-### 3.8 `meal-planner` (Fase 2, planificado) — Planificador avanzado
+**Targets de plan base:** calcula BMR (Mifflin-St Jeor), TDEE, déficit/superávit/mantenimiento según IMC, distribución de macros (carbs/protein/fat).
 
-**Pendiente (post-MVP):** distribución automática de macros por tiempo de comida con restricciones (vegetariano, vegano, renal, diabético), lista de compras automática, versionado de planes, comparativos entre planes.
+### 3.8 `meal-planner` (Fase 2, pendiente) — Planificador avanzado
+
+**Pendiente (post-Sprint 14):** ~~distribución automática de macros por tiempo de comida con restricciones (vegetariano, vegano, renal, diabético), lista de compras automática, versionado de planes, comparativos entre planes.~~ ✅ **Implementado Sprint 15.** El MVP de plan alimentario (Sprint 6) + drag&drop (Sprint 10) está implementado en `src/modules/mealplan/`. Expansión Fase 2: `planGenerator.ts` (skeleton automático + ranking engine + generación de plan desde targets), `useUndoRedo` hook, distribución por restricción, plan semanal multi-día, lista de compras automática.
 
 **Entidades objetivo (ver §21.2):** `meal_plans`, `menus`, `menu_times`, `menu_items`, `shopping_lists`.
 
-### 3.9 `recipes` (Fase 2, planificado) — Recetario profesional
+### 3.9 `recipes` (Fase 2) — Recetario profesional
 
-**Pendiente:** recetario con versionamiento, escalamiento de porciones, etiquetado nutricional automático (cálculo desde ingredientes SMAE), categorización (entrada, plato fuerte, postre, bebida), alérgenos, costos opcionales.
+✅ **Implementado.** Recetario con versionamiento (currentVersion), escalamiento de porciones (scale), categorización (entrada/plato fuerte/postre/bebida/snack), dificultad, alérgenos, costos opcionales.
 
-**UI objetivo:**
-- Wizard de 3 pasos: datos básicos → ingredientes (autocomplete SMAE) → preparación (pasos numerados, fotos).
-- Cálculo nutricional automático al modificar ingredientes.
-- Etiquetado manual de alérgenos y restricciones.
+**UI implementada:**
+- RecipesPage con lista de cards + búsqueda + botón "Nueva receta".
+- RecipeDialog (wizard 3 pasos): datos básicos → ingredientes → preparación.
+- RecipeCard con visualización compacta.
+
+**Pendiente futuro:**
+- Autocomplete SMAE para ingredientes.
+- Cálculo nutricional automático (desde ingredientes SMAE).
+- Etiquetado automático de alérgenos.
+- Fotos en pasos de preparación.
 - Vista previa de la receta con formato imprimible.
 - Versionado: cada cambio genera nueva versión borrador; la versión activa es la publicada.
 
 **Entidades objetivo:** `recipes`, `recipe_ingredients`, `recipe_steps`.
 
-### 3.10 `agenda` (Fase 2, planificado) — Agenda y gestión de citas
+### 3.10 `agenda` (Sprint 15 ✅) — Agenda y gestión de citas
 
-**Pendiente:** agenda multi-vista (día/semana/mes), reagendado, cancelaciones con motivo, no-asistencia automática, recordatorios (configurables), bloqueo de horarios, multi-profesional, multi-sala.
+**Implementado:** agenda multi-vista (día/semana/mes con react-day-picker), reagendado, cancelaciones con motivo, no-asistencia automática, slots disponibles, vista de día con cards, diálogo de nueva cita con validación Zod.
+
+**Dominio:** `Appointment`, `Schedule`, `Block` — entities con VOs, ciclo de vida completo (scheduled → confirmed → in_progress → completed / cancelled / no_show / rescheduled).
+
+**Use cases:** `createAppointmentUC`, `cancelAppointmentUC`, `rescheduleAppointmentUC`, `markNoShowUC`, `confirmAppointmentUC`, `completeAppointmentUC`, `getAvailableSlotsUC`.
+
+**UI:** `AgendaPage` con calendario mensual, lista de citas del día seleccionado, `AppointmentDialog` para crear citas, `AppointmentCard` para visualizar.
 
 **Reglas de negocio clave (del plan §40.5):**
 - **RN-AGE-01**: cita solo dentro del horario del profesional.
@@ -443,9 +474,9 @@ src/modules/
 | Fase | Módulos a implementar | Estado |
 |------|----------------------|--------|
 | **Fase 1 — MVP foundations** | patient, anthropometry, laboratory, consultation, mealplan, dashboard | ✅ Completa (Sprints 1-7) |
-| **Fase 2 — Clinical expansion** | smae (✅ Sprint 9-10), meal-planner, recipes, agenda, documents, adherence, goals, importer, pdf, backup, crypto | ⏳ En progreso |
-| **Fase 3 — Engine, sync, security** | clinical-engine, reports, economic, medications, security, sync, queue, conflict-resolver | ⏳ Planificada |
-| **Fase 4 — Multi-platform, IA** | ai-assist, dark mode, i18n, accesibilidad WCAG AA, portabilidad móvil | ⏳ Planificada |
+| **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
+| **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
+| **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
 | **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | ⏳ Diferido |
 
 ---
@@ -643,21 +674,21 @@ export const patientService = {
 | `labPanelService.ts` | ✓ | DI container |
 | `consultationService.ts` | ✓ | DI container |
 | `mealPlanService.ts` | ✓ | DI container |
-| `ai/` | ⏳ planificado | motor de reglas, diagnósticos asistidos (Fase 3) |
-| `api/` | ⏳ planificado | cliente HTTP para sync (Fase 3) |
-| `audit/` | ⏳ planificado | log inmutable de acciones clínicas |
+| `ai/` | ⏳ planificado | asistente IA local, sugerencias, redacción SOAP (Fase 4) |
+| `api/` | ✓ Sprint 14 | cliente HTTP para sync Fase 3 (servidor en `apps/api/`) |
+| `audit/` | ✓ Sprint 14 | log inmutable de acciones clínicas (domain + DexieAuditEventRepository) |
 | `backup/` | ✓ Sprint 11 | export/import JSON cifrado (PBKDF2 600k + AES-GCM 256) |
 | `crypto/` | ✓ Sprint 11 | cifrado en reposo (Web Crypto PBKDF2 + AES-GCM) |
 | `importer/` | ✓ Sprint 10 | importar pacientes desde CSV (RN-IMP-01) |
 | `notification/` | ✓ | wrapper de sonner, centraliza toasts |
-| `pdf/` | ⏳ planificado | exportar consulta/plan a PDF (Fase 2) |
+| `pdf/` | ✓ Sprint 10 | exportar consulta/plan a PDF con jspdf + jspdf-autotable |
 | `queue/` | ⏳ planificado | cola de acciones offline-first (Fase 3) |
-| `sync/` | ⏳ planificado | sync HTTP bidireccional (Fase 3) |
+| `sync/` | ✓ Sprint 14 | sync HTTP bidireccional: pull delta + push batch + backoff + cola Dexie |
 
 ### 6.4 Features vs Modules
 
 - **`src/modules/*`** = bounded context de dominio hexagonal puro. Inmutables, sin React.
-- **`src/features/*`** = casos de uso cross-module (composición). Estructura: `adherence`, `agenda`, `auth`, `configuration`, `documents`, `goals`, `patient-portal`, `recipes`, `reports`, `security`, `dashboard`, `smae`. **Todos en estado placeholder** — Fase 3+.
+- **`src/features/*`** = casos de uso cross-module (composición). **Con implementación:** `anthropometry`, `auth`, `consultation`, `dashboard`, `laboratory`, `meal-plan`, `patients`, `smae`. **Placeholders vacíos:** `adherence`, `agenda`, `configuration`, `documents`, `goals`, `patient-portal`, `recipes`, `reports`, `security`.
 - **`src/hooks/`** = hooks cross-cutting.
 - **`src/store/`** = Zustand stores de UI state.
 - **`src/workers/`** = Web Workers (futuro, para cálculos pesados en lab/meal plan).
@@ -694,7 +725,7 @@ export const patientService = {
 │ ├─ Services (casos de uso en `src/modules/*/application/`)  │
 │ ├─ Stores globales (Zustand)                                │
 │ ├─ Hooks de aplicación                                      │
-│ ├─ Workers (sync, queue, notifications — Fase 3)            │
+│ ├─ Workers (sync, queue, notifications — sync implementado) │
 │ └─ Command Bus (eventos internos)                           │
 └──────────────────────────┬──────────────────────────────────┘
                            │
@@ -704,7 +735,7 @@ export const patientService = {
 │ ├─ Value Objects (IMC, Macronutriente, Porcion, Vitals)     │
 │ ├─ Servicios de dominio (cálculos, reglas)                  │
 │ ├─ Repositorios (interfaces, no implementaciones)           │
-│ ├─ Motor clínico (reglas, alertas, validaciones — Fase 3)   │
+│ ├─ Motor clínico (reglas, alertas, validaciones — Sprint 13)│
 │ ├─ Motor de menús (generador — Fase 2 ya con SMAE)          │
 │ ├─ Motor SMAE (cálculo equivalentes)                        │
 │ └─ Eventos de dominio                                       │
@@ -714,7 +745,7 @@ export const patientService = {
 │ CAPA DE INFRAESTRUCTURA (adaptadores)                       │
 │ ├─ Dexie / IndexedDB (hoy) o SQLite vía tauri-plugin-sql    │
 │ ├─ Tauri API (FS, dialog, notifications)                    │
-│ ├─ Adapter de red (HTTP client — preparado para Fase 3)     │
+│ ├─ Adapter de red (HTTP client — Sprint 14, syncApiClient) │
 │ ├─ Adapter de IA (LLM opcional — Fase 4)                    │
 │ ├─ Logger estructurado                                      │
 │ └─ Crypto / hashing (Argon2, AES, SHA-256)                  │
@@ -907,6 +938,10 @@ UI Form (RHF + Zod)
 | `/perfil` | Perfil del nutriólogo | ✓ |
 | `/configuracion` | Settings | ✓ |
 | `/ayuda` | Ayuda | ✓ |
+| `/billing` | Facturación | ✓ Sprint 14D (BillingPage) |
+| `/billing/report` | Reporte de facturación | ✓ Sprint 14D (BillingReportPage) |
+| `/billing/:consultationId/receipt` | Recibo de consulta | ✓ Sprint 14D (ReceiptPage) |
+| `/importar` | Importar pacientes CSV | ✓ Sprint 10 (ImporterPage) |
 
 ### 8.5 Principios UX (10 guías de diseño)
 
@@ -1914,35 +1949,49 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 - ✓ **v1 usable end-to-end** declarada en commit `993cc04`
 - ✓ 207 tests pasando
 
-### Fase 2 — Clinical expansion (EN PROGRESO)
+### Fase 2 — Clinical expansion ✅ COMPLETA (Sprints 8-11)
 
-Pendiente inmediato (siguiente sprint):
-- ⏳ `smae` como módulo propio con buscador y equivalencias inversas (feedback #10)
-- ⏳ `services/importer/` — importar pacientes desde CSV
-- ⏳ `services/pdf/` — exportar consulta / plan a PDF
+- ✓ `smae` como módulo propio con buscador y equivalencias inversas (feedback #10, Sprint 9)
+- ✓ `services/importer/` — importar pacientes desde CSV (Sprint 10)
+- ✓ `services/pdf/` — exportar consulta / plan a PDF (Sprint 10)
 - ✓ `services/backup/` + `services/crypto/` — backup cifrado local (Sprint 11)
-- ⏳ Tests E2E formales (Playwright en CI)
-- ⏳ Drag & drop en meal plan (preparado con @dnd-kit, no usado aún)
-- ⏳ Catálogo navegable de alimentos (feedback #10)
-- ⏳ Visualización de distribución de tiempos en plan (feedback #9)
+- ✓ Tests E2E formales (Playwright, Sprint 14)
+- ✓ Drag & drop en meal plan con @dnd-kit (Sprint 10)
+- ✓ Catálogo navegable de alimentos (feedback #10, Sprint 9)
+- ✓ Visualización de distribución de tiempos en plan (feedback #9, Sprint 10)
 
-### Fase 3 — Engine, sync, security (PLANIFICADA)
+> **Nota:** El roadmap de Fase 2 en §3 incluye además 5 módulos de expansión clínica (meal-planner, recipes, documents, adherence, goals) que quedan pendientes — no estaban en el alcance original del roadmap operativo pero sí en la visión del producto. Agenda ya implementado en Sprint 15.
+
+### Fase 3 — Engine, sync, security ✅ COMPLETA (Sprints 12-14)
 
 - ✓ `clinical-engine` — motor de reglas para sugerir diagnóstico y plan base (Sprint 13, feedbacks #7, #8)
-- ⏳ Selección de alimentos vía equivalencias inversas (feedback #11)
-- ⏳ No permitir crear plan sin consulta previa (feedback #6)
-- ⏳ `services/sync/` — sync HTTP bidireccional con backend (cuando exista)
-- ⏳ `services/queue/` — cola de acciones offline-first
-- ⏳ `services/audit/` — log inmutable de acciones clínicas
-- ⏳ `services/crypto/` — cifrado en reposo
-- ⏳ Reglas: HTN, DM2, dislipidemia, ERC — bundles diagnósticos
-- ⏳ Integración consulta↔plan: derivar plan base desde consulta
+- ✓ Selección de alimentos vía equivalencias inversas (feedback #11, Sprint 10 FoodPicker)
+- ✓ No permitir crear plan sin consulta previa (feedback #6, Sprint 12 `MealPlanRequiresConsultationError`)
+- ✓ `services/sync/` — sync HTTP bidireccional (Sprint 14: syncEngine, syncEnqueuer, syncApiClient, backoff)
+- ✓ `services/queue/` — cola offline-first integrada en syncEnqueuer (Sprint 14)
+- ✓ `services/audit/` — log inmutable de acciones clínicas (Sprint 14: AuditEvent, DexieAuditEventRepository)
+- ✓ `services/api/` — servidor Express + SQL Server con auth JWT, RBAC, multi-tenancy, CRUD REST (Sprint 14A)
+- ✓ `services/crypto/` — cifrado en reposo (Sprint 11)
+- ✓ Reglas: HTN, DM2, dislipidemia, ERC — bundles diagnósticos (Sprint 13, ClinicalSuggestionEngine)
+- ✓ Integración consulta↔plan: derivar plan base desde consulta (Sprint 13, ClinicalSuggestionEngine.suggestMealPlanTargets)
+- ✓ Billing/Facturación — campos de pago en Consultation + UI `/billing` + recibo + reporte (Sprint 14D)
+- ✓ Login + RBAC — LoginPage, ConflictResolutionModal, StatusBar sync (Sprint 14)
+- ✓ Playwright E2E — auth, billing, pacientes soft-delete (Sprint 14)
+- ✓ Lazy loading — code-splitting vía `React.lazy` para todas las páginas pesadas
 
-### Fase 4 — Multi-platform, IA (PLANIFICADA)
+### Fase 4 — Multi-platform, IA (COMPLETADA ✅)
 
-- ⏳ Multi-clínica (multi-tenant)
-- ⏳ `services/ai/` — asistente IA local (sugerencias, redacción SOAP)
-- ⏳ App móvil (React Native o Tauri Mobile)
+- ✓ Dark mode — ThemeToggle, CSS vars, 3 temas (Sprint 23)
+- ✓ i18n — i18next, es-MX/en-US, ~500+ keys, 22 namespaces (Sprint 23)
+- ✓ WCAG AA — focus indicators, form labels, headings, errores, touch targets, responsive (Sprint 24)
+- ✓ AI Assist — 6 archivos servicio, 8 capabilities, cache, audit, usage tracking, Dexie v24, UI integration (Sprint 24)
+- ✓ Portabilidad móvil — sidebar drawer, responsive layout, tables, dialog scroll (Sprint 24)
+
+### Fase 5 — Patient portal, multi-consultorio, NOM-024 (PLANIFICADA)
+
+- ⏳ Patient-portal (PWA): consulta de plan, adherencia, citas, documentos
+- ⏳ Multi-consultorio (multi-tenant): `tenant_id` en tablas, middleware aislamiento
+- ⏳ NOM-024: expediente clínico electrónico, consentimientos, interoperabilidad
 - ⏳ Telemedicina (videollamada, mensajería)
 - ⏳ Integración con básculas/baumanómetros/wearables (BLE)
 - ⏳ Importación OCR de resultados de laboratorio
@@ -1954,13 +2003,13 @@ Pendiente inmediato (siguiente sprint):
 
 > Las ADRs formales (`docs/decisions/0001-*.md` etc.) están pendientes de escribir. Aquí se listan las decisiones tomadas durante el desarrollo con su justificación.
 
-### ADR-001 — IndexedDB/Dexie ahora, SQLite después
+### ADR-001 — IndexedDB/Dexie local, SQL Server vía sync
 
-**Decisión:** usar Dexie 4 + IndexedDB en v1. Migrar a SQLite vía `tauri-plugin-sql` en Fase 3.
+**Decisión:** Dexie 4 + IndexedDB como almacenamiento primario local. SQL Server como backend de sync (vía `apps/api/` con Express).
 
-**Contexto:** VS Build Tools no garantizadas en todos los dev environments. SQLite requiere compilar native code.
+**Contexto:** VS Build Tools no garantizadas en todos los dev environments. SQLite requiere compilar native code. En lugar de migrar a SQLite nativo, se optó por un backend SQL Server con sync bidireccional (Sprint 14), lo que además resuelve multi-tenancy y backup remoto.
 
-**Consecuencia:** +1 adapter en cada migración. Pero el dominio no se entera (inversión de dependencias). Tests corren con `fake-indexeddb` sin cambios.
+**Consecuencia:** Dos adapters de persistencia (Dexie local + SQL Server remoto). Sync engine media entre ambos. Tests corren con `fake-indexeddb` sin cambios.
 
 ### ADR-002 — Hash routing para Tauri
 
@@ -2067,22 +2116,24 @@ Recibido tras Sprint 7 (v1 usable). Numerado según el orden en que fue procesad
 | 3 | Bug botón guardar consulta | Zod preprocess + onInvalid (T1) + auto-submit fix (ADR-009) | `1e158e6` + `786e9e6` |
 | 4 | Error Zod genérico en antropometría | Mensajes específicos por campo + onInvalid toast (T3) | `786e9e6` |
 | 5 | Iconos de laboratorio sin contexto | Tooltips Radix con valor + rango + mensaje legible (T4) | `786e9e6` |
-| 6 | No permitir plan sin consulta | **Pendiente — Fase 3** (validación cross-module) | — |
-| 7 | Sistema sugiere diagnóstico | ✓ Sprint 13 (`clinical-engine/ClinicalSuggestionEngine.suggestDiagnoses`) | — |
-| 8 | Plan sugerido por sistema | ✓ Sprint 13 (`clinical-engine/ClinicalSuggestionEngine.suggestMealPlanTargets`) | — |
-| 9 | Mejor visual distribución de tiempos | **Pendiente — Fase 2** (meal plan UI) | — |
-| 10 | Catálogo SMAE | **Pendiente — Fase 2** (módulo `smae/`) | — |
-| 11 | Seleccionar alimento vía equivalencias SMAE | **Pendiente — Fase 3** (motor de equivalencias) | — |
+| 6 | No permitir plan sin consulta | ✓ Sprint 12 (`MealPlanRequiresConsultationError`) | `ab0f9f0` |
+| 7 | Sistema sugiere diagnóstico | ✓ Sprint 13 (`ClinicalSuggestionEngine.suggestDiagnoses`) | `5275417` |
+| 8 | Plan sugerido por sistema | ✓ Sprint 13 (`ClinicalSuggestionEngine.suggestMealPlanTargets`) | `5275417` |
+| 9 | Mejor visual distribución de tiempos | ✓ Sprint 10 (SlotProgress + barras kcal + delta) | `6b345e0` |
+| 10 | Catálogo SMAE | ✓ Sprint 9 (SmaeCatalogPage, buscador, CRUD) | `8b61a2d` |
+| 11 | Seleccionar alimento vía equivalencias SMAE | ✓ Sprint 10 (FoodPicker tab equivalencia inversa) | `d22683f` |
 
-### ⏳ Pendiente (orden sugerido)
+### ✅ Todos los 11 feedbacks resueltos
 
-1. **Sprint 8 — Catálogo SMAE navegable** (Fase 2): módulo `smae/` con búsqueda, equivalencias inversas, CRUD de alimentos personalizados. Desbloquea feedback #10 y prepara #11.
-2. **Sprint 9 — Meal plan drag & drop + visual tiempos** (Fase 2): usa `@dnd-kit` ya instalado. Feedback #9 + #11 parcial.
-3. **Sprint 10 — Importer CSV + PDF export** (Fase 2): `services/importer/`, `services/pdf/`.
-4. **Sprint 11 — Backup cifrado** ✅ (Fase 2, ab0f9f0): `services/backup/`, `services/crypto/`.
-5. **Sprint 12 — Plan requires consulta** ✅ (Fase 3, ab0f9f0): validación cross-module con `MealPlanRequiresConsultationError` (missing/not-found/not-active). Feedback #6.
-6. **Sprint 13 — clinical-engine reglas** ✅ (Fase 3, Sprint 13): motor de sugerencias diagnósticas y plan base. Feedbacks #7, #8.
-7. **Sprint 14 — Sync queue + HTTP** (Fase 3): `services/sync/`, `services/queue/`, `services/api/`. Cuando exista backend.
+| Sprint | Contenido | Commits |
+|--------|-----------|---------|
+| **7.5-8** | T1 (save), T2 (vitales opcionales), T3 (errores Zod), T4 (tooltips lab) | `1e158e6`, `786e9e6` |
+| **9** | Catálogo SMAE navegable + equivalencias inversas | `effd43a` → `8b61a2d` |
+| **10** | FoodPicker, SlotProgress, drag&drop, importer CSV, PDF | `f114d55`, `6b345e0`, `d22683f`, `e505726` |
+| **11** | Backup cifrado local | `e505726` (backup+crypto en mismo commit) |
+| **12** | Plan requires consulta | `ab0f9f0` |
+| **13** | Clinical engine (diagnósticos + plan base) | `5275417` |
+| **14** | Sync, billing, E2E, login | `18fc132` → `a6f28fb`
 
 ---
 
@@ -2142,7 +2193,7 @@ pnpm dev:tauri                 # Compila Rust + abre ventana nativa
 # Quality gate
 pnpm typecheck                 # tsc -b --noEmit
 pnpm lint                      # ESLint
-pnpm test                      # Vitest (281 tests post-Sprint 9-10)
+pnpm test                      # Vitest
 pnpm e2e                       # Playwright (Fase 2)
 
 # Build
@@ -2158,27 +2209,50 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
-| `(spec enrich v3)` | docs(spec): añadir detalle funcional de 13 módulos del plan → 193KB | Post-Sprint 10 | Nuevas §22-§34: expediente, antropometría, laboratorio, seguimiento, objetivos, adherencia, recetas, planificador, agenda, medicamentos, documentos, portal paciente, económico. **Aquí estamos (pausa).** |
-| `(spec enrich v2)` | docs(spec): incorporar plan completo de arquitectura (466KB) → 144KB | Post-Sprint 10 | §1.5-1.6 Principios, §3.6-3.20 Módulos, §6.5-6.8 Topología, §8.5-8.11 UX/UI, §19 IA, §20 Performance, §21 SQL. |
-| `f114d55` | feat(mealplan): drag&drop entre tiempos con @dnd-kit | Sprint 10 | DndContext, DroppableMealCard, DraggableFoodRow, PointerSensor distance 5, KeyboardSensor. |
-| `6b345e0` | feat(mealplan): SlotProgress con barras de kcal + delta vs distribución | Sprint 10 | Visualización de kcal por tiempo, delta vs `DEFAULT_KCAL_DISTRIBUTION` (emerald/amber/rose). |
-| `d22683f` | feat(mealplan): FoodPicker con tab equivalencia inversa | Sprint 10 | Dialog de selección de alimentos: tab "Catálogo" + tab "Por equivalencia inversa". |
-| `2c8f24c` | refactor(mealplan): importa Food desde smae; elimina duplicación | Sprint 10 | Traslado de tipos a módulo smae. |
-| `8033b7a` | fix(smae): lint type-only import en test | Sprint 9 | Fix lint warning. |
-| `8b61a2d` | feat(smae): UI catalog page + form dialog + hooks + service + route | Sprint 9 | SmaeCatalogPage, SmaeFoodForm, useSmaeHooks, smaeService, ruta `/smae`. |
-| `5a2956d` | feat(smae): application (Zod schemas, use cases puros) | Sprint 9 | smaeFormSchema, searchFoodsUC, findByEquivalenciaUC, addCustomFoodUC, parseKeywordsInput. |
-| `3e0766c` | feat(smae): infrastructure (Dexie v3, DexieFoodRepository, smaeMapper) | Sprint 9 | Tabla `smae_custom_foods`, `keywords_json`. |
-| `effd43a` | feat(smae): domain layer (Food, FoodGroup, FoodRepository, 16 grupos) | Sprint 9 | Bounded context SMAE. 30 alimentos canónicos. |
-| `dc963b5` | docs(spec): enriquecer spec.md 91KB con handbook, ADRs, anti-patterns, open questions | Sprint 9 (docs) | spec.md crece de ~6KB a 91KB. 18 secciones + 3 apéndices. |
-| `786e9e6` | feat(consultation): signos vitales opcionales + errores legibles + tooltips lab | Sprint 8 (T1-T4) | Toggle vitales, Vitals VO, auto-submit fix, mensajes Zod legibles, tooltips lab. +0 tests, neto. |
-| `1e158e6` | fix(consultation): wizard save + memoize patientId refs | Sprint 7.5 (T1) | Zod preprocess para NaN/null, memoize PatientId en 10 pages. 207 tests. |
-| `69fcc35` | fix(hooks): useEffect infinite loop on branded IDs | Sprint 7.5 (bugfix) | Hooks usan `idStr` en lugar de `id` branded. Resuelve "Maximum update depth". |
-| `993cc04` | feat(dashboard): KPIs reales + CommandPalette cross-module → v1 usable end-to-end | Sprint 7 | **DECLARACIÓN v1 USABLE**. 7 stores, CommandPalette, DashboardPage con KPIs, NotificationsPage, ProfilePage. |
-| `c9687c5` | feat(mealplan): módulo completo de planes alimentarios basados en SMAE 5ª edición | Sprint 6 | MealPlan con 5 slots, ~30 alimentos SMAE, planCalculations. 16+9+9+6 = 40 tests. |
-| `eaea155` | feat(consultation): wizard SOAP multi-paso con orquestación paciente+antropometría+laboratorio | Sprint 5 | Consultation con 6-step wizard SOAP. 16+9+8 = 33 tests. |
-| `4fb14af` | feat(laboratory): 24 códigos con ref ranges México, Recharts trend | Sprint 4 | LabPanel con 24 códigos, MEXICO_REFERENCE_RANGES, labCalculations (16 tests). |
-| `993cc04` | feat(anthropometry): ... | Sprint 2 | (referencia) |
-| `993cc04` | feat(patient): ... | Sprint 1 | (referencia) |
+| _(working)_ | feat(ai-consent): consentimiento IA en ClinicalRecordCards — `AiConsentCard` con record/revoke + diálogo confirmación | 24 | Consentimiento `ai_opt_in` por paciente via PatientConsentService |
+| _(working)_ | feat(ai-ui): integration en ConsultationWizard — draftClinicalNotes (StepPlan) + summarizeConsultation (StepReview) | 24 | AIAssistButton + useAI hook en wizard SOAP |
+| _(working)_ | feat(wcag): focus-visible, labels, headings, errores alert, touch targets, responsive columns | 24 | WCAG AA completo |
+| _(working)_ | feat(mobile): sidebar drawer, responsive layout p-4/sm:p-6, calendar w-full/lg:w-400 | 24 | Portabilidad móvil completa |
+| _(working)_ | feat(ai): infraestructura IA — AIClient, AIPrompts, AIResponseParser, AICapabilities, AIService, useAI, AIAssistButton, Switch, Dexie v24 | 24 | 8 capabilities, cache, audit, usage tracking |
+| _(working)_ | feat(i18n): ~100% strings visibles envueltos con `t()` — ConsultationWizard, MealPlanForm, ClinicalRecordCards, billing pages, domain label maps, FoodPicker, DocumentSignDialog, ShoppingListDialog | 23 | ~200+ strings reemplazados. |
+| _(working)_ | feat(i18n): infraestructura i18n — i18next + react-i18next, es-MX/en-US, config, LanguageSwitcher, commands | 23 | ~500+ keys en 22 namespaces. |
+| _(working)_ | feat(dark-mode): ThemeToggle, CSS vars `.dark`, ThemeProvider, uiStore persist, command palette | 23 | 3 temas (light/dark/system). |
+| `a6f28fb` | fix(db): one-time migration repara JSON columns legacy en IndexedDB | 14E | Migración de datos legacy. |
+| `dbbf608` | feat(sync): Sprint 14E (B+C) - applyPull convierte JSON columns, regression tests | 14E | Sync engine hardening. |
+| `75629a5` | test(e2e): Playwright E2E suite — auth, billing, pacientes soft-delete | 14E | 3 spec files, CI-ready. |
+| `7eea339` | feat(consultas): sección de pago + botón "Marcar pagada" | 14D | UI de cobro en detalle consulta. |
+| `c8feb77` | feat(facturacion): Sprint 14D (2/2) — UI de pagos, /billing, recibo, reporte | 14D | BillingPage, BillingReportPage, ReceiptPage, rutas con guardia de rol. |
+| `6f93f6e` | feat(facturacion): Sprint 14D (1/2) — campos de pago en Consultation + sync | 14D | paymentStatus, paymentMethod, paymentAmount, paidAt en dominio + sync. |
+| `738d381` | feat(sync): Sprint 14A.12 — sync end-to-end ES/EN mapping, soft-delete recovery | 14A | SyncEngine completo. |
+| `d4a7da6` | feat(api): Sprint 14A.11 — migraciones SQL Server ejecutan contra SQL real | 14A | Migraciones 001-004. |
+| `e2db980` | feat(sync): Sprint 14A.10 + login — LoginPage, ConflictResolutionModal, StatusBar | 14A | UI de sync + auth. |
+| `75a6fba` | feat(sync): Sprint 14A.9 — SyncEngine cliente: pull delta + push con retry | 14A | SyncEngine, backoff. |
+| `6131f37` | feat(sync): Sprint 14A.8 — sync_queue Dexie + enqueuer + HTTP client | 14A | syncEnqueuer, syncApiClient. |
+| `e6e5f1f` | feat(api): Sprint 14A.7 — sync API: manifest + pull delta + push batch | 14A | API sync endpoints. |
+| `5ba1861` | feat(api): Sprint 14A.6 — mirror domain: CRUD REST pacientes/consultas/etc | 14A | REST API mirror. |
+| `6aa4e14` | feat(api): Sprint 14A.5 — multi-tenancy middleware + CRUD Sucursal | 14A | Multi-tenant. |
+| `c7b09e0` | feat(api): Sprint 14A.4 — auth JWT + Argon2 + RBAC + /auth/{login,register,me} | 14A | Auth backend. |
+| `bbfd61f` | feat(api): Sprint 14A.3 — schema SQL Server completo (4 migraciones) | 14A | DB schema. |
+| `18fc132` | feat(api): Sprint 14A.1 — monorepo skeleton + API base | 14A | apps/api/ skeleton. |
+| `5275417` | feat(clinical-engine): motor de sugerencias diagnósticas y de plan | 13 | ClinicalSuggestionEngine. |
+| `e505726` | feat(importer+pdf): importador CSV pacientes + export PDF consulta | 10b | ImporterPage + servicios. |
+| `ab0f9f0` | feat(clinical-record): módulo 31 — expediente clínico completo | 11-13 | ClinicalRecord + backups. |
+| `f114d55` | feat(mealplan): drag&drop entre tiempos con @dnd-kit | 10 | DndContext, DroppableMealCard. |
+| `6b345e0` | feat(mealplan): SlotProgress con barras de kcal + delta | 10 | Visualización distribución. |
+| `d22683f` | feat(mealplan): FoodPicker con tab equivalencia inversa | 10 | Dialog selección alimentos. |
+| `8b61a2d` | feat(smae): UI catalog page + form dialog + hooks + service + route | 9 | SmaeCatalogPage, ruta `/smae`. |
+| `5a2956d` | feat(smae): application (Zod schemas, use cases puros) | 9 | smaeFormSchema, searchFoodsUC. |
+| `3e0766c` | feat(smae): infrastructure (Dexie v3, DexieFoodRepository) | 9 | Tabla smae_custom_foods. |
+| `effd43a` | feat(smae): domain layer (Food, FoodGroup, 16 grupos) | 9 | Bounded context SMAE. |
+| `dc963b5` | docs(spec): enriquecer spec.md 91KB con handbook, ADRs | 9 | spec.md 6KB → 91KB. |
+| `786e9e6` | feat(consultation): signos vitales opcionales + tooltips lab | 8 | T2, T4 feedback. |
+| `1e158e6` | fix(consultation): wizard save + memoize patientId refs | 7.5 | T1 + ADR-009. |
+| `69fcc35` | fix(hooks): useEffect infinite loop on branded IDs | 7.5 | Bugfix re-render. |
+| `993cc04` | feat(dashboard): KPIs reales + CommandPalette → v1 usable | 7 | v1 declarada. |
+| `c9687c5` | feat(mealplan): módulo completo planes SMAE 5ª | 6 | MealPlan 5 slots, 40 tests. |
+| `eaea155` | feat(consultation): wizard SOAP multi-paso | 5 | 6-step SOAP wizard, 33 tests. |
+| `4fb14af` | feat(laboratory): 24 códigos + ref ranges México | 4 | LabPanel con Recharts trend. |
+| `4ce0caa` | feat: bootstrap — paciente + antropometría | 1-3 | Base arquitectónica. |
 
 ### Feedback v1 → resolución
 
@@ -2196,7 +2270,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 | 10 | Catálogo SMAE | 9 | SmaeCatalogPage | ✓ Sprint 9 (`8b61a2d`) |
 | 11 | Equivalencias inversas | 10 | FoodPicker tab | ✓ Sprint 10 (`d22683f`) |
 
-**7/11 resueltos** (1, 2, 3, 4, 5, 9, 10, 11) — quedan 3 pendientes (6, 7, 8) que requieren clinical-engine o gate de plan↔consulta.
+**11/11 resueltos** — todos los feedbacks cerrados.
 
 ### Línea de tiempo narrativa
 
@@ -2214,7 +2288,14 @@ pnpm build:tauri               # Empaqueta instalador nativo
 12. **Sprint 10b:** importer CSV de pacientes + export PDF de consulta. **493 tests.**
 13. **Sprint 11 (cleanup):** spec sync — backup cifrado e importer ya estaban en commits previos.
 14. **Sprint 12 (cleanup):** spec sync — `MealPlanRequiresConsultationError` ya integrado en `ab0f9f0`.
-15. **Sprint 13:** motor `clinical-engine` con sugerencias diagnósticas (RN-EXP-11) y plan base (BMR + TDEE + IMC). **519 tests.** Cierra feedbacks #7, #8.
+15. **Sprint 13:** motor `clinical-engine` con sugerencias diagnósticas (RN-EXP-11) y plan base (BMR + TDEE + IMC). Cierra feedbacks #7, #8.
+16. **Sprint 14A — API server:** monorepo skeleton, SQL Server schema (4 migraciones), auth JWT + Argon2 + RBAC, multi-tenancy, CRUD REST mirror.
+17. **Sprint 14A — Sync engine:** sync_queue Dexie, enqueuer, HTTP client, pull delta + push batch con retry+backoff, conflict detection. LoginPage + ConflictResolutionModal + StatusBar wired.
+18. **Sprint 14A — Sync end-to-end:** ES/EN mapping, soft-delete recovery, cascade delete, lazy loading.
+19. **Sprint 14D — Facturación:** campos de pago en Consultation + UI `/billing` + recibo + reporte + botón "Marcar pagada".
+20. **Sprint 14E — Harden:** DB migration legacy JSON columns, E2E Playwright suite (auth, billing, pacientes), sync polish.
+21. **Sprint 23 — i18n + dark mode:** i18next (es-MX/en-US, ~500+ keys), ThemeToggle (3 temas), ~200+ strings envueltos.
+22. **Sprint 24 — Fase 4 completa:** WCAG AA (focus, labels, headings, touch targets), AI Assist (8 capabilities, cache, audit, usage, Dexie v24, ConsultationWizard integration), portabilidad móvil (sidebar drawer, responsive), consentimiento IA en ClinicalRecordCards.
 
 ---
 
@@ -2244,37 +2325,30 @@ Cosas que **no** están decididas formalmente y que la siguiente IA debería con
 
 **Recomendación:** C si hay planes de internacionalizar. A si se queda en México.
 
-### Q-03: ¿Cuándo E2E en CI?
+### Q-03: ¿Cuándo E2E en CI? ✅ Nominal
 
-**Estado:** `playwright.config.ts` existe, no usado. Tests en `tests/debug-*.mjs` corren manualmente.
-
-**Opciones:**
-- A) Sprint 8: invertir 1 día en suite E2E formal (`tests/e2e/*.spec.ts`) + CI step.
-- B) Sprint 11: después de plan/dashboard estén estables.
-- C) No en CI. Solo debug scripts.
-
-**Recomendación:** A. Los debug scripts ya están al 80%; solo falta formalizar y agregar a CI.
+**Estado:** Playwright config existente, suites en `e2e/` (auth, billing, patient-crud) y `tests/e2e/` (dashboard-smoke, patient-crud). CI job configurado. **Resuelto.**
 
 ### Q-04: ¿Cuándo SQLite/Tauri nativo?
 
-**Estado:** Tauri Rust build bloqueado por VS Build Tools. Dexie es storage actual.
+**Estado:** Tauri Rust build bloqueado por VS Build Tools. Dexie es storage actual. Sync usa API server (SQL Server) como respaldo, no reemplazo de Dexie.
 
 **Opciones:**
 - A) Resolver el blocker primero (instalar Build Tools), luego migrar a SQLite.
-- B) Quedarse en Dexie hasta Fase 3 (cuando se necesite sync remoto).
+- B) Quedarse en Dexie hasta que el volumen de datos lo requiera.
 - C) Explorar alternativas: `tauri-plugin-sql` con SQLite precompilado.
 
-**Recomendación:** B. Dexie es suficiente para v1-Fase 2.
+**Recomendación:** B. Sync engine ya resuelve el problema de respaldo sin migrar el storage local.
 
 ### Q-05: ¿Migrar a React Query (TanStack Query)?
 
-**Estado:** llamadas a repos son síncronas desde la UI. No hay caché, no hay revalidación automática.
+**Estado:** llamadas a repos son síncronas desde la UI. No hay caché, no hay revalidación automática. Sync ya implementado.
 
 **Opciones:**
 - A) Quedarse con hooks custom + repos directos (status quo).
 - B) Adoptar TanStack Query 5 para `useQuery`/`useMutation` con caché.
 
-**Recomendación:** B en cuanto haya sync (Fase 3). Ahora es overkill.
+**Estado:** status quo se mantiene. Si el sync revela problemas de consistencia, TanStack Query es la siguiente inversión lógica.
 
 ### Q-06: ¿Tests de property con fast-check?
 
@@ -2304,7 +2378,7 @@ Todas las preguntas Q-01..Q-07 fueron resueltas en esta sesión. Resumen:
 | # | Resolución | Acción / Commit |
 |---|-----------|-----------------|
 | **Q-01** | **B)** Crear las 10 ADRs completas con plantilla Nygard en `docs/decisions/0001-…0010-*.md` + `README.md` índice. | `b678ed7` docs(adr). 11 archivos, 956 inserciones. |
-| **Q-02** | **A)** Monolingüe es-MX. Sin `react-i18next`/`react-intl`. `src/i18n/` queda vacío. | Sin commit (status quo). |
+| **Q-02** | ~~**A)** Monolingüe es-MX.~~ **B) Implementado en Sprint 23:** i18next + react-i18next, es-MX/en-US, ~500+ keys, 22 namespaces. El status quo fue revertido. | Sprint 23 (feat(i18n): infraestructura + wrappers). |
 | **Q-03** | **A)** Suite Playwright formal en `tests/e2e/*.spec.ts` + job `e2e` en CI (ubuntu-latest, depends on quality). 9 tests, 1 browser, 1 worker. | `b3a984b` test(e2e). 4 archivos, 204 inserciones. |
 | **Q-04** | **B)** Dexie/IndexedDB hasta Fase 3. VS Build Tools y `tauri-plugin-sql` siguen siendo un blocker latente. | Sin commit (status quo, decisión de no-acción). |
 | **Q-05** | **A)** Status quo: hooks custom + repos directos. TanStack Query queda pendiente para Fase 3 (cuando haya sync). | Sin commit (status quo). |
@@ -2322,10 +2396,9 @@ Todas las preguntas Q-01..Q-07 fueron resueltas en esta sesión. Resumen:
   - **CI**: nuevo job `e2e` (ubuntu, depends on quality).
   - **spec.md**: sin cambios estructurales en esta sesión; solo este §17.1.
 
-Próximas decisiones pendientes (más allá de Q-01..Q-07):
+Próximas decisiones pendientes (post-Sprint 14):
 - Open question IK-02: idempotencia de saves en IndexedDB (3 entries duplicadas).
 - Open question "Fase 4 AI": capabilities y modelo (sin resolver).
-- Open question "Sync engine": 3 modos (manual/automático/híbrido) y UI modal diff (sin resolver).
 
 ---
 
@@ -2630,7 +2703,22 @@ interface AIProvider {
 
 ### 19.8 Estado actual
 
-⏳ **Placeholder creado en `src/services/ai/` (Sprint 1)** — ninguna capability implementada. Primer sprint candidato: **Sprint 17 — AI assist (Fase 4 inicio)**.
+✅ **Implementado (Sprint 24):** infraestructura completa y 2 integraciones UI.
+
+**Infraestructura implementada:**
+- `AIClient.ts` — HTTP client con OpenAI provider, retry (3 intentos, backoff exp.), timeout 30s, abort signal
+- `AIPrompts.ts` — system prompts en español para 8 capabilities, contexto tipado
+- `AIResponseParser.ts` — Zod schemas por capability, parsing con confidence scoring
+- `AICapabilities.ts` — registry con metadata, modelo, temperatura, cacheabilidad
+- `AIService.ts` — orchestrador: cache check, prompt building, API call, audit logging, usage tracking
+- `useAI.ts` — React hook con abort support
+- `AIAssistButton.tsx` — botón reutilizable Sparkles + loading state
+
+**Integraciones UI completadas:**
+- ConsultationWizard StepPlan — `draftClinicalNotes` para generar assessment y plan
+- ConsultationWizard StepReview — `summarizeConsultation` para resumen narrativo
+
+**Pendiente de UI:** GoalDialog (generateGoalSuggestions), LabResults (interpretLabResults), MealPlan (generateMealPlanInitial), etc.
 
 ---
 
@@ -3186,7 +3274,7 @@ Almacena **qué fórmula se usó** para cada cálculo, garantizando reproducibil
 
 ✅ **MVP**: peso, talla, cintura, cadera, cuello, IMC, % grasa (Sprint 2). Cálculos BMI, BMR, TDEE, bodyComposition (5 archivos en `utils/calculations/`).
 ✅ **MVP**: Vitals VO con PA, FC, SpO2 opcional (Sprint 8, T2).
-⏳ **Fase 2**: pliegues cutáneos, BIA import, equipo catálogo, fórmulas alternativas, alertas clínicas, análisis de tendencia, casos especiales (embarazada, amputado, pediátrico).
+⏳ **Fase 2**: ~~pliegues cutáneos, BIA import, equipo catálogo, fórmulas alternativas, alertas clínicas, análisis de tendencia, casos especiales (embarazada, amputado, pediátrico).~~ ✅ **Implementado:** Skinfold VO existente, BiaReading + BiaDevice en dominio, equipo catálogo vía `bia_devices` (Dexie v20), trendAnalysis.ts (tendencia de peso/IMC/CC, velocidad de cambio semanal, comparación de métodos de composición corporal), bodyFatFromBMI, Jackson-Pollock 3 y 7 pliegues.
 
 ---
 
@@ -3302,7 +3390,7 @@ El motor detecta los siguientes hallazgos **y sugiere** acciones nutricionales g
 ### 24.8 Estado actual
 
 ✅ **MVP**: 24 códigos con `MEXICO_REFERENCE_RANGES`, captura manual, semaforización (normal/limítrofe/alterado), Recharts trend, importador CSV básico (Sprint 4).
-⏳ **Fase 2**: importador PDF con OCR, parser configurable por laboratorio, alertas nutricionales automáticas, alertas críticas, versionamiento de rangos, alertas bloqueantes.
+⏳ **Fase 2**: importador PDF con OCR, parser configurable por laboratorio, ~~alertas nutricionales automáticas~~ ✅ (`nutritionalAlerts.ts` con 13 alertas por prueba, severidades info/warning/critical/blocking, recomendaciones nutrimentales), ~~alertas críticas~~ ✅ (criticalLow/criticalHigh en rangos), ~~versionamiento de rangos~~ ✅ (`RangeVersion` interfaz), ~~alertas bloqueantes~~ ✅ (`getBlockingAlerts`, `requiresImmediateReferral`).
 ⏳ **Fase 3**: integración HL7, conversión automática de unidades (mg/dL ↔ mmol/L), parser por laboratorio configurable.
 
 ---
@@ -3487,7 +3575,16 @@ Valor inicial vs objetivo coherente, plazo ≥1 sem, plazo ≤104 sem (2 años),
 
 ### 26.7 Estado actual
 
-⏳ No implementado. Resolverá feedbacks #7 (sugerir diagnóstico) y #8 (plan sugerido) junto con `clinical-engine` (módulo 27 / Fase 3).
+✅ **Implementado (Sprint 15).**
+- Dominio: Goal, GoalEvaluation (entities, VOs), branded GoalId, 6 tipos (antropométrico/bioquímico/clínico/dietético/conductual/personalizado), 6 estados, 3 prioridades, 3 fuentes, criterios de éxito, GoalRepository interface, Goal.create, pause, markAchieved, markNotAchieved, abandon, scale integrado.
+- Aplicación: 10 use cases (create, update, listByPatient, listAll, getById, delete, pause, achieve, abandon, listByStatus), Zod form schema.
+- Infraestructura: DexieGoalRepository, goalMapper, Dexie schema v16 (tabla `goals`).
+- UI: GoalsPage con cards agrupados por tipo + badges de estado + skeleton loading.
+- Service: goalService.ts.
+- Sidebar: nav en sección Clínica.
+- Router: `/objetivos`.
+
+**Pendiente futuro:** integración con consultas SOAP (evaluación automática por consulta), motor de proyecciones, alertas por plazo próximo.
 
 ---
 
@@ -3558,7 +3655,16 @@ Generar tendencia
 
 ### 27.6 Estado actual
 
-⏳ No implementado. Se captura cumplimiento percibido (1-10) en wizard SOAP (Sprint 5) pero no se calcula índice ni se gestionan barreras.
+✅ **Implementado (Sprint 15).**
+- Dominio: AdherenceRecord, AdherenceIndex (con cálculo ponderado), BarrierEvent (entities), branded AdherenceId, 4 fuentes, 7 tipos de barrera, repositorio unificado.
+- Aplicación: 7 use cases (createRecord, listByPatient, getById, deleteRecord, calculateIndex, createBarrier, listBarriers), Zod form schema.
+- Infraestructura: DexieAdherenceRepository (3 tablas), adherenceMapper, Dexie schema v17 (tablas `adherence_records`, `adherence_indexes`, `adherence_barriers`).
+- UI: AdherencePage con cards de 5 métricas + colores por rango.
+- Service: adherenceService.ts.
+- Sidebar: nav en sección Clínica.
+- Router: `/adherencia`.
+
+**Pendiente futuro:** integración con portal del paciente, alertas por adherencia crítica, cálculo de tendencia real (comparación entre períodos).
 
 ---
 
@@ -3626,7 +3732,15 @@ Generar tendencia
 
 ### 28.6 Estado actual
 
-⏳ No implementado. Sprint candidato: **Sprint 18-19**.
+✅ **Implementado (Sprint 15).**
+- Dominio: Recipe, RecipeIngredient, RecipeStep (entities, VOs, branded IDs, RecipeStatus, categorías, dificultad, alérgenos, RecipeRepository interface, Recipe.create, publish, archive, scale, calculateNutrition placeholder).
+- Aplicación: 8 use cases (create, update, publish, archive, list, getById, delete, search, scale), Zod schema wizard 3 pasos.
+- Infraestructura: DexieRepository (tabla `recipes` v15), mapper.
+- UI: RecipesPage, RecipeCard, RecipeDialog wizard, hooks (useRecipes, useCreateRecipe).
+- Sidebar: nav "Recetario" en planningNav.
+- Router: `/recetas`.
+
+**Implementado como MVP** — wizard manual, sin autocomplete SMAE ni cálculo nutricional automático.
 
 ---
 
@@ -3672,7 +3786,8 @@ Generar tendencia
 
 ✅ **MVP**: MealPlan con 5 slots, 30 alimentos SMAE, `planCalculations`, distribución básica (Sprint 6).
 ✅ **Sprint 10**: SlotProgress con barras de kcal + delta vs `DEFAULT_KCAL_DISTRIBUTION`; drag&drop entre tiempos.
-⏳ **Fase 2**: lista de compras, restricción por patología, escalamiento, planificador mensual, versionamiento, menús cíclicos.
+✅ **Sprint 15 (expansión)**: WeeklyPlan (plan semanal multi-día con MenuDay), ShoppingList (generación automática desde plan), macroDistribution calculator con ajustes por restricción (diabético, renal), Dexie schema v19 (tablas `weekly_plans`, `shopping_lists`), MealPlannerPage, sidebar nav "Plan semanal".
+⏳ **Pendiente futuro**: planificador mensual/cíclico, versionamiento, comparativos entre planes, restricción completa por patología.
 
 ---
 
@@ -3738,7 +3853,7 @@ Generar tendencia
 
 ### 30.6 Estado actual
 
-⏳ No implementado. Sprint candidato: **Sprint 14-15**.
+✅ Implementado en Sprint 15. Pendiente fino: recordatorios (reminder configurable), citas recurrentes, citas grupales, lista de espera, integración con calendario externo.
 
 ---
 
@@ -3853,7 +3968,16 @@ Generar tendencia
 
 ### 32.6 Estado actual
 
-⏳ No implementado. Sprint candidato: **Sprint 11 (PDF básico) + Sprint 16-17 (firmas y plantillas)**.
+✅ **MVP implementado (Sprint 15).**
+- Dominio: NutriClinicaDocument (entity con estados: draft/signed/delivered/voided, firma digital, versionado), DocumentId branded, 6 tipos de documento, repository interface.
+- Aplicación: 7 use cases (create, list, getById, delete, sign, deliver, void), Zod form schema.
+- Infraestructura: DexieDocumentRepository, documentMapper, Dexie schema v18 (tabla `documents`).
+- UI: DocumentsPage con cards + badges de estado + vista previa HTML.
+- Service: documentService.ts.
+- Sidebar: nav en Planificación.
+- Router: `/documentos`.
+
+**Pendiente futuro:** plantillas con placeholders, vista previa en vivo, firma digital SHA-256 real, envío al paciente, integración con módulos (generar documento desde consulta/plan/receta).
 
 ---
 

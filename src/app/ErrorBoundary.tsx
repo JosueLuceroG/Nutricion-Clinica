@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import i18n from "@i18n/config";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -42,10 +43,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
                 <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden />
               </div>
-              <CardTitle>Algo salió mal</CardTitle>
+              <CardTitle>{i18n.t("common.error_title")}</CardTitle>
               <CardDescription>
-                La aplicación encontró un error inesperado. Puedes intentar recargar
-                la vista o volver al inicio.
+                {i18n.t("common.app_error_description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -57,12 +57,12 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               <div className="flex flex-wrap gap-2">
                 <Button onClick={this.handleReset} variant="outline" size="sm">
                   <RefreshCw className="mr-2 h-4 w-4" />
-                  Reintentar
+                  {i18n.t("common.retry")}
                 </Button>
                 <Button asChild size="sm">
                   <Link to="/">
                     <Home className="mr-2 h-4 w-4" />
-                    Ir al inicio
+                    {i18n.t("pages.go_home")}
                   </Link>
                 </Button>
               </div>

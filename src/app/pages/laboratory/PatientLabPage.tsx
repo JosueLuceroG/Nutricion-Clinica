@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Plus,
@@ -32,8 +33,8 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import type { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import type { LabPanel } from "@modules/laboratory/domain/LabPanel";
 import type { LabTestCode } from "@modules/laboratory/domain/LabTest";
-import { LAB_TEST_DEFINITIONS, LabTestCategoryLabel } from "@modules/laboratory/domain/LabTest";
-import { classifyLabValue, LabFlagLabel, type LabResult } from "@modules/laboratory/domain/LabResult";
+import { LAB_TEST_DEFINITIONS, type LabTestCategory } from "@modules/laboratory/domain/LabTest";
+import { classifyLabValue, type LabFlag, type LabResult } from "@modules/laboratory/domain/LabResult";
 import { findReferenceRange } from "@modules/laboratory/domain/LabReferenceRange";
 import { MEXICO_REFERENCE_RANGES } from "@modules/laboratory/data/mexicoReferenceRanges";
 import { labPanelService } from "@services/labPanelService";
@@ -68,6 +69,7 @@ const TRACKED_TESTS: LabTestCode[] = [
 ];
 
 export function PatientLabPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const id = React.useMemo(
@@ -78,13 +80,13 @@ export function PatientLabPage() {
   const { data, loading, error, reload } = usePatientLabPanels(id);
 
   const onDelete = async (panelId: LabPanelId) => {
-    if (!confirm("¿Eliminar este panel? Esta acción no se puede deshacer.")) return;
+    if (!confirm(t("lab.delete_panel_confirm"))) return;
     try {
       await labPanelService.delete.execute(panelId, true);
-      toast.success("Panel eliminado");
+      toast.success(t("lab.panel_deleted"));
       reload();
     } catch (err) {
-      toast.error("No se pudo eliminar", {
+      toast.error(t("lab.delete_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -93,7 +95,7 @@ export function PatientLabPage() {
   if (patientLoading || loading) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -108,7 +110,7 @@ export function PatientLabPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_title")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -119,11 +121,11 @@ export function PatientLabPage() {
   if (!patient) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.not_found_title")} />
         <PageContent>
           <EmptyState
-            title="El paciente no existe"
-            action={{ label: "Volver", onClick: () => navigate("/pacientes") }}
+            title={t("patient.not_exists")}
+            action={{ label: t("common.back"), onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
       </>
@@ -136,20 +138,20 @@ export function PatientLabPage() {
   return (
     <>
       <PageHeader
-        title={`Laboratorio · ${patient.fullName}`}
-        description={`${items.length} panel${items.length === 1 ? "" : "es"} registrado${items.length === 1 ? "" : "s"}`}
+        title={t("lab.patient_lab", { patientName: patient.fullName })}
+        description={t("lab.panel_count", { count: items.length })}
         actions={
           <>
             <Button asChild variant="outline">
               <Link to={`/pacientes/${patient.id.toString()}`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al paciente
+                {t("patient.back_to_patient")}
               </Link>
             </Button>
             <Button asChild>
               <Link to={`/pacientes/${patient.id.toString()}/laboratorio/nuevo`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nuevo panel
+                {t("lab.new_panel")}
               </Link>
             </Button>
           </>
@@ -159,10 +161,10 @@ export function PatientLabPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={FlaskConical}
-            title="Sin paneles de laboratorio"
-            description="Registra la primera toma para iniciar el seguimiento bioquímico del paciente."
+            title={t("lab.no_panels")}
+            description={t("lab.empty_patient_desc")}
             action={{
-              label: "Registrar primer panel",
+              label: t("lab.create_first_panel"),
               onClick: () => navigate(`/pacientes/${patient.id.toString()}/laboratorio/nuevo`),
             }}
           />
@@ -198,6 +200,7 @@ function LabPanelCard({
   sex: Sex;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const byCategory = React.useMemo(() => {
     const grouped = new Map<string, LabResult[]>();
     for (const r of panel.results) {
@@ -208,7 +211,7 @@ function LabPanelCard({
     return Array.from(grouped.entries());
   }, [panel.results]);
 
-  const derived = React.useMemo(() => deriveCalculations(panel, ageYears, sex), [panel, ageYears, sex]);
+  const derived = React.useMemo(() => deriveCalculations(panel, ageYears, sex, t), [panel, ageYears, sex, t]);
 
   return (
     <Card>
@@ -220,14 +223,13 @@ function LabPanelCard({
               {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(panel.takenAt)}
             </CardTitle>
             <CardDescription>
-              {panel.labName ?? "Laboratorio no especificado"} · {panel.results.length} resultado
-              {panel.results.length === 1 ? "" : "s"}
+              {t("lab.panel_summary", { labName: panel.labName ?? t("lab.unspecified"), count: panel.results.length })}
             </CardDescription>
           </div>
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Eliminar"
+            aria-label={t("common.delete")}
             onClick={onDelete}
           >
             <Trash2 className="h-4 w-4" />
@@ -238,7 +240,7 @@ function LabPanelCard({
         {byCategory.map(([cat, results]) => (
           <div key={cat}>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {LabTestCategoryLabel[cat as keyof typeof LabTestCategoryLabel] ?? cat}
+              {t(`lab.category_${(cat as LabTestCategory).replace(/-/g, "_")}`)}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {results.map((r) => (
@@ -251,7 +253,7 @@ function LabPanelCard({
         {derived.length > 0 && (
           <div className="rounded-md border border-dashed bg-muted/30 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Cálculos derivados
+              {t("lab.derived_calculations")}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {derived.map((d) => (
@@ -286,6 +288,7 @@ function LabResultBadge({
   ageYears: number;
   sex: Sex;
 }) {
+  const { t } = useTranslation();
   const def = LAB_TEST_DEFINITIONS[test];
   const range = findReferenceRange(test, sex, ageYears, MEXICO_REFERENCE_RANGES);
   const flag = classifyLabValue(value, range);
@@ -317,8 +320,8 @@ function LabResultBadge({
               "ml-auto",
               isCritical ? "text-destructive" : "text-warning",
             )}
-            aria-label={LabFlagLabel[flag]}
-            title={LabFlagLabel[flag]}
+            aria-label={labFlagLabel(t, flag)}
+            title={labFlagLabel(t, flag)}
           >
             {trendIcon}
           </span>
@@ -329,6 +332,7 @@ function LabResultBadge({
 }
 
 function LabTrendChart({ panels }: { panels: LabPanel[] }) {
+  const { t } = useTranslation();
   const series = React.useMemo(() => {
     return TRACKED_TESTS.map((test) => {
       const points = panels
@@ -369,9 +373,9 @@ function LabTrendChart({ panels }: { panels: LabPanel[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Tendencia longitudinal</CardTitle>
+        <CardTitle className="text-base">{t("lab.longitudinal_trend")}</CardTitle>
         <CardDescription>
-          Evolución de los principales indicadores bioquímicos
+          {t("lab.trend_description")}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -424,7 +428,11 @@ interface Derived {
   note?: string;
 }
 
-function deriveCalculations(panel: LabPanel, ageYears: number, sex: Sex): Derived[] {
+function labFlagLabel(t: ReturnType<typeof useTranslation>["t"], flag: LabFlag) {
+  return t(`lab.flag_${flag.replace(/-/g, "_")}`);
+}
+
+function deriveCalculations(panel: LabPanel, ageYears: number, sex: Sex, t: ReturnType<typeof useTranslation>["t"]): Derived[] {
   const out: Derived[] = [];
   const creatinine = panel.getValue("CREATININA");
   if (creatinine !== null && (sex === "male" || sex === "female")) {
@@ -442,7 +450,7 @@ function deriveCalculations(panel: LabPanel, ageYears: number, sex: Sex): Derive
     try {
       const homa = calculateHOMA({ glucoseMgDl: glucose, insulinUUiMl: insulin });
       const interp =
-        homa < 1.5 ? "sensible" : homa < 2.5 ? "borderline" : "resistencia";
+        homa < 1.5 ? t("lab.homa_sensitive") : homa < 2.5 ? t("lab.homa_borderline") : t("lab.homa_resistance");
       out.push({ label: "HOMA-IR", value: homa.toFixed(2), note: interp });
     } catch {
       /* ignore */

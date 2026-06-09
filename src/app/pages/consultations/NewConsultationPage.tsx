@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Skeleton } from "@components/ui/skeleton";
@@ -10,6 +11,7 @@ import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 
 export function NewConsultationPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
@@ -20,7 +22,7 @@ export function NewConsultationPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Cargando paciente…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <Skeleton className="h-96 w-full" />
         </PageContent>
@@ -31,7 +33,7 @@ export function NewConsultationPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_occurred")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -42,7 +44,7 @@ export function NewConsultationPage() {
   if (!patient || !id) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.title_single") + " " + t("common.no_results").toLowerCase()} />
         <PageContent>{null}</PageContent>
       </>
     );
@@ -51,13 +53,13 @@ export function NewConsultationPage() {
   return (
     <>
       <PageHeader
-        title="Nueva consulta"
-        description={`Paciente: ${patient.fullName} · ${patient.age} años`}
+        title={t("consultation.new")}
+        description={`${t("common.patient")}: ${patient.fullName} · ${patient.age} ${t("patient.title_single").toLowerCase()}`}
         actions={
           <Button asChild variant="outline">
             <Link to={`/pacientes/${patient.id.toString()}/consultas`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
+              {t("common.previous")}
             </Link>
           </Button>
         }

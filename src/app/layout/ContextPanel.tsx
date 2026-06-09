@@ -1,11 +1,13 @@
 import * as React from "react";
 import { useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { X, Info, Stethoscope, AlertCircle } from "lucide-react";
 import { Button } from "@components/ui/button";
 import { useUIStore } from "@store/uiStore";
 import { cn } from "@utils/cn";
 
 export function ContextPanel() {
+  const { t } = useTranslation();
   const open = useUIStore((s) => s.contextPanelOpen);
   const setOpen = useUIStore((s) => s.setContextPanelOpen);
   const location = useLocation();
@@ -13,24 +15,24 @@ export function ContextPanel() {
   const ctx = React.useMemo(() => {
     if (location.pathname.startsWith("/pacientes")) {
       return {
-        title: "Información del paciente",
-        description: "Los datos personales se cifran localmente antes de persistir.",
+        title: t("layout.context_patient_title"),
+        description: t("layout.context_patient_desc"),
         icon: Stethoscope,
       };
     }
     if (location.pathname.startsWith("/consultas")) {
       return {
-        title: "Reglas SMAE",
-        description: "Las recomendaciones siguen SMAE 5ª edición.",
+        title: t("layout.context_smae_title"),
+        description: t("layout.context_smae_desc"),
         icon: Info,
       };
     }
     return {
-      title: "Contexto",
-      description: "Información contextual de la sección actual.",
+      title: t("layout.context_title"),
+      description: t("layout.context_desc"),
       icon: Info,
     };
-  }, [location.pathname]);
+  }, [location.pathname, t]);
 
   if (!open) return null;
   const Icon = ctx.icon;
@@ -38,7 +40,7 @@ export function ContextPanel() {
   return (
     <aside
       className="hidden w-80 shrink-0 flex-col border-l bg-muted/20 lg:flex"
-      aria-label="Panel contextual"
+      aria-label={t("layout.context_panel")}
     >
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -49,7 +51,7 @@ export function ContextPanel() {
           variant="ghost"
           size="icon-sm"
           onClick={() => setOpen(false)}
-          aria-label="Cerrar panel contextual"
+          aria-label={t("layout.close_context_panel")}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -62,10 +64,7 @@ export function ContextPanel() {
           )}
         >
           <AlertCircle className="h-4 w-4 shrink-0 text-info" aria-hidden />
-          <span>
-            Esta aplicación funciona sin conexión. Los cambios se sincronizan
-            automáticamente cuando se restablece la conexión.
-          </span>
+          <span>{t("layout.offline_hint")}</span>
         </div>
       </div>
     </aside>

@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Trash2,
@@ -23,19 +24,18 @@ import { ErrorState, EmptyState } from "@components/layout/EmptyState";
 import { useMealPlan } from "@modules/mealplan/ui/useMealPlanHooks";
 import { MealPlanId } from "@modules/mealplan/domain/MealPlanId";
 import {
-  MealPlanStatusLabel,
   MealPlanStatusColor,
   canTransitionMealPlan,
   type MealPlanStatus,
 } from "@modules/mealplan/domain/MealPlanStatus";
 import {
   MEAL_SLOT_ORDER,
-  MealSlotLabel,
+  type MealSlot,
 } from "@modules/mealplan/domain/MealSlot";
 import {
-  FoodGroupLabel,
   Food,
   SYSTEM_FOODS,
+  type FoodGroup,
 } from "@modules/smae/domain";
 import {
   planDailyNutrition,
@@ -46,7 +46,20 @@ import { mealPlanService } from "@services/mealPlanService";
 import { pdfService } from "@services/pdf/pdfService";
 import { patientService } from "@services/patientService";
 
+function mealPlanStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: MealPlanStatus) {
+  return t(`mealplan.status_${status}`);
+}
+
+function mealSlotLabel(t: ReturnType<typeof useTranslation>["t"], slot: MealSlot) {
+  return t(`mealplan.${slot.replace("-", "_")}`);
+}
+
+function foodGroupLabel(t: ReturnType<typeof useTranslation>["t"], group: FoodGroup) {
+  return t(`smae.food_group_${group.replace(/-/g, "_")}`);
+}
+
 export function MealPlanDetailPage() {
+  const { t } = useTranslation();
   const { planId } = useParams();
   const navigate = useNavigate();
   const id = planId ? MealPlanId.fromUnsafe(planId) : null;
@@ -58,10 +71,10 @@ export function MealPlanDetailPage() {
     setBusy(true);
     try {
       await mealPlanService.transition.execute(id, to);
-      toast.success(`Plan ${MealPlanStatusLabel[to].toLowerCase()}`);
+      toast.success(t("mealplan.status_changed", { status: mealPlanStatusLabel(t, to).toLowerCase() }));
       reload();
     } catch (err) {
-      toast.error("No se pudo cambiar el estado", {
+      toast.error(t("mealplan.status_change_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -71,14 +84,14 @@ export function MealPlanDetailPage() {
 
   const onDelete = async () => {
     if (!id || !plan) return;
-    if (!confirm(`¿Eliminar "${plan.name}"? Esta acción se puede revertir.`)) return;
+    if (!confirm(t("mealplan.delete_confirm", { name: plan.name }))) return;
     setBusy(true);
     try {
       await mealPlanService.delete.execute(id, true);
-      toast.success("Plan eliminado");
+      toast.success(t("mealplan.deleted_success"));
       navigate(`/pacientes/${plan.patientId.toString()}/planes`);
     } catch (err) {
-      toast.error("No se pudo eliminar", {
+      toast.error(t("mealplan.delete_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
       setBusy(false);
@@ -90,7 +103,7 @@ export function MealPlanDetailPage() {
     try {
       const patient = await patientService.get.execute(plan.patientId);
       if (!patient) {
-        toast.error("No se encontró el paciente");
+        toast.error(t("patient.not_exists"));
         return;
       }
       const systemFoods = SYSTEM_FOODS.reduce<Record<string, Food>>((acc, f) => {
@@ -107,16 +120,16 @@ export function MealPlanDetailPage() {
         group: "verduras" as const,
         name: foodId,
         shortName: foodId,
-        serving: "1 ración",
+        serving: t("mealplan.default_serving"),
         servingGrams: 100,
         keywords: [],
         custom: false,
       });
       const data = pdfService.generateMealPlanPdf(plan, patient, lookupFn);
       pdfService.download(data, `plan-alimentacion-${patient.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf`);
-      toast.success("PDF descargado");
+      toast.success(t("consultation.pdf_downloaded"));
     } catch (err) {
-      toast.error("Error al generar PDF", {
+      toast.error(t("mealplan.pdf_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -125,7 +138,7 @@ export function MealPlanDetailPage() {
   if (loading && !plan) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-4">
             <Skeleton className="h-32 w-full" />
@@ -139,7 +152,7 @@ export function MealPlanDetailPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_title")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -150,12 +163,12 @@ export function MealPlanDetailPage() {
   if (!plan) {
     return (
       <>
-        <PageHeader title="Plan no encontrado" />
+        <PageHeader title={t("mealplan.not_found_title")} />
         <PageContent>
           <EmptyState
-            title="El plan no existe"
-            description="Es posible que haya sido eliminado o el enlace sea incorrecto."
-            action={{ label: "Volver", onClick: () => navigate("/planes") }}
+            title={t("mealplan.not_exists")}
+            description={t("mealplan.not_found_desc")}
+            action={{ label: t("common.back"), onClick: () => navigate("/planes") }}
           />
         </PageContent>
       </>
@@ -170,7 +183,7 @@ export function MealPlanDetailPage() {
     actions.push(
       <Button key="activate" onClick={() => onTransition("active")} disabled={busy}>
         <PlayCircle className="mr-2 h-4 w-4" />
-        Activar plan
+        {t("mealplan.activate_plan")}
       </Button>,
     );
   }
@@ -178,7 +191,7 @@ export function MealPlanDetailPage() {
     actions.push(
       <Button key="complete" onClick={() => onTransition("completed")} disabled={busy}>
         <CheckCircle2 className="mr-2 h-4 w-4" />
-        Marcar completado
+        {t("mealplan.mark_completed")}
       </Button>,
     );
   }
@@ -191,7 +204,7 @@ export function MealPlanDetailPage() {
         disabled={busy}
       >
         <RotateCcw className="mr-2 h-4 w-4" />
-        Reactivar como borrador
+        {t("mealplan.reactivate_as_draft")}
       </Button>,
     );
   }
@@ -204,7 +217,7 @@ export function MealPlanDetailPage() {
         disabled={busy}
       >
         <XCircle className="mr-2 h-4 w-4" />
-        Cancelar
+        {t("common.cancel")}
       </Button>,
     );
   }
@@ -223,7 +236,7 @@ export function MealPlanDetailPage() {
             <Button asChild variant="outline">
               <Link to={`/pacientes/${plan.patientId.toString()}/planes`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver
+                {t("common.back")}
               </Link>
             </Button>
             {actions}
@@ -233,7 +246,7 @@ export function MealPlanDetailPage() {
             </Button>
             <Button variant="destructive" onClick={onDelete} disabled={busy}>
               <Trash2 className="mr-2 h-4 w-4" />
-              Eliminar
+              {t("common.delete")}
             </Button>
           </>
         }
@@ -253,12 +266,12 @@ export function MealPlanDetailPage() {
                       <div>
                         <CardTitle className="flex items-center gap-2 text-base">
                           <UtensilsCrossed className="h-4 w-4 text-muted-foreground" />
-                          {MealSlotLabel[slot]}
+                          {mealSlotLabel(t, slot)}
                         </CardTitle>
                         <CardDescription>
                           {rows.length === 0
-                            ? "Sin alimentos"
-                            : `${rows.length} alimento${rows.length === 1 ? "" : "s"} · ${Math.round(mealKcal)} kcal`}
+                            ? t("mealplan.no_foods")
+                            : t("mealplan.food_count_kcal", { count: rows.length, kcal: Math.round(mealKcal) })}
                         </CardDescription>
                       </div>
                     </div>
@@ -266,7 +279,7 @@ export function MealPlanDetailPage() {
                   <CardContent>
                     {rows.length === 0 ? (
                       <p className="text-sm italic text-muted-foreground">
-                        Sin alimentos registrados en este tiempo
+                        {t("mealplan.no_foods_in_slot")}
                       </p>
                     ) : (
                       <ul className="divide-y">
@@ -281,7 +294,7 @@ export function MealPlanDetailPage() {
                                   {r.count} × {r.foodName}
                                 </p>
                                 <p className="truncate text-[11px] text-muted-foreground">
-                                  {FoodGroupLabel[r.group]} · {r.serving}
+                                  {foodGroupLabel(t, r.group)} · {r.serving}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1.5 text-[11px] tabular-nums text-muted-foreground">
@@ -305,7 +318,7 @@ export function MealPlanDetailPage() {
             {plan.notes && (
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Notas del plan</CardTitle>
+                  <CardTitle className="text-base">{t("mealplan.plan_notes")}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="whitespace-pre-wrap text-sm leading-relaxed">{plan.notes}</p>
@@ -319,9 +332,9 @@ export function MealPlanDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Target className="h-4 w-4" />
-                  Cumplimiento diario
+                  {t("mealplan.daily_compliance")}
                 </CardTitle>
-                <CardDescription>Reales vs objetivos prescritos</CardDescription>
+                <CardDescription>{t("mealplan.actual_vs_targets")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-2">
@@ -333,7 +346,7 @@ export function MealPlanDetailPage() {
                     decimals={0}
                   />
                   <ComplianceStat
-                    label="Proteína"
+                    label={t("mealplan.protein")}
                     actual={totals.proteinG}
                     target={plan.proteinTargetG}
                     diff={diff.proteinG}
@@ -341,7 +354,7 @@ export function MealPlanDetailPage() {
                     unit="g"
                   />
                   <ComplianceStat
-                    label="Carbohidratos"
+                    label={t("mealplan.carbs")}
                     actual={totals.carbsG}
                     target={plan.carbsTargetG}
                     diff={diff.carbsG}
@@ -349,7 +362,7 @@ export function MealPlanDetailPage() {
                     unit="g"
                   />
                   <ComplianceStat
-                    label="Grasa"
+                    label={t("mealplan.fat")}
                     actual={totals.fatG}
                     target={plan.fatTargetG}
                     diff={diff.fatG}
@@ -358,18 +371,18 @@ export function MealPlanDetailPage() {
                   />
                 </div>
                 <p className="mt-3 text-[11px] text-muted-foreground">
-                  Positivo = excedente · Negativo = déficit
+                  {t("mealplan.diff_hint")}
                 </p>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Estado</CardTitle>
+                <CardTitle className="text-base">{t("common.status")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <Badge variant={MealPlanStatusColor[plan.status] as never}>
-                  {MealPlanStatusLabel[plan.status]}
+                  {mealPlanStatusLabel(t, plan.status)}
                 </Badge>
                 {plan.description && (
                   <p className="text-sm text-muted-foreground">{plan.description}</p>
@@ -377,12 +390,12 @@ export function MealPlanDetailPage() {
                 <div className="border-t pt-2 text-xs text-muted-foreground">
                   <p className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />
-                    Inicio: {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(plan.startDate)}
+                    {t("mealplan.start_label", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(plan.startDate) })}
                   </p>
                   {plan.endDate && (
                     <p className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      Fin: {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(plan.endDate)}
+                      {t("mealplan.end_label", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(plan.endDate) })}
                     </p>
                   )}
                 </div>
@@ -391,17 +404,17 @@ export function MealPlanDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Vinculación clínica</CardTitle>
+                <CardTitle className="text-base">{t("mealplan.clinical_link")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 <div className="flex items-center gap-2 rounded-md border p-2">
                   <ClipboardList className="h-4 w-4 text-primary" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Expediente del paciente</p>
-                    <p className="text-xs text-muted-foreground">Ver consultas y mediciones</p>
+                    <p className="text-sm font-medium">{t("mealplan.patient_record")}</p>
+                    <p className="text-xs text-muted-foreground">{t("mealplan.view_consultations_measurements")}</p>
                   </div>
                   <Button asChild variant="ghost" size="sm">
-                    <Link to={`/pacientes/${plan.patientId.toString()}`}>Abrir</Link>
+                    <Link to={`/pacientes/${plan.patientId.toString()}`}>{t("common.open")}</Link>
                   </Button>
                 </div>
               </CardContent>
@@ -409,14 +422,14 @@ export function MealPlanDetailPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Auditoría</CardTitle>
+                <CardTitle className="text-base">{t("consultation.audit")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-xs text-muted-foreground">
                 <p>
-                  Creado: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(plan.createdAt)}
+                  {t("mealplan.created_at", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(plan.createdAt) })}
                 </p>
                 <p>
-                  Actualizado: {new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(plan.updatedAt)}
+                  {t("mealplan.updated_at", { date: new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(plan.updatedAt) })}
                 </p>
               </CardContent>
             </Card>
@@ -442,6 +455,7 @@ function ComplianceStat({
   decimals: number;
   unit?: string;
 }) {
+  const { t } = useTranslation();
   const inMeta = Math.abs(diff) <= 0.1;
   const tone = inMeta ? "success" : diff > 0 ? "destructive" : "warning";
   return (
@@ -453,7 +467,7 @@ function ComplianceStat({
       </p>
       {inMeta ? (
         <Badge variant="success" className="mt-1">
-          En meta
+          {t("mealplan.in_target")}
         </Badge>
       ) : (
         <Badge variant={tone as never} className="mt-1">

@@ -13,49 +13,76 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Receipt,
+  BookOpen,
+  Target,
+  HeartPulse,
+  FileText,
+  CalendarRange,
+  Pill,
+  BarChart3,
+  Database,
+  Upload,
 } from "lucide-react";
 import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
 import { Button } from "@components/ui/button";
 import { Separator } from "@components/ui/separator";
 import { Badge } from "@components/ui/badge";
+import { ThemeToggle } from "@components/ui/ThemeToggle";
+import { LanguageSwitcher } from "@components/ui/LanguageSwitcher";
 import { cn } from "@utils/cn";
 import { db } from "@services/db";
 import { useLiveQuery } from "dexie-react-hooks";
+import { useTranslation } from "react-i18next";
 import { isBillingRole } from "@modules/auth/authRoles";
 
 interface NavItem {
   to: string;
-  label: string;
+  labelKey: string;
   icon: React.ComponentType<{ className?: string }>;
   /** Si está, se suscribe al live count desde Dexie. */
-  liveCountFrom?: "patients" | "consultations" | "anthropometry" | "lab_panels" | "meal_plans" | "pending_payments";
+  liveCountFrom?: "patients" | "consultations" | "anthropometry" | "lab_panels" | "meal_plans" | "pending_payments" | "appointments";
 }
 
 const primaryNav: NavItem[] = [
-  { to: "/", label: "Panel", icon: LayoutDashboard },
-  { to: "/pacientes", label: "Pacientes", icon: Users, liveCountFrom: "patients" },
-  { to: "/consultas", label: "Consultas", icon: ClipboardList },
-  { to: "/agenda", label: "Agenda", icon: Calendar },
+  { to: "/", labelKey: "nav.dashboard", icon: LayoutDashboard },
+  { to: "/pacientes", labelKey: "nav.patients", icon: Users, liveCountFrom: "patients" },
+  { to: "/consultas", labelKey: "nav.consultations", icon: ClipboardList },
+  { to: "/agenda", labelKey: "nav.agenda", icon: Calendar, liveCountFrom: "appointments" },
 ];
 
 const clinicalNav: NavItem[] = [
-  { to: "/laboratorio", label: "Laboratorio", icon: FlaskConical },
-  { to: "/calculos", label: "Cálculos clínicos", icon: Calculator },
+  { to: "/laboratorio", labelKey: "nav.laboratory", icon: FlaskConical },
+  { to: "/calculos", labelKey: "nav.calculations", icon: Calculator },
+  { to: "/objetivos", labelKey: "nav.goals", icon: Target },
+  { to: "/adherencia", labelKey: "nav.adherence", icon: HeartPulse },
+  { to: "/medicamentos", labelKey: "nav.medications", icon: Pill },
 ];
 
 const planningNav: NavItem[] = [
-  { to: "/planes", label: "Planes alimentarios", icon: UtensilsCrossed },
+  { to: "/planes", labelKey: "nav.meal_plans", icon: UtensilsCrossed },
+  { to: "/plan-semanal", labelKey: "nav.meal_plans", icon: CalendarRange },
+  { to: "/recetas", labelKey: "nav.recipes", icon: BookOpen },
+  { to: "/documentos", labelKey: "nav.documents", icon: FileText },
+];
+
+const reportsNav: NavItem[] = [
+  { to: "/reportes", labelKey: "nav.reports", icon: BarChart3 },
 ];
 
 const secondaryNav: NavItem[] = [
-  { to: "/configuracion", label: "Configuración", icon: Settings },
-  { to: "/ayuda", label: "Ayuda", icon: HelpCircle },
+  { to: "/smae", labelKey: "nav.smae_catalog", icon: Database },
+  { to: "/importar", labelKey: "nav.import", icon: Upload },
+  { to: "/configuracion", labelKey: "nav.settings", icon: Settings },
+  { to: "/ayuda", labelKey: "nav.help", icon: HelpCircle },
 ];
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggle = useUIStore((s) => s.toggleSidebar);
+  const mobileOpen = useUIStore((s) => s.mobileSidebarOpen);
+  const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const userRole = useAuthStore((s) => s.user?.rol ?? null);
   const showBilling = isBillingRole(userRole);
 
@@ -63,21 +90,15 @@ export function Sidebar() {
     ? [
         {
           to: "/billing",
-          label: "Facturación",
+          labelKey: "nav.billing",
           icon: Receipt,
           liveCountFrom: "pending_payments",
         },
       ]
     : [];
 
-  return (
-    <aside
-      className={cn(
-        "flex h-full flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200",
-        collapsed ? "w-16" : "w-72",
-      )}
-      aria-label="Navegación principal"
-    >
+  const sidebarContent = (
+    <>
       <div className={cn("flex h-14 items-center border-b px-4", collapsed && "justify-center px-2")}>
         {!collapsed && (
           <Link to="/" className="flex items-center gap-2 font-semibold">
@@ -85,7 +106,7 @@ export function Sidebar() {
               <UtensilsCrossed className="h-4 w-4" aria-hidden />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-sm">NutriClinica</span>
+              <span className="text-sm">{t("common.app_name")}</span>
               <span className="text-[10px] text-muted-foreground">v0.1.0</span>
             </div>
           </Link>
@@ -98,40 +119,77 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        <NavSection title="General" items={primaryNav} collapsed={collapsed} />
+        <NavSection title={t("nav.general")} items={primaryNav} collapsed={collapsed} />
         {billingNav.length > 0 && (
           <>
             <Separator className="my-3" />
-            <NavSection title="Finanzas" items={billingNav} collapsed={collapsed} />
+            <NavSection title={t("nav.finance")} items={billingNav} collapsed={collapsed} />
           </>
         )}
         <Separator className="my-3" />
-        <NavSection title="Clínica" items={clinicalNav} collapsed={collapsed} />
+        <NavSection title={t("nav.consultations")} items={clinicalNav} collapsed={collapsed} />
         <Separator className="my-3" />
-        <NavSection title="Planificación" items={planningNav} collapsed={collapsed} />
+        <NavSection title={t("nav.meal_plans")} items={planningNav} collapsed={collapsed} />
+        <Separator className="my-3" />
+        <NavSection title={t("nav.reports")} items={reportsNav} collapsed={collapsed} />
         <Separator className="my-3" />
         <NavSection title="" items={secondaryNav} collapsed={collapsed} />
       </nav>
 
       <div className="border-t p-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={toggle}
-          className="w-full justify-center"
-          aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
-        >
-          {collapsed ? (
-            <ChevronsRight className="h-4 w-4" />
-          ) : (
-            <>
+        {collapsed ? (
+          <div className="flex flex-col items-center gap-1">
+            <ThemeToggle collapsed />
+            <LanguageSwitcher collapsed />
+            <Button variant="ghost" size="sm" onClick={toggle} className="w-full justify-center" aria-label={t("nav.expand")}>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <ThemeToggle />
+            <LanguageSwitcher />
+            <Button variant="ghost" size="sm" onClick={toggle} className="w-full justify-start gap-2 px-2" aria-label={t("nav.collapse")}>
               <ChevronsLeft className="h-4 w-4" />
-              <span>Colapsar</span>
-            </>
-          )}
-        </Button>
+              <span>{t("nav.collapse")}</span>
+            </Button>
+          </div>
+        )}
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside
+        className={cn(
+          "hidden h-full flex-col border-r bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
+          collapsed ? "w-16" : "w-72",
+        )}
+        aria-label={t("nav.main_menu")}
+      >
+        {sidebarContent}
+      </aside>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden
+          />
+          <aside
+            className={cn(
+              "fixed inset-y-0 left-0 z-50 flex h-full flex-col border-r bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200",
+              collapsed ? "w-16" : "w-72",
+            )}
+            aria-label={t("nav.main_menu")}
+          >
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -159,7 +217,9 @@ function NavSection({
 }
 
 function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+  const { t } = useTranslation();
   const Icon = item.icon;
+  const label = t(item.labelKey);
   // Switch explícito (en vez de `db[item.liveCountFrom]`) para que Dexie
   // pueda observar correctamente cada tabla y para que filtremos
   // soft-deleted (que es la causa del "número fijo" en el badge: el
@@ -177,6 +237,10 @@ function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolea
           return db.lab_panels.filter((r) => r.deleted_at === null).count();
         case "meal_plans":
           return db.meal_plans.filter((r) => r.deleted_at === null).count();
+        case "appointments":
+          return db.appointments
+            .filter((r) => r.status === "scheduled" || r.status === "confirmed")
+            .count();
         case "pending_payments":
           return db.consultations
             .filter((r) => r.deleted_at === null && !r.paid && r.cost > 0)
@@ -202,10 +266,10 @@ function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolea
           collapsed && "justify-center",
         )
       }
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? label : undefined}
     >
       <Icon className="h-4 w-4 shrink-0" aria-hidden />
-      {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
+      {!collapsed && <span className="flex-1 truncate">{label}</span>}
       {!collapsed && badge && (
         <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px]">
           {badge}

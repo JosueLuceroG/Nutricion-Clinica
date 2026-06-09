@@ -65,15 +65,15 @@ export class DexieLabPanelRepository implements LabPanelRepository {
     let collection: Collection<LabPanelRow, string> = source;
     if (query.patientId) {
       const pid = query.patientId.toString();
-      collection = source.filter((row: LabPanelRow) => row.patient_id === pid);
+      collection = collection.filter((row: LabPanelRow) => row.patient_id === pid);
     }
     if (query.from) {
       const fromIso = query.from.toISOString();
-      collection = source.filter((row: LabPanelRow) => row.taken_at >= fromIso);
+      collection = collection.filter((row: LabPanelRow) => row.taken_at >= fromIso);
     }
     if (query.to) {
       const toIso = query.to.toISOString();
-      collection = source.filter((row: LabPanelRow) => row.taken_at <= toIso);
+      collection = collection.filter((row: LabPanelRow) => row.taken_at <= toIso);
     }
     return collection;
   }

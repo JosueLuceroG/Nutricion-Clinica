@@ -58,6 +58,7 @@ function makeAnthropometry(weightKg: number, heightCm: number, waistCm: number |
       hip: hipCm !== null ? Circumference.fromCm(hipCm) : undefined,
     },
     skinfolds: {},
+    bia: null,
     notes: null,
     createdAt: new Date(),
     updatedAt: new Date(),

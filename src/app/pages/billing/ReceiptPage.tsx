@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import i18n from "../../../i18n/config";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, X } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -10,10 +12,9 @@ import {
   useConsultationLive,
   usePatientLive,
 } from "@modules/consultation/ui/useBillingHooks";
-import { PAYMENT_METHOD_LABELS } from "@modules/consultation/domain/PaymentMethod";
 import { formatCurrency } from "@utils/formatCurrency";
 
-const MXN = (n: number) => formatCurrency(n, "MXN", "es-MX");
+const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
 /**
  * Recibo imprimible (HTML, no CFDI).
@@ -22,6 +23,7 @@ const MXN = (n: number) => formatCurrency(n, "MXN", "es-MX");
  * - Disclaimer visible: "ESTE DOCUMENTO NO ES UN CFDI".
  */
 export const ReceiptPage = () => {
+  const { t } = useTranslation();
   const { consultationId } = useParams<{ consultationId: string }>();
   const navigate = useNavigate();
   const [now] = useState(() => new Date());
@@ -62,13 +64,13 @@ export const ReceiptPage = () => {
   }, []);
 
   const fechaEmision = useMemo(() => {
-    return new Intl.DateTimeFormat("es-MX", { dateStyle: "long", timeStyle: "short" }).format(now);
+    return new Intl.DateTimeFormat(i18n.language, { dateStyle: "long", timeStyle: "short" }).format(now);
   }, [now]);
 
   if (consultationId === undefined) {
     return (
       <PageContent>
-        <EmptyState title="Recibo no disponible" description="Falta el ID de la consulta." />
+        <EmptyState title={t("billing.receipt_title")} description={t("common.error_occurred")} />
       </PageContent>
     );
   }
@@ -77,7 +79,7 @@ export const ReceiptPage = () => {
     // No cargado aún
     return (
       <>
-        <PageHeader title="Cargando recibo…" />
+        <PageHeader title={`${t("common.loading")} ${t("billing.receipt_title")}`} />
         <PageContent>
           <Skeleton className="h-96 w-full" />
         </PageContent>
@@ -89,9 +91,9 @@ export const ReceiptPage = () => {
     return (
       <PageContent>
         <EmptyState
-          title="Consulta no encontrada"
-          description="La consulta solicitada no existe o fue eliminada."
-          action={{ label: "Volver", onClick: () => navigate("/billing") }}
+          title={t("common.error_occurred")}
+          description={t("common.no_results")}
+          action={{ label: t("common.previous"), onClick: () => navigate("/billing") }}
         />
       </PageContent>
     );
@@ -101,22 +103,22 @@ export const ReceiptPage = () => {
     return (
       <>
         <PageHeader
-          title="Recibo no disponible"
+          title={t("billing.receipt_title")}
           actions={
             <Button asChild variant="outline">
               <Link to="/billing">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver
+                {t("common.previous")}
               </Link>
             </Button>
           }
         />
         <PageContent>
           <EmptyState
-            title="La consulta aún no está pagada"
-            description="Solo se pueden emitir recibos de consultas con pago registrado."
+            title={t("common.no_data")}
+            description={t("billing.pending_consultations")}
             action={{
-              label: "Marcar como pagada",
+              label: t("consultation.mark_as_paid"),
               onClick: () => navigate(`/billing?mark=${consultation.id.toString()}`),
             }}
           />
@@ -129,24 +131,24 @@ export const ReceiptPage = () => {
   return (
     <>
       <PageHeader
-        title="Recibo"
-        description={`Consulta #${c.consultationNumber} · ${patient?.fullName ?? "(cargando paciente)"}`}
+        title={t("billing.receipt_title")}
+        description={`${t("consultation.title_single")} #${c.consultationNumber} · ${patient?.fullName ?? `(${t("common.loading")})`}`}
         actions={
           <div className="billing-receipt-no-print flex gap-2">
             <Button asChild variant="outline">
               <Link to="/billing">
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver
+                {t("common.previous")}
               </Link>
             </Button>
             <Button onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" />
-              Imprimir
+              {t("billing.print")}
             </Button>
             <Button asChild variant="ghost">
               <Link to="/billing">
                 <X className="mr-2 h-4 w-4" />
-                Cerrar
+                {t("common.close")}
               </Link>
             </Button>
           </div>
@@ -159,16 +161,16 @@ export const ReceiptPage = () => {
               {/* Encabezado */}
               <header className="flex items-start justify-between border-b pb-4">
                 <div>
-                  <h1 className="text-2xl font-bold">NutriClínica</h1>
-                  <p className="text-sm text-muted-foreground">RECIBO DE PAGO</p>
+                  <h2 className="text-2xl font-bold">{t("common.app_name")}</h2>
+                  <p className="text-sm text-muted-foreground">{t("billing.receipt_header")}</p>
                 </div>
                 <div className="text-right text-sm">
                   <p>
-                    <span className="text-muted-foreground">Folio:</span>{" "}
+                    <span className="text-muted-foreground">{t("billing.receipt_no", { id: "" })}</span>
                     <span className="font-mono">{c.id.toString().slice(0, 8).toUpperCase()}</span>
                   </p>
                   <p>
-                    <span className="text-muted-foreground">Emisión:</span> {fechaEmision}
+                    <span className="text-muted-foreground">{t("billing.receipt_date", { date: "" })}</span>{fechaEmision}
                   </p>
                 </div>
               </header>
@@ -176,17 +178,17 @@ export const ReceiptPage = () => {
               {/* Paciente */}
               <section>
                 <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">
-                  Paciente
+                  {t("common.patient")}
                 </h2>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div>
-                    <p className="text-xs text-muted-foreground">Nombre</p>
+                    <p className="text-xs text-muted-foreground">{t("common.name")}</p>
                     <p className="font-medium">{patient?.fullName ?? "—"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-muted-foreground">Fecha de consulta</p>
+                    <p className="text-xs text-muted-foreground">{t("consultation.consultation_date")}</p>
                     <p className="font-medium">
-                      {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
+                      {new Intl.DateTimeFormat(i18n.language, { dateStyle: "long" }).format(
                         c.consultationDate,
                       )}
                     </p>
@@ -197,15 +199,15 @@ export const ReceiptPage = () => {
               {/* Consulta */}
               <section>
                 <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">
-                  Consulta
+                  {t("consultation.title_single")}
                 </h2>
                 <div className="rounded-md border p-3 text-sm">
                   <p>
-                    <span className="text-muted-foreground">Motivo:</span> {c.reason}
+                    <span className="text-muted-foreground">{t("consultation.reason")}:</span> {c.reason}
                   </p>
                   {c.assessment && (
                     <p className="mt-1">
-                      <span className="text-muted-foreground">Diagnóstico:</span> {c.assessment}
+                      <span className="text-muted-foreground">{t("consultation.assessment")}:</span> {c.assessment}
                     </p>
                   )}
                 </div>
@@ -213,27 +215,27 @@ export const ReceiptPage = () => {
 
               {/* Pago */}
               <section>
-                <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">
-                  Pago
-                </h2>
+                  <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">
+                    {t("consultation.payment_section")}
+                  </h2>
                 <div className="overflow-hidden rounded-md border">
                   <table className="w-full text-sm">
                     <tbody>
                       <tr className="border-b">
-                        <td className="p-3">Concepto</td>
-                        <td className="p-3 text-right">Consulta nutricional</td>
+                        <td className="p-3">{t("common.description")}</td>
+                        <td className="p-3 text-right">{t("consultation.title_single")}</td>
                       </tr>
                       <tr className="border-b">
-                        <td className="p-3">Método de pago</td>
+                        <td className="p-3">{t("consultation.payment_method")}</td>
                         <td className="p-3 text-right">
-                          {c.paymentMethod ? PAYMENT_METHOD_LABELS[c.paymentMethod] : "—"}
+                          {c.paymentMethod ? t(`consultation.method_${c.paymentMethod}`) : "—"}
                         </td>
                       </tr>
                       <tr className="border-b">
-                        <td className="p-3">Fecha de pago</td>
+                        <td className="p-3">{t("consultation.payment_date")}</td>
                         <td className="p-3 text-right">
                           {c.paidAt
-                            ? new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(
+                            ? new Intl.DateTimeFormat(i18n.language, { dateStyle: "long" }).format(
                                 c.paidAt,
                               )
                             : "—"}
@@ -241,18 +243,18 @@ export const ReceiptPage = () => {
                       </tr>
                       {c.reference && (
                         <tr className="border-b">
-                          <td className="p-3">Referencia</td>
+                          <td className="p-3">{t("common.description")}</td>
                           <td className="p-3 text-right font-mono">{c.reference}</td>
                         </tr>
                       )}
                       {c.invoiceNumber && (
                         <tr className="border-b">
-                          <td className="p-3">Nº de factura</td>
+                          <td className="p-3">{t("billing.receipt_no", { id: "" })}</td>
                           <td className="p-3 text-right font-mono">{c.invoiceNumber}</td>
                         </tr>
                       )}
                       <tr className="bg-muted/30 font-semibold">
-                        <td className="p-3">Total</td>
+                        <td className="p-3">{t("billing.column_cost")}</td>
                         <td className="p-3 text-right text-lg">{MXN(c.cost)}</td>
                       </tr>
                     </tbody>
@@ -263,7 +265,7 @@ export const ReceiptPage = () => {
               {c.billingNotes && (
                 <section>
                   <h2 className="mb-1 text-sm font-semibold uppercase text-muted-foreground">
-                    Notas
+                    {t("common.notes")}
                   </h2>
                   <p className="text-sm">{c.billingNotes}</p>
                 </section>
@@ -271,11 +273,7 @@ export const ReceiptPage = () => {
 
               <footer className="border-t pt-4 text-center text-xs text-muted-foreground">
                 <p className="font-semibold uppercase text-destructive">
-                  Este documento NO es un CFDI
-                </p>
-                <p>
-                  La facturación electrónica ante el SAT es responsabilidad del
-                  profesional de la salud.
+                  {t("billing.receipt_disclaimer")}
                 </p>
               </footer>
             </CardContent>

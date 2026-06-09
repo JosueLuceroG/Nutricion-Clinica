@@ -8,6 +8,35 @@ import type { SmaeCustomFoodRow } from "@modules/smae/infrastructure/smaeMapper"
 import type { AllergyRow, MedicationRow, ClinicalEventRow, FamilyHistoryRow, PersonalHistoryRow, HabitRow, PhysicalActivityRow, DietHistoryRow, IntoleranceRow, SurgeryRow, HospitalizationRow, SupplementRow, FoodFrequencyRow, GiSymptomRow, SnapshotExpedienteRow } from "@modules/clinical-record/infrastructure/clinicalRecordMapper";
 import type { AuditEventRow } from "@services/audit/infrastructure/auditEventMapper";
 import type { SyncQueueItem } from "@modules/sync/domain/SyncQueueItem";
+import type { AppointmentRow, ScheduleRow, BlockRow } from "@modules/agenda/infrastructure/agendaMapper";
+import type { RecipeRow } from "@modules/recipes/infrastructure/recipeMapper";
+import type { MedicationCatalogRow, NutrientInteractionRow } from "@modules/medication/infrastructure/medicationMapper";
+import type { GoalRow } from "@modules/goals/infrastructure/goalMapper";
+import type { AdherenceRecordRow, AdherenceIndexRow, BarrierEventRow } from "@modules/adherence/infrastructure/adherenceMapper";
+import type { DocumentRow } from "@modules/documents/infrastructure/documentMapper";
+import type { WeeklyPlanRow, ShoppingListRow } from "@modules/meal-planner/infrastructure/mealPlannerMapper";
+import type { BiaDeviceProps } from "@modules/anthropometry/domain/BiaReading";
+import type { IndicatorRow, IndicatorValueRow, GeneratedReportRow, DashboardConfigRow } from "@modules/reports/infrastructure/reportMapper";
+import type { PatientConsent } from "@modules/auth/PatientConsentService";
+
+export interface AICacheRow {
+  key: string;
+  capability: string;
+  response: string;
+  confidence: number;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface AIUsageLogRow {
+  id: string;
+  capability: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  model: string;
+  success: boolean;
+  created_at: string;
+}
 
 const PATIENT_STORES = [
   "id",
@@ -110,6 +139,38 @@ const GI_SYMPTOMS_STORES = "id, patient_id, symptom_type, severity, created_at";
 const SNAPSHOT_EXPEDIENTES_STORES = "id, consulta_id, patient_id, fecha_snapshot, created_at";
 const AUDIT_EVENTS_STORES = "id, patient_id, user_id, module, action, resource_type, resource_id, created_at";
 const SYNC_QUEUE_STORES = "id, entity, status, enqueued_at";
+const APPOINTMENTS_STORES = [
+  "id",
+  "patient_id",
+  "professional_id",
+  "date",
+  "status",
+  "type",
+  "[date+professional_id]",
+  "start_time",
+  "created_at",
+  "updated_at",
+].join(", ");
+const SCHEDULES_STORES = "id, professional_id, day_of_week";
+const BLOCKS_STORES = "id, professional_id, start_date, end_date";
+const RECIPES_STORES = "id, name, category, difficulty, status, created_at";
+const GOALS_STORES = "id, patient_id, type, variable, status, priority, start_date, target_date";
+const ADHERENCE_RECORDS_STORES = "id, patient_id, date, source, [patient_id+date]";
+const ADHERENCE_INDEXES_STORES = "id, patient_id, period_start, period_end";
+const ADHERENCE_BARRIERS_STORES = "id, patient_id, type, date";
+const DOCUMENTS_STORES = "id, patient_id, type, status, generated_by, generated_at";
+const WEEKLY_PLANS_STORES = "id, patient_id, type, status, start_date, end_date";
+const SHOPPING_LISTS_STORES = "id, patient_id, weekly_plan_id, generated_at";
+const MEDICATION_CATALOG_STORES = "id, nombre_comercial, principio_activo, via_administracion, categoria_farmacologica, created_at";
+const NUTRIENT_INTERACTIONS_STORES = "id, medicamento_id, nutriente, tipo, severidad, created_at";
+const BIA_DEVICES_STORES = "id, name, type";
+const INDICATORS_STORES = "id, name, category, calculation_type, refresh_frequency, is_active, created_at";
+const INDICATOR_VALUES_STORES = "id, indicator_id, dimension, dimension_type, [indicator_id+dimension], created_at";
+const GENERATED_REPORTS_STORES = "id, type, status, generated_by, generated_at";
+const DASHBOARD_CONFIGS_STORES = "id, user_id, widget_type, is_visible, position, created_at";
+const PATIENT_CONSENTS_STORES = "id, patient_id, type, signed_at, revoked_at";
+const AI_CACHE_STORES = ["key", "capability", "created_at", "expires_at"].join(", ");
+const AI_USAGE_LOGS_STORES = ["id", "capability", "created_at"].join(", ");
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
@@ -135,6 +196,27 @@ export class NutriClinicaDB extends Dexie {
   food_frequencies!: Table<FoodFrequencyRow, string>;
   gi_symptoms!: Table<GiSymptomRow, string>;
   sync_queue!: Table<SyncQueueItem, string>;
+  appointments!: Table<AppointmentRow, string>;
+  schedules!: Table<ScheduleRow, string>;
+  blocks!: Table<BlockRow, string>;
+  recipes!: Table<RecipeRow, string>;
+  goals!: Table<GoalRow, string>;
+  adherence_records!: Table<AdherenceRecordRow, string>;
+  adherence_indexes!: Table<AdherenceIndexRow, string>;
+  adherence_barriers!: Table<BarrierEventRow, string>;
+  documents!: Table<DocumentRow, string>;
+  weekly_plans!: Table<WeeklyPlanRow, string>;
+  shopping_lists!: Table<ShoppingListRow, string>;
+  medication_catalog!: Table<MedicationCatalogRow, string>;
+  nutrient_interactions!: Table<NutrientInteractionRow, string>;
+  bia_devices!: Table<BiaDeviceProps, string>;
+  indicators!: Table<IndicatorRow, string>;
+  indicator_values!: Table<IndicatorValueRow, string>;
+  generated_reports!: Table<GeneratedReportRow, string>;
+  dashboard_configs!: Table<DashboardConfigRow, string>;
+  patient_consents!: Table<PatientConsent, string>;
+  ai_cache!: Table<AICacheRow>;
+  ai_usage_logs!: Table<AIUsageLogRow>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -213,6 +295,60 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(13).stores({
       consultations: CONSULTATIONS_BILLING_STORES,
+    });
+
+    this.version(14).stores({
+      appointments: APPOINTMENTS_STORES,
+      schedules: SCHEDULES_STORES,
+      blocks: BLOCKS_STORES,
+    });
+
+    this.version(15).stores({
+      recipes: RECIPES_STORES,
+    });
+
+    this.version(16).stores({
+      goals: GOALS_STORES,
+    });
+
+    this.version(17).stores({
+      adherence_records: ADHERENCE_RECORDS_STORES,
+      adherence_indexes: ADHERENCE_INDEXES_STORES,
+      adherence_barriers: ADHERENCE_BARRIERS_STORES,
+    });
+
+    this.version(18).stores({
+      documents: DOCUMENTS_STORES,
+    });
+
+    this.version(19).stores({
+      weekly_plans: WEEKLY_PLANS_STORES,
+      shopping_lists: SHOPPING_LISTS_STORES,
+    });
+
+    this.version(20).stores({
+      bia_devices: BIA_DEVICES_STORES,
+    });
+
+    this.version(21).stores({
+      medication_catalog: MEDICATION_CATALOG_STORES,
+      nutrient_interactions: NUTRIENT_INTERACTIONS_STORES,
+    });
+
+    this.version(22).stores({
+      indicators: INDICATORS_STORES,
+      indicator_values: INDICATOR_VALUES_STORES,
+      generated_reports: GENERATED_REPORTS_STORES,
+      dashboard_configs: DASHBOARD_CONFIGS_STORES,
+    });
+
+    this.version(23).stores({
+      patient_consents: PATIENT_CONSENTS_STORES,
+    });
+
+    this.version(24).stores({
+      ai_cache: AI_CACHE_STORES,
+      ai_usage_logs: AI_USAGE_LOGS_STORES,
     });
   }
 }

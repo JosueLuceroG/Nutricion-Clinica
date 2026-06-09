@@ -1,17 +1,20 @@
 import * as React from "react";
-import { Download, Upload, Lock, ShieldAlert } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Download, Upload, Lock, ShieldAlert, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
+import { Switch } from "@components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@components/ui/dialog";
 import { backupService } from "@services/backup/backupService";
 
 type PasswordMode = "export" | "import" | null;
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const [exporting, setExporting] = React.useState(false);
   const [importing, setImporting] = React.useState(false);
   const [password, setPassword] = React.useState("");
@@ -20,6 +23,11 @@ export function SettingsPage() {
   const [passwordMode, setPasswordMode] = React.useState<PasswordMode>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [aiEnabled, setAiEnabled] = React.useState(() => localStorage.getItem("ai-enabled") === "true");
+
+  React.useEffect(() => {
+    localStorage.setItem("ai-enabled", String(aiEnabled));
+  }, [aiEnabled]);
 
   const doExport = async (pwd: string | undefined) => {
     setExporting(true);
@@ -31,9 +39,9 @@ export function SettingsPage() {
       a.download = result.fileName;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`Respaldo exportado (${(result.sizeBytes / 1024).toFixed(1)} KB)`);
+      toast.success(t("settings.backup_exported_size", { size: (result.sizeBytes / 1024).toFixed(1) }));
     } catch (err) {
-      toast.error("Error al exportar", {
+      toast.error(t("settings.export_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -46,14 +54,14 @@ export function SettingsPage() {
     try {
       const result = await backupService.importBackup(file, pwd);
       if (result.success) {
-        toast.success(`Respaldo restaurado: ${result.rowCount} registros en ${result.tablesImported.length} tablas`);
+        toast.success(t("settings.backup_restored", { rows: result.rowCount, tables: result.tablesImported.length }));
       } else {
-        toast.error("Errores al importar", {
+        toast.error(t("settings.import_errors"), {
           description: result.errors.join("\n"),
         });
       }
     } catch (err) {
-      toast.error("Error al importar", {
+      toast.error(t("settings.import_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -74,7 +82,7 @@ export function SettingsPage() {
 
   const onPasswordSubmit = () => {
     if (!password.trim()) {
-      toast.error("Debes ingresar una contraseña");
+      toast.error(t("settings.password_required"));
       return;
     }
     setPasswordDialogOpen(false);
@@ -110,27 +118,27 @@ export function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Configuración" description="Ajustes generales de la aplicación" />
+      <PageHeader title={t("settings.title")} description={t("settings.description")} />
       <PageContent>
         <div className="grid gap-6 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Download className="h-5 w-5" />
-                Respaldo de datos
+                {t("settings.data_backup")}
               </CardTitle>
               <CardDescription>
-                Exporta toda la base de datos a un archivo JSON. Puedes cifrarlo con contraseña.
+                {t("settings.export_backup_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Button onClick={() => onExportClick(false)} disabled={exporting} className="w-full">
                 <Download className="mr-2 h-4 w-4" />
-                {exporting ? "Exportando..." : "Exportar respaldo (sin cifrar)"}
+                {exporting ? t("settings.exporting") : t("settings.export_plain")}
               </Button>
               <Button onClick={() => onExportClick(true)} disabled={exporting} variant="outline" className="w-full">
                 <Lock className="mr-2 h-4 w-4" />
-                {exporting ? "Exportando..." : "Exportar respaldo cifrado"}
+                {exporting ? t("settings.exporting") : t("settings.export_encrypted")}
               </Button>
             </CardContent>
           </Card>
@@ -139,19 +147,19 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Upload className="h-5 w-5" />
-                Restaurar respaldo
+                {t("settings.restore_backup")}
               </CardTitle>
               <CardDescription>
-                Importa un archivo de respaldo (.json o .enc). Los datos actuales serán reemplazados.
+                {t("settings.restore_backup_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="backup-password">Contraseña (solo si el archivo está cifrado)</Label>
+                <Label htmlFor="backup-password">{t("settings.password_if_encrypted")}</Label>
                 <Input
                   id="backup-password"
                   type="password"
-                  placeholder="Dejar vacío si no está cifrado"
+                  placeholder={t("settings.password_empty_hint")}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -170,7 +178,7 @@ export function SettingsPage() {
                 className="w-full"
               >
                 <Upload className="mr-2 h-4 w-4" />
-                {importing ? "Importando..." : "Seleccionar archivo y restaurar"}
+                {importing ? t("settings.importing") : t("settings.select_restore_file")}
               </Button>
             </CardContent>
           </Card>
@@ -179,14 +187,39 @@ export function SettingsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <ShieldAlert className="h-5 w-5" />
-                Preferencias
+                {t("settings.preferences")}
               </CardTitle>
               <CardDescription>
-                Tema, idioma, formato de fecha, zona horaria, unidades.
+                {t("settings.preferences_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Configuración respaldada en Zustand persist. Pendiente de UI.
+              {t("settings.preferences_pending")}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4" />
+                {t("ai.title")}
+              </CardTitle>
+              <CardDescription>{t("ai.enable")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{t("ai.title")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("ai.enable_desc")}
+                  </p>
+                </div>
+                <Switch
+                  checked={aiEnabled}
+                  onCheckedChange={setAiEnabled}
+                  aria-label={t("ai.title")}
+                />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -196,14 +229,14 @@ export function SettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {passwordMode === "export" ? "Cifrar respaldo" : "Restaurar respaldo cifrado"}
+              {passwordMode === "export" ? t("settings.encrypt_backup") : t("settings.restore_encrypted_backup")}
             </DialogTitle>
             <DialogDescription>
-              Ingresa la contraseña para {passwordMode === "export" ? "cifrar el archivo" : "desbloquear el archivo"}.
+              {passwordMode === "export" ? t("settings.password_export_desc") : t("settings.password_import_desc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="dialog-password">Contraseña</Label>
+            <Label htmlFor="dialog-password">{t("auth.password")}</Label>
             <Input
               id="dialog-password"
               type="password"
@@ -214,9 +247,9 @@ export function SettingsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setPasswordDialogOpen(false); setPassword(""); setPendingFile(null); }}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
-            <Button onClick={onPasswordSubmit}>Continuar</Button>
+            <Button onClick={onPasswordSubmit}>{t("common.next")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -224,16 +257,16 @@ export function SettingsPage() {
       <Dialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reemplazar datos actuales</DialogTitle>
+            <DialogTitle>{t("settings.replace_data_title")}</DialogTitle>
             <DialogDescription>
-              Esto reemplazará todos los datos actuales con los del archivo de respaldo. Esta acción no se puede deshacer.
+              {t("settings.replace_data_desc")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setConfirmDialogOpen(false); setPendingFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
-            <Button variant="destructive" onClick={onConfirmImport}>Continuar y reemplazar</Button>
+            <Button variant="destructive" onClick={onConfirmImport}>{t("settings.continue_replace")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

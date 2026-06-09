@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Outlet } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { StatusBar } from "./StatusBar";
@@ -8,20 +9,31 @@ import { ContextPanel } from "./ContextPanel";
 import { useUIStore } from "@store/uiStore";
 import { cn } from "@utils/cn";
 
-const PageFallback = (
-  <div className="flex h-full items-center justify-center p-12 text-sm text-muted-foreground">
-    <div className="flex flex-col items-center gap-3">
-      <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
-      Cargando…
+function PageFallback() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex h-full items-center justify-center p-12 text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+        {t("common.loading")}
+      </div>
     </div>
-  </div>
-);
+  );
+}
 
 export function AppLayout() {
+  const { t } = useTranslation();
   const contextOpen = useUIStore((s) => s.contextPanelOpen);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:ring-2 focus:ring-ring focus:rounded-md"
+      >
+        {t("common.skip_to_content")}
+      </a>
+
       <Sidebar />
 
       <div className="flex flex-1 flex-col overflow-hidden">
@@ -32,12 +44,14 @@ export function AppLayout() {
             id="main-content"
             className="flex-1 overflow-y-auto"
             tabIndex={-1}
-            aria-label="Contenido principal"
+            aria-label={t("layout.main_content")}
           >
-            <React.Suspense fallback={PageFallback}>
+            <React.Suspense fallback={<PageFallback />}>
               <Outlet />
             </React.Suspense>
           </main>
+
+          <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
 
           {contextOpen && <ContextPanel />}
         </div>
@@ -80,5 +94,5 @@ export function PageHeader({
 }
 
 export function PageContent({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("p-6", className)}>{children}</div>;
+  return <div className={cn("p-4 sm:p-6", className)}>{children}</div>;
 }

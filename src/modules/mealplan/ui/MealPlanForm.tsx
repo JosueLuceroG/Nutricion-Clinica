@@ -2,6 +2,7 @@ import * as React from "react";
 import { useForm, useFieldArray, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   DndContext,
   useDraggable,
@@ -60,6 +61,7 @@ interface MealPlanFormProps {
 
 export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFormProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
 
   const { control, register, handleSubmit, watch, setValue, formState: { errors } } =
@@ -137,11 +139,14 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
 
     setValue(`meals.${sourceIdx}.exchanges`, newSource, { shouldDirty: true });
     setValue(`meals.${targetIdx}.exchanges`, newTarget, { shouldDirty: true });
-    toast.success(`${getSystemFoodById(exchange.foodId)?.name ?? "Alimento"} movido a ${MealSlotShortLabel[targetSlot as MealSlot]}`);
+    toast.success(t("mealplan.form.toast.food_moved", {
+      food: getSystemFoodById(exchange.foodId)?.name ?? t("mealplan.form.food"),
+      slot: MealSlotShortLabel[targetSlot as MealSlot],
+    }));
   };
 
   const suggestDistribution = () => {
-    toast.info("Distribución calórica sugerida", {
+    toast.info(t("mealplan.form.toast.suggested_distribution"), {
       description: MEAL_SLOT_ORDER.map(
         (s) =>
           `${MealSlotShortLabel[s]}: ${Math.round(
@@ -182,8 +187,11 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
         (acc, m) => acc + m.exchanges.length,
         0,
       );
-      toast.success("Plan alimentario creado", {
-        description: `${totalExchanges} equivalentes registrados · ${Math.round(totals.kcal)} kcal`,
+      toast.success(t("mealplan.form.toast.plan_created"), {
+        description: t("mealplan.form.toast.plan_created_desc", {
+          count: totalExchanges,
+          kcal: Math.round(totals.kcal),
+        }),
       });
 
       if (onSaved) {
@@ -192,7 +200,7 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
         navigate(`/pacientes/${patientId.toString()}/planes`);
       }
     } catch (err) {
-      toast.error("No se pudo guardar el plan", {
+      toast.error(t("mealplan.form.toast.save_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -206,63 +214,73 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Target className="h-4 w-4" />
-            Datos generales y objetivos
+            {t("mealplan.form.section.general")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nombre del plan" error={errors.name?.message} required>
+            <Field label={t("mealplan.form.field.plan_name")} htmlFor="field-plan-name" error={errors.name?.message} required>
               <Input
+                id="field-plan-name"
                 {...register("name")}
-                placeholder="Ej. Hipocalórico 1500 kcal — Etapa 1"
+                placeholder={t("mealplan.form.placeholder.plan_name")}
                 aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? "field-plan-name-error" : undefined}
               />
             </Field>
-            <Field label="Fecha de inicio" error={errors.startDate?.message} required>
-              <Input type="date" {...register("startDate")} aria-invalid={!!errors.startDate} />
+            <Field label={t("mealplan.form.field.start_date")} htmlFor="field-plan-start-date" error={errors.startDate?.message} required>
+              <Input id="field-plan-start-date" type="date" {...register("startDate")} aria-invalid={!!errors.startDate} aria-describedby={errors.startDate ? "field-plan-start-date-error" : undefined} />
             </Field>
-            <Field label="Fecha de fin (opcional)" error={errors.endDate?.message}>
-              <Input type="date" {...register("endDate")} aria-invalid={!!errors.endDate} />
+            <Field label={t("mealplan.form.field.end_date")} htmlFor="field-plan-end-date" error={errors.endDate?.message}>
+              <Input id="field-plan-end-date" type="date" {...register("endDate")} aria-invalid={!!errors.endDate} aria-describedby={errors.endDate ? "field-plan-end-date-error" : undefined} />
             </Field>
-            <Field label="Descripción" error={errors.description?.message}>
+            <Field label={t("mealplan.form.field.description")} htmlFor="field-plan-description" error={errors.description?.message}>
               <Input
+                id="field-plan-description"
                 {...register("description")}
-                placeholder="Notas del plan, contexto clínico"
+                placeholder={t("mealplan.form.placeholder.description")}
                 aria-invalid={!!errors.description}
+                aria-describedby={errors.description ? "field-plan-description-error" : undefined}
               />
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-4">
-            <Field label="kcal objetivo" error={errors.kcalTarget?.message} required>
+            <Field label={t("mealplan.form.field.kcal_target")} htmlFor="field-plan-kcal" error={errors.kcalTarget?.message} required>
               <Input
+                id="field-plan-kcal"
                 type="number"
                 step="10"
                 {...register("kcalTarget", { valueAsNumber: true })}
                 aria-invalid={!!errors.kcalTarget}
+                aria-describedby={errors.kcalTarget ? "field-plan-kcal-error" : undefined}
               />
             </Field>
-            <Field label="Proteína (g)" error={errors.proteinTargetG?.message}>
+            <Field label={t("mealplan.form.field.protein")} htmlFor="field-plan-protein" error={errors.proteinTargetG?.message}>
               <Input
+                id="field-plan-protein"
                 type="number"
                 step="1"
                 {...register("proteinTargetG", { valueAsNumber: true })}
+                aria-describedby={errors.proteinTargetG ? "field-plan-protein-error" : undefined}
               />
             </Field>
-            <Field label="Carbohidratos (g)" error={errors.carbsTargetG?.message}>
+            <Field label={t("mealplan.form.field.carbs")} htmlFor="field-plan-carbs" error={errors.carbsTargetG?.message}>
               <Input
+                id="field-plan-carbs"
                 type="number"
                 step="1"
                 {...register("carbsTargetG", { valueAsNumber: true })}
+                aria-describedby={errors.carbsTargetG ? "field-plan-carbs-error" : undefined}
               />
             </Field>
-            <Field label="Grasa (g)" error={errors.fatTargetG?.message}>
-              <Input type="number" step="1" {...register("fatTargetG", { valueAsNumber: true })} />
+            <Field label={t("mealplan.form.field.fat")} htmlFor="field-plan-fat" error={errors.fatTargetG?.message}>
+              <Input id="field-plan-fat" type="number" step="1" {...register("fatTargetG", { valueAsNumber: true })} aria-describedby={errors.fatTargetG ? "field-plan-fat-error" : undefined} />
             </Field>
           </div>
           <div className="flex items-center justify-end">
             <Button type="button" variant="outline" size="sm" onClick={suggestDistribution}>
               <Target className="mr-2 h-4 w-4" />
-              Ver distribución sugerida por tiempo
+              {t("mealplan.form.btn.suggest_distribution")}
             </Button>
           </div>
         </CardContent>
@@ -291,14 +309,14 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
 
       <Card>
         <CardHeader>
-          <CardTitle>Notas del plan</CardTitle>
-          <CardDescription>Indicaciones generales, técnica culinaria, recomendaciones</CardDescription>
+          <CardTitle>{t("mealplan.form.section.notes")}</CardTitle>
+          <CardDescription>{t("mealplan.form.section.notes_desc")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Textarea
             {...register("notes")}
             rows={3}
-            placeholder="Ej. Tomar 2 L de agua al día, preferir preparaciones al vapor…"
+            placeholder={t("mealplan.form.placeholder.notes")}
             aria-invalid={!!errors.notes}
           />
           {errors.notes?.message && (
@@ -310,11 +328,11 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
       <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
         <Button type="button" variant="ghost" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
-          Cancelar
+          {t("mealplan.form.btn.cancel")}
         </Button>
         <Button type="submit" disabled={submitting}>
           <Save className="mr-2 h-4 w-4" />
-          {submitting ? "Guardando…" : "Crear plan"}
+          {submitting ? t("mealplan.form.btn.saving") : t("mealplan.form.btn.create")}
         </Button>
       </div>
     </form>
@@ -334,6 +352,7 @@ function TotalsCard({
   carbsTargetG: number;
   fatTargetG: number;
 }) {
+  const { t } = useTranslation();
   const diff = {
     kcal: totals.kcal - kcalTarget,
     proteinG: totals.proteinG - proteinTargetG,
@@ -345,37 +364,37 @@ function TotalsCard({
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <UtensilsCrossed className="h-4 w-4" />
-          Totales del día vs objetivos
+          {t("mealplan.form.section.totals")}
         </CardTitle>
         <CardDescription>
-          Cálculo en tiempo real a partir de los equivalentes registrados
+          {t("mealplan.form.section.totals_desc")}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <MacroStat
-            label="kcal"
+            label={t("mealplan.form.macro.kcal")}
             actual={totals.kcal}
             target={kcalTarget}
             diff={diff.kcal}
             unit=""
           />
           <MacroStat
-            label="Proteína"
+            label={t("mealplan.form.macro.protein")}
             actual={totals.proteinG}
             target={proteinTargetG}
             diff={diff.proteinG}
             unit="g"
           />
           <MacroStat
-            label="Carbohidratos"
+            label={t("mealplan.form.macro.carbs")}
             actual={totals.carbsG}
             target={carbsTargetG}
             diff={diff.carbsG}
             unit="g"
           />
           <MacroStat
-            label="Grasa"
+            label={t("mealplan.form.macro.fat")}
             actual={totals.fatG}
             target={fatTargetG}
             diff={diff.fatG}
@@ -400,6 +419,7 @@ function MacroStat({
   diff: number;
   unit: string;
 }) {
+  const { t } = useTranslation();
   const show = Math.abs(diff) > 0.1;
   const tone = diff > 0 ? "destructive" : diff < 0 ? "warning" : "success";
   const decimals = unit === "g" ? 1 : 0;
@@ -410,7 +430,7 @@ function MacroStat({
         {actual.toFixed(decimals)}{" "}
         <span className="text-xs text-muted-foreground">{unit}</span>
       </p>
-      <p className="text-[10px] text-muted-foreground">Objetivo: {target}{unit}</p>
+      <p className="text-[10px] text-muted-foreground">{t("mealplan.form.macro.target")}: {target}{unit}</p>
       {show ? (
         <Badge variant={tone as never} className="mt-1">
           {diff > 0 ? "+" : ""}
@@ -418,7 +438,7 @@ function MacroStat({
         </Badge>
       ) : (
         <Badge variant="success" className="mt-1">
-          En meta
+          {t("mealplan.form.macro.on_target")}
         </Badge>
       )}
     </div>
@@ -438,6 +458,7 @@ function MealSection({
   watch: ReturnType<typeof useForm<MealPlanFormValues>>["watch"];
   slotKcalTarget: number;
 }) {
+  const { t } = useTranslation();
   const idx = MEAL_SLOT_ORDER.indexOf(slot);
   const { fields, append, remove, update } = useFieldArray({
     control,
@@ -493,15 +514,18 @@ function MealSection({
             <CardTitle className="text-base">{MealSlotLabel[slot]}</CardTitle>
             <CardDescription>
               {fields.length === 0
-                ? "Sin alimentos registrados"
-                : `${fields.length} alimento${fields.length === 1 ? "" : "s"} · ${Math.round(totals.kcal)} kcal`}
+                ? t("mealplan.form.empty.no_foods")
+                : t("mealplan.form.empty.food_count", {
+                    count: fields.length,
+                    kcal: Math.round(totals.kcal),
+                  })}
             </CardDescription>
           </div>
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={collapsed ? "Expandir" : "Colapsar"}
+            aria-label={collapsed ? t("mealplan.form.aria.expand") : t("mealplan.form.aria.collapse")}
             onClick={() => setCollapsed((c) => !c)}
           >
             {collapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
@@ -534,7 +558,7 @@ function MealSection({
             onClick={openPickerForNew}
           >
             <Plus className="mr-2 h-3 w-3" />
-            Añadir alimento
+            {t("mealplan.form.btn.add_food")}
           </Button>
 
           <FoodPicker
@@ -574,6 +598,7 @@ function DraggableFoodRow({
   onDelete,
   countProps,
 }: DraggableFoodRowProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `food-${slot}-${rowIdx}`,
   });
@@ -589,7 +614,7 @@ function DraggableFoodRow({
       <div className="col-span-1 flex items-end pb-1">
         <button
           type="button"
-          aria-label="Arrastrar a otro tiempo"
+          aria-label={t("mealplan.form.aria.drag")}
           className="cursor-grab touch-none rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing"
           {...attributes}
           {...listeners}
@@ -598,7 +623,7 @@ function DraggableFoodRow({
         </button>
       </div>
       <div className="col-span-6">
-        <Label className="text-xs">Alimento</Label>
+        <Label className="text-xs">{t("mealplan.form.field.food")}</Label>
         <Button
           type="button"
           variant="outline"
@@ -609,16 +634,16 @@ function DraggableFoodRow({
           {foodName ? (
             <span className="truncate">{foodName}</span>
           ) : (
-            <span className="text-muted-foreground">Seleccionar alimento…</span>
+            <span className="text-muted-foreground">{t("mealplan.form.placeholder.select_food")}</span>
           )}
         </Button>
       </div>
       <div className="col-span-3">
-        <Label className="text-xs">Raciones</Label>
-        <Input type="number" step="0.5" min="0" {...countProps} />
+        <Label className="text-xs" htmlFor={`servings-${slot}-${rowIdx}`}>{t("mealplan.form.field.servings")}</Label>
+        <Input type="number" step="0.5" min="0" {...countProps} id={`servings-${slot}-${rowIdx}`} />
       </div>
       <div className="col-span-2 flex items-end justify-end">
-        <Button type="button" variant="ghost" size="icon-sm" aria-label="Eliminar" onClick={onDelete}>
+        <Button type="button" variant="ghost" size="icon-sm" aria-label={t("mealplan.form.aria.delete")} onClick={onDelete}>
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>
@@ -630,30 +655,34 @@ function Field({
   label,
   error,
   required,
+  htmlFor,
   children,
 }: {
   label: string;
   error?: string;
   required?: boolean;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm">
+      <Label className="text-sm" htmlFor={htmlFor}>
         {label}
         {required && <span className="ml-1 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
 
 function SlotProgress({ actualKcal, targetKcal }: { actualKcal: number; targetKcal: number }) {
+  const { t } = useTranslation();
   if (targetKcal <= 0) {
     return (
       <p className="text-[10px] text-muted-foreground mt-1">
-        Define kcal objetivo para ver distribución sugerida
+        {t("mealplan.form.progress.define_target")}
       </p>
     );
   }
@@ -669,12 +698,12 @@ function SlotProgress({ actualKcal, targetKcal }: { actualKcal: number; targetKc
           : "bg-amber-500";
   const adherence =
     ratio < 0.5
-      ? "muy bajo"
+      ? t("mealplan.form.adherence.too_low")
       : ratio > 1.15
-        ? "excede"
+        ? t("mealplan.form.adherence.exceeds")
         : ratio >= 0.85 && ratio <= 1.15
-          ? "en meta"
-          : "ajustar";
+          ? t("mealplan.form.adherence.on_target")
+          : t("mealplan.form.adherence.adjust");
   return (
     <div className="mt-2 space-y-1" aria-label={`${Math.round(actualKcal)} de ${targetKcal} kcal (${adherence})`}>
       <div className="flex items-center justify-between text-[10px] text-muted-foreground">
@@ -683,9 +712,9 @@ function SlotProgress({ actualKcal, targetKcal }: { actualKcal: number; targetKc
         </span>
         <Badge
           variant={
-            adherence === "en meta"
+            adherence === t("mealplan.form.adherence.on_target")
               ? "success"
-              : adherence === "excede"
+              : adherence === t("mealplan.form.adherence.exceeds")
                 ? "destructive"
                 : "warning"
           }

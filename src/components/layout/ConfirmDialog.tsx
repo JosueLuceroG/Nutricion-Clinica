@@ -8,6 +8,7 @@ import {
 } from "@components/ui/dialog";
 import { Button } from "@components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export type ConfirmTone = "danger" | "warning" | "info";
 
@@ -44,8 +45,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirmar",
-  cancelLabel = "Cancelar",
+  confirmLabel,
+  cancelLabel,
   tone = "danger",
   busy = false,
   onConfirm,
@@ -60,6 +61,7 @@ export function ConfirmDialog({
   busy?: boolean;
   onConfirm: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
   const confirmVariant: "default" | "destructive" =
     tone === "danger" ? "destructive" : "default";
 
@@ -80,7 +82,7 @@ export function ConfirmDialog({
             onClick={() => onOpenChange(false)}
             disabled={busy}
           >
-            {cancelLabel}
+            {cancelLabel ?? t("common.cancel")}
           </Button>
           <Button
             type="button"
@@ -95,7 +97,7 @@ export function ConfirmDialog({
               }
             }}
           >
-            {busy ? "Procesando…" : confirmLabel}
+            {busy ? t("common.processing") : (confirmLabel ?? t("common.confirm"))}
           </Button>
         </DialogFooter>
       </DialogContent>

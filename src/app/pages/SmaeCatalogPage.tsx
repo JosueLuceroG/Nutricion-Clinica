@@ -7,6 +7,7 @@
 import * as React from "react";
 import { Search, Plus, Edit2, Trash2, Sparkles, Apple } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Input } from "@components/ui/input";
@@ -53,6 +54,7 @@ interface FoodCardProps {
 }
 
 function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
+  const { t } = useTranslation();
   const n = food.nutrition;
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -63,7 +65,7 @@ function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
             <CardDescription className="text-xs">{food.shortName}</CardDescription>
           </div>
           <Badge className={GROUP_CHIP_CLASS[food.group]} variant="secondary">
-            {FoodGroupLabel[food.group]}
+            {t("smae.food_group_" + food.group, { defaultValue: FoodGroupLabel[food.group] })}
           </Badge>
         </div>
       </CardHeader>
@@ -73,12 +75,12 @@ function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
         </p>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded bg-muted px-2 py-0.5">{n.kcal} kcal</span>
-          <span className="rounded bg-muted px-2 py-0.5">P {n.proteinG} g</span>
-          <span className="rounded bg-muted px-2 py-0.5">C {n.carbsG} g</span>
-          <span className="rounded bg-muted px-2 py-0.5">G {n.fatG} g</span>
+          <span className="rounded bg-muted px-2 py-0.5">{t("smae.protein_short")} {n.proteinG} g</span>
+          <span className="rounded bg-muted px-2 py-0.5">{t("smae.carbs_short")} {n.carbsG} g</span>
+          <span className="rounded bg-muted px-2 py-0.5">{t("smae.fat_short")} {n.fatG} g</span>
           {food.custom && (
             <Badge variant="outline" className="text-xs">
-              personalizado
+              {t("smae.custom_badge")}
             </Badge>
           )}
         </div>
@@ -89,12 +91,12 @@ function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
           <div className="flex gap-2 pt-2">
             {onEdit && (
               <Button size="sm" variant="outline" onClick={() => onEdit(food)}>
-                <Edit2 className="mr-1 h-3 w-3" /> Editar
+                <Edit2 className="mr-1 h-3 w-3" /> {t("common.edit")}
               </Button>
             )}
             {onDelete && (
               <Button size="sm" variant="ghost" onClick={() => onDelete(food)}>
-                <Trash2 className="mr-1 h-3 w-3" /> Eliminar
+                <Trash2 className="mr-1 h-3 w-3" /> {t("common.delete")}
               </Button>
             )}
           </div>
@@ -105,6 +107,7 @@ function FoodCard({ food, onEdit, onDelete }: FoodCardProps) {
 }
 
 export function SmaeCatalogPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = React.useState("");
   const [group, setGroup] = React.useState<FoodGroup | "">("");
   const [customOnly, setCustomOnly] = React.useState(false);
@@ -129,12 +132,12 @@ export function SmaeCatalogPage() {
   const { remove } = useRemoveCustomFood();
 
   const handleDelete = async (food: Food) => {
-    if (!confirm(`¿Eliminar el alimento personalizado "${food.name}"?`)) return;
+    if (!confirm(t("smae.delete_custom_confirm", { name: food.name }))) return;
     const ok = await remove(food.id);
     if (ok) {
-      toast.success("Alimento eliminado");
+      toast.success(t("smae.delete_success"));
     } else {
-      toast.error("No se pudo eliminar");
+      toast.error(t("smae.delete_error"));
     }
   };
 
@@ -151,8 +154,8 @@ export function SmaeCatalogPage() {
   return (
     <>
       <PageHeader
-        title="Catálogo SMAE"
-        description="Sistema Mexicano de Alimentos Equivalentes 5ª edición · navega, busca por nombre o palabra clave, o encuentra alimentos por equivalencia nutricional"
+        title={t("smae.title")}
+        description={t("smae.page_description")}
       />
       <PageContent className="space-y-4">
         <Card>
@@ -161,7 +164,7 @@ export function SmaeCatalogPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por nombre o palabra clave (ej. tortilla, frijol, mexicano)"
+                  placeholder={t("smae.search_long")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-8"
@@ -172,31 +175,30 @@ export function SmaeCatalogPage() {
                 onChange={(e) => setGroup((e.target.value || "") as FoodGroup | "")}
                 className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               >
-                <option value="">Todos los grupos</option>
+                <option value="">{t("smae.all_groups")}</option>
                 {FOOD_GROUPS.map((g) => (
                   <option key={g} value={g}>
-                    {FoodGroupLabel[g]}
+                    {t("smae.food_group_" + g, { defaultValue: FoodGroupLabel[g] })}
                   </option>
                 ))}
               </select>
               <Button onClick={() => setShowEquiv((s) => !s)} variant="outline">
-                <Sparkles className="mr-1 h-4 w-4" /> Búsqueda por equivalencia
+                <Sparkles className="mr-1 h-4 w-4" /> {t("smae.equivalence_search")}
               </Button>
               <Button onClick={() => setCustomOnly((c) => !c)} variant={customOnly ? "default" : "outline"}>
                 <Apple className="mr-1 h-4 w-4" />
-                {customOnly ? "Solo personalizados" : "Todos"}
+                {customOnly ? t("smae.custom_only") : t("smae.all_foods_filter")}
               </Button>
               <Button onClick={handleNew}>
-                <Plus className="mr-1 h-4 w-4" /> Nuevo
+                <Plus className="mr-1 h-4 w-4" /> {t("smae.new")}
               </Button>
             </div>
 
             {showEquiv && (
               <div className="rounded-lg border bg-muted/40 p-3 space-y-2">
-                <p className="text-sm font-medium">Equivalencia inversa</p>
+                <p className="text-sm font-medium">{t("smae.inverse_equivalence")}</p>
                 <p className="text-xs text-muted-foreground">
-                  Encuentra alimentos cuyo grupo cumple un kcal target ± tolerancia.
-                  Útil para "¿qué me da ~70 kcal por ración?" → cereales.
+                  {t("smae.inverse_description")}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <label className="text-sm flex items-center gap-1">
@@ -211,7 +213,7 @@ export function SmaeCatalogPage() {
                     />
                   </label>
                   <label className="text-sm flex items-center gap-1">
-                    tolerancia{" "}
+                    {t("smae.tolerance")}{" "}
                     <Input
                       type="number"
                       min="0"
@@ -223,8 +225,8 @@ export function SmaeCatalogPage() {
                   </label>
                   <span className="text-sm text-muted-foreground">
                     {equivLoading
-                      ? "Buscando…"
-                      : `${equivFoods?.length ?? 0} resultado(s)`}
+                      ? t("smae.searching")
+                      : t("smae.result_count", { count: equivFoods?.length ?? 0 })}
                   </span>
                 </div>
                 {equivFoods && equivFoods.length > 0 && (
@@ -250,7 +252,7 @@ export function SmaeCatalogPage() {
         {error && (
           <Card className="border-destructive">
             <CardContent className="pt-6 text-sm text-destructive">
-              Error al cargar el catálogo: {error.message}
+              {t("smae.load_error", { message: error.message })}
             </CardContent>
           </Card>
         )}
@@ -275,9 +277,9 @@ export function SmaeCatalogPage() {
         {foods && foods.length === 0 && (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              <p>No se encontraron alimentos con los criterios actuales.</p>
+              <p>{t("smae.no_matching_foods")}</p>
               <p className="text-xs mt-1">
-                Cambia la búsqueda o limpia el filtro de grupo.
+                {t("smae.no_matching_foods_hint")}
               </p>
             </CardContent>
           </Card>
@@ -298,9 +300,9 @@ export function SmaeCatalogPage() {
 
         <Card className="bg-muted/30">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Perfiles nutricionales por grupo</CardTitle>
+            <CardTitle className="text-sm">{t("smae.nutrition_profiles")}</CardTitle>
             <CardDescription className="text-xs">
-              Los valores por ración se derivan del grupo al que pertenece cada alimento.
+              {t("smae.nutrition_profiles_description")}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -309,9 +311,9 @@ export function SmaeCatalogPage() {
                 const n = GroupNutrition[g];
                 return (
                   <div key={g} className="flex justify-between border-b py-0.5">
-                    <span className="truncate">{FoodGroupLabel[g]}</span>
+                    <span className="truncate">{t("smae.food_group_" + g, { defaultValue: FoodGroupLabel[g] })}</span>
                     <span className="text-muted-foreground">
-                      {n.kcal} kcal · P{n.proteinG} C{n.carbsG} G{n.fatG}
+                      {n.kcal} kcal · {t("smae.protein_short")}{n.proteinG} {t("smae.carbs_short")}{n.carbsG} {t("smae.fat_short")}{n.fatG}
                     </span>
                   </div>
                 );

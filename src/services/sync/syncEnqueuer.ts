@@ -65,41 +65,64 @@ export class SyncEnqueuer {
         console.warn(`[sync] table ${tableName} not found, skipping enqueuer`);
         continue;
       }
-      const enqueue = (op: SyncOp) => (primKey: unknown, obj: unknown) => {
+      // Los hooks de Dexie 4.x tienen diferente orden de parámetros:
+      // - creating(primKey, obj) / deleting(primKey, obj)
+      // - updating(modifications, primKey, obj, transaction)
+      // Por eso necesitamos callbacks separados para cada hook.
+      const enqueueCreate = (primKey: unknown, obj: unknown) => {
         if (!this.active || isSyncApplying()) return;
         const id = String(primKey);
-        const payload = op === 'delete' ? null : obj;
-        // La transacción del hook sólo contiene la tabla mutada
-        // (e.g. `patients`); `sync_queue` no está en su scope, por lo
-        // que encolar dentro del hook tira NotFoundError. Diferimos
-        // el enqueue dos microtasks más allá: para entonces la
-        // transacción ya hizo commit y podemos abrir una nueva sobre
-        // `sync_queue` sin chocar.
-        queueMicrotask(() => {
-          queueMicrotask(() => {
-            // Deduplicación: si ya hay un item activo (pending/syncing)
-            // para esta misma (entity, entityId, op), no encolamos otro.
-            // Protege contra múltiples instancias del enqueuer enganchadas
-            // a la misma tabla (HMR de Vite + React StrictMode en dev).
-            this.queue
-              .findActiveByEntityId(entity, id, op)
-              .then((existing) => {
-                if (existing) return;
-                return this.queue.enqueue({ entity, entityId: id, op, payload });
-              })
-              .catch((err: unknown) => {
-                console.error('[sync] enqueue failed', err);
-              });
-          });
-        });
+        doEnqueue(this.queue, entity, id, 'create', obj);
       };
-      table.hook('creating', enqueue('create'));
-      table.hook('updating', enqueue('update'));
-      table.hook('deleting', enqueue('delete'));
+      const enqueueUpdate = (_modifications: unknown, primKey: unknown, obj: unknown) => {
+        if (!this.active || isSyncApplying()) return;
+        const id = String(primKey);
+        doEnqueue(this.queue, entity, id, 'update', obj);
+      };
+      const enqueueDelete = (primKey: unknown) => {
+        if (!this.active || isSyncApplying()) return;
+        const id = String(primKey);
+        doEnqueue(this.queue, entity, id, 'delete', null);
+      };
+      table.hook('creating', enqueueCreate);
+      table.hook('updating', enqueueUpdate as unknown as (primKey: unknown, obj: unknown) => void);
+      table.hook('deleting', enqueueDelete);
     }
   }
 
   stop(): void {
     this.active = false;
   }
+}
+
+function doEnqueue(
+  queue: SyncQueueRepository,
+  entity: SyncableEntity,
+  id: string,
+  op: SyncOp,
+  payload: unknown,
+): void {
+  // La transacción del hook sólo contiene la tabla mutada
+  // (e.g. `patients`); `sync_queue` no está en su scope, por lo
+  // que encolar dentro del hook tira NotFoundError. Diferimos
+  // el enqueue dos microtasks más allá: para entonces la
+  // transacción ya hizo commit y podemos abrir una nueva sobre
+  // `sync_queue` sin chocar.
+  queueMicrotask(() => {
+    queueMicrotask(() => {
+      // Deduplicación: si ya hay un item activo (pending/syncing)
+      // para esta misma (entity, entityId, op), no encolamos otro.
+      // Protege contra múltiples instancias del enqueuer enganchadas
+      // a la misma tabla (HMR de Vite + React StrictMode en dev).
+      queue
+        .findActiveByEntityId(entity, id, op)
+        .then((existing) => {
+          if (existing) return;
+          return queue.enqueue({ entity, entityId: id, op, payload });
+        })
+        .catch((err: unknown) => {
+          console.error('[sync] enqueue failed', err);
+        });
+    });
+  });
 }

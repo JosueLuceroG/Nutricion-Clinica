@@ -4,12 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
 import { Save, X, Ruler, Activity } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import {
   AnthropometryFormSchema,
   anthropometryFormDefaultValues,
   type AnthropometryFormValues,
 } from "@modules/anthropometry/application/anthropometryFormSchema";
-import { SexLabel, type Sex } from "@modules/patient/domain/Sex";
+import type { Sex } from "@modules/patient/domain/Sex";
 import { Weight, Height, Circumference, Skinfold } from "@modules/anthropometry/domain/Measurements";
 import { anthropometryService } from "@services/anthropometryService";
 import type { PatientId } from "@modules/patient/domain/PatientId";
@@ -36,6 +37,7 @@ export function AnthropometryForm({
   defaultSex,
 }: AnthropometryFormProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
   const [age, setAge] = React.useState<number | null>(defaultAge ?? null);
   const [sex, setSex] = React.useState<Sex>(defaultSex ?? "undisclosed");
@@ -110,12 +112,12 @@ export function AnthropometryForm({
         notes: values.notes ?? null,
       });
 
-      toast.success("Medición registrada", {
+      toast.success(t("anthropometry.save"), {
         description: `BMI: ${created.bmi.toFixed(1)}`,
       });
       navigate(`/pacientes/${patientId.toString()}`);
     } catch (err) {
-      toast.error("No se pudo registrar la medición", {
+      toast.error(t("common.error_occurred"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -130,8 +132,8 @@ export function AnthropometryForm({
         return msg ? `${k}: ${msg}` : null;
       })
       .filter((s): s is string => s !== null);
-    toast.error("Corrige los errores del formulario", {
-      description: messages.length > 0 ? messages.join("\n") : "Revisa los campos marcados en rojo.",
+    toast.error(t("errors.required"), {
+      description: messages.length > 0 ? messages.join("\n") : t("anthropometry.measurements"),
     });
   };
 
@@ -141,30 +143,34 @@ export function AnthropometryForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Datos básicos
+            {t("anthropometry.measurements")}
           </CardTitle>
-          <CardDescription>Peso, talla y fecha de la medición</CardDescription>
+          <CardDescription>{t("anthropometry.column_weight")}, {t("anthropometry.height_cm")} {t("common.date")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
-          <FormField label="Fecha" error={errors.measuredAt?.message} required>
-            <Input type="date" {...register("measuredAt")} aria-invalid={!!errors.measuredAt} />
+          <FormField label={t("common.date")} error={errors.measuredAt?.message} required htmlFor="field-anthropometry-date">
+            <Input type="date" id="field-anthropometry-date" {...register("measuredAt")} aria-invalid={!!errors.measuredAt} aria-describedby={errors.measuredAt ? "field-anthropometry-date-error" : undefined} />
           </FormField>
-          <FormField label="Peso (kg)" error={errors.weightKg?.message} required>
+          <FormField label={t("anthropometry.weight_kg")} error={errors.weightKg?.message} required htmlFor="field-anthropometry-weight">
             <Input
               type="number"
               step="0.1"
+              id="field-anthropometry-weight"
               {...register("weightKg")}
               placeholder="70.5"
               aria-invalid={!!errors.weightKg}
+              aria-describedby={errors.weightKg ? "field-anthropometry-weight-error" : undefined}
             />
           </FormField>
-          <FormField label="Talla (cm)" error={errors.heightCm?.message} required>
+          <FormField label={t("anthropometry.height_cm")} error={errors.heightCm?.message} required htmlFor="field-anthropometry-height">
             <Input
               type="number"
               step="0.1"
+              id="field-anthropometry-height"
               {...register("heightCm")}
               placeholder="170"
               aria-invalid={!!errors.heightCm}
+              aria-describedby={errors.heightCm ? "field-anthropometry-height-error" : undefined}
             />
           </FormField>
         </CardContent>
@@ -174,30 +180,32 @@ export function AnthropometryForm({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Ruler className="h-4 w-4" />
-            Circunferencias (cm)
+            {t("anthropometry.circumferences")}
           </CardTitle>
-          <CardDescription>Opcionales — registradas para % grasa, RCC, RCE y masa muscular</CardDescription>
+          <CardDescription>{t("common.optional")} - {t("anthropometry.body_fat_pct")}, RCC, RCE</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4">
           {(
             [
-              ["neck", "Cuello"],
-              ["chest", "Tórax"],
-              ["waist", "Cintura"],
-              ["hip", "Cadera"],
-              ["arm", "Brazo"],
-              ["forearm", "Antebrazo"],
-              ["thigh", "Muslo"],
-              ["calf", "Pantorrilla"],
+              ["neck", t("anthropometry.neck_cm")],
+              ["chest", t("anthropometry.chest_cm")],
+              ["waist", t("anthropometry.waist_cm")],
+              ["hip", t("anthropometry.hip_cm")],
+              ["arm", t("anthropometry.arm_cm")],
+              ["forearm", t("anthropometry.forearm_cm")],
+              ["thigh", t("anthropometry.thigh_cm")],
+              ["calf", t("anthropometry.calf_cm")],
             ] as const
           ).map(([k, label]) => (
-            <FormField key={k} label={label} error={errors[k]?.message}>
+            <FormField key={k} label={label} error={errors[k]?.message} htmlFor={`field-anthropometry-${k}`}>
               <Input
                 type="number"
                 step="0.1"
+                id={`field-anthropometry-${k}`}
                 {...register(k)}
                 placeholder="—"
                 aria-invalid={!!errors[k]}
+                aria-describedby={errors[k] ? `field-anthropometry-${k}-error` : undefined}
               />
             </FormField>
           ))}
@@ -206,28 +214,30 @@ export function AnthropometryForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Pliegues cutáneos (mm)</CardTitle>
-          <CardDescription>Para cálculo de % grasa por Jackson-Pollock</CardDescription>
+          <CardTitle>{t("anthropometry.skinfolds")}</CardTitle>
+          <CardDescription>{t("anthropometry.body_fat_pct")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-4">
           {(
             [
-              ["triceps", "Tríceps"],
-              ["biceps", "Bíceps"],
-              ["subscapular", "Subescapular"],
-              ["suprailiac", "Suprailiaco"],
-              ["abdominal", "Abdominal"],
-              ["thigh_skinfold", "Muslo"],
-              ["calf_skinfold", "Pantorrilla"],
+              ["triceps", t("anthropometry.triceps_mm")],
+              ["biceps", t("anthropometry.biceps_mm")],
+              ["subscapular", t("anthropometry.subscapular_mm")],
+              ["suprailiac", t("anthropometry.suprailiac_mm")],
+              ["abdominal", t("anthropometry.abdominal_mm")],
+              ["thigh_skinfold", t("anthropometry.thigh_skinfold_mm")],
+              ["calf_skinfold", t("anthropometry.calf_skinfold_mm")],
             ] as const
           ).map(([k, label]) => (
-            <FormField key={k} label={label} error={errors[k]?.message}>
+            <FormField key={k} label={label} error={errors[k]?.message} htmlFor={`field-anthropometry-${k}`}>
               <Input
                 type="number"
                 step="0.1"
+                id={`field-anthropometry-${k}`}
                 {...register(k)}
                 placeholder="—"
                 aria-invalid={!!errors[k]}
+                aria-describedby={errors[k] ? `field-anthropometry-${k}-error` : undefined}
               />
             </FormField>
           ))}
@@ -236,37 +246,41 @@ export function AnthropometryForm({
 
       <Card>
         <CardHeader>
-          <CardTitle>Contexto clínico</CardTitle>
+          <CardTitle>{t("common.notes")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <FormField label="Sexo (para cálculos)" error={errors.sex?.message}>
+            <FormField label={t("patient.sex")} error={errors.sex?.message} htmlFor="field-anthropometry-sex">
               <select
+                id="field-anthropometry-sex"
                 {...register("sex")}
                 onChange={(e) => setSex(e.target.value as Sex)}
+                aria-describedby={errors.sex ? "field-anthropometry-sex-error" : undefined}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                {(Object.keys(SexLabel) as Sex[]).map((s) => (
+                {(["female", "male", "intersex", "undisclosed"] as Sex[]).map((s) => (
                   <option key={s} value={s}>
-                    {SexLabel[s]}
+                    {t(`patient.sex_${s}`)}
                   </option>
                 ))}
               </select>
             </FormField>
-            <FormField label="Edad actual" error={errors.ageYears?.message}>
+            <FormField label={t("patient.age")} error={errors.ageYears?.message} htmlFor="field-anthropometry-age">
               <Input
                 type="number"
+                id="field-anthropometry-age"
                 {...register("ageYears")}
                 onChange={(e) => setAge(Number(e.target.value) || 0)}
+                aria-describedby={errors.ageYears ? "field-anthropometry-age-error" : undefined}
               />
             </FormField>
           </div>
           <div>
-            <Label htmlFor="notes">Notas</Label>
+            <Label htmlFor="notes">{t("common.notes")}</Label>
             <Textarea
               id="notes"
               {...register("notes")}
-              placeholder="Condiciones de la medición, observaciones, equipo utilizado…"
+              placeholder={t("anthropometry.notes_placeholder")}
               rows={3}
               className="mt-1.5"
             />
@@ -278,8 +292,8 @@ export function AnthropometryForm({
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            Se calcularán automáticamente: BMI, % grasa (Deurenberg), RCC, RCE
-            {sex === "male" || sex === "female" ? " y % grasa por Jackson-Pollock (si hay pliegues)." : "."}
+            {t("anthropometry.auto_calculated")}
+            {sex === "male" || sex === "female" ? ` ${t("anthropometry.auto_calculated_jackson")}` : "."}
           </AlertDescription>
         </Alert>
       )}
@@ -287,11 +301,11 @@ export function AnthropometryForm({
       <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
         <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
-          Cancelar
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={submitting}>
           <Save className="mr-2 h-4 w-4" />
-          {submitting ? "Guardando…" : "Registrar medición"}
+          {submitting ? t("common.saving") : t("anthropometry.save")}
         </Button>
       </div>
     </form>
@@ -302,21 +316,24 @@ function FormField({
   label,
   error,
   required,
+  htmlFor,
   children,
 }: {
   label: string;
   error?: string;
   required?: boolean;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm">
+      <Label className="text-sm" htmlFor={htmlFor}>
         {label}
         {required && <span className="ml-1 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

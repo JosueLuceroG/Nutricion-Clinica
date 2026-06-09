@@ -3,6 +3,7 @@ import { Anthropometry as AnthropometryEntity } from "../domain/Anthropometry";
 import { AnthropometryId } from "../domain/AnthropometryId";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { Weight, Height, Circumference, Skinfold } from "../domain/Measurements";
+import type { BiaReading } from "../domain/BiaReading";
 import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface AnthropometryRow {
@@ -13,6 +14,7 @@ export interface AnthropometryRow {
   height_m: number;
   circumferences: Record<string, number> | null;
   skinfolds: Record<string, number> | null;
+  bia_json: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
@@ -74,6 +76,7 @@ export const anthropometryRowToDomain = (row: AnthropometryRow): Anthropometry =
     height: Height.fromMeters(row.height_m),
     circumferences: deserializeCircumferences(row.circumferences),
     skinfolds: deserializeSkinfolds(row.skinfolds),
+    bia: row.bia_json ? (JSON.parse(row.bia_json) as BiaReading) : null,
     notes: row.notes,
     createdAt: safeDate(row.created_at, undefined, "anthropometry.created_at")!,
     updatedAt: safeDate(row.updated_at, undefined, "anthropometry.updated_at")!,
@@ -90,6 +93,7 @@ export const anthropometryDomainToRow = (a: Anthropometry): AnthropometryRow => 
     height_m: a.height.toMeters(),
     circumferences: serializeCircumferences(a.circumferences),
     skinfolds: serializeSkinfolds(a.skinfolds),
+    bia_json: a.bia ? JSON.stringify(a.bia) : null,
     notes: a.notes,
     created_at: toIsoStringSafe(a.createdAt, new Date().toISOString(), "anthropometry.created_at")!,
     updated_at: toIsoStringSafe(a.updatedAt, new Date().toISOString(), "anthropometry.updated_at")!,

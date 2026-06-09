@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Upload, FileText, CheckCircle2, AlertTriangle, FileUp, Download, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Button } from "@components/ui/button";
@@ -25,6 +26,7 @@ Juan,Pérez,,1985-03-20,masculino,juan.perez@example.com,+52 55 8765 4321,Profes
 Ana,López,Hernández,1992-11-08,F,juan.perez@example.com,+52 33 1234 5678,Estudiante,Sin observaciones`;
 
 export function ImporterPage() {
+  const { t } = useTranslation();
   const [csv, setCsv] = React.useState("");
   const [preview, setPreview] = React.useState<ImporterPreview | null>(null);
   const [parsing, setParsing] = React.useState(false);
@@ -40,7 +42,7 @@ export function ImporterPage() {
       const result = patientImporterService.preview(text);
       setPreview(result);
     } catch (err) {
-      toast.error("Error al leer el archivo", {
+      toast.error(t("pages.importer_file_read_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
       setPreview(null);
@@ -56,7 +58,7 @@ export function ImporterPage() {
       const result = patientImporterService.preview(csv);
       setPreview(result);
     } catch (err) {
-      toast.error("Error al analizar CSV", {
+      toast.error(t("pages.importer_parse_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
       setPreview(null);
@@ -71,16 +73,16 @@ export function ImporterPage() {
     try {
       const result = await patientImporterService.apply(csv);
       if (result.failed.length === 0) {
-        toast.success(`${result.imported} pacientes importados`);
+        toast.success(t("pages.importer_imported_success", { count: result.imported }));
       } else {
-        toast.warning(`${result.imported} importados, ${result.failed.length} con error`, {
-          description: result.failed.slice(0, 3).map((f) => `Fila ${f.rowNumber}: ${f.errors.join(", ")}`).join("\n"),
+        toast.warning(t("pages.importer_imported_warning", { imported: result.imported, failed: result.failed.length }), {
+          description: result.failed.slice(0, 3).map((f) => t("pages.importer_failed_row", { row: f.rowNumber, errors: f.errors.join(", ") })).join("\n"),
         });
       }
       setPreview(null);
       setCsv("");
     } catch (err) {
-      toast.error("Error al importar", {
+      toast.error(t("pages.importer_import_error_short"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -101,8 +103,8 @@ export function ImporterPage() {
   return (
     <>
       <PageHeader
-        title="Importar pacientes desde CSV"
-        description="Carga pacientes desde un archivo CSV. RN-IMP-01: requiere confirmación antes de aplicar."
+        title={t("pages.importer_patients_title")}
+        description={t("pages.importer_description")}
       />
       <PageContent>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -110,10 +112,10 @@ export function ImporterPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileUp className="h-5 w-5" />
-                1. Cargar archivo
+                {t("pages.importer_step_upload")}
               </CardTitle>
               <CardDescription>
-                Acepta archivos .csv con encabezados. Los nombres de columna pueden estar en español o inglés.
+                {t("pages.importer_upload_description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -130,14 +132,14 @@ export function ImporterPage() {
               />
               <Button onClick={() => fileInputRef.current?.click()} className="w-full" disabled={parsing}>
                 <Upload className="mr-2 h-4 w-4" />
-                {parsing ? "Procesando..." : "Seleccionar archivo CSV"}
+                {parsing ? t("pages.importer_processing") : t("pages.importer_select_csv")}
               </Button>
               <div className="space-y-2">
-                <Label htmlFor="csv-paste">O pega el contenido CSV directamente</Label>
+                <Label htmlFor="csv-paste">{t("pages.importer_paste_csv")}</Label>
                 <textarea
                   id="csv-paste"
                   className="flex min-h-[160px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder="nombre,apellido,fecha de nacimiento,sexo..."
+                  placeholder={t("pages.importer_csv_placeholder")}
                   value={csv}
                   onChange={(e) => setCsv(e.target.value)}
                 />
@@ -145,11 +147,11 @@ export function ImporterPage() {
               <div className="flex gap-2">
                 <Button onClick={handlePreview} variant="outline" disabled={!csv.trim() || parsing} className="flex-1">
                   <FileText className="mr-2 h-4 w-4" />
-                  Analizar
+                  {t("pages.importer_analyze")}
                 </Button>
                 <Button onClick={downloadSample} variant="ghost">
                   <Download className="mr-2 h-4 w-4" />
-                  Plantilla
+                  {t("pages.importer_template")}
                 </Button>
               </div>
             </CardContent>
@@ -167,17 +169,17 @@ export function ImporterPage() {
       <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmar importación</DialogTitle>
+            <DialogTitle>{t("pages.importer_confirm_title")}</DialogTitle>
             <DialogDescription>
-              Se importarán {preview?.valid.length ?? 0} pacientes. Las filas con errores no se importarán.
+              {t("pages.importer_confirm_description", { count: preview?.valid.length ?? 0 })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={applying}>
-              Cancelar
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleApply} disabled={applying}>
-              {applying ? "Importando..." : "Importar"}
+              {applying ? t("pages.importer_importing") : t("pages.importer_import")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -197,20 +199,21 @@ function PreviewPanel({
   onApply: () => void;
   onClear: () => void;
 }) {
+  const { t } = useTranslation();
   if (!preview) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            2. Vista previa
+            {t("pages.importer_step_preview")}
           </CardTitle>
           <CardDescription>
-            Carga un archivo o pega CSV para ver la vista previa de la importación.
+            {t("pages.importer_preview_description")}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          La vista previa muestra qué filas son válidas y cuáles tienen errores, sin persistir.
+          {t("pages.importer_preview_body")}
         </CardContent>
       </Card>
     );
@@ -222,17 +225,17 @@ function PreviewPanel({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="h-5 w-5" />
-            Columnas faltantes
+            {t("pages.importer_missing_columns")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm">
-            El CSV no contiene las columnas obligatorias: <strong>{preview.missingRequiredColumns.join(", ")}</strong>.
+            {t("pages.importer_missing_columns_description", { columns: preview.missingRequiredColumns.join(", ") })}
           </p>
           <p className="text-xs text-muted-foreground">
-            Columnas obligatorias: nombre, apellido, fecha de nacimiento, sexo.
+            {t("pages.importer_required_columns")}
           </p>
-          <Button variant="outline" onClick={onClear}>Limpiar</Button>
+          <Button variant="outline" onClick={onClear}>{t("common.clear")}</Button>
         </CardContent>
       </Card>
     );
@@ -243,20 +246,20 @@ function PreviewPanel({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          2. Vista previa
+          {t("pages.importer_step_preview")}
         </CardTitle>
         <CardDescription className="space-x-3">
           <Badge variant="default">
             <CheckCircle2 className="mr-1 h-3 w-3" />
-            {preview.valid.length} válidas
+            {t("pages.importer_valid_rows", { count: preview.valid.length })}
           </Badge>
           {preview.invalid.length > 0 && (
             <Badge variant="destructive">
               <X className="mr-1 h-3 w-3" />
-              {preview.invalid.length} con errores
+              {t("pages.importer_invalid_rows", { count: preview.invalid.length })}
             </Badge>
           )}
-          <span className="text-xs">de {preview.totalRows} filas</span>
+          <span className="text-xs">{t("pages.importer_total_rows", { count: preview.totalRows })}</span>
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -267,12 +270,12 @@ function PreviewPanel({
             {preview.invalid.length > 0 && (
               <details className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
                 <summary className="cursor-pointer font-medium text-destructive">
-                  Ver {preview.invalid.length} filas con errores
+                  {t("pages.importer_view_invalid_rows", { count: preview.invalid.length })}
                 </summary>
                 <ul className="mt-2 space-y-1 text-xs">
                   {preview.invalid.map((r) => (
                     <li key={r.rowNumber}>
-                      Fila {r.rowNumber}: {r.errors.join("; ")}
+                      {t("pages.importer_row_error", { row: r.rowNumber, errors: r.errors.join("; ") })}
                     </li>
                   ))}
                 </ul>
@@ -284,10 +287,10 @@ function PreviewPanel({
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
-                      <TableHead>Nombre</TableHead>
-                      <TableHead>Fecha nac.</TableHead>
-                      <TableHead>Sexo</TableHead>
-                      <TableHead>Correo</TableHead>
+                      <TableHead>{t("common.name")}</TableHead>
+                      <TableHead>{t("pages.importer_birth_date_short")}</TableHead>
+                      <TableHead>{t("patient.sex")}</TableHead>
+                      <TableHead>{t("patient.email")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -298,12 +301,12 @@ function PreviewPanel({
                 </Table>
                 {preview.valid.length > 50 && (
                   <p className="border-t p-2 text-center text-xs text-muted-foreground">
-                    Mostrando primeras 50 filas de {preview.valid.length}
+                    {t("pages.importer_showing_first_rows", { count: preview.valid.length })}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No hay filas válidas para importar.</p>
+              <p className="text-sm text-muted-foreground">{t("pages.importer_no_valid_rows")}</p>
             )}
             <div className="flex gap-2">
               <Button
@@ -312,9 +315,9 @@ function PreviewPanel({
                 className="flex-1"
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Importar {preview.valid.length} pacientes
+                {t("pages.importer_import_patients", { count: preview.valid.length })}
               </Button>
-              <Button variant="outline" onClick={onClear} disabled={applying}>Limpiar</Button>
+              <Button variant="outline" onClick={onClear} disabled={applying}>{t("common.clear")}</Button>
             </div>
           </>
         )}

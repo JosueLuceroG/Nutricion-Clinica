@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { AlertTriangle, Inbox, Search, Database } from "lucide-react";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
@@ -59,23 +60,25 @@ export function EmptyState({
 }
 
 export function NoResultsFound({ onReset }: { onReset?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       variant="search"
-      title="Sin resultados"
-      description="No encontramos elementos que coincidan con tu búsqueda."
-      action={onReset ? { label: "Limpiar filtros", onClick: onReset } : undefined}
+      title={t("common.no_results")}
+      description={t("common.no_results_description")}
+      action={onReset ? { label: t("common.clear_filters"), onClick: onReset } : undefined}
     />
   );
 }
 
 export function ErrorState({ message, onRetry }: { message?: string; onRetry?: () => void }) {
+  const { t } = useTranslation();
   return (
     <EmptyState
       variant="error"
-      title="Algo salió mal"
-      description={message ?? "Ocurrió un error inesperado. Intenta de nuevo."}
-      action={onRetry ? { label: "Reintentar", onClick: onRetry } : undefined}
+      title={t("common.error_title")}
+      description={message ?? t("common.unexpected_error")}
+      action={onRetry ? { label: t("common.retry"), onClick: onRetry } : undefined}
     />
   );
 }

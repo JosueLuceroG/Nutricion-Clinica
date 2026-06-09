@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
@@ -9,7 +10,7 @@ import {
   patientFormDefaultValues,
   type PatientFormValues,
 } from "@modules/patient/application/patientFormSchema";
-import { SexLabel, type Sex } from "@modules/patient/domain/Sex";
+import type { Sex } from "@modules/patient/domain/Sex";
 import { Email, Phone as PhoneVO } from "@modules/patient/domain/Contact";
 import { patientService } from "@services/patientService";
 import { Button } from "@components/ui/button";
@@ -36,6 +37,7 @@ interface PatientFormProps {
 const selectClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
 export function PatientForm({ mode, patientId, initialPatient }: PatientFormProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
   // Ref-based lock: protege contra dos `onSubmit` consecutivos dentro del
@@ -110,16 +112,16 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
 
       if (mode === "create") {
         const created = await patientService.create.execute(payload);
-        toast.success("Paciente creado", { description: created.fullName });
+        toast.success(t("patient.created_success"), { description: created.fullName });
         navigate(`/pacientes/${created.id.toString()}`);
       } else if (patientId) {
         const updated = await patientService.update.execute(patientId, payload);
-        toast.success("Paciente actualizado", { description: updated.fullName });
+        toast.success(t("patient.updated_success"), { description: updated.fullName });
         navigate(`/pacientes/${updated.id.toString()}`);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Error desconocido";
-      toast.error(mode === "create" ? "No se pudo crear el paciente" : "No se pudo actualizar", {
+      const message = err instanceof Error ? err.message : t("common.unexpected_error");
+      toast.error(mode === "create" ? t("patient.create_error") : t("patient.update_error"), {
         description: message,
       });
     } finally {
@@ -134,59 +136,59 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-4 w-4" />
-            Datos personales
+            {t("patient.personal_data")}
           </CardTitle>
-          <CardDescription>Información básica de identificación del paciente</CardDescription>
+          <CardDescription>{t("patient.personal_data_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Nombre(s)" error={errors.firstName?.message} required>
-            <Input {...register("firstName")} placeholder="María Fernanda" autoComplete="given-name" aria-invalid={!!errors.firstName} />
+          <FormField label={t("patient.names")} error={errors.firstName?.message} required htmlFor="field-patient-first-name">
+            <Input id="field-patient-first-name" {...register("firstName")} placeholder={t("patient.first_name_placeholder")} autoComplete="given-name" aria-invalid={!!errors.firstName} aria-describedby={errors.firstName ? "field-patient-first-name-error" : undefined} />
           </FormField>
-          <FormField label="Apellido paterno" error={errors.lastName?.message} required>
-            <Input {...register("lastName")} placeholder="García" autoComplete="family-name" aria-invalid={!!errors.lastName} />
+          <FormField label={t("patient.first_surname")} error={errors.lastName?.message} required htmlFor="field-patient-last-name">
+            <Input id="field-patient-last-name" {...register("lastName")} placeholder={t("patient.last_name_placeholder")} autoComplete="family-name" aria-invalid={!!errors.lastName} aria-describedby={errors.lastName ? "field-patient-last-name-error" : undefined} />
           </FormField>
-          <FormField label="Apellido materno" error={errors.secondLastName?.message}>
-            <Input {...register("secondLastName")} placeholder="López" />
+          <FormField label={t("patient.second_surname")} error={errors.secondLastName?.message} htmlFor="field-patient-second-last-name">
+            <Input id="field-patient-second-last-name" {...register("secondLastName")} placeholder={t("patient.second_last_name_placeholder")} aria-describedby={errors.secondLastName ? "field-patient-second-last-name-error" : undefined} />
           </FormField>
-          <FormField label="Fecha de nacimiento" error={errors.birthDate?.message} required>
+          <FormField label={t("patient.birth_date")} error={errors.birthDate?.message} required htmlFor="field-patient-birth-date">
             <div className="relative">
               <Calendar className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-              <Input type="date" {...register("birthDate")} className="pl-9" aria-invalid={!!errors.birthDate} />
+              <Input id="field-patient-birth-date" type="date" {...register("birthDate")} className="pl-9" aria-invalid={!!errors.birthDate} aria-describedby={errors.birthDate ? "field-patient-birth-date-error" : undefined} />
             </div>
           </FormField>
-          <FormField label="Sexo biológico" error={errors.sex?.message} required>
-            <select {...register("sex")} className={selectClass} aria-invalid={!!errors.sex}>
-              {(Object.keys(SexLabel) as Sex[]).map((s) => (
-                <option key={s} value={s}>{SexLabel[s]}</option>
+          <FormField label={t("patient.sex")} error={errors.sex?.message} required htmlFor="field-patient-sex">
+            <select id="field-patient-sex" {...register("sex")} className={selectClass} aria-invalid={!!errors.sex} aria-describedby={errors.sex ? "field-patient-sex-error" : undefined}>
+              {(["female", "male", "intersex", "undisclosed"] as Sex[]).map((s) => (
+                <option key={s} value={s}>{t(`patient.sex_${s}`)}</option>
               ))}
             </select>
           </FormField>
-          <FormField label="Ocupación" error={errors.occupation?.message} className="sm:col-span-2">
-            <Input {...register("occupation")} placeholder="Ej. Ingeniero, ama de casa, estudiante" />
+          <FormField label={t("patient.occupation")} error={errors.occupation?.message} className="sm:col-span-2" htmlFor="field-patient-occupation">
+            <Input id="field-patient-occupation" {...register("occupation")} placeholder={t("patient.occupation_placeholder")} aria-describedby={errors.occupation ? "field-patient-occupation-error" : undefined} />
           </FormField>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Contacto</CardTitle>
-          <CardDescription>Al menos un dato de contacto facilita el seguimiento</CardDescription>
+          <CardTitle>{t("patient.contact")}</CardTitle>
+          <CardDescription>{t("patient.contact_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Correo electrónico" error={errors.email?.message}>
+          <FormField label={t("patient.email")} error={errors.email?.message} htmlFor="field-patient-email">
             <div className="relative">
               <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-              <Input type="email" {...register("email")} placeholder="paciente@correo.com" autoComplete="email" className="pl-9" aria-invalid={!!errors.email} />
+              <Input id="field-patient-email" type="email" {...register("email")} placeholder="paciente@correo.com" autoComplete="email" className="pl-9" aria-invalid={!!errors.email} aria-describedby={errors.email ? "field-patient-email-error" : undefined} />
             </div>
           </FormField>
-          <FormField label="Teléfono principal" error={errors.phone?.message}>
+          <FormField label={t("patient.primary_phone")} error={errors.phone?.message} htmlFor="field-patient-phone">
             <div className="relative">
               <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
-              <Input type="tel" {...register("phone")} placeholder="+52 55 1234 5678" autoComplete="tel" className="pl-9" aria-invalid={!!errors.phone} />
+              <Input id="field-patient-phone" type="tel" {...register("phone")} placeholder="+52 55 1234 5678" autoComplete="tel" className="pl-9" aria-invalid={!!errors.phone} aria-describedby={errors.phone ? "field-patient-phone-error" : undefined} />
             </div>
           </FormField>
-          <FormField label="Teléfono secundario" error={errors.secondaryPhone?.message}>
-            <Input type="tel" {...register("secondaryPhone")} placeholder="+52 55 8765 4321" />
+          <FormField label={t("patient.secondary_phone")} error={errors.secondaryPhone?.message} htmlFor="field-patient-secondary-phone">
+            <Input id="field-patient-secondary-phone" type="tel" {...register("secondaryPhone")} placeholder="+52 55 8765 4321" aria-describedby={errors.secondaryPhone ? "field-patient-secondary-phone-error" : undefined} />
           </FormField>
         </CardContent>
       </Card>
@@ -195,19 +197,19 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Heart className="h-4 w-4 text-rose-500" />
-            Contacto de emergencia
+            {t("patient.emergency_contact")}
           </CardTitle>
-          <CardDescription>Persona a contactar en caso de emergencia</CardDescription>
+          <CardDescription>{t("patient.emergency_contact_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-3">
-          <FormField label="Nombre completo" error={errors.emergencyContactName?.message}>
-            <Input {...register("emergencyContactName")} placeholder="Juan Pérez" />
+          <FormField label={t("patient.full_name")} error={errors.emergencyContactName?.message} htmlFor="field-patient-emergency-name">
+            <Input id="field-patient-emergency-name" {...register("emergencyContactName")} placeholder={t("patient.emergency_name_placeholder")} aria-describedby={errors.emergencyContactName ? "field-patient-emergency-name-error" : undefined} />
           </FormField>
-          <FormField label="Parentesco" error={errors.emergencyContactRelationship?.message}>
-            <Input {...register("emergencyContactRelationship")} placeholder="Cónyuge, hijo/a, madre…" />
+          <FormField label={t("patient.relationship")} error={errors.emergencyContactRelationship?.message} htmlFor="field-patient-emergency-relationship">
+            <Input id="field-patient-emergency-relationship" {...register("emergencyContactRelationship")} placeholder={t("patient.relationship_placeholder")} aria-describedby={errors.emergencyContactRelationship ? "field-patient-emergency-relationship-error" : undefined} />
           </FormField>
-          <FormField label="Teléfono" error={errors.emergencyContactPhone?.message}>
-            <Input type="tel" {...register("emergencyContactPhone")} placeholder="+52 55 1234 5678" />
+          <FormField label={t("patient.phone")} error={errors.emergencyContactPhone?.message} htmlFor="field-patient-emergency-phone">
+            <Input id="field-patient-emergency-phone" type="tel" {...register("emergencyContactPhone")} placeholder="+52 55 1234 5678" aria-describedby={errors.emergencyContactPhone ? "field-patient-emergency-phone-error" : undefined} />
           </FormField>
         </CardContent>
       </Card>
@@ -216,29 +218,33 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
-            Notas y etiquetas
+            {t("patient.notes_and_tags")}
           </CardTitle>
-          <CardDescription>Observaciones generales y etiquetas clínicas</CardDescription>
+          <CardDescription>{t("patient.notes_and_tags_desc")}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <FormField label="Notas generales" error={errors.generalNotes?.message}>
+          <FormField label={t("patient.general_notes")} error={errors.generalNotes?.message} htmlFor="field-patient-general-notes">
             <Textarea
+              id="field-patient-general-notes"
               {...register("generalNotes")}
-              placeholder="Observaciones generales del paciente…"
+              placeholder={t("patient.general_notes_placeholder")}
               rows={3}
               aria-invalid={!!errors.generalNotes}
+              aria-describedby={errors.generalNotes ? "field-patient-general-notes-error" : undefined}
             />
           </FormField>
-          <FormField label="Etiquetas clínicas" error={errors.clinicalTags?.message}>
+          <FormField label={t("patient.clinical_tags")} error={errors.clinicalTags?.message} htmlFor="field-patient-clinical-tags">
             <div className="relative">
               <Tags className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
               <Input
+                id="field-patient-clinical-tags"
                 {...register("clinicalTags")}
-                placeholder="diabético, embarazo, vegetariano"
+                placeholder={t("patient.clinical_tags_placeholder")}
                 className="pl-9"
+                aria-describedby={errors.clinicalTags ? "field-patient-clinical-tags-error" : undefined}
               />
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Separadas por coma</p>
+            <p className="mt-1 text-xs text-muted-foreground">{t("patient.comma_separated")}</p>
           </FormField>
         </CardContent>
       </Card>
@@ -246,11 +252,11 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
       <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
         <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
-          Cancelar
+          {t("common.cancel")}
         </Button>
         <Button type="submit" disabled={submitting || (mode === "edit" && !isDirty)}>
           <Save className="mr-2 h-4 w-4" />
-          {submitting ? "Guardando…" : mode === "create" ? "Crear paciente" : "Guardar cambios"}
+          {submitting ? t("common.saving") : mode === "create" ? t("patient.create") : t("settings.save_changes")}
         </Button>
       </div>
     </form>
@@ -262,22 +268,25 @@ function FormField({
   error,
   required,
   className,
+  htmlFor,
   children,
 }: {
   label: string;
   error?: string;
   required?: boolean;
   className?: string;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className={`space-y-1.5 ${className ?? ""}`}>
-      <Label className="text-sm">
+      <Label className="text-sm" htmlFor={htmlFor}>
         {label}
         {required && <span className="ml-1 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }

@@ -22,8 +22,10 @@ export interface LabPanelRow {
   deleted_at: string | null;
 }
 
-const rowToResults = (rows: LabResultRow[]) =>
-  rows.map((r) => LabResult.from({ test: r.test, value: r.value }));
+const rowToResults = (rows: LabResultRow[] | null | undefined): LabResult[] => {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((r) => LabResult.from({ test: r.test, value: r.value }));
+};
 
 const resultsToRows = (results: ReadonlyArray<LabResult>): LabResultRow[] =>
   results.map((r) => ({ test: r.test, value: r.value }));

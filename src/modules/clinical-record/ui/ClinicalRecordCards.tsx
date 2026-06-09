@@ -1,9 +1,14 @@
 import * as React from "react";
-import { X, Pill, AlertTriangle, CalendarDays, Users, Heart, Activity, Dumbbell, Apple, ChevronDown, ChevronRight, Stethoscope, Syringe, TestTube, UtensilsCrossed } from "lucide-react";
+import { X, Pill, AlertTriangle, CalendarDays, Users, Heart, Activity, Dumbbell, Apple, ChevronDown, ChevronRight, Stethoscope, Syringe, TestTube, UtensilsCrossed, Sparkles, Check, XCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import i18n from "@i18n/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
 import { Skeleton } from "@components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@components/ui/dialog";
+import { toast } from "sonner";
+import { ConsentService, type PatientConsent } from "@modules/auth/PatientConsentService";
 import { SeverityLabel, type Severity } from "../domain/Allergy";
 import { EventTypeLabel, type EventType } from "../domain/ClinicalEvent";
 import { MedicationFreqLabel } from "../domain/Medication";
@@ -24,6 +29,7 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import type { AllergyFormData, MedicationFormData, ClinicalEventFormData, FamilyHistoryFormData, PersonalHistoryFormData, HabitFormData, PhysicalActivityFormData, DietHistoryFormData, IntoleranceFormData, SurgeryFormData, HospitalizationFormData, SupplementFormData, FoodFrequencyFormData, GiSymptomFormData } from "../application/clinicalRecordSchemas";
 
 export function ClinicalRecordCards({ patientId }: { patientId: string }) {
+  useTranslation();
   return (
     <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       <AllergyCard patientId={patientId} />
@@ -40,6 +46,7 @@ export function ClinicalRecordCards({ patientId }: { patientId: string }) {
       <SupplementCard patientId={patientId} />
       <FoodFrequencyCard patientId={patientId} />
       <GiSymptomCard patientId={patientId} />
+      <AiConsentCard patientId={patientId} />
     </div>
   );
 }
@@ -55,14 +62,14 @@ function AllergyCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
-          Alergias ({data.length})
+          {i18n.t("clinical_record.allergies")} ({data.length})
           {blocked.length > 0 && (
-            <Badge variant="destructive" className="ml-1 text-xs">{blocked.length} bloqueados</Badge>
+            <Badge variant="destructive" className="ml-1 text-xs">{blocked.length} {i18n.t("clinical_record.blocked")}</Badge>
           )}
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddAllergyDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -72,7 +79,7 @@ function AllergyCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin alergias registradas</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_allergies")}</p>
           ) : (
             <>
               {data.map((a) => (
@@ -81,7 +88,7 @@ function AllergyCard({ patientId }: { patientId: string }) {
                     <span className="font-medium">{a.allergen}</span>
                     <div className="flex items-center gap-1">
                       <SeverityBadge severity={a.severity} />
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(a.id.toString()); }}>
+                      <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(a.id.toString()); }}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -92,7 +99,7 @@ function AllergyCard({ patientId }: { patientId: string }) {
               {blocked.length > 0 && (
                 <details className="text-xs text-muted-foreground">
                   <summary className="cursor-pointer hover:text-foreground">
-                    Alimentos bloqueados ({blocked.length})
+                    {i18n.t("clinical_record.blocked_foods")} ({blocked.length})
                   </summary>
                   <ul className="mt-1 space-y-0.5 pl-4 list-disc">
                     {blocked.map((id) => (
@@ -120,11 +127,11 @@ function MedicationCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Pill className="h-4 w-4 text-blue-500" />
-          Medicamentos ({active.length} activos)
+          {i18n.t("clinical_record.medications")} ({i18n.t("clinical_record.active_count", { count: active.length })})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddMedicationDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -134,21 +141,21 @@ function MedicationCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin medicamentos registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_medications")}</p>
           ) : (
             data.map((m) => (
               <div key={m.id.toString()} className={`rounded-md border p-2 text-sm ${!m.isActive ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{m.name}</span>
                   <div className="flex items-center gap-1">
-                    {!m.isActive && <Badge variant="outline">Inactivo</Badge>}
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(m.id.toString()); }}>
+                    {!m.isActive && <Badge variant="outline">{i18n.t("common.inactive")}</Badge>}
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(m.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {m.dose} · {MedicationFreqLabel[m.frequency]} · {m.route}
+                  {m.dose} · {i18n.t("clinical_record.medication_frequency_" + m.frequency, { defaultValue: MedicationFreqLabel[m.frequency] })} · {m.route}
                 </p>
               </div>
             ))
@@ -169,11 +176,11 @@ function ClinicalEventCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <CalendarDays className="h-4 w-4 text-purple-500" />
-          Eventos clínicos ({data.length})
+          {i18n.t("clinical_record.clinical_events")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddClinicalEventDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -183,7 +190,7 @@ function ClinicalEventCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin eventos registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_events")}</p>
           ) : (
             data.map((e) => (
               <div key={e.id.toString()} className="rounded-md border p-2 text-sm">
@@ -191,7 +198,7 @@ function ClinicalEventCard({ patientId }: { patientId: string }) {
                   <span className="font-medium">{e.name}</span>
                   <div className="flex items-center gap-1">
                     <EventTypeBadge type={e.type} />
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(e.id.toString()); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(e.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -216,11 +223,11 @@ function SeverityBadge({ severity }: { severity: Severity }) {
     severa: "destructive",
     anafilaxia: "destructive",
   };
-  return <Badge variant={map[severity]}>{SeverityLabel[severity]}</Badge>;
+  return <Badge variant={map[severity]}>{i18n.t("clinical_record.severity_" + severity, { defaultValue: SeverityLabel[severity] })}</Badge>;
 }
 
 function EventTypeBadge({ type }: { type: EventType }) {
-  return <Badge variant="outline">{EventTypeLabel[type]}</Badge>;
+  return <Badge variant="outline">{i18n.t("clinical_record.event_type_" + type, { defaultValue: EventTypeLabel[type] })}</Badge>;
 }
 
 function FamilyHistoryCard({ patientId }: { patientId: string }) {
@@ -234,11 +241,11 @@ function FamilyHistoryCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Users className="h-4 w-4 text-emerald-500" />
-          Antecedentes familiares ({data.length})
+          {i18n.t("clinical_record.family_history")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddFamilyHistoryDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -248,21 +255,21 @@ function FamilyHistoryCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin antecedentes registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_histories")}</p>
           ) : (
             data.map((f) => (
               <div key={f.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{FamilyRelationshipLabel[f.relationship]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.family_relationship_" + f.relationship, { defaultValue: FamilyRelationshipLabel[f.relationship] })}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{ConditionLabel[f.condition]}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(f.id.toString()); }}>
+                    <Badge variant="outline">{i18n.t("clinical_record.family_condition_" + f.condition, { defaultValue: ConditionLabel[f.condition] })}</Badge>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(f.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 {f.diagnosisAge !== null && (
-                  <p className="text-xs text-muted-foreground mt-1">Edad diagnóstico: {f.diagnosisAge} años</p>
+                  <p className="text-xs text-muted-foreground mt-1">{i18n.t("clinical_record.diagnosis_age")}: {f.diagnosisAge} {i18n.t("clinical_record.years")}</p>
                 )}
               </div>
             ))
@@ -284,11 +291,11 @@ function PersonalHistoryCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Heart className="h-4 w-4 text-rose-500" />
-          Antecedentes personales ({data.length})
+          {i18n.t("clinical_record.personal_history")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddPersonalHistoryDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -298,21 +305,21 @@ function PersonalHistoryCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin antecedentes registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_histories")}</p>
           ) : (
             data.map((p) => (
               <div key={p.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{PersonalConditionLabel[p.condition]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.personal_condition_" + p.condition, { defaultValue: PersonalConditionLabel[p.condition] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant={p.status === "activo" ? "default" : "secondary"}>{p.status}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(p.id.toString()); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(p.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 {p.diagnosisDate && (
-                  <p className="text-xs text-muted-foreground mt-1">Diagnóstico: {new Date(p.diagnosisDate).toLocaleDateString("es-MX")}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{i18n.t("clinical_record.diagnosis")}: {new Date(p.diagnosisDate).toLocaleDateString("es-MX")}</p>
                 )}
               </div>
             ))
@@ -333,11 +340,11 @@ function HabitCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Activity className="h-4 w-4 text-orange-500" />
-          Hábitos ({data.length})
+          {i18n.t("clinical_record.habits")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddHabitDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -347,21 +354,21 @@ function HabitCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin hábitos registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_habits")}</p>
           ) : (
             data.map((h) => (
               <div key={h.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{HabitCategoryLabel[h.category]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.habit_category_" + h.category, { defaultValue: HabitCategoryLabel[h.category] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant="outline">{h.status}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(h.id.toString()); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(h.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 {h.frequency && (
-                  <p className="text-xs text-muted-foreground mt-1">Frecuencia: {h.frequency}{h.quantity ? ` · ${h.quantity}` : ""}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{i18n.t("clinical_record.frequency")}: {h.frequency}{h.quantity ? ` · ${h.quantity}` : ""}</p>
                 )}
               </div>
             ))
@@ -383,11 +390,11 @@ function PhysicalActivityCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Dumbbell className="h-4 w-4 text-indigo-500" />
-          Actividad física ({active.length} activas)
+          {i18n.t("clinical_record.physical_activity")} ({i18n.t("clinical_record.active_count_f", { count: active.length })})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddPhysicalActivityDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -397,21 +404,21 @@ function PhysicalActivityCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin actividad registrada</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_activity")}</p>
           ) : (
             data.map((a) => (
               <div key={a.id.toString()} className={`rounded-md border p-2 text-sm ${!a.isActive ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{ActivityTypeLabel[a.type]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.activity_type_" + a.type, { defaultValue: ActivityTypeLabel[a.type] })}</span>
                   <div className="flex items-center gap-1">
-                    {!a.isActive && <Badge variant="outline">Inactiva</Badge>}
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(a.id.toString()); }}>
+                    {!a.isActive && <Badge variant="outline">{i18n.t("common.inactive")}</Badge>}
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(a.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {a.frequencyPerWeek}x/sem · {a.durationMinutes} min · {BorgIntensityLabel[a.intensity]}
+                  {a.frequencyPerWeek}x/sem · {a.durationMinutes} min · {i18n.t("clinical_record.borg_intensity_" + a.intensity, { defaultValue: BorgIntensityLabel[a.intensity] })}
                 </p>
               </div>
             ))
@@ -432,11 +439,11 @@ function DietHistoryCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Apple className="h-4 w-4 text-green-500" />
-          Historia dietética
+          {i18n.t("clinical_record.diet_history")}
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddDietHistoryDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -446,18 +453,18 @@ function DietHistoryCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : !data ? (
-            <p className="text-sm text-muted-foreground">Sin historia dietética registrada</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_diet_history")}</p>
           ) : (
             <div className="space-y-1 text-sm">
-              <p><span className="font-medium">Tipo de dieta:</span> {DietTypeLabel[data.dietType]}</p>
-              <p><span className="font-medium">Comidas al día:</span> {data.mealsPerDay}</p>
-              <p><span className="font-medium">Horarios:</span> {data.mealSchedule || "—"}</p>
-              <p><span className="font-medium">Lugar de comida:</span> {MealPlaceLabel[data.mealPlace]}</p>
-              <p><span className="font-medium">Quien prepara:</span> {data.mealPreparer || "—"}</p>
-              <p><span className="font-medium">Presupuesto:</span> {data.budget || "—"}</p>
-              <p><span className="font-medium">Personas en hogar:</span> {data.householdPeople}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.diet_type")}:</span> {i18n.t("clinical_record.diet_type_" + data.dietType, { defaultValue: DietTypeLabel[data.dietType] })}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.meals_per_day")}:</span> {data.mealsPerDay}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.meal_schedule")}:</span> {data.mealSchedule || "—"}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.meal_place")}:</span> {i18n.t("clinical_record.meal_place_" + data.mealPlace, { defaultValue: MealPlaceLabel[data.mealPlace] })}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.meal_preparer")}:</span> {data.mealPreparer || "—"}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.budget")}:</span> {data.budget || "—"}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.household_people")}:</span> {data.householdPeople}</p>
               {data.labelReading && (
-                <p><span className="font-medium">Lectura de etiquetas:</span> Sí</p>
+                <p><span className="font-medium">{i18n.t("clinical_record.label_reading")}:</span> {i18n.t("clinical_record.yes")}</p>
               )}
             </div>
           )}
@@ -479,14 +486,14 @@ function IntoleranceCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="h-4 w-4 text-orange-500" />
-          Intolerancias ({data.length})
+          {i18n.t("clinical_record.intolerances")} ({data.length})
           {warnings.length > 0 && (
-            <Badge variant="warning" className="ml-1 text-xs">{warnings.length} alimentos alerta</Badge>
+            <Badge variant="warning" className="ml-1 text-xs">{warnings.length} {i18n.t("clinical_record.cards.food_alerts")}</Badge>
           )}
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddIntoleranceDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -496,7 +503,7 @@ function IntoleranceCard({ patientId }: { patientId: string }) {
           {loading ? (
             <Skeleton className="h-16 w-full" />
           ) : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin intolerancias registradas</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_intolerances")}</p>
           ) : (
             <>
               {data.map((i) => (
@@ -505,22 +512,22 @@ function IntoleranceCard({ patientId }: { patientId: string }) {
                     <span className="font-medium">{i.food}</span>
                     <div className="flex items-center gap-1">
                       <IntoleranceSeverityBadge severity={i.severity} />
-                      <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(i.id.toString()); }}>
+                      <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(i.id.toString()); }}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{i.symptom}</p>
                   <p className="text-xs text-muted-foreground">
-                    {MechanismLabel[i.mechanism]}
-                    {i.thresholdDose ? ` · Dosis umbral: ${i.thresholdDose}` : ""}
+                    {i18n.t("clinical_record.mechanism_" + i.mechanism, { defaultValue: MechanismLabel[i.mechanism] })}
+                    {i.thresholdDose ? ` · ${i18n.t("clinical_record.threshold_dose")}: ${i.thresholdDose}` : ""}
                   </p>
                 </div>
               ))}
               {warnings.length > 0 && (
                 <details className="text-xs text-muted-foreground">
                   <summary className="cursor-pointer hover:text-foreground">
-                    Alimentos con advertencia ({warnings.length})
+                    {i18n.t("clinical_record.cards.food_warnings")} ({warnings.length})
                   </summary>
                   <ul className="mt-1 space-y-0.5 pl-4 list-disc">
                     {warnings.map((w, i) => (
@@ -541,7 +548,7 @@ function IntoleranceSeverityBadge({ severity }: { severity: IntoleranceSeverity 
   const map: Record<IntoleranceSeverity, "default" | "secondary" | "destructive"> = {
     leve: "secondary", moderada: "default", severa: "destructive",
   };
-  return <Badge variant={map[severity]}>{IntoleranceSeverityLabel[severity]}</Badge>;
+  return <Badge variant={map[severity]}>{i18n.t("clinical_record.intolerance_severity_" + severity, { defaultValue: IntoleranceSeverityLabel[severity] })}</Badge>;
 }
 
 function SurgeryCard({ patientId }: { patientId: string }) {
@@ -553,11 +560,11 @@ function SurgeryCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Stethoscope className="h-4 w-4 text-sky-500" />
-          Cirugías ({data.length})
+          {i18n.t("clinical_record.surgeries")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddSurgeryDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -565,20 +572,20 @@ function SurgeryCard({ patientId }: { patientId: string }) {
       {open && (
         <CardContent className="space-y-2 pt-0">
           {loading ? <Skeleton className="h-16 w-full" /> : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin cirugías registradas</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_surgeries")}</p>
           ) : (
             data.map((s) => (
               <div key={s.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{SurgeryTypeLabel[s.type]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.surgery_type_" + s.type, { defaultValue: SurgeryTypeLabel[s.type] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant="outline">{new Date(s.date).toLocaleDateString("es-MX")}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(s.id.toString()); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{s.hospital}{s.complications ? ` · Complicaciones: ${s.complications}` : ""}</p>
+                <p className="text-xs text-muted-foreground mt-1">{s.hospital}{s.complications ? ` · ${i18n.t("clinical_record.complications")}: ${s.complications}` : ""}</p>
               </div>
             ))
           )}
@@ -597,11 +604,11 @@ function HospitalizationCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <Syringe className="h-4 w-4 text-violet-500" />
-          Hospitalizaciones ({data.length})
+          {i18n.t("clinical_record.hospitalizations")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddHospitalizationDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -609,20 +616,20 @@ function HospitalizationCard({ patientId }: { patientId: string }) {
       {open && (
         <CardContent className="space-y-2 pt-0">
           {loading ? <Skeleton className="h-16 w-full" /> : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin hospitalizaciones registradas</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_hospitalizations")}</p>
           ) : (
             data.map((h) => (
               <div key={h.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{h.reason}</span>
-                  <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(h.id.toString()); }}>
+                  <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(h.id.toString()); }}>
                     <X className="h-3 w-3" />
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ingreso: {new Date(h.admissionDate).toLocaleDateString("es-MX")}
-                  {h.dischargeDate ? ` · Egreso: ${new Date(h.dischargeDate).toLocaleDateString("es-MX")}` : ""}
-                  {h.stayDays > 0 ? ` · ${h.stayDays} días` : ""}
+                  {i18n.t("clinical_record.cards.admission_label")}: {new Date(h.admissionDate).toLocaleDateString("es-MX")}
+                  {h.dischargeDate ? ` · ${i18n.t("clinical_record.cards.discharge_label")}: ${new Date(h.dischargeDate).toLocaleDateString("es-MX")}` : ""}
+                  {h.stayDays > 0 ? ` · ${i18n.t("clinical_record.stay_days", { count: h.stayDays })}` : ""}
                 </p>
                 <p className="text-xs text-muted-foreground">{h.hospital}</p>
               </div>
@@ -644,11 +651,11 @@ function SupplementCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <TestTube className="h-4 w-4 text-teal-500" />
-          Suplementos ({active.length} activos)
+          {i18n.t("clinical_record.supplements")} ({i18n.t("clinical_record.active_count", { count: active.length })})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddSupplementDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -656,15 +663,15 @@ function SupplementCard({ patientId }: { patientId: string }) {
       {open && (
         <CardContent className="space-y-2 pt-0">
           {loading ? <Skeleton className="h-16 w-full" /> : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin suplementos registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_supplements")}</p>
           ) : (
             data.map((s) => (
               <div key={s.id.toString()} className={`rounded-md border p-2 text-sm ${s.endDate && new Date(s.endDate) <= new Date() ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{s.name}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{SupplementCategoryLabel[s.category]}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(s.id.toString()); }}>
+                    <Badge variant="outline">{i18n.t("clinical_record.supplement_category_" + s.category, { defaultValue: SupplementCategoryLabel[s.category] })}</Badge>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -690,11 +697,11 @@ function FoodFrequencyCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <UtensilsCrossed className="h-4 w-4 text-yellow-500" />
-          Frecuencia de consumo ({data.length})
+          {i18n.t("clinical_record.consumption_frequency")} ({data.length})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddFoodFrequencyDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -702,22 +709,22 @@ function FoodFrequencyCard({ patientId }: { patientId: string }) {
       {open && (
         <CardContent className="space-y-2 pt-0">
           {loading ? <Skeleton className="h-16 w-full" /> : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin frecuencias registradas</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_frequencies")}</p>
           ) : (
             data.map((f) => (
               <div key={f.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{f.foodGroupName || f.foodGroupId}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{FrequencyValueLabel[f.frequency]}</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(f.id.toString()); }}>
+                    <Badge variant="outline">{i18n.t("clinical_record.food_frequency_" + f.frequency, { defaultValue: FrequencyValueLabel[f.frequency] })}</Badge>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(f.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {f.quantity ? `Cantidad: ${f.quantity}` : ""}
-                  {f.preparation ? ` · Preparación: ${f.preparation}` : ""}
+                  {f.quantity ? `${i18n.t("clinical_record.quantity")}: ${f.quantity}` : ""}
+                  {f.preparation ? ` · ${i18n.t("clinical_record.preparation")}: ${f.preparation}` : ""}
                 </p>
               </div>
             ))
@@ -738,11 +745,11 @@ function GiSymptomCard({ patientId }: { patientId: string }) {
       <CardHeader className="flex flex-row items-center justify-between py-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
           <AlertTriangle className="h-4 w-4 text-red-500" />
-          Síntomas GI ({data.length}{severe.length > 0 ? ` · ${severe.length} severos` : ""})
+          {i18n.t("clinical_record.gi_symptoms_short")} ({data.length}{severe.length > 0 ? ` · ${i18n.t("clinical_record.severe_count", { count: severe.length })}` : ""})
         </CardTitle>
         <div className="flex items-center gap-1">
           <AddGiSymptomDialog onSave={onSave} />
-          <Button variant="ghost" size="icon" onClick={() => setOpen(!open)}>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
             {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </Button>
         </div>
@@ -750,15 +757,15 @@ function GiSymptomCard({ patientId }: { patientId: string }) {
       {open && (
         <CardContent className="space-y-2 pt-0">
           {loading ? <Skeleton className="h-16 w-full" /> : data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin síntomas registrados</p>
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_symptoms")}</p>
           ) : (
             data.map((s) => (
               <div key={s.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{GiSymptomTypeLabel[s.symptomType]}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.gi_symptom_type_" + s.symptomType, { defaultValue: GiSymptomTypeLabel[s.symptomType] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant={s.severity >= 7 ? "destructive" : s.severity >= 4 ? "default" : "secondary"}>{s.severity}/10</Badge>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={async () => { await remove(s.id.toString()); }}>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
                   </div>
@@ -767,13 +774,157 @@ function GiSymptomCard({ patientId }: { patientId: string }) {
                   {s.frequency}{s.description ? ` · ${s.description}` : ""}
                 </p>
                 {s.foodRelation && (
-                  <p className="text-xs text-muted-foreground">Relación: {s.foodRelation}</p>
+                  <p className="text-xs text-muted-foreground">{i18n.t("clinical_record.relationship")}: {s.foodRelation}</p>
                 )}
               </div>
             ))
           )}
         </CardContent>
       )}
+    </Card>
+  );
+}
+
+function AiConsentCard({ patientId }: { patientId: string }) {
+  const [open, setOpen] = React.useState(false);
+  const [showDialog, setShowDialog] = React.useState(false);
+  const [consents, setConsents] = React.useState<PatientConsent[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [active, setActive] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await ConsentService.listByPatient(patientId);
+      setConsents(list);
+      setActive(await ConsentService.isConsentActive(patientId, "ai_opt_in"));
+    } catch {
+      setConsents([]);
+      setActive(false);
+    } finally {
+      setLoading(false);
+    }
+  }, [patientId]);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const handleRecord = async () => {
+    setSubmitting(true);
+    try {
+      await ConsentService.recordConsent({
+        id: crypto.randomUUID(),
+        patient_id: patientId,
+        type: "ai_opt_in",
+        signed_at: new Date().toISOString(),
+        expires_at: null,
+        revoked_at: null,
+      });
+      toast.success(i18n.t("clinical_record.ai_consent_recorded"));
+      setShowDialog(false);
+      await load();
+    } catch {
+      toast.error(i18n.t("clinical_record.ai_consent_error"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRevoke = async () => {
+    const activeConsent = consents.find((c) => c.type === "ai_opt_in" && !c.revoked_at);
+    if (!activeConsent) return;
+    setSubmitting(true);
+    try {
+      await ConsentService.revokeConsent(activeConsent.id);
+      toast.success(i18n.t("clinical_record.ai_consent_revoked"));
+      await load();
+    } catch {
+      toast.error(i18n.t("clinical_record.ai_consent_error"));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between py-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <Sparkles className="h-4 w-4 text-purple-500" />
+          {i18n.t("clinical_record.ai_assist")}
+          {!loading && (
+            active
+              ? <Badge variant="default" className="text-xs">{i18n.t("clinical_record.ai_consent_active")}</Badge>
+              : <Badge variant="secondary" className="text-xs">{i18n.t("clinical_record.ai_consent_inactive")}</Badge>
+          )}
+        </CardTitle>
+        <div className="flex items-center gap-1">
+          <Button type="button" variant="outline" size="sm" onClick={() => setShowDialog(true)}>
+            {active ? <XCircle className="mr-1 h-3 w-3" /> : <Check className="mr-1 h-3 w-3" />}
+            {active ? i18n.t("clinical_record.revoke") : i18n.t("clinical_record.record")}
+          </Button>
+          <Button variant="ghost" size="icon" aria-label={open ? i18n.t("clinical_record.collapse_section") : i18n.t("clinical_record.expand_section")} onClick={() => setOpen(!open)}>
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </Button>
+        </div>
+      </CardHeader>
+      {open && (
+        <CardContent className="space-y-2 pt-0">
+          {loading ? (
+            <Skeleton className="h-16 w-full" />
+          ) : consents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.ai_no_consents")}</p>
+          ) : (
+            consents.map((c) => {
+              const isActive = !c.revoked_at && (!c.expires_at || new Date(c.expires_at) > new Date());
+              return (
+                <div key={c.id} className={`rounded-md border p-2 text-sm ${isActive ? "border-purple-200 bg-purple-50 dark:border-purple-800 dark:bg-purple-950" : ""}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{i18n.t("clinical_record.ai_consent")}</span>
+                    <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                      {isActive ? i18n.t("clinical_record.active") : i18n.t("clinical_record.revoked")}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {i18n.t("clinical_record.signed_at")}: {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(c.signed_at))}
+                  </p>
+                  {c.revoked_at && (
+                    <p className="text-xs text-muted-foreground">
+                      {i18n.t("clinical_record.revoked_at")}: {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(c.revoked_at))}
+                    </p>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      )}
+      <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>{i18n.t("clinical_record.ai_consent_dialog_title")}</DialogTitle>
+            <DialogDescription>
+              {active
+                ? i18n.t("clinical_record.ai_consent_dialog_revoke_desc")
+                : i18n.t("clinical_record.ai_consent_dialog_record_desc")
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setShowDialog(false)}>
+              {i18n.t("common.cancel")}
+            </Button>
+            {active ? (
+              <Button type="button" variant="destructive" disabled={submitting} onClick={handleRevoke}>
+                {submitting ? i18n.t("common.loading") : i18n.t("clinical_record.revoke")}
+              </Button>
+            ) : (
+              <Button type="button" disabled={submitting} onClick={handleRecord}>
+                {submitting ? i18n.t("common.loading") : i18n.t("clinical_record.record")}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

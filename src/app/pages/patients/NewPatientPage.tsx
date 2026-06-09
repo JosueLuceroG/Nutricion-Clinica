@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -8,6 +9,7 @@ import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 
 export function NewPatientPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const isEdit = Boolean(patientId);
   const id = React.useMemo(
@@ -19,17 +21,17 @@ export function NewPatientPage() {
   return (
     <>
       <PageHeader
-        title={isEdit ? "Editar paciente" : "Nuevo paciente"}
+        title={isEdit ? t("patient.edit_title") : t("patient.new")}
         description={
           isEdit
-            ? "Modifica los datos del paciente"
-            : "Registra un nuevo paciente en el sistema"
+            ? t("patient.edit_description")
+            : t("patient.new_description")
         }
         actions={
           <Button asChild variant="outline">
             <Link to={isEdit && patient ? `/pacientes/${patient.id.toString()}` : "/pacientes"}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
+              {t("common.back")}
             </Link>
           </Button>
         }

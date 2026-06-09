@@ -13,6 +13,14 @@ import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
 import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
 import { SettingsPage } from "@app/pages/SettingsPage";
 import { SmaeCatalogPage } from "@app/pages/SmaeCatalogPage";
+import { AgendaPage } from "@app/pages/agenda/AgendaPage";
+import { RecipesPage } from "@app/pages/recipes/RecipesPage";
+import { DocumentsPage } from "@app/pages/documents/DocumentsPage";
+import { MealPlannerPage } from "@app/pages/meal-planner/MealPlannerPage";
+import { GoalsPage } from "@app/pages/goals/GoalsPage";
+import { AdherencePage } from "@app/pages/adherence/AdherencePage";
+import { MedicationsPage } from "@app/pages/medications/MedicationsPage";
+import { ReportsPage } from "@app/pages/reports/ReportsPage";
 import { ImporterPage } from "@app/pages/ImporterPage";
 import { HelpPage } from "@app/pages/HelpPage";
 import { NotFoundPage } from "@app/pages/NotFoundPage";
@@ -176,6 +184,11 @@ const router = createHashRouter([
       },
       { path: "calculos", element: <CalculationsPage /> },
       { path: "smae", element: <SmaeCatalogPage /> },
+      { path: "recetas", element: <RecipesPage /> },
+      { path: "objetivos", element: <GoalsPage /> },
+      { path: "adherencia", element: <AdherencePage /> },
+      { path: "documentos", element: <DocumentsPage /> },
+      { path: "plan-semanal", element: <MealPlannerPage /> },
       { path: "importar", element: <ImporterPage /> },
       {
         path: "planes",
@@ -184,7 +197,9 @@ const router = createHashRouter([
           { path: ":planId", element: <MealPlanDetailPage /> },
         ],
       },
-      { path: "agenda", element: <Navigate to="/consultas" replace /> },
+      { path: "medicamentos", element: <MedicationsPage /> },
+      { path: "reportes", element: <ReportsPage /> },
+      { path: "agenda", element: <AgendaPage /> },
       { path: "notificaciones", element: <NotificationsPage /> },
       { path: "perfil", element: <ProfilePage /> },
       { path: "configuracion", element: <SettingsPage /> },

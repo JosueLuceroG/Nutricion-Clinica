@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, Plus, UtensilsCrossed, Trash2, Calendar, User, Target } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -12,11 +13,12 @@ import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { usePatientMealPlans } from "@modules/mealplan/ui/useMealPlanHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import type { MealPlanId } from "@modules/mealplan/domain/MealPlanId";
-import { MealPlanStatusLabel, MealPlanStatusColor } from "@modules/mealplan/domain/MealPlanStatus";
+import { MealPlanStatusColor } from "@modules/mealplan/domain/MealPlanStatus";
 import { planDailyNutrition, planVsTarget } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
 
 export function PatientMealPlansPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const id = React.useMemo(
@@ -27,13 +29,13 @@ export function PatientMealPlansPage() {
   const { data, loading, error, reload } = usePatientMealPlans(id);
 
   const onDelete = async (planId: MealPlanId, planName: string) => {
-    if (!confirm(`¿Eliminar el plan "${planName}"? Esta acción se puede revertir.`)) return;
+    if (!confirm(t("mealplan.delete_confirm", { name: planName }))) return;
     try {
       await mealPlanService.delete.execute(planId, true);
-      toast.success("Plan eliminado");
+      toast.success(t("mealplan.deleted_success"));
       reload();
     } catch (err) {
-      toast.error("No se pudo eliminar", {
+      toast.error(t("mealplan.delete_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     }
@@ -42,7 +44,7 @@ export function PatientMealPlansPage() {
   if (patientLoading || loading) {
     return (
       <>
-        <PageHeader title="Cargando…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
@@ -57,7 +59,7 @@ export function PatientMealPlansPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_title")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -68,11 +70,11 @@ export function PatientMealPlansPage() {
   if (!patient) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.not_found_title")} />
         <PageContent>
           <EmptyState
-            title="El paciente no existe"
-            action={{ label: "Volver", onClick: () => navigate("/pacientes") }}
+            title={t("patient.not_exists")}
+            action={{ label: t("common.back"), onClick: () => navigate("/pacientes") }}
           />
         </PageContent>
       </>
@@ -84,20 +86,20 @@ export function PatientMealPlansPage() {
   return (
     <>
       <PageHeader
-        title={`Planes alimentarios · ${patient.fullName}`}
-        description={`${items.length} plan${items.length === 1 ? "" : "es"} registrado${items.length === 1 ? "" : "s"}`}
+        title={t("mealplan.patient_plans", { patientName: patient.fullName })}
+        description={t("mealplan.count_registered", { count: items.length })}
         actions={
           <>
             <Button asChild variant="outline">
               <Link to={`/pacientes/${patient.id.toString()}`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
-                Volver al paciente
+                {t("patient.back_to_patient")}
               </Link>
             </Button>
             <Button asChild>
               <Link to={`/pacientes/${patient.id.toString()}/planes/nuevo`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nuevo plan
+                {t("mealplan.new")}
               </Link>
             </Button>
           </>
@@ -107,10 +109,10 @@ export function PatientMealPlansPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={UtensilsCrossed}
-            title="Sin planes alimentarios"
-            description="Crea un plan basado en el Sistema Mexicano de Alimentos Equivalentes para este paciente."
+            title={t("mealplan.no_plans")}
+            description={t("mealplan.empty_patient_desc")}
             action={{
-              label: "Crear primer plan",
+              label: t("mealplan.create_first"),
               onClick: () => navigate(`/pacientes/${patient.id.toString()}/planes/nuevo`),
             }}
           />
@@ -149,12 +151,12 @@ export function PatientMealPlansPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant={MealPlanStatusColor[p.status] as never}>
-                          {MealPlanStatusLabel[p.status]}
+                          {t(`mealplan.status_${p.status}`)}
                         </Badge>
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label="Eliminar"
+                          aria-label={t("common.delete")}
                           onClick={() => onDelete(p.id, p.name)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -165,22 +167,22 @@ export function PatientMealPlansPage() {
                   <CardContent>
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                       <MiniStat
-                        label="kcal reales / objetivo"
+                        label={t("mealplan.kcal_actual_target")}
                         value={`${Math.round(totals.kcal)} / ${p.kcalTarget}`}
                         diff={diff.kcal}
                       />
                       <MiniStat
-                        label="Proteína g / objetivo"
+                        label={t("mealplan.protein_actual_target")}
                         value={`${totals.proteinG.toFixed(1)} / ${p.proteinTargetG}`}
                         diff={diff.proteinG}
                       />
                       <MiniStat
-                        label="Carbohidratos g / objetivo"
+                        label={t("mealplan.carbs_actual_target")}
                         value={`${totals.carbsG.toFixed(1)} / ${p.carbsTargetG}`}
                         diff={diff.carbsG}
                       />
                       <MiniStat
-                        label="Grasa g / objetivo"
+                        label={t("mealplan.fat_actual_target")}
                         value={`${totals.fatG.toFixed(1)} / ${p.fatTargetG}`}
                         diff={diff.fatG}
                       />
@@ -188,11 +190,10 @@ export function PatientMealPlansPage() {
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
                       <p className="flex items-center gap-1 text-xs text-muted-foreground">
                         <User className="h-3 w-3" />
-                        {patient.fullName} · {totalExchanges} equivalente
-                        {totalExchanges === 1 ? "" : "s"} registrados
+                        {t("mealplan.exchanges_registered", { name: patient.fullName, count: totalExchanges })}
                       </p>
                       <Button asChild variant="outline" size="sm">
-                        <Link to={`/planes/${p.id.toString()}`}>Ver detalle completo</Link>
+                        <Link to={`/planes/${p.id.toString()}`}>{t("common.view_details")}</Link>
                       </Button>
                     </div>
                   </CardContent>
@@ -207,6 +208,7 @@ export function PatientMealPlansPage() {
 }
 
 function MiniStat({ label, value, diff }: { label: string; value: string; diff: number }) {
+  const { t } = useTranslation();
   const tone = Math.abs(diff) <= 0.1 ? "success" : diff > 0 ? "destructive" : "warning";
   return (
     <div className="rounded-md bg-muted/20 p-2">
@@ -222,7 +224,7 @@ function MiniStat({ label, value, diff }: { label: string; value: string; diff: 
         </Badge>
       ) : (
         <Badge variant="success" className="mt-1">
-          En meta
+          {t("mealplan.in_target")}
         </Badge>
       )}
     </div>

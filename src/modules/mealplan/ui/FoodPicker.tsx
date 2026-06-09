@@ -10,6 +10,7 @@
  * al detalle del repositorio.
  */
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import { Search, Sparkles, Apple, Loader2 } from "lucide-react";
 import {
   type Food,
@@ -44,6 +45,7 @@ interface FoodPickerProps {
 type Tab = "catalog" | "equivalencia";
 
 export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: FoodPickerProps) {
+  const { t } = useTranslation();
   const [tab, setTab] = React.useState<Tab>("catalog");
 
   const [query, setQuery] = React.useState("");
@@ -93,9 +95,9 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Seleccionar alimento</DialogTitle>
+          <DialogTitle>{t("mealplan.food_picker.title")}</DialogTitle>
           <DialogDescription>
-            Busca en el catálogo SMAE o encuentra alimentos por equivalencia nutricional.
+            {t("mealplan.food_picker.description")}
           </DialogDescription>
         </DialogHeader>
 
@@ -106,7 +108,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
             size="sm"
             onClick={() => setTab("catalog")}
           >
-            <Apple className="mr-1 h-4 w-4" /> Catálogo
+            <Apple className="mr-1 h-4 w-4" /> {t("mealplan.food_picker.tab_catalog")}
           </Button>
           <Button
             type="button"
@@ -114,7 +116,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
             size="sm"
             onClick={() => setTab("equivalencia")}
           >
-            <Sparkles className="mr-1 h-4 w-4" /> Por equivalencia
+            <Sparkles className="mr-1 h-4 w-4" /> {t("mealplan.food_picker.tab_equivalencia")}
           </Button>
         </div>
 
@@ -125,7 +127,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
                   autoFocus
-                  placeholder="Buscar por nombre o palabra clave (ej. tortilla, frijol, mexicano)"
+                  placeholder={t("mealplan.food_picker.search_placeholder")}
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="pl-8"
@@ -136,7 +138,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
                 onChange={(e) => setGroup((e.target.value || "") as FoodGroup | "")}
                 className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               >
-                <option value="">Todos los grupos</option>
+                <option value="">{t("mealplan.food_picker.all_groups")}</option>
                 {FOOD_GROUPS.map((g) => (
                   <option key={g} value={g}>
                     {FoodGroupLabel[g]}
@@ -150,7 +152,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
               error={catalogError}
               foods={filteredCatalog}
               onSelect={handleSelect}
-              emptyMessage="No se encontraron alimentos con esos criterios."
+              emptyMessage={t("mealplan.food_picker.no_results")}
             />
           </div>
         )}
@@ -158,8 +160,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
         {tab === "equivalencia" && (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Encuentra alimentos cuyo grupo cumple un kcal target ± tolerancia.
-              Útil para "¿qué me da ~70 kcal por ración?".
+              {t("mealplan.food_picker.equivalencia_description")}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm flex items-center gap-1">
@@ -174,7 +175,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
                 />
               </label>
               <label className="text-sm flex items-center gap-1">
-                ± tolerancia
+                ± {t("mealplan.food_picker.tolerance")}
                 <Input
                   type="number"
                   min="0"
@@ -185,11 +186,11 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
                 />
               </label>
               <span className="text-sm text-muted-foreground">
-                {loadingEquiv ? (
-                  <Loader2 className="inline h-3 w-3 animate-spin" />
-                ) : (
-                  `${filteredEquiv.length} resultado(s)`
-                )}
+                  {loadingEquiv ? (
+                    <Loader2 className="inline h-3 w-3 animate-spin" />
+                  ) : (
+                    t("mealplan.food_picker.results_count", { count: filteredEquiv.length })
+                  )}
               </span>
             </div>
             <ResultsList
@@ -197,7 +198,7 @@ export function FoodPicker({ open, onOpenChange, onSelect, excludeFoodIds }: Foo
               error={null}
               foods={filteredEquiv}
               onSelect={handleSelect}
-              emptyMessage="Ningún grupo cumple ese criterio. Ajusta tolerancia o kcal."
+              emptyMessage={t("mealplan.food_picker.no_equivalencia_results")}
             />
           </div>
         )}

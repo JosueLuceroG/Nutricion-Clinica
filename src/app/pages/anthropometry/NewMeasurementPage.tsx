@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Skeleton } from "@components/ui/skeleton";
@@ -11,6 +12,7 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import type { Sex } from "@modules/patient/domain/Sex";
 
 export function NewMeasurementPage() {
+  const { t } = useTranslation();
   const { patientId } = useParams();
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
@@ -21,7 +23,7 @@ export function NewMeasurementPage() {
   if (loading) {
     return (
       <>
-        <PageHeader title="Cargando paciente…" />
+        <PageHeader title={t("common.loading")} />
         <PageContent>
           <div className="mx-auto max-w-3xl space-y-4">
             <Skeleton className="h-32 w-full" />
@@ -36,7 +38,7 @@ export function NewMeasurementPage() {
   if (error) {
     return (
       <>
-        <PageHeader title="Error" />
+        <PageHeader title={t("common.error_occurred")} />
         <PageContent>
           <ErrorState message={error.message} onRetry={reload} />
         </PageContent>
@@ -47,7 +49,7 @@ export function NewMeasurementPage() {
   if (!patient || !id) {
     return (
       <>
-        <PageHeader title="Paciente no encontrado" />
+        <PageHeader title={t("patient.title_single") + " " + t("common.no_results")} />
         <PageContent>{null}</PageContent>
       </>
     );
@@ -56,13 +58,13 @@ export function NewMeasurementPage() {
   return (
     <>
       <PageHeader
-        title="Nueva medición antropométrica"
-        description={`Paciente: ${patient.fullName}`}
+        title={t("anthropometry.new_title")}
+        description={`${t("patient.title_single")}: ${patient.fullName}`}
         actions={
           <Button asChild variant="outline">
             <Link to={`/pacientes/${patient.id.toString()}/antropometria`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Volver
+              {t("common.previous")}
             </Link>
           </Button>
         }

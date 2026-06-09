@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Plus,
@@ -52,15 +53,19 @@ import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePat
 import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
 import { usePatientsUIStore } from "@store/patientsUIStore";
 import type { Patient } from "@modules/patient/domain/Patient";
-import { SexLabel } from "@modules/patient/domain/Sex";
-import { PatientStatusLabel } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
+
+function patientStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: Patient["status"]) {
+  if (status === "deceased") return t("patient.status_deceased");
+  return t(`common.${status}`);
+}
 
 const columnHelper = createColumnHelper<Patient>();
 
 export function PatientsListPage() {
   const navigate = useNavigate();
   const { search, statusFilter, setSearch, setStatusFilter, reset } = usePatientsUIStore();
+  const { t } = useTranslation();
   const isDeletedView = statusFilter === "deleted";
   const { data, loading, error, reload } = usePatients(
     isDeletedView
@@ -84,16 +89,16 @@ export function PatientsListPage() {
     onComplete: (outcome) => {
       if (deleteTarget) {
         if (outcome === "deleted") {
-          toast.success(`${deleteTarget.fullName} eliminado`);
+          toast.success(t("patient.deleted_success", { name: deleteTarget.fullName }));
         } else if (outcome === "archived") {
-          toast.success(`${deleteTarget.fullName} archivado`);
+          toast.success(t("patient.archived_success", { name: deleteTarget.fullName }));
         }
       }
       setDeleteTarget(null);
       void reload();
     },
     onError: (err) => {
-      toast.error("No se pudo completar la operación", {
+      toast.error(t("patient.operation_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     },
@@ -104,11 +109,11 @@ export function PatientsListPage() {
     setBusy(true);
     try {
       await patientService.archive.execute(archiveTarget.id);
-      toast.success(`${archiveTarget.fullName} archivado`);
+      toast.success(t("patient.archived_success", { name: archiveTarget.fullName }));
       setArchiveTarget(null);
       void reload();
     } catch (err) {
-      toast.error("No se pudo archivar", {
+      toast.error(t("patient.archive_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -121,11 +126,11 @@ export function PatientsListPage() {
     setBusy(true);
     try {
       await patientService.restore.execute(restoreTarget.id);
-      toast.success(`${restoreTarget.fullName} restaurado`);
+      toast.success(t("patient.restored_success", { name: restoreTarget.fullName }));
       setRestoreTarget(null);
       void reload();
     } catch (err) {
-      toast.error("No se pudo restaurar", {
+      toast.error(t("patient.restore_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -136,21 +141,21 @@ export function PatientsListPage() {
   const columns = React.useMemo(
     () => [
       columnHelper.accessor("fullName", {
-        header: "Paciente",
+        header: t("patient.title_single"),
         cell: (info) => {
           const p = info.row.original;
           return (
             <div className="flex flex-col">
               <span className="font-medium">{info.getValue()}</span>
               <span className="text-xs text-muted-foreground">
-                {p.age} años · {SexLabel[p.sex]}
+                {t("dashboard.patient_age_sex", { age: p.age, sex: t(`patient.sex_${p.sex}`) })}
               </span>
             </div>
           );
         },
       }),
       columnHelper.accessor("email", {
-        header: "Contacto",
+        header: t("patient.contact"),
         cell: (info) => {
           const p = info.row.original;
           return (
@@ -172,7 +177,7 @@ export function PatientsListPage() {
       }),
       columnHelper.accessor((row) => row.birthDate, {
         id: "birthDate",
-        header: "Nacimiento",
+        header: t("patient.birth_date"),
         cell: (info) => (
           <span className="text-xs text-muted-foreground">
             {new Intl.DateTimeFormat("es-MX", {
@@ -184,7 +189,7 @@ export function PatientsListPage() {
         ),
       }),
       columnHelper.accessor("status", {
-        header: "Estado",
+        header: t("common.status"),
         cell: (info) => (
           <StatusBadge status={info.getValue()} deletedAt={info.row.original.deletedAt} />
         ),
@@ -206,7 +211,7 @@ export function PatientsListPage() {
         ),
       }),
     ],
-    [navigate, cascade, isDeletedView],
+    [navigate, cascade, isDeletedView, t],
   );
 
   const table = useReactTable({
@@ -228,26 +233,26 @@ export function PatientsListPage() {
   return (
     <>
       <PageHeader
-        title={isDeletedView ? "Pacientes eliminados" : "Pacientes"}
+        title={isDeletedView ? `${t("patient.title")} ${t("common.deleted")}` : t("patient.title")}
         description={
           isDeletedView
-            ? "Pacientes soft-deleted. Usa Restaurar para devolverlos al listado activo."
+            ? t("patient.deleted_view_description")
             : total > 0
-              ? `${total} paciente${total === 1 ? "" : "s"}`
-              : "Gestiona los expedientes"
+              ? t("patient.count", { count: total })
+              : t("patient.manage_records")
         }
         actions={
           <div className="flex gap-2">
             <Button asChild variant="outline">
               <Link to="/importar">
                 <Upload className="mr-2 h-4 w-4" />
-                Importar CSV
+                {`${t("nav.import")} CSV`}
               </Link>
             </Button>
             <Button asChild>
               <Link to="/pacientes/nuevo">
                 <Plus className="mr-2 h-4 w-4" />
-                Nuevo paciente
+                {t("patient.new")}
               </Link>
             </Button>
           </div>
@@ -263,9 +268,9 @@ export function PatientsListPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por nombre o correo…"
+              placeholder={t("patient.search_placeholder")}
               className="pl-9"
-              aria-label="Buscar pacientes"
+              aria-label={`${t("common.search")} ${t("patient.title")}`}
             />
           </div>
           <div className="flex gap-1 rounded-md border bg-background p-0.5">
@@ -277,7 +282,7 @@ export function PatientsListPage() {
                 onClick={() => setStatusFilter(s)}
                 className="h-7 px-3 text-xs"
               >
-                {s === "all" ? "Todos" : s === "deleted" ? "Eliminados" : PatientStatusLabel[s]}
+                {s === "all" ? t("common.all") : s === "deleted" ? t("common.deleted") : patientStatusLabel(t, s)}
               </Button>
             ))}
           </div>
@@ -293,21 +298,30 @@ export function PatientsListPage() {
         ) : showEmpty ? (
           <EmptyState
             icon={UsersIcon}
-            title="Sin pacientes registrados"
-            description="Comienza registrando tu primer paciente para crear consultas y planes alimentarios."
-            action={{ label: "Crear paciente", onClick: () => navigate("/pacientes/nuevo") }}
+            title={t("patient.no_patients")}
+            description={t("patient.register")}
+            action={{ label: t("patient.new"), onClick: () => navigate("/pacientes/nuevo") }}
           />
         ) : showNoResults ? (
           <NoResultsFound onReset={reset} />
         ) : (
           <>
-            <div className="rounded-md border bg-card">
+            <div className="overflow-x-auto rounded-md border bg-card">
               <Table>
                 <TableHeader>
                   {table.getHeaderGroups().map((hg) => (
                     <TableRow key={hg.id}>
                       {hg.headers.map((header) => (
-                        <TableHead key={header.id}>
+                        <TableHead
+                          key={header.id}
+                          className={
+                            header.column.id === "birthDate"
+                              ? "hidden md:table-cell"
+                              : header.column.id === "email" || header.column.id === "status"
+                                ? "hidden lg:table-cell"
+                                : undefined
+                          }
+                        >
                           {header.isPlaceholder
                             ? null
                             : flexRender(header.column.columnDef.header, header.getContext())}
@@ -321,10 +335,27 @@ export function PatientsListPage() {
                     <TableRow
                       key={row.id}
                       className="cursor-pointer"
+                      tabIndex={0}
+                      role="link"
                       onClick={() => navigate(`/pacientes/${row.original.id.toString()}`)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          navigate(`/pacientes/${row.original.id.toString()}`)
+                        }
+                      }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id}>
+                        <TableCell
+                          key={cell.id}
+                          className={
+                            cell.column.id === "birthDate"
+                              ? "hidden md:table-cell"
+                              : cell.column.id === "email" || cell.column.id === "status"
+                                ? "hidden lg:table-cell"
+                                : undefined
+                          }
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
@@ -337,7 +368,7 @@ export function PatientsListPage() {
             {table.getPageCount() > 1 && (
               <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
                 <span>
-                  Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+                  {t("common.page_info", { current: table.getState().pagination.pageIndex + 1, total: table.getPageCount() })}
                 </span>
                 <div className="flex gap-1">
                   <Button
@@ -347,7 +378,7 @@ export function PatientsListPage() {
                     disabled={!table.getCanPreviousPage()}
                   >
                     <ChevronLeft className="h-4 w-4" />
-                    Anterior
+                    {t("common.previous")}
                   </Button>
                   <Button
                     variant="outline"
@@ -355,7 +386,7 @@ export function PatientsListPage() {
                     onClick={() => table.nextPage()}
                     disabled={!table.getCanNextPage()}
                   >
-                    Siguiente
+                    {t("common.next")}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
@@ -368,9 +399,9 @@ export function PatientsListPage() {
       <ConfirmDialog
         open={archiveTarget !== null}
         onOpenChange={(o) => !o && setArchiveTarget(null)}
-        title={archiveTarget ? `¿Archivar a ${archiveTarget.fullName}?` : ""}
-        description="El paciente se ocultará de los listados activos, pero su expediente clínico se conserva. Podés revertir esta acción más tarde."
-        confirmLabel="Archivar"
+        title={archiveTarget ? t("patient.archive_title", { name: archiveTarget.fullName }) : ""}
+        description={t("patient.archive_desc")}
+        confirmLabel={t("common.archive")}
         tone="warning"
         busy={busy}
         onConfirm={executeArchive}
@@ -379,9 +410,9 @@ export function PatientsListPage() {
       <ConfirmDialog
         open={restoreTarget !== null}
         onOpenChange={(o) => !o && setRestoreTarget(null)}
-        title={restoreTarget ? `¿Restaurar a ${restoreTarget.fullName}?` : ""}
-        description="El paciente volverá al listado activo y podrá editarse / recibir consultas y planes. El cambio se sincroniza con el servidor."
-        confirmLabel="Restaurar"
+        title={restoreTarget ? t("patient.restore_title", { name: restoreTarget.fullName }) : ""}
+        description={t("patient.restore_desc")}
+        confirmLabel={t("common.restore")}
         tone="info"
         busy={busy}
         onConfirm={executeRestore}
@@ -405,8 +436,9 @@ export function PatientsListPage() {
 }
 
 function StatusBadge({ status, deletedAt }: { status: Patient["status"]; deletedAt: Date | null }) {
+  const { t } = useTranslation();
   if (deletedAt !== null) {
-    return <Badge variant="destructive">Eliminado</Badge>;
+    return <Badge variant="destructive">{t("common.deleted")}</Badge>;
   }
   const map: Record<Patient["status"], { variant: "success" | "secondary" | "warning" | "outline" }> = {
     active: { variant: "success" },
@@ -414,7 +446,7 @@ function StatusBadge({ status, deletedAt }: { status: Patient["status"]; deleted
     archived: { variant: "outline" },
     deceased: { variant: "warning" },
   };
-  return <Badge variant={map[status].variant}>{PatientStatusLabel[status]}</Badge>;
+  return <Badge variant={map[status].variant}>{patientStatusLabel(t, status)}</Badge>;
 }
 
 function RowActions({
@@ -432,31 +464,32 @@ function RowActions({
   onDelete: (p: Patient) => void;
   onRestore: (p: Patient) => void;
 }) {
+  const { t } = useTranslation();
   const isDeleted = patient.deletedAt !== null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label="Acciones">
+          <Button variant="ghost" size="icon-sm" aria-label={t("common.actions")}>
             <MoreHorizontal className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuLabel>{patient.fullName}</DropdownMenuLabel>
-          <DropdownMenuItem onClick={onView}>Ver detalle</DropdownMenuItem>
+          <DropdownMenuItem onClick={onView}>{t("common.view_details")}</DropdownMenuItem>
           {!isDeleted && (
             <>
               <DropdownMenuItem asChild>
-                <Link to={`/pacientes/${patient.id.toString()}/editar`}>Editar</Link>
+                <Link to={`/pacientes/${patient.id.toString()}/editar`}>{t("common.edit")}</Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to={`/pacientes/${patient.id.toString()}/consultas`}>Nueva consulta</Link>
+                <Link to={`/pacientes/${patient.id.toString()}/consultas`}>{t("consultation.new")}</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {patient.status !== "archived" && (
                 <DropdownMenuItem onClick={() => onArchive(patient)}>
                   <Archive className="mr-2 h-4 w-4" />
-                  Archivar
+                  {t("common.archive")}
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -464,7 +497,7 @@ function RowActions({
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
-                Eliminar
+                {t("common.delete")}
               </DropdownMenuItem>
             </>
           )}
@@ -477,7 +510,7 @@ function RowActions({
                 data-testid="restore-patient-menu-item"
               >
                 <Archive className="mr-2 h-4 w-4" />
-                Restaurar
+                {t("common.restore")}
               </DropdownMenuItem>
             </>
           )}

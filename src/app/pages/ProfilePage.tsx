@@ -1,29 +1,29 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { User as UserIcon } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { useAuthStore } from "@store/authStore";
-import { RoleLabel } from "@nutriclinica/shared";
 
 export function ProfilePage() {
+  const { t } = useTranslation();
   const user = useAuthStore((s) => s.user);
 
   return (
     <>
-      <PageHeader title="Mi perfil" description="Información del profesional" />
+      <PageHeader title={t("layout.profile")} description={t("profile.description")} />
       <PageContent>
         {!user ? (
           <Card>
             <CardHeader>
-              <CardTitle>Sin sesión iniciada</CardTitle>
+              <CardTitle>{t("profile.no_session")}</CardTitle>
               <CardDescription>
-                NutriClinica funciona en modo local. La autenticación se habilita en Fase 3.
+                {t("profile.local_mode_desc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
-              Los datos locales están cifrados en reposo. La sincronización entre dispositivos se
-              implementará en una fase posterior.
+              {t("profile.local_data_desc")}
             </CardContent>
           </Card>
         ) : (
@@ -32,24 +32,24 @@ export function ProfilePage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <UserIcon className="h-4 w-4" />
-                  Datos del profesional
+                  {t("profile.professional_data")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <Row label="Nombre" value={user.nombreCompleto} />
-                <Row label="Rol" value={RoleLabel[user.rol]} />
+                <Row label={t("common.name")} value={user.nombreCompleto} />
+                <Row label={t("profile.role")} value={t(`auth.role_${user.rol}`)} />
               </CardContent>
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Sesión</CardTitle>
+                <CardTitle className="text-base">{t("profile.session")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>Estado: <Badge variant="success">Activo</Badge></p>
-                <p>Modo: local (offline-first)</p>
+                <p>{t("profile.status")}: <Badge variant="success">{t("common.active")}</Badge></p>
+                <p>{t("profile.mode")}: {t("profile.local_offline_first")}</p>
                 <p className="border-t pt-2 text-xs">
                   <Link to="/configuracion" className="hover:underline">
-                    Configuración general
+                    {t("profile.general_settings")}
                   </Link>
                 </p>
               </CardContent>

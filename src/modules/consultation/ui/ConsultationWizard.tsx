@@ -2,6 +2,7 @@ import * as React from "react";
 import { useForm, FormProvider, useFormContext, type FieldErrors, type FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Save,
   X,
@@ -42,6 +43,8 @@ import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { cn } from "@utils/cn";
+import { useAI } from "@services/ai/useAI";
+import { AIAssistButton } from "@components/ai/AIAssistButton";
 
 interface ConsultationWizardProps {
   patientId: PatientId;
@@ -58,6 +61,7 @@ const STEP_ICONS: Record<WizardStepKey, React.ComponentType<{ className?: string
 };
 
 export function ConsultationWizard({ patientId, onComplete }: ConsultationWizardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = React.useState(1);
   const [submitting, setSubmitting] = React.useState(false);
@@ -111,8 +115,8 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           nextVisitDate,
         });
 
-        toast.success("Consulta registrada", {
-          description: `Consulta #${consultation.consultationNumber} agendada`,
+        toast.success(t("consultation.wizard.toast_registered"), {
+          description: t("consultation.wizard.toast_scheduled", { number: consultation.consultationNumber }),
         });
 
         if (onComplete) {
@@ -121,7 +125,7 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           navigate(`/pacientes/${patientId.toString()}/consultas`);
         }
       } catch (err) {
-        toast.error("No se pudo guardar la consulta", {
+        toast.error(t("consultation.wizard.toast_save_error"), {
           description: err instanceof Error ? err.message : String(err),
         });
       } finally {
@@ -135,8 +139,8 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           return msg ? `${k}: ${msg}` : null;
         })
         .filter((s): s is string => s !== null);
-      toast.error("Corrige los errores del formulario", {
-        description: messages.length > 0 ? messages.join("\n") : "Revisa los campos marcados en rojo.",
+      toast.error(t("consultation.wizard.toast_fix_errors"), {
+        description: messages.length > 0 ? messages.join("\n") : t("consultation.wizard.toast_check_fields"),
       });
     },
   );
@@ -162,18 +166,18 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
               {step > 1 && (
                 <Button type="button" variant="outline" onClick={goBack} disabled={submitting}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
-                  Atrás
+                  {t("common.back")}
                 </Button>
               )}
             </div>
             <div className="flex items-center gap-2">
               <Button type="button" variant="ghost" onClick={() => navigate(-1)} disabled={submitting}>
                 <X className="mr-2 h-4 w-4" />
-                Cancelar
+                {t("common.cancel")}
               </Button>
               {step < WIZARD_STEPS.length ? (
                 <Button type="button" onClick={goNext}>
-                  Siguiente
+                  {t("common.next")}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
@@ -183,14 +187,14 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
                   disabled={submitting}
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  {submitting ? "Guardando…" : "Guardar consulta"}
+                  {submitting ? t("consultation.wizard.saving") : t("consultation.wizard.save_consultation")}
                 </Button>
               )}
             </div>
           </div>
           {currentStepDef && step < WIZARD_STEPS.length && (
             <p className="text-center text-xs text-muted-foreground">
-              Paso {step} de {WIZARD_STEPS.length} · {currentStepDef.title}
+              {t("consultation.wizard.step_of", { step, total: WIZARD_STEPS.length })} · {currentStepDef.title}
             </p>
           )}
         </div>
@@ -257,25 +261,28 @@ function Stepper({
 
 function StepBasics({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
   const { register } = useFormContextSafe();
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Stethoscope className="h-4 w-4" />
-          Datos básicos de la consulta
+          {t("consultation.wizard.basic_info")}
         </CardTitle>
-        <CardDescription>Fecha y motivo principal</CardDescription>
+        <CardDescription>{t("consultation.wizard.basic_info_description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <Field label="Fecha" error={errors.consultationDate?.message} required>
-          <Input type="date" {...register("consultationDate")} aria-invalid={!!errors.consultationDate} />
+        <Field label={t("consultation.wizard.date")} htmlFor="field-consultation-date" error={errors.consultationDate?.message} required>
+          <Input type="date" id="field-consultation-date" {...register("consultationDate")} aria-invalid={!!errors.consultationDate} aria-describedby={errors.consultationDate ? "field-consultation-date-error" : undefined} />
         </Field>
-        <Field label="Motivo de consulta" error={errors.reason?.message} required>
+        <Field label={t("consultation.wizard.reason")} htmlFor="field-consultation-reason" error={errors.reason?.message} required>
           <Textarea
+            id="field-consultation-reason"
             {...register("reason")}
             rows={3}
-            placeholder="Ej. Control trimestral, paciente busca bajar de peso, seguimiento de diabetes…"
+            placeholder={t("consultation.wizard.reason_placeholder")}
             aria-invalid={!!errors.reason}
+            aria-describedby={errors.reason ? "field-consultation-reason-error" : undefined}
           />
         </Field>
       </CardContent>
@@ -285,21 +292,24 @@ function StepBasics({ errors }: { errors: FieldErrors<ConsultationFormValues> })
 
 function StepSubjective({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
   const { register } = useFormContextSafe();
+  const { t } = useTranslation();
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <MessageCircle className="h-4 w-4" />
-          Subjetivo (S)
+          {t("consultation.wizard.subjective")}
         </CardTitle>
-        <CardDescription>Lo que el paciente reporta: síntomas, antecedentes, cambios recientes</CardDescription>
+        <CardDescription>{t("consultation.wizard.subjective_description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Field label="Notas subjetivas" error={errors.subjective?.message}>
+        <Field label={t("consultation.wizard.subjective_notes")} htmlFor="field-consultation-subjective" error={errors.subjective?.message}>
           <Textarea
+            id="field-consultation-subjective"
             {...register("subjective")}
             rows={6}
-            placeholder="Síntomas, cambios en apetito/energía, adherencia al plan anterior, eventos relevantes…"
+            placeholder={t("consultation.wizard.subjective_placeholder")}
+            aria-describedby={errors.subjective ? "field-consultation-subjective-error" : undefined}
           />
         </Field>
       </CardContent>
@@ -315,6 +325,7 @@ function StepObjective({
   errors: FieldErrors<ConsultationFormValues>;
 }) {
   const { register, watch, setValue } = useFormContextSafe();
+  const { t } = useTranslation();
   const vitalsTaken = watch("vitalsTaken");
   const [measurements, setMeasurements] = React.useState<
     Array<{ id: string; measuredAt: string; weightKg: number; heightCm: number; bmi: number }>
@@ -355,9 +366,9 @@ function StepObjective({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Signos vitales
+            {t("consultation.wizard.vital_signs")}
           </CardTitle>
-          <CardDescription>Marca esta opción solo si se tomaron signos vitales en esta consulta</CardDescription>
+          <CardDescription>{t("consultation.wizard.vital_signs_description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <label className="flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors hover:bg-muted/30 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
@@ -368,9 +379,9 @@ function StepObjective({
               className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border border-primary text-primary accent-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             />
             <div className="flex-1">
-              <p className="text-sm font-medium leading-none">¿Se tomaron signos vitales?</p>
+              <p className="text-sm font-medium leading-none">{t("consultation.wizard.vital_signs_taken")}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Opcional. Si los tomaste, completa los campos; si no, deja apagado y registra solo las notas de exploración.
+                {t("consultation.wizard.vital_signs_taken_description")}
               </p>
             </div>
           </label>
@@ -382,38 +393,46 @@ function StepObjective({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Heart className="h-4 w-4" />
-              Captura de signos vitales
+              {t("consultation.wizard.vital_signs_capture")}
             </CardTitle>
-            <CardDescription>Toma clínica del día</CardDescription>
+            <CardDescription>{t("consultation.wizard.vital_signs_capture_description")}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Field label="Tensión arterial sistólica (mmHg)" error={errors.vitalSigns?.systolicMmHg?.message}>
+            <Field label={t("consultation.wizard.systolic_pressure")} htmlFor="field-consultation-systolic" error={errors.vitalSigns?.systolicMmHg?.message}>
               <Input
                 type="number"
+                id="field-consultation-systolic"
                 {...register("vitalSigns.systolicMmHg", { valueAsNumber: true })}
                 placeholder="120"
+                aria-describedby={errors.vitalSigns?.systolicMmHg ? "field-consultation-systolic-error" : undefined}
               />
             </Field>
-            <Field label="Tensión arterial diastólica (mmHg)" error={errors.vitalSigns?.diastolicMmHg?.message}>
+            <Field label={t("consultation.wizard.diastolic_pressure")} htmlFor="field-consultation-diastolic" error={errors.vitalSigns?.diastolicMmHg?.message}>
               <Input
                 type="number"
+                id="field-consultation-diastolic"
                 {...register("vitalSigns.diastolicMmHg", { valueAsNumber: true })}
                 placeholder="80"
+                aria-describedby={errors.vitalSigns?.diastolicMmHg ? "field-consultation-diastolic-error" : undefined}
               />
             </Field>
-            <Field label="Frecuencia cardíaca (lpm)" error={errors.vitalSigns?.heartRateBpm?.message}>
+            <Field label={t("consultation.wizard.heart_rate")} htmlFor="field-consultation-heart-rate" error={errors.vitalSigns?.heartRateBpm?.message}>
               <Input
                 type="number"
+                id="field-consultation-heart-rate"
                 {...register("vitalSigns.heartRateBpm", { valueAsNumber: true })}
                 placeholder="72"
+                aria-describedby={errors.vitalSigns?.heartRateBpm ? "field-consultation-heart-rate-error" : undefined}
               />
             </Field>
-            <Field label="Temperatura (°C)" error={errors.vitalSigns?.temperatureC?.message}>
+            <Field label={t("consultation.wizard.temperature")} htmlFor="field-consultation-temperature" error={errors.vitalSigns?.temperatureC?.message}>
               <Input
                 type="number"
+                id="field-consultation-temperature"
                 step="0.1"
                 {...register("vitalSigns.temperatureC", { valueAsNumber: true })}
                 placeholder="36.5"
+                aria-describedby={errors.vitalSigns?.temperatureC ? "field-consultation-temperature-error" : undefined}
               />
             </Field>
           </CardContent>
@@ -422,14 +441,16 @@ function StepObjective({
 
       <Card>
         <CardHeader>
-          <CardTitle>Exploración física</CardTitle>
+          <CardTitle>{t("consultation.wizard.physical_exam")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Field label="Notas de exploración" error={errors.objective?.message}>
+          <Field label={t("consultation.wizard.physical_exam_notes")} htmlFor="field-consultation-objective" error={errors.objective?.message}>
             <Textarea
+              id="field-consultation-objective"
               {...register("objective")}
               rows={4}
-              placeholder="Edema, palidez, hidratación, hallazgos a la exploración…"
+              placeholder={t("consultation.wizard.physical_exam_placeholder")}
+              aria-describedby={errors.objective ? "field-consultation-objective-error" : undefined}
             />
           </Field>
         </CardContent>
@@ -437,14 +458,14 @@ function StepObjective({
 
       <Card>
         <CardHeader>
-          <CardTitle>Vincular medición antropométrica</CardTitle>
-          <CardDescription>Opcional — selecciona una medición reciente del paciente</CardDescription>
+          <CardTitle>{t("consultation.wizard.link_anthropometry")}</CardTitle>
+          <CardDescription>{t("consultation.wizard.link_anthropometry_description")}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Cargando mediciones…</p>
+            <p className="text-sm text-muted-foreground">{t("consultation.wizard.loading_measurements")}</p>
           ) : measurements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">El paciente no tiene mediciones registradas.</p>
+            <p className="text-sm text-muted-foreground">{t("consultation.wizard.no_measurements")}</p>
           ) : (
             <MeasurementPicker
               name="anthropometryId"
@@ -465,6 +486,7 @@ function StepLab({
   errors: FieldErrors<ConsultationFormValues>;
 }) {
   const { register } = useFormContextSafe();
+  const { t } = useTranslation();
   const [panels, setPanels] = React.useState<
     Array<{ id: string; takenAt: string; labName: string | null; testCount: number }>
   >([]);
@@ -497,15 +519,15 @@ function StepLab({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FlaskConical className="h-4 w-4" />
-          Vincular panel de laboratorio
+          {t("consultation.wizard.link_lab_panel")}
         </CardTitle>
-        <CardDescription>Opcional — selecciona un panel reciente para referenciarlo en esta consulta</CardDescription>
+        <CardDescription>{t("consultation.wizard.link_lab_panel_description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <p className="text-sm text-muted-foreground">Cargando paneles…</p>
+          <p className="text-sm text-muted-foreground">{t("consultation.wizard.loading_panels")}</p>
         ) : panels.length === 0 ? (
-          <p className="text-sm text-muted-foreground">El paciente no tiene paneles de laboratorio.</p>
+          <p className="text-sm text-muted-foreground">{t("consultation.wizard.no_panels")}</p>
         ) : (
           <div className="space-y-2">
             {panels.map((p) => (
@@ -525,7 +547,7 @@ function StepLab({
                     {p.labName && <span className="ml-2 text-xs text-muted-foreground">{p.labName}</span>}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {p.testCount} prueba{p.testCount === 1 ? "" : "s"}
+                    {t("consultation.wizard.test_count", { count: p.testCount })}
                   </p>
                 </div>
               </label>
@@ -537,7 +559,7 @@ function StepLab({
                 {...register("labPanelId")}
                 className="size-4 accent-primary"
               />
-              <span className="text-sm text-muted-foreground">Ninguno</span>
+              <span className="text-sm text-muted-foreground">{t("common.none")}</span>
             </label>
           </div>
         )}
@@ -557,10 +579,39 @@ function StepPlan({
   errors: FieldErrors<ConsultationFormValues>;
 }) {
   const { register, watch, setValue } = useFormContextSafe();
+  const { t } = useTranslation();
   const anthropometryId = watch("anthropometryId");
   const labPanelId = watch("labPanelId");
   const vitalsTaken = watch("vitalsTaken");
   const vitals = watch("vitalSigns");
+  const ai = useAI();
+
+  const handleAIDraft = async () => {
+    const values = watch();
+    const v = vitalsTaken && vitals
+      ? `${vitals.systolicMmHg ?? "?"}/${vitals.diastolicMmHg ?? "?"} PA, ${vitals.heartRateBpm ?? "?"} lpm, ${vitals.temperatureC ?? "?"}°C`
+      : "No tomados";
+
+    const result = await ai.execute("draftClinicalNotes", {
+      reason: values.reason ?? "",
+      subjective: values.subjective ?? "",
+      objective: values.objective ?? "",
+      vitals: v,
+      anthropometrySummary: anthropometryId ? `Registro antropométrico disponible (ID: ${anthropometryId})` : "No disponible",
+      labSummary: labPanelId ? `Panel de laboratorio disponible (ID: ${labPanelId})` : "No disponible",
+      patientId,
+    });
+
+    if (result?.success && result.data) {
+      const d = result.data as { assessment?: string; plan?: string };
+      if (d.assessment) setValue("assessment", d.assessment, { shouldDirty: true });
+      if (d.plan) setValue("plan", d.plan, { shouldDirty: true });
+      toast.success(t("consultation.wizard.ai_draft_success"));
+    } else if (ai.error) {
+      toast.error(t("consultation.wizard.ai_draft_error"), { description: ai.error });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <ClinicalSuggestionCard
@@ -585,23 +636,35 @@ function StepPlan({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ClipboardList className="h-4 w-4" />
-            Diagnóstico (A) y Plan (P)
+            {t("consultation.wizard.assessment_and_plan")}
           </CardTitle>
-          <CardDescription>Interpretación clínica y plan a seguir</CardDescription>
+          <CardDescription>{t("consultation.wizard.assessment_and_plan_description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Field label="Diagnóstico / evaluación nutricional" error={errors.assessment?.message}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">{t("consultation.wizard.ai_draft_hint")}</p>
+            <AIAssistButton
+              capability="draftClinicalNotes"
+              busy={ai.busy}
+              onClick={handleAIDraft}
+            />
+          </div>
+          <Field label={t("consultation.wizard.assessment")} htmlFor="field-consultation-assessment" error={errors.assessment?.message}>
             <Textarea
+              id="field-consultation-assessment"
               {...register("assessment")}
               rows={4}
-              placeholder="Sobrepeso grado I, riesgo cardiometabólico moderado, deficiencia de vitamina D…"
+              placeholder={t("consultation.wizard.assessment_placeholder")}
+              aria-describedby={errors.assessment ? "field-consultation-assessment-error" : undefined}
             />
           </Field>
-          <Field label="Plan y recomendaciones" error={errors.plan?.message}>
+          <Field label={t("consultation.wizard.plan")} htmlFor="field-consultation-plan" error={errors.plan?.message}>
             <Textarea
+              id="field-consultation-plan"
               {...register("plan")}
               rows={5}
-              placeholder="Dieta hipocalórica 1500 kcal, 30 min actividad aeróbica 5x/semana, suplementación…"
+              placeholder={t("consultation.wizard.plan_placeholder")}
+              aria-describedby={errors.plan ? "field-consultation-plan-error" : undefined}
             />
           </Field>
         </CardContent>
@@ -609,11 +672,11 @@ function StepPlan({
 
       <Card>
         <CardHeader>
-          <CardTitle>Próxima cita</CardTitle>
+          <CardTitle>{t("consultation.wizard.next_appointment")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Field label="Fecha de próxima cita" error={errors.nextVisitDate?.message}>
-            <Input type="date" {...register("nextVisitDate")} />
+          <Field label={t("consultation.wizard.next_appointment_date")} htmlFor="field-consultation-next-visit" error={errors.nextVisitDate?.message}>
+            <Input type="date" id="field-consultation-next-visit" {...register("nextVisitDate")} aria-describedby={errors.nextVisitDate ? "field-consultation-next-visit-error" : undefined} />
           </Field>
         </CardContent>
       </Card>
@@ -623,7 +686,10 @@ function StepPlan({
 
 function StepReview() {
   const { watch } = useFormContextSafe();
+  const { t } = useTranslation();
   const v = watch();
+  const ai = useAI();
+  const [summary, setSummary] = React.useState<string | null>(null);
 
   const vs = v.vitalSigns ?? {};
   const vsRow = [
@@ -634,37 +700,76 @@ function StepReview() {
     .filter(Boolean)
     .join(" · ");
 
+  const handleAISummarize = async () => {
+    const context = {
+      reason: v.reason ?? "",
+      subjective: v.subjective ?? "",
+      objective: v.objective ?? "",
+      assessment: v.assessment ?? "",
+      plan: v.plan ?? "",
+      vitals: vsRow || "No tomados",
+      anthropometrySummary: v.anthropometryId ? `Registro antropométrico disponible (ID: ${v.anthropometryId})` : "No disponible",
+      labSummary: v.labPanelId ? `Panel de laboratorio disponible (ID: ${v.labPanelId})` : "No disponible",
+    };
+
+    const result = await ai.execute("summarizeConsultation", context);
+    if (result?.success && result.data) {
+      const d = result.data as { summary: string };
+      setSummary(d.summary);
+      toast.success(t("consultation.wizard.ai_summarize_success"));
+    } else if (ai.error) {
+      toast.error(t("consultation.wizard.ai_summarize_error"), { description: ai.error });
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-4 w-4" />
-          Revisión
-        </CardTitle>
-        <CardDescription>Verifica la información antes de guardar</CardDescription>
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              {t("consultation.wizard.review")}
+            </CardTitle>
+            <CardDescription>{t("consultation.wizard.review_description")}</CardDescription>
+          </div>
+          <AIAssistButton
+            capability="summarizeConsultation"
+            busy={ai.busy}
+            onClick={handleAISummarize}
+          />
+        </div>
       </CardHeader>
+      {summary && (
+        <CardContent className="border-b bg-muted/20 pb-4">
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("consultation.wizard.ai_summarize")}
+          </h4>
+          <p className="whitespace-pre-wrap text-sm leading-relaxed">{summary}</p>
+        </CardContent>
+      )}
       <CardContent className="space-y-4">
-        <ReviewSection title="Datos básicos">
+        <ReviewSection title={t("consultation.wizard.review_basic_info")}>
           <ReviewRow
-            label="Fecha"
+            label={t("consultation.wizard.date")}
             value={
               v.consultationDate
                 ? new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(v.consultationDate))
                 : "—"
             }
           />
-          <ReviewRow label="Motivo" value={v.reason || "—"} />
+          <ReviewRow label={t("consultation.wizard.reason")} value={v.reason || "—"} />
         </ReviewSection>
 
-        <ReviewSection title="Subjetivo (S)">
+        <ReviewSection title={t("consultation.wizard.review_subjective")}>
           <p className="whitespace-pre-wrap rounded-md bg-muted/30 p-2 text-sm">
-            {v.subjective || <em className="text-muted-foreground">Sin notas</em>}
+            {v.subjective || <em className="text-muted-foreground">{t("consultation.wizard.no_notes")}</em>}
           </p>
         </ReviewSection>
 
-        <ReviewSection title="Objetivo (O)">
+        <ReviewSection title={t("consultation.wizard.review_objective")}>
           <p className="whitespace-pre-wrap rounded-md bg-muted/30 p-2 text-sm">
-            {v.objective || <em className="text-muted-foreground">Sin notas</em>}
+            {v.objective || <em className="text-muted-foreground">{t("consultation.wizard.no_notes")}</em>}
           </p>
           {vsRow && (
             <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -674,32 +779,32 @@ function StepReview() {
           )}
           {v.anthropometryId && (
             <Badge variant="info" className="mt-2">
-              Medición antropométrica vinculada
+              {t("consultation.wizard.anthropometry_linked")}
             </Badge>
           )}
         </ReviewSection>
 
-        <ReviewSection title="Laboratorio">
+        <ReviewSection title={t("consultation.wizard.review_lab")}>
           {v.labPanelId ? (
-            <Badge variant="info">Panel de laboratorio vinculado</Badge>
+            <Badge variant="info">{t("consultation.wizard.lab_panel_linked")}</Badge>
           ) : (
-            <p className="text-sm text-muted-foreground">Sin panel vinculado</p>
+            <p className="text-sm text-muted-foreground">{t("consultation.wizard.no_lab_panel")}</p>
           )}
         </ReviewSection>
 
-        <ReviewSection title="Diagnóstico (A)">
+        <ReviewSection title={t("consultation.wizard.review_assessment")}>
           <p className="whitespace-pre-wrap rounded-md bg-muted/30 p-2 text-sm">
-            {v.assessment || <em className="text-muted-foreground">Sin diagnóstico</em>}
+            {v.assessment || <em className="text-muted-foreground">{t("consultation.wizard.no_assessment")}</em>}
           </p>
         </ReviewSection>
 
-        <ReviewSection title="Plan (P)">
+        <ReviewSection title={t("consultation.wizard.review_plan")}>
           <p className="whitespace-pre-wrap rounded-md bg-muted/30 p-2 text-sm">
-            {v.plan || <em className="text-muted-foreground">Sin plan</em>}
+            {v.plan || <em className="text-muted-foreground">{t("consultation.wizard.no_plan")}</em>}
           </p>
           {v.nextVisitDate && (
             <p className="mt-2 text-xs text-muted-foreground">
-              Próxima cita:{" "}
+              {t("consultation.wizard.next_appointment_label")}:{" "}
               {new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(new Date(v.nextVisitDate))}
             </p>
           )}
@@ -735,6 +840,7 @@ function MeasurementPicker({
   measurements: Array<{ id: string; measuredAt: string; weightKg: number; heightCm: number; bmi: number }>;
 }) {
   const { register } = useFormContextSafe();
+  const { t } = useTranslation();
   return (
     <div className="space-y-2">
       {measurements.map((m) => (
@@ -751,7 +857,7 @@ function MeasurementPicker({
           <div className="flex-1">
             <p className="text-sm font-medium">{m.measuredAt}</p>
             <p className="text-xs text-muted-foreground">
-              Peso {m.weightKg.toFixed(1)} kg · Talla {m.heightCm.toFixed(0)} cm · BMI {m.bmi.toFixed(1)}
+              {t("consultation.wizard.weight")} {m.weightKg.toFixed(1)} kg · {t("consultation.wizard.height")} {m.heightCm.toFixed(0)} cm · BMI {m.bmi.toFixed(1)}
             </p>
           </div>
         </label>
@@ -763,7 +869,7 @@ function MeasurementPicker({
           {...register(name)}
           className="size-4 accent-primary"
         />
-        <span className="text-sm text-muted-foreground">Ninguna</span>
+        <span className="text-sm text-muted-foreground">{t("common.none_f")}</span>
       </label>
     </div>
   );
@@ -773,21 +879,24 @@ function Field({
   label,
   error,
   required,
+  htmlFor,
   children,
 }: {
   label: string;
   error?: string;
   required?: boolean;
+  htmlFor?: string;
   children: React.ReactNode;
 }) {
+  const errorId = htmlFor ? `${htmlFor}-error` : undefined;
   return (
     <div className="space-y-1.5">
-      <Label className="text-sm">
+      <Label className="text-sm" htmlFor={htmlFor}>
         {label}
         {required && <span className="ml-1 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p id={errorId} role="alert" className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
@@ -821,6 +930,7 @@ function ClinicalSuggestionCard({
   onApplyAssessment,
   onApplyPlan,
 }: ClinicalSuggestionCardProps) {
+  const { t } = useTranslation();
   const [busy, setBusy] = React.useState(false);
   const [diagnostics, setDiagnostics] = React.useState<DiagnosticSuggestion[] | null>(null);
   const [plan, setPlan] = React.useState<PlanTargetSuggestion | null>(null);
@@ -839,14 +949,14 @@ function ClinicalSuggestionCard({
       setDiagnostics(bundle.diagnostics);
       setPlan(bundle.plan);
       if (bundle.diagnostics.length === 0 && bundle.plan === null) {
-        toast.info("Sin sugerencias", {
-          description: "Vincula antropometría o laboratorio para obtener sugerencias.",
+        toast.info(t("consultation.wizard.toast_no_suggestions"), {
+          description: t("consultation.wizard.toast_no_suggestions_description"),
         });
       } else {
-        toast.success(`${bundle.diagnostics.length} sugerencia(s) diagnóstica(s)`);
+        toast.success(t("consultation.wizard.toast_suggestions_count", { count: bundle.diagnostics.length }));
       }
     } catch (err) {
-      toast.error("No se pudieron generar sugerencias", {
+      toast.error(t("consultation.wizard.toast_suggestions_error"), {
         description: err instanceof Error ? err.message : String(err),
       });
     } finally {
@@ -860,7 +970,7 @@ function ClinicalSuggestionCard({
       .map((d) => `${d.label} (${ConfidenceLabel[d.confidence]}) — ${d.rationale}`)
       .join("\n");
     onApplyAssessment(text);
-    toast.success("Diagnóstico sugerido insertado en (A)");
+    toast.success(t("consultation.wizard.toast_diagnostic_inserted"));
   };
 
   const onApplyPlanTargets = () => {
@@ -872,7 +982,7 @@ function ClinicalSuggestionCard({
       `BMR ${plan.bmrKcal} kcal (${plan.bmrFormula}), TDEE ${plan.tdeeKcal} kcal (actividad ${plan.activityLevel}). ` +
       `${plan.rationale}.`;
     onApplyPlan(text);
-    toast.success("Objetivos de plan insertados en (P)");
+    toast.success(t("consultation.wizard.toast_plan_inserted"));
   };
 
   return (
@@ -880,31 +990,31 @@ function ClinicalSuggestionCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          Sugerencias del sistema
+          {t("consultation.wizard.system_suggestions")}
         </CardTitle>
         <CardDescription>
-          Basado en medición antropométrica, laboratorio y signos vitales. El sistema solo sugiere; la decisión clínica es tuya (RN-EXP-12).
+          {t("consultation.wizard.system_suggestions_description")}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="secondary" onClick={onSuggest} disabled={busy || !canCompute}>
             <Sparkles className="mr-2 h-4 w-4" />
-            {busy ? "Analizando…" : "Sugerir diagnóstico y plan"}
+            {busy ? t("consultation.wizard.analyzing") : t("consultation.wizard.suggest_diagnostic_plan")}
           </Button>
           {diagnostics !== null && diagnostics.length > 0 && (
             <Button type="button" variant="outline" size="sm" onClick={onApplyDiagnostics}>
-              Insertar diagnóstico en (A)
+              {t("consultation.wizard.insert_diagnostic")}
             </Button>
           )}
           {plan !== null && (
             <Button type="button" variant="outline" size="sm" onClick={onApplyPlanTargets}>
-              Insertar objetivos en (P)
+              {t("consultation.wizard.insert_plan")}
             </Button>
           )}
           {!canCompute && (
             <p className="text-xs text-muted-foreground">
-              Vincula antropometría, laboratorio o captura signos vitales para habilitar.
+              {t("consultation.wizard.enable_suggestions_hint")}
             </p>
           )}
         </div>
@@ -928,7 +1038,7 @@ function ClinicalSuggestionCard({
         {plan !== null && (
           <div className="rounded-md border bg-primary/5 p-2 text-sm">
             <p className="font-medium">
-              {plan.goal === "loss" ? "Déficit" : plan.goal === "gain" ? "Superávit" : "Mantenimiento"} · {plan.kcalTarget} kcal
+              {plan.goal === "loss" ? t("consultation.wizard.deficit") : plan.goal === "gain" ? t("consultation.wizard.surplus") : t("consultation.wizard.maintenance")} · {plan.kcalTarget} kcal
             </p>
             <p className="text-xs text-muted-foreground">
               P {plan.proteinG} g · CHO {plan.carbsG} g · G {plan.fatG} g · TDEE {plan.tdeeKcal} kcal
