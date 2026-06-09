@@ -39,6 +39,12 @@ describe('migrate — utilidades', () => {
   it('checksumOf distingue contenido distinto', () => {
     expect(checksumOf('a')).not.toBe(checksumOf('b'));
   });
+
+  it('checksumOf normaliza CRLF para evitar drift entre sistemas operativos', () => {
+    expect(checksumOf('CREATE TABLE a;\nSELECT 1;\n')).toBe(
+      checksumOf('CREATE TABLE a;\r\nSELECT 1;\r\n'),
+    );
+  });
 });
 
 describe('migrate — listMigrations', () => {

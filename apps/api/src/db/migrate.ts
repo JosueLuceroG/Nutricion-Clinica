@@ -17,7 +17,7 @@ export interface MigrationFile {
 }
 
 export function checksumOf(content: string): string {
-  return createHash('sha256').update(content, 'utf8').digest('hex');
+  return createHash('sha256').update(content.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
 export async function listMigrations(): Promise<MigrationFile[]> {
