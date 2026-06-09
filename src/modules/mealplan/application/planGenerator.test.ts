@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateSkeleton, rankFoodsByTarget, generatePlanMealsFromSkeleton } from "./planGenerator";
+import { applySubstitutions, generateSkeleton, rankFoodsByTarget, generatePlanMealsFromSkeleton } from "./planGenerator";
 
 describe("generateSkeleton", () => {
   it("crea skeleton con el número correcto de slots", () => {
@@ -128,5 +128,38 @@ describe("generatePlanMealsFromSkeleton", () => {
         expect(ex.count).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe("applySubstitutions", () => {
+  it("reemplaza foodIds guardados y conserva conteos/slots", () => {
+    const meals = [
+      {
+        slot: "breakfast" as const,
+        exchanges: [
+          { foodId: "fruta-manzana" as const, count: 1 },
+          { foodId: "cereal-tortilla-maiz" as const, count: 2 },
+        ],
+      },
+      {
+        slot: "lunch" as const,
+        exchanges: [{ foodId: "aoa-pechuga-pollo" as const, count: 3 }],
+      },
+    ];
+
+    const result = applySubstitutions(meals, {
+      "fruta-manzana": "fruta-platano",
+      "aoa-pechuga-pollo": "aoa-huevo",
+    });
+
+    expect(result[0]!.slot).toBe("breakfast");
+    expect(result[0]!.exchanges[0]).toEqual({ foodId: "fruta-platano", count: 1 });
+    expect(result[0]!.exchanges[1]).toEqual({ foodId: "cereal-tortilla-maiz", count: 2 });
+    expect(result[1]!.exchanges[0]).toEqual({ foodId: "aoa-huevo", count: 3 });
+  });
+
+  it("retorna las mismas comidas si no hay sustituciones", () => {
+    const meals = [{ slot: "dinner" as const, exchanges: [{ foodId: "verdura-acelga" as const, count: 2 }] }];
+    expect(applySubstitutions(meals, {})).toBe(meals);
   });
 });

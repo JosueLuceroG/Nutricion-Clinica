@@ -39,7 +39,7 @@ export async function createPatientSubstitution(
 ): Promise<PatientSubstitution> {
   const response = await httpRequest<unknown>(`/pacientes/${encodeURIComponent(pacienteId)}/substitutions`, {
     method: "POST",
-    body: JSON.stringify(SubstitutionInputSchema.parse(input)),
+    body: SubstitutionInputSchema.parse(input),
     signal,
   });
   return SubstitutionSchema.parse(response);
@@ -53,7 +53,7 @@ export async function updatePatientSubstitution(
 ): Promise<void> {
   await httpRequest(`/pacientes/${encodeURIComponent(pacienteId)}/substitutions/${subId}`, {
     method: "PUT",
-    body: JSON.stringify(input),
+    body: input,
     signal,
   });
 }
@@ -76,7 +76,7 @@ export async function batchSavePatientSubstitutions(
 ): Promise<{ inserted: number }> {
   const response = await httpRequest<unknown>(`/pacientes/${encodeURIComponent(pacienteId)}/substitutions/batch`, {
     method: "POST",
-    body: JSON.stringify({ substitutions }),
+    body: { substitutions },
     signal,
   });
   return z.object({ inserted: z.number() }).parse(response);

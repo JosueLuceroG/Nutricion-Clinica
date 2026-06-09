@@ -14,3 +14,19 @@ ReactDOM.createRoot(rootElement).render(
     <App />
   </React.StrictMode>,
 );
+
+if (shouldRegisterServiceWorker()) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+      console.warn("Service worker registration failed", error);
+    });
+  });
+}
+
+function shouldRegisterServiceWorker(): boolean {
+  if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return false;
+  return (
+    window.location.protocol === "https:" ||
+    ["localhost", "127.0.0.1"].includes(window.location.hostname)
+  );
+}

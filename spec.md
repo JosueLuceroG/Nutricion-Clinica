@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.3
-**Última actualización:** Sprint 25E — Adherencia profesional + sync + captura en consulta ✅
-**Estado del proyecto:** Sprints 1-25 completos · Sprint 25E completo · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 🔄** · ~440 archivos TS/TSX · ~2.2MB código fuente · 74 archivos de test frontend · 969 tests frontend · 100 tests API · 7 E2E tests
+**Versión del documento:** 2.5
+**Última actualización:** Sprint 30 — PWA/offline cache del portal del paciente ✅
+**Estado del proyecto:** Sprints 1-30 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 ~70% 🔄** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 983 tests frontend · 101 tests API · 8 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Fase 5 Sprint 25D — adherencia desde portal completada. Siguiente slice lógico: consolidar esos registros en la vista profesional/sync, mensajería paciente-nutrióloga o PWA offline/cache.
+- **Sprint actual:** Sprint 30 completado — portal paciente con cache offline/PWA básica. Siguiente slice recomendado: mensajería paciente-nutrióloga o fotos de comidas del portal.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -186,7 +186,7 @@ Estos 6 principios son la constitución del sistema. Cualquier desviación requi
 |------|------|-------------|--------|
 | **Escritorio standalone** | 1 (✅ MVP) | Instalador Windows/Mac/Linux para consultorio individual. Datos locales en IndexedDB. Backup manual. | ✅ Actual |
 | **Servidor LAN consultorio** | 2+ | Servidor local en LAN del consultorio con PostgreSQL + Tauri apps como clientes. Multi-puesto (≤10). | ⏳ Planificado |
-| **PWA espejo** | 5 | Web progresiva como espejo de consulta remota (no sustituye escritorio). Solo lectura + anotaciones rápidas. | ⏳ Diferido |
+| **PWA espejo** | 5 | Web progresiva como espejo de consulta remota (no sustituye escritorio). Solo lectura + anotaciones rápidas. | 🔄 Parcial (portal + offline cache) |
 
 > El **escritorio es el producto principal**. La PWA es un complemento para situaciones donde el nutriólogo no puede llevar su laptop (ej. visita domiciliaria).
 
@@ -461,9 +461,9 @@ src/modules/
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
-### 3.18 `patient-portal` (Fase 5, en progreso) — Portal del paciente (PWA)
+### 3.18 `patient-portal` (Fase 5, ~70% en progreso) — Portal del paciente (PWA)
 
-**Implementado (Sprints 25A-25E):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente también puede enviar un registro rápido de adherencia mediante `POST /patient-portal/:token/adherence`. La UI profesional del expediente permite crear, copiar una sola vez, listar y revocar enlaces temporales, y consultar historial reciente de eventos. El backend registra eventos `created`, `revoked`, `accessed` y `adherence_submitted` en `patient_portal_audit_events` y también en `audit_log`. Adicionalmente, el profesional puede consultar todos los registros de adherencia del paciente desde una card profesional (`PatientPortalAdherenceCard`) integrada en `PatientDetailPage`, y cuenta con su propia página de captura de adherencia (`PatientAdherencePage`) que reusa la arquitectura offline-first (Dexie + sync) para crear registros con `source='consulta'`. Los registros de adherencia ahora son syncables: se incluyen en `SYNCABLE_ENTITIES` (shared), `ENTITY_TABLES`/`SERVER_INJECTED_COLUMNS`/entityColumnMaps en el backend, y los maps de syncEngine/syncEnqueuer/syncBootstrap en el frontend. Se agregaron endpoints profesionales `GET /adherence`, `POST /adherence` y `PUT /adherence/:id` en `adherenceRoutes.ts`. **Pendiente:** PWA completa, fotos de comidas, recordatorios, mensajería, descarga/firmado documental completo e interoperabilidad/certificación NOM-024.
+**Implementado (Sprints 25A-30):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). **Pendiente:** fotos de comidas, mensajería, multi-consultorio formal si excede sucursales, NOM-024 avanzada/interoperabilidad/certificación, telemedicina, wearables/OCR opcionales.
 
 ### 3.19 `ai-assist` (Fase 4, planificado) — Sistema de IA
 
@@ -477,7 +477,7 @@ src/modules/
 | **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
 | **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
 | **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
-| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | 🔄 En progreso (Sprint 25E: adherencia profesional + sync + captura en consulta) |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | 🔄 ~70% (Sprint 30: PWA/offline cache del portal) |
 
 ---
 
@@ -1987,16 +1987,22 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 - ✓ AI Assist — 6 archivos servicio, 8 capabilities, cache, audit, usage tracking, Dexie v24, UI integration (Sprint 24)
 - ✓ Portabilidad móvil — sidebar drawer, responsive layout, tables, dialog scroll (Sprint 24)
 
-### Fase 5 — Patient portal, multi-consultorio, NOM-024 (EN PROGRESO 🔄)
+### Fase 5 — Patient portal, multi-consultorio, NOM-024 (~70% EN PROGRESO 🔄)
 
 - ✓ Patient-portal read-only MVP (Sprint 25A): token público hasheado/expirable/revocable, `GET /patient-portal/:token`, ruta `/portal/:token`, resumen, plan activo, citas próximas, documentos
 - ✓ Gestión profesional de enlaces (Sprint 25B): `GET/POST/PATCH /patient-portal/tokens`, crear/copiar/listar/revocar desde expediente del paciente
 - ✓ Auditoría base del portal (Sprint 25C): `patient_portal_audit_events`, espejo en `audit_log`, eventos `created/revoked/accessed`, IP, user-agent e historial reciente en UI profesional
 - ✓ Adherencia desde portal (Sprint 25D): `adherence_records`, scope `adherence`, `POST /patient-portal/:token/adherence`, UI pública con scores 0-100 y auditoría `adherence_submitted`
 - ✓ Vista profesional de adherencia (Sprint 25E): `GET /patient-portal/adherence?pacienteId=`, `PatientPortalAdherenceCard` integrada en expediente
-- ✓ Adherencia como entidad syncable (Sprint 25E): `SYNCABLE_ENTIES`, `ENTITY_TABLES`, `SERVER_INJECTED_COLUMNS`, `adherenceRecordsMap`, maps syncEngine/syncEnqueuer/syncBootstrap
+- ✓ Adherencia como entidad syncable (Sprint 25E): `SYNCABLE_ENTITIES`, `ENTITY_TABLES`, `SERVER_INJECTED_COLUMNS`, `adherenceRecordsMap`, maps syncEngine/syncEnqueuer/syncBootstrap
 - ✓ Captura profesional de adherencia desde consulta (Sprint 25E): `adherenceRoutes.ts` (GET/POST/PUT), `PatientAdherencePage`, ruta `/:patientId/adherencia`, reuso de `AdherenceRecordDialog` existente con `source='consulta'`
-- ⏳ Patient-portal PWA completa: fotos de comidas, recordatorios, mensajería, cache/offline
+- ✓ Documentos del portal con descarga/vista previa firmada SHA-256 (Sprint 26): endpoints públicos de documento, links de preview/download y validación de integridad
+- ✓ Recordatorios/notificaciones email desde portal (Sprint 27): `notificaciones_email`, `emailService`, SMTP opcional/simulado, `send-reminder`, confirmación de adherencia e historial de notificaciones
+- ✓ Sustituciones/preferencias guardadas (Sprint 28): `patient_substitutions`, API profesional, card en expediente, botón de guardar preferencia y aplicación de preferencias en plan
+- ✓ Dashboard de métricas de clínica (Sprint 29): `GET /dashboard/metrics`, cards de pacientes nuevos, pagos pendientes, adherencia, actividad clínica, sexo y patologías
+- ✓ QA/E2E post-29: cobertura E2E portal email/dashboard visible + unit tests de API clients y `applySubstitutions`
+- ✓ Patient-portal PWA/offline cache (Sprint 30): manifest, Service Worker app-shell, fallback a payload/notificaciones cacheados y cola local de adherencia
+- ⏳ Patient-portal PWA completa: fotos de comidas, mensajería
 - ⏳ Multi-consultorio (multi-tenant): `tenant_id` en tablas, middleware aislamiento
 - ⏳ NOM-024 avanzada: consentimientos, interoperabilidad, retención/certificación formal
 - ⏳ Telemedicina (videollamada, mensajería)
@@ -2307,7 +2313,13 @@ pnpm build:tauri               # Empaqueta instalador nativo
 24. **Sprint 25B — Gestión profesional de enlaces del portal:** endpoints autenticados `GET/POST/PATCH /patient-portal/tokens`, token claro one-time, `PatientPortalLinksCard` en detalle de paciente, copiar/revocar/listar enlaces, i18n, tests API client/backend utilities.
 25. **Sprint 25C — Auditoría NOM-024 del portal:** migración SQL `007-patient-portal-audit.sql` con `patient_portal_audit_events`, bitácora doble en `audit_log`, eventos `created/revoked/accessed` con IP/user-agent/details, historial reciente por enlace en API/UI profesional, fix UUID 8-4-4-4-12 en rutas de enlaces y verificación focused E2E de pacientes.
 26. **Sprint 25D — Adherencia desde portal:** migración SQL `008-portal-adherence.sql` con `adherence_records`, scope `adherence` por defecto en enlaces nuevos, endpoint público `POST /patient-portal/:token/adherence`, card pública para scores de plan/agua/actividad/suplementos/sueño y barreras/facilitadores/notas, auditoría `adherence_submitted`, cliente API y E2E público ampliado.
-27. **Sprint 25E — Adherencia profesional + sync + captura en consulta:** endpoint profesional `GET /patient-portal/adherence?pacienteId=` autenticado, `PatientPortalAdherenceCard` en `PatientDetailPage` para listar records del portal. `adherence_records` como entidad syncable: registrado en `SYNCABLE_ENTITES` (shared), `ENTITY_TABLES`/`SERVER_INJECTED_COLUMNS` (syncService), nuevo `adherenceRecordsMap` con 19 columnas (entityColumnMaps). Frontend sync maps actualizados (syncEngine, syncEnqueuer, syncBootstrap). Captura profesional: `adherenceRoutes.ts` (GET/POST/PUT) montado en `server.ts`, `PatientAdherencePage` con `AdherenceRecordDialog` existente + `useAdherenceHooks`, ruta `/:patientId/adherencia` con `ModuleLink` icono `ClipboardCheck` en `PatientDetailPage`. `source='consulta'` por defecto en creación profesional. 6 nuevas claves i18n para card profesional. 100% tests pasando (frontend 969, API 100).
+27. **Sprint 25E — Adherencia profesional + sync + captura en consulta:** endpoint profesional `GET /patient-portal/adherence?pacienteId=` autenticado, `PatientPortalAdherenceCard` en `PatientDetailPage` para listar records del portal. `adherence_records` como entidad syncable: registrado en `SYNCABLE_ENTITIES` (shared), `ENTITY_TABLES`/`SERVER_INJECTED_COLUMNS` (syncService), nuevo `adherenceRecordsMap` con 19 columnas (entityColumnMaps). Frontend sync maps actualizados (syncEngine, syncEnqueuer, syncBootstrap). Captura profesional: `adherenceRoutes.ts` (GET/POST/PUT) montado en `server.ts`, `PatientAdherencePage` con `AdherenceRecordDialog` existente + `useAdherenceHooks`, ruta `/:patientId/adherencia` con `ModuleLink` icono `ClipboardCheck` en `PatientDetailPage`. `source='consulta'` por defecto en creación profesional. 6 nuevas claves i18n para card profesional. 100% tests pasando (frontend 969, API 100).
+28. **Sprint 26 — Portal documentos firmados:** descarga/vista previa de documentos desde portal con URL pública tokenizada, hash SHA-256 y UI responsive para preview/download.
+29. **Sprint 27 — Recordatorios/notificaciones email:** migración `009-email-notifications.sql`, `emailService` con SMTP opcional/simulado, endpoints `send-reminder` y `notifications`, email automático de confirmación de adherencia, variables `.env.example`, UI de recordatorio/historial en portal.
+30. **Sprint 28 — Sustituciones guardadas:** migración `010-patient-substitutions.sql`, API profesional `/pacientes/:pacienteId/substitutions`, `patientSubstitutionApi`, card de preferencias en expediente, botón de guardar preferencia en `MealPlanForm`, utilidad `applySubstitutions`.
+31. **Sprint 29 — Dashboard de métricas clínicas:** endpoint `GET /dashboard/metrics`, cliente `dashboardApi`, `DashboardPageClinicMetrics`, métricas de pacientes/consultas/pagos/planes/adherencia/sexo/patologías, corrección de checksums de migraciones CRLF/LF.
+32. **Sprint QA/E2E post-29:** ampliación de Playwright portal para recordatorio/notificaciones, aserciones dashboard metrics en auth E2E, unit tests de `dashboardApi`, `patientSubstitutionApi`, endpoints portal email y `applySubstitutions`.
+33. **Sprint 30 — PWA/offline cache del portal:** `manifest.webmanifest`, Service Worker de app shell, registro production-only, cache local de payload/notificaciones del portal, banner de datos guardados, cola local de adherencia con flush al reconectar, unit tests y E2E de fallback offline.
 
 ---
 
@@ -2779,7 +2791,7 @@ interface AIProvider {
 |-------|-----------|-----|
 | L1 | Memoria (LRU) | Sesión activa, calculados derivados |
 | L2 | IndexedDB (Dexie) | Catálogo SMAE, pacientes activos, configs |
-| L3 | Service Worker (futuro) | Assets estáticos, PWA offline |
+| L3 | Service Worker | Assets estáticos, PWA offline del portal |
 | L4 | Servidor (Fase 3) | SMAE versionado, datos multi-puesto |
 
 #### 20.2.5 Optimización de tablas
@@ -4035,16 +4047,19 @@ PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, ag
 
 ### 33.6 Estado actual
 
-🔄 **MVP portal + gestión + auditoría + adherencia implementados parcialmente (Sprints 25A-25D).**
+🔄 **Portal paciente ~70% implementado (Sprints 25A-30 + QA/E2E post-29).**
 - Backend: `patient_portal_tokens` en `apps/api/migrations/006-patient-portal.sql` con token SHA-256, expiración, revocación, scopes JSON y `last_accessed_at`.
 - Auditoría: `patient_portal_audit_events` en `apps/api/migrations/007-patient-portal-audit.sql`; cada creación, revocación y acceso público inserta evento específico y espejo NOM-024-style en `audit_log` (`entity_type = patient_portal_token`).
 - Adherencia portal: `adherence_records` en `apps/api/migrations/008-portal-adherence.sql`; `POST /patient-portal/:token/adherence` crea registros con `source = portal`, scores 0-100, barreras/facilitadores/notas, `submitted_by_token_id` y auditoría `adherence_submitted`.
 - API pública: `GET /patient-portal/:token` resuelve paciente+sucursal desde el token, sin JWT profesional, y devuelve resumen, plan activo, próximas citas y documentos; `POST /patient-portal/:token/adherence` también es público pero exige token vigente con scope `adherence`.
 - API profesional: `GET /patient-portal/tokens`, `POST /patient-portal/tokens`, `PATCH /patient-portal/tokens/:id/revoke` con JWT + sucursal activa, solo `admin`/`nutriologa` para crear/revocar; la lista incluye `recentEvents` por enlace.
-- Frontend: ruta pública `/portal/:token` fuera de `AppLayout`, cliente `src/services/api/patientPortalApi.ts` con métodos públicos/profesionales/adherencia, UI responsive, card de adherencia pública, `PatientPortalLinksCard` en detalle de paciente con historial reciente y traducciones `patient_portal.*`.
-- Tests: backend utilities, cliente API público/profesional/adherencia, UUID estándar de rutas de portal y E2E Playwright público con payload interceptado incluyendo envío de adherencia.
+- Documentos portal: descarga/vista previa pública por token con hash SHA-256 y links de preview/download.
+- Email portal: `notificaciones_email`, `emailService`, recordatorio de cita, confirmación de adherencia e historial público de notificaciones.
+- PWA/offline (Sprint 30): `manifest.webmanifest`, Service Worker app-shell que evita cachear API/documentos, cache local del payload del portal y notificaciones, banner de datos guardados y cola local de adherencia con flush al reconectar.
+- Frontend: ruta pública `/portal/:token` fuera de `AppLayout`, cliente `src/services/api/patientPortalApi.ts` con métodos públicos/profesionales/adherencia/email/documentos, UI responsive, card de adherencia pública, `PatientPortalLinksCard` y `PatientSubstitutionsCard` en detalle de paciente con historial reciente y traducciones `patient_portal.*`.
+- Tests: backend utilities, cliente API público/profesional/adherencia/email/cache offline, UUID estándar de rutas de portal, E2E Playwright público con payload interceptado incluyendo envío de adherencia, recordatorio, notificaciones y fallback offline cacheado.
 
-**Pendiente futuro:** PWA offline/cache, consolidación/sync de adherencia portal hacia la vista profesional local, carga de fotos, recordatorios, mensajería, descarga/firmado documental completo, retención avanzada, consentimientos e interoperabilidad NOM-024 formal.
+**Pendiente futuro:** carga de fotos, mensajería, multi-consultorio formal, retención avanzada, consentimientos e interoperabilidad/certificación NOM-024 formal.
 
 ---
 
@@ -4114,7 +4129,7 @@ PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, ag
 | 42 Medicamentos | 31 | 3 | Solo registro en paciente | 20+ |
 | 43 Documentos | 32 | 2 | No | 11 (PDF) + 16-17 (firmas) |
 | 44 Dashboard | (ya en §20) | 3 | MVP (4 KPIs) | 19-20 |
-| 45 Portal paciente | 33 | 5 | No | Diferido |
+| 45 Portal paciente | 33 | 5 | Parcial (~70%) | Fotos/mensajería |
 | 46 Seguridad | (ya en §9) | 3 | MVP (datos locales) | 17-18 |
 | 47 Arquitectura técnica | (ya en §6) | 1-3 | MVP | Continuo |
 
@@ -5212,7 +5227,7 @@ Inicio
 |-------|-----------|-----|
 | L1 | Memoria (LRU) | Sesión activa, calculados derivados |
 | L2 | IndexedDB (Dexie) / SQLite local | Datos del usuario, catálogo SMAE, configs |
-| L3 | Service Worker (futuro) | Assets estáticos, PWA offline |
+| L3 | Service Worker | Assets estáticos, PWA offline del portal |
 | L4 | Servidor (Fase 3) / CDN (Fase 4) | SMAE versionado, datos multi-puesto, assets |
 
 **Estrategia:**

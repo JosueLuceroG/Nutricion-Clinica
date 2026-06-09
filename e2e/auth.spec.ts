@@ -5,6 +5,8 @@ test.describe("Auth", () => {
   test("flujo de login con credenciales válidas redirige al Panel", async ({ page }) => {
     await loginAsAdmin(page);
     await expect(page.getByRole("heading", { name: /^(Dashboard|Panel)$/i })).toBeVisible();
+    await expect(page.getByText(/Pacientes nuevos|New patients/i)).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Actividad clínica|Clinical activity/i)).toBeVisible({ timeout: 15_000 });
     // La URL debe cambiar a #
     expect(page.url()).toContain("#/");
     expect(page.url()).not.toContain("#/login");

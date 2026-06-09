@@ -1,5 +1,16 @@
 import { z } from "zod";
-import { httpRequest } from "./httpClient.js";
+import { NetworkError, httpRequest } from "./httpClient.js";
+
+const PORTAL_CACHE_VERSION = 1;
+const PORTAL_PAYLOAD_CACHE_PREFIX = "nutriclinica:patient-portal:payload:";
+const PORTAL_NOTIFICATIONS_CACHE_PREFIX =
+  "nutriclinica:patient-portal:notifications:";
+const PORTAL_ADHERENCE_QUEUE_PREFIX =
+  "nutriclinica:patient-portal:adherence-queue:";
+const portalAdherenceFlushes = new Map<
+  string,
+  Promise<PortalAdherenceFlushResult>
+>();
 
 const PortalMealExchangeSchema = z.object({
   foodId: z.string(),
@@ -76,6 +87,12 @@ const PatientPortalPayloadSchema = z.object({
   ),
 });
 
+const PatientPortalPayloadCacheSchema = z.object({
+  version: z.literal(PORTAL_CACHE_VERSION),
+  cachedAt: z.string(),
+  data: PatientPortalPayloadSchema,
+});
+
 const PortalAuditEventSchema = z.object({
   id: z.string(),
   tokenId: z.string(),
@@ -139,6 +156,21 @@ const SubmitPortalAdherenceResponseSchema = z.object({
   record: PortalAdherenceRecordSchema,
 });
 
+const PortalNotificationSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  to: z.string(),
+  subject: z.string(),
+  error: z.string().nullable(),
+  sentAt: z.string(),
+});
+
+const PortalNotificationsCacheSchema = z.object({
+  version: z.literal(PORTAL_CACHE_VERSION),
+  cachedAt: z.string(),
+  notifications: z.array(PortalNotificationSchema),
+});
+
 const CreatePortalLinkResponseSchema = z.object({
   token: z.string(),
   portalPath: z.string(),
@@ -155,7 +187,11 @@ export type PatientPortalMeal = PatientPortalPlan["meals"][number];
 export type PortalLink = z.infer<typeof PortalLinkSchema>;
 export type PortalAuditEvent = z.infer<typeof PortalAuditEventSchema>;
 export type PortalAdherenceRecord = z.infer<typeof PortalAdherenceRecordSchema>;
-export type CreatePortalLinkResponse = z.infer<typeof CreatePortalLinkResponseSchema>;
+export type PortalNotification = z.infer<typeof PortalNotificationSchema>;
+export type PortalCacheSource = "network" | "cache";
+export type CreatePortalLinkResponse = z.infer<
+  typeof CreatePortalLinkResponseSchema
+>;
 
 export interface CreatePortalLinkInput {
   pacienteId: string;
@@ -182,16 +218,269 @@ export interface SubmitPortalAdherenceInput {
   notes?: string;
 }
 
-export async function getPatientPortalPayload(token: string, signal?: AbortSignal): Promise<PatientPortalPayload> {
-  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}`, {
-    skipAuth: true,
-    skipSucursalHeader: true,
-    signal,
-  });
+const SubmitPortalAdherenceInputSchema = z.object({
+  date: z.string().optional(),
+  adherenceMenu: z.number(),
+  adherenceWater: z.number(),
+  adherenceActivity: z.number(),
+  adherenceSupplements: z.number(),
+  adherenceSleep: z.number(),
+  hungerAvg: z.number().nullable().optional(),
+  satietyAvg: z.number().nullable().optional(),
+  moodAvg: z.number().nullable().optional(),
+  energyAvg: z.number().nullable().optional(),
+  intercurrentEvents: z.string().optional(),
+  barriers: z.string().optional(),
+  facilitators: z.string().optional(),
+  mealsLogged: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+const PendingPortalAdherenceSubmissionSchema = z.object({
+  id: z.string(),
+  input: SubmitPortalAdherenceInputSchema,
+  createdAt: z.string(),
+  attempts: z.number(),
+  lastError: z.string().optional(),
+});
+
+const PendingPortalAdherenceQueueSchema = z.array(
+  PendingPortalAdherenceSubmissionSchema,
+);
+
+export interface PatientPortalPayloadCacheResult {
+  data: PatientPortalPayload;
+  source: PortalCacheSource;
+  cachedAt: string;
+  error?: string;
+}
+
+export interface PortalNotificationsCacheResult {
+  notifications: PortalNotification[];
+  source: PortalCacheSource;
+  cachedAt: string;
+  error?: string;
+}
+
+export type PendingPortalAdherenceSubmission = z.infer<
+  typeof PendingPortalAdherenceSubmissionSchema
+>;
+
+export type PortalAdherenceSubmissionResult =
+  | { status: "submitted"; record: PortalAdherenceRecord }
+  | { status: "queued"; pending: PendingPortalAdherenceSubmission };
+
+export interface PortalAdherenceFlushResult {
+  submitted: number;
+  failed: number;
+  remaining: number;
+}
+
+function getPortalStorage(): Storage | null {
+  try {
+    return (
+      (globalThis as typeof globalThis & { localStorage?: Storage })
+        .localStorage ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
+function portalStorageKey(prefix: string, token: string): string {
+  return `${prefix}${encodeURIComponent(token)}`;
+}
+
+function readPortalStorage<T>(key: string, schema: z.ZodType<T>): T | null {
+  const storage = getPortalStorage();
+  if (!storage) return null;
+
+  const raw = storage.getItem(key);
+  if (!raw) return null;
+
+  try {
+    return schema.parse(JSON.parse(raw));
+  } catch {
+    storage.removeItem(key);
+    return null;
+  }
+}
+
+function writePortalStorage(key: string, value: unknown): boolean {
+  const storage = getPortalStorage();
+  if (!storage) return false;
+
+  try {
+    storage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removePortalStorage(key: string): void {
+  const storage = getPortalStorage();
+  if (!storage) return;
+  storage.removeItem(key);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Network failure";
+}
+
+function shouldUsePortalCache(error: unknown): boolean {
+  return (
+    error instanceof NetworkError ||
+    (typeof navigator !== "undefined" && !navigator.onLine)
+  );
+}
+
+function createPendingId(): string {
+  const cryptoApi = (globalThis as typeof globalThis & { crypto?: Crypto })
+    .crypto;
+  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function saveCachedPatientPortalPayload(
+  token: string,
+  data: PatientPortalPayload,
+): string | null {
+  const cachedAt = new Date().toISOString();
+  const saved = writePortalStorage(
+    portalStorageKey(PORTAL_PAYLOAD_CACHE_PREFIX, token),
+    {
+      version: PORTAL_CACHE_VERSION,
+      cachedAt,
+      data,
+    },
+  );
+  return saved ? cachedAt : null;
+}
+
+export function getCachedPatientPortalPayload(
+  token: string,
+): PatientPortalPayloadCacheResult | null {
+  const cached = readPortalStorage(
+    portalStorageKey(PORTAL_PAYLOAD_CACHE_PREFIX, token),
+    PatientPortalPayloadCacheSchema,
+  );
+  if (!cached) return null;
+  return { data: cached.data, source: "cache", cachedAt: cached.cachedAt };
+}
+
+function saveCachedPortalNotifications(
+  token: string,
+  notifications: PortalNotification[],
+): string | null {
+  const cachedAt = new Date().toISOString();
+  const saved = writePortalStorage(
+    portalStorageKey(PORTAL_NOTIFICATIONS_CACHE_PREFIX, token),
+    {
+      version: PORTAL_CACHE_VERSION,
+      cachedAt,
+      notifications,
+    },
+  );
+  return saved ? cachedAt : null;
+}
+
+export function getCachedPortalNotifications(
+  token: string,
+): PortalNotificationsCacheResult | null {
+  const cached = readPortalStorage(
+    portalStorageKey(PORTAL_NOTIFICATIONS_CACHE_PREFIX, token),
+    PortalNotificationsCacheSchema,
+  );
+  if (!cached) return null;
+  return {
+    notifications: cached.notifications,
+    source: "cache",
+    cachedAt: cached.cachedAt,
+  };
+}
+
+export function getPendingPortalAdherenceSubmissions(
+  token: string,
+): PendingPortalAdherenceSubmission[] {
+  return (
+    readPortalStorage(
+      portalStorageKey(PORTAL_ADHERENCE_QUEUE_PREFIX, token),
+      PendingPortalAdherenceQueueSchema,
+    ) ?? []
+  );
+}
+
+function savePendingPortalAdherenceSubmissions(
+  token: string,
+  submissions: PendingPortalAdherenceSubmission[],
+): boolean {
+  const key = portalStorageKey(PORTAL_ADHERENCE_QUEUE_PREFIX, token);
+  if (submissions.length === 0) {
+    removePortalStorage(key);
+    return true;
+  }
+  return writePortalStorage(key, submissions);
+}
+
+export function queuePortalAdherenceSubmission(
+  token: string,
+  input: SubmitPortalAdherenceInput,
+  lastError?: string,
+): PendingPortalAdherenceSubmission {
+  const pending: PendingPortalAdherenceSubmission = {
+    id: createPendingId(),
+    input,
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+    lastError,
+  };
+  const saved = savePendingPortalAdherenceSubmissions(token, [
+    ...getPendingPortalAdherenceSubmissions(token),
+    pending,
+  ]);
+  if (!saved)
+    throw new Error("Could not save the adherence record for offline sync.");
+  return pending;
+}
+
+export async function getPatientPortalPayload(
+  token: string,
+  signal?: AbortSignal,
+): Promise<PatientPortalPayload> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}`,
+    {
+      skipAuth: true,
+      skipSucursalHeader: true,
+      signal,
+    },
+  );
   return PatientPortalPayloadSchema.parse(response);
 }
 
-export async function listPatientPortalLinks(pacienteId: string, signal?: AbortSignal): Promise<PortalLink[]> {
+export async function getPatientPortalPayloadWithCache(
+  token: string,
+  signal?: AbortSignal,
+): Promise<PatientPortalPayloadCacheResult> {
+  try {
+    const data = await getPatientPortalPayload(token, signal);
+    const cachedAt =
+      saveCachedPatientPortalPayload(token, data) ?? new Date().toISOString();
+    return { data, source: "network", cachedAt };
+  } catch (error) {
+    if (signal?.aborted || !shouldUsePortalCache(error)) throw error;
+
+    const cached = getCachedPatientPortalPayload(token);
+    if (cached) return { ...cached, error: errorMessage(error) };
+    throw error;
+  }
+}
+
+export async function listPatientPortalLinks(
+  pacienteId: string,
+  signal?: AbortSignal,
+): Promise<PortalLink[]> {
   const response = await httpRequest<unknown>("/patient-portal/tokens", {
     query: { pacienteId },
     signal,
@@ -199,7 +488,9 @@ export async function listPatientPortalLinks(pacienteId: string, signal?: AbortS
   return PortalLinksResponseSchema.parse(response).tokens;
 }
 
-export async function createPatientPortalLink(input: CreatePortalLinkInput): Promise<CreatePortalLinkResponse> {
+export async function createPatientPortalLink(
+  input: CreatePortalLinkInput,
+): Promise<CreatePortalLinkResponse> {
   const response = await httpRequest<unknown>("/patient-portal/tokens", {
     method: "POST",
     body: input,
@@ -208,9 +499,12 @@ export async function createPatientPortalLink(input: CreatePortalLinkInput): Pro
 }
 
 export async function revokePatientPortalLink(id: string): Promise<PortalLink> {
-  const response = await httpRequest<unknown>(`/patient-portal/tokens/${encodeURIComponent(id)}/revoke`, {
-    method: "PATCH",
-  });
+  const response = await httpRequest<unknown>(
+    `/patient-portal/tokens/${encodeURIComponent(id)}/revoke`,
+    {
+      method: "PATCH",
+    },
+  );
   return RevokePortalLinkResponseSchema.parse(response).token;
 }
 
@@ -222,73 +516,175 @@ export async function listPatientPortalAdherence(
     query: { pacienteId },
     signal,
   });
-  return z.object({ records: z.array(PortalAdherenceRecordSchema) }).parse(response).records;
+  return z
+    .object({ records: z.array(PortalAdherenceRecordSchema) })
+    .parse(response).records;
 }
 
 /** Base URL del backend para construir URLs absolutas de descarga. */
 function getBackendBaseUrl(): string {
-  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
+  const fromVite = (import.meta as unknown as { env?: Record<string, string> })
+    .env?.VITE_API_URL;
   if (fromVite) return fromVite;
-  const fromProcess = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
-  return fromProcess ?? 'http://localhost:3000';
+  const fromProcess =
+    typeof process !== "undefined" ? process.env?.VITE_API_URL : undefined;
+  return fromProcess ?? "http://localhost:3000";
 }
 
 /** URL para descargar un documento del portal. */
-export function getDocumentDownloadUrl(token: string, documentId: string): string {
+export function getDocumentDownloadUrl(
+  token: string,
+  documentId: string,
+): string {
   return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download`;
 }
 
 /** URL para previsualizar un documento del portal en el navegador. */
-export function getDocumentPreviewUrl(token: string, documentId: string): string {
+export function getDocumentPreviewUrl(
+  token: string,
+  documentId: string,
+): string {
   return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
 }
 
 export async function sendPortalReminder(
   token: string,
   signal?: AbortSignal,
-): Promise<{ sent: boolean; messageId?: string; to?: string; appointmentDate?: string }> {
-  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}/send-reminder`, {
-    method: "POST",
-    skipAuth: true,
-    skipSucursalHeader: true,
-    signal,
-  });
-  return z.object({
-    sent: z.boolean(),
-    messageId: z.string().optional(),
-    to: z.string().optional(),
-    appointmentDate: z.string().optional(),
-  }).parse(response);
+): Promise<{
+  sent: boolean;
+  messageId?: string;
+  to?: string;
+  appointmentDate?: string;
+}> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/send-reminder`,
+    {
+      method: "POST",
+      skipAuth: true,
+      skipSucursalHeader: true,
+      signal,
+    },
+  );
+  return z
+    .object({
+      sent: z.boolean(),
+      messageId: z.string().optional(),
+      to: z.string().optional(),
+      appointmentDate: z.string().optional(),
+    })
+    .parse(response);
 }
 
 export async function getPortalNotifications(
   token: string,
   signal?: AbortSignal,
-): Promise<Array<{ id: string; type: string; to: string; subject: string; error: string | null; sentAt: string }>> {
-  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}/notifications`, {
-    skipAuth: true,
-    skipSucursalHeader: true,
-    signal,
-  });
-  return z.object({ notifications: z.array(z.object({
-    id: z.string(),
-    type: z.string(),
-    to: z.string(),
-    subject: z.string(),
-    error: z.string().nullable(),
-    sentAt: z.string(),
-  })) }).parse(response).notifications;
+): Promise<PortalNotification[]> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/notifications`,
+    {
+      skipAuth: true,
+      skipSucursalHeader: true,
+      signal,
+    },
+  );
+  return z
+    .object({ notifications: z.array(PortalNotificationSchema) })
+    .parse(response).notifications;
+}
+
+export async function getPortalNotificationsWithCache(
+  token: string,
+  signal?: AbortSignal,
+): Promise<PortalNotificationsCacheResult> {
+  try {
+    const notifications = await getPortalNotifications(token, signal);
+    const cachedAt =
+      saveCachedPortalNotifications(token, notifications) ??
+      new Date().toISOString();
+    return { notifications, source: "network", cachedAt };
+  } catch (error) {
+    if (signal?.aborted || !shouldUsePortalCache(error)) throw error;
+
+    const cached = getCachedPortalNotifications(token);
+    if (cached) return { ...cached, error: errorMessage(error) };
+    throw error;
+  }
 }
 
 export async function submitPatientPortalAdherence(
   token: string,
   input: SubmitPortalAdherenceInput,
 ): Promise<PortalAdherenceRecord> {
-  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}/adherence`, {
-    method: "POST",
-    body: input,
-    skipAuth: true,
-    skipSucursalHeader: true,
-  });
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/adherence`,
+    {
+      method: "POST",
+      body: input,
+      skipAuth: true,
+      skipSucursalHeader: true,
+    },
+  );
   return SubmitPortalAdherenceResponseSchema.parse(response).record;
+}
+
+export async function submitPatientPortalAdherenceWithQueue(
+  token: string,
+  input: SubmitPortalAdherenceInput,
+): Promise<PortalAdherenceSubmissionResult> {
+  try {
+    const record = await submitPatientPortalAdherence(token, input);
+    return { status: "submitted", record };
+  } catch (error) {
+    if (!shouldUsePortalCache(error)) throw error;
+    const pending = queuePortalAdherenceSubmission(
+      token,
+      input,
+      errorMessage(error),
+    );
+    return { status: "queued", pending };
+  }
+}
+
+export async function flushPendingPortalAdherenceSubmissions(
+  token: string,
+): Promise<PortalAdherenceFlushResult> {
+  const activeFlush = portalAdherenceFlushes.get(token);
+  if (activeFlush) return activeFlush;
+
+  const flush = flushPendingPortalAdherenceSubmissionsNow(token);
+  portalAdherenceFlushes.set(token, flush);
+  try {
+    return await flush;
+  } finally {
+    if (portalAdherenceFlushes.get(token) === flush)
+      portalAdherenceFlushes.delete(token);
+  }
+}
+
+async function flushPendingPortalAdherenceSubmissionsNow(
+  token: string,
+): Promise<PortalAdherenceFlushResult> {
+  const queue = getPendingPortalAdherenceSubmissions(token);
+  if (queue.length === 0) return { submitted: 0, failed: 0, remaining: 0 };
+
+  let submitted = 0;
+  let failed = 0;
+  const remaining: PendingPortalAdherenceSubmission[] = [];
+
+  for (const item of queue) {
+    try {
+      await submitPatientPortalAdherence(token, item.input);
+      submitted += 1;
+    } catch (error) {
+      failed += 1;
+      remaining.push({
+        ...item,
+        attempts: item.attempts + 1,
+        lastError: errorMessage(error),
+      });
+    }
+  }
+
+  savePendingPortalAdherenceSubmissions(token, remaining);
+  return { submitted, failed, remaining: remaining.length };
 }

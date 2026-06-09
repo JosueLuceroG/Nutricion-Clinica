@@ -6,6 +6,7 @@ import {
   Bell,
   CalendarClock,
   CheckCircle2,
+  CloudOff,
   Download,
   Eye,
   FileText,
@@ -18,54 +19,91 @@ import {
 } from "lucide-react";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@components/ui/card";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Skeleton } from "@components/ui/skeleton";
 import { Textarea } from "@components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@components/ui/tooltip";
 import { getSystemFoodById } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "@modules/mealplan/domain/MealSlot";
 import {
+  flushPendingPortalAdherenceSubmissions,
   getDocumentDownloadUrl,
   getDocumentPreviewUrl,
-  getPatientPortalPayload,
-  getPortalNotifications,
+  getPatientPortalPayloadWithCache,
+  getPendingPortalAdherenceSubmissions,
+  getPortalNotificationsWithCache,
   sendPortalReminder,
-  submitPatientPortalAdherence,
   type PatientPortalMeal,
   type PatientPortalPayload,
   type PatientPortalPlan,
+  type PortalNotification,
   type SubmitPortalAdherenceInput,
+  submitPatientPortalAdherenceWithQueue,
 } from "@services/api/patientPortalApi";
 
 type PortalState =
   | { status: "loading"; data: null; error: null }
-  | { status: "ready"; data: PatientPortalPayload; error: null }
+  | {
+      status: "ready";
+      data: PatientPortalPayload;
+      error: string | null;
+      source: "network" | "cache";
+      cachedAt: string;
+    }
   | { status: "error"; data: null; error: string };
 
 export function PatientPortalPage() {
   const { token } = useParams();
   const { t, i18n } = useTranslation();
   const [reloadKey, setReloadKey] = React.useState(0);
-  const [state, setState] = React.useState<PortalState>({ status: "loading", data: null, error: null });
+  const [state, setState] = React.useState<PortalState>({
+    status: "loading",
+    data: null,
+    error: null,
+  });
 
   React.useEffect(() => {
     if (!token) {
-      setState({ status: "error", data: null, error: t("patient_portal.missing_token") });
+      setState({
+        status: "error",
+        data: null,
+        error: t("patient_portal.missing_token"),
+      });
       return;
     }
 
     const controller = new AbortController();
     setState({ status: "loading", data: null, error: null });
-    getPatientPortalPayload(token, controller.signal)
-      .then((data) => setState({ status: "ready", data, error: null }))
+    getPatientPortalPayloadWithCache(token, controller.signal)
+      .then((result) =>
+        setState({
+          status: "ready",
+          data: result.data,
+          error: result.error ?? null,
+          source: result.source,
+          cachedAt: result.cachedAt,
+        }),
+      )
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         setState({
           status: "error",
           data: null,
-          error: err instanceof Error ? err.message : t("patient_portal.load_error"),
+          error:
+            err instanceof Error ? err.message : t("patient_portal.load_error"),
         });
       });
 
@@ -101,16 +139,70 @@ export function PatientPortalPage() {
           />
         )}
         {state.status === "ready" && (
-          <PortalContent data={state.data} locale={i18n.language} token={token ?? ""} />
+          <>
+            {state.source === "cache" && (
+              <PortalOfflineBanner
+                cachedAt={state.cachedAt}
+                locale={i18n.language}
+                error={state.error}
+              />
+            )}
+            <PortalContent
+              data={state.data}
+              locale={i18n.language}
+              token={token ?? ""}
+            />
+          </>
         )}
       </div>
     </main>
   );
 }
 
-function PortalContent({ data, locale, token }: { data: PatientPortalPayload; locale: string; token: string }) {
+function PortalOfflineBanner({
+  cachedAt,
+  locale,
+  error,
+}: {
+  cachedAt: string;
+  locale: string;
+  error: string | null;
+}) {
   const { t } = useTranslation();
-  const patientFirstName = data.patient.fullName.split(" ")[0] ?? data.patient.fullName;
+  return (
+    <Card className="border-warning/30 bg-warning/10">
+      <CardContent className="flex flex-col gap-2 p-4 text-sm text-warning sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-2">
+          <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <div>
+            <p className="font-semibold">
+              {t("patient_portal.offline_cache_title")}
+            </p>
+            <p>
+              {t("patient_portal.offline_cache_desc", {
+                date: formatDateTime(cachedAt, locale),
+              })}
+            </p>
+          </div>
+        </div>
+        {error && <span className="text-xs opacity-80">{error}</span>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PortalContent({
+  data,
+  locale,
+  token,
+}: {
+  data: PatientPortalPayload;
+  locale: string;
+  token: string;
+}) {
+  const { t } = useTranslation();
+  const patientFirstName =
+    data.patient.fullName.split(" ")[0] ?? data.patient.fullName;
   const nextAppointment = data.upcomingAppointments[0];
   const canSubmitAdherence = data.portal.scopes.includes("adherence");
 
@@ -127,10 +219,28 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
             </CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-            <InfoLine label={t("patient_portal.full_name")} value={data.patient.fullName} />
-            <InfoLine label={t("patient_portal.birth_date")} value={formatDate(data.patient.birthDate, locale)} />
-            {data.patient.email && <InfoLine label={t("patient_portal.email")} value={data.patient.email} icon={Mail} />}
-            {data.patient.phone && <InfoLine label={t("patient_portal.phone")} value={data.patient.phone} icon={Phone} />}
+            <InfoLine
+              label={t("patient_portal.full_name")}
+              value={data.patient.fullName}
+            />
+            <InfoLine
+              label={t("patient_portal.birth_date")}
+              value={formatDate(data.patient.birthDate, locale)}
+            />
+            {data.patient.email && (
+              <InfoLine
+                label={t("patient_portal.email")}
+                value={data.patient.email}
+                icon={Mail}
+              />
+            )}
+            {data.patient.phone && (
+              <InfoLine
+                label={t("patient_portal.phone")}
+                value={data.patient.phone}
+                icon={Phone}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -143,7 +253,11 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>{t("patient_portal.security_desc")}</p>
-            <p>{t("patient_portal.expires_at", { date: formatDateTime(data.portal.expiresAt, locale) })}</p>
+            <p>
+              {t("patient_portal.expires_at", {
+                date: formatDateTime(data.portal.expiresAt, locale),
+              })}
+            </p>
           </CardContent>
         </Card>
       </section>
@@ -152,17 +266,26 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
         <SummaryCard
           icon={UtensilsCrossed}
           label={t("patient_portal.active_plan")}
-          value={data.summary?.activePlanName ?? t("patient_portal.no_active_plan_short")}
+          value={
+            data.summary?.activePlanName ??
+            t("patient_portal.no_active_plan_short")
+          }
         />
         <SummaryCard
           icon={CalendarClock}
           label={t("patient_portal.next_appointment")}
-          value={nextAppointment ? formatDateTime(nextAppointment.consultationDate, locale) : t("patient_portal.no_appointments_short")}
+          value={
+            nextAppointment
+              ? formatDateTime(nextAppointment.consultationDate, locale)
+              : t("patient_portal.no_appointments_short")
+          }
         />
         <SummaryCard
           icon={FileText}
           label={t("patient_portal.documents")}
-          value={t("patient_portal.documents_count", { count: data.documents.length })}
+          value={t("patient_portal.documents_count", {
+            count: data.documents.length,
+          })}
         />
       </section>
 
@@ -170,51 +293,128 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
         <ActivePlanCard plan={data.activePlan} locale={locale} />
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
-          <AppointmentsCard token={token ?? ""} appointments={data.upcomingAppointments} locale={locale} />
+          <AppointmentsCard
+            token={token ?? ""}
+            appointments={data.upcomingAppointments}
+            locale={locale}
+          />
           <NotificationsCard token={token ?? ""} />
-          <DocumentsCard token={token ?? ""} documents={data.documents} locale={locale} />
+          <DocumentsCard
+            token={token ?? ""}
+            documents={data.documents}
+            locale={locale}
+          />
         </div>
       </section>
     </>
   );
 }
 
-type ScoreKey = "adherenceMenu" | "adherenceWater" | "adherenceActivity" | "adherenceSupplements" | "adherenceSleep";
+type ScoreKey =
+  | "adherenceMenu"
+  | "adherenceWater"
+  | "adherenceActivity"
+  | "adherenceSupplements"
+  | "adherenceSleep";
 
 const SCORE_FIELDS: Array<{ key: ScoreKey; labelKey: string }> = [
   { key: "adherenceMenu", labelKey: "patient_portal.adherence_menu" },
   { key: "adherenceWater", labelKey: "patient_portal.adherence_water" },
   { key: "adherenceActivity", labelKey: "patient_portal.adherence_activity" },
-  { key: "adherenceSupplements", labelKey: "patient_portal.adherence_supplements" },
+  {
+    key: "adherenceSupplements",
+    labelKey: "patient_portal.adherence_supplements",
+  },
   { key: "adherenceSleep", labelKey: "patient_portal.adherence_sleep" },
 ];
 
 function AdherenceSubmissionCard({ token }: { token: string }) {
   const { t } = useTranslation();
-  const [form, setForm] = React.useState<SubmitPortalAdherenceInput>(() => defaultAdherenceForm());
+  const [form, setForm] = React.useState<SubmitPortalAdherenceInput>(() =>
+    defaultAdherenceForm(),
+  );
   const [submitting, setSubmitting] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
+  const [queued, setQueued] = React.useState(false);
+  const [syncedCount, setSyncedCount] = React.useState(0);
+  const [pendingCount, setPendingCount] = React.useState(
+    () => getPendingPortalAdherenceSubmissions(token).length,
+  );
   const [error, setError] = React.useState<string | null>(null);
 
   const updateScore = (key: ScoreKey, value: number) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
 
-  const updateText = (key: "barriers" | "facilitators" | "notes", value: string) => {
+  const updateText = (
+    key: "barriers" | "facilitators" | "notes",
+    value: string,
+  ) => {
     setForm((current) => ({ ...current, [key]: value }));
   };
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const refreshPending = () => {
+      if (!cancelled)
+        setPendingCount(getPendingPortalAdherenceSubmissions(token).length);
+    };
+
+    const flushPending = async () => {
+      try {
+        const result = await flushPendingPortalAdherenceSubmissions(token);
+        if (cancelled) return;
+        setPendingCount(getPendingPortalAdherenceSubmissions(token).length);
+        if (result.submitted > 0) {
+          setQueued(false);
+          setSyncedCount(result.submitted);
+        }
+      } catch {
+        refreshPending();
+      }
+    };
+
+    refreshPending();
+    if (typeof navigator === "undefined" || navigator.onLine)
+      void flushPending();
+
+    if (typeof window === "undefined") {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const handleOnline = () => void flushPending();
+    window.addEventListener("online", handleOnline);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [token]);
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSubmitting(true);
     setSuccess(false);
+    setQueued(false);
+    setSyncedCount(0);
     setError(null);
     try {
-      await submitPatientPortalAdherence(token, form);
-      setSuccess(true);
+      const result = await submitPatientPortalAdherenceWithQueue(token, form);
+      if (result.status === "queued") {
+        setQueued(true);
+        setPendingCount(getPendingPortalAdherenceSubmissions(token).length);
+      } else {
+        setSuccess(true);
+      }
       setForm(defaultAdherenceForm());
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("patient_portal.adherence_error"));
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("patient_portal.adherence_error"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -237,7 +437,9 @@ function AdherenceSubmissionCard({ token }: { token: string }) {
               id="portal-adherence-date"
               type="date"
               value={form.date ?? ""}
-              onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
+              onChange={(event) =>
+                setForm((current) => ({ ...current, date: event.target.value }))
+              }
             />
           </div>
 
@@ -275,15 +477,57 @@ function AdherenceSubmissionCard({ token }: { token: string }) {
           </div>
 
           {success && (
-            <p className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success" role="status">
+            <p
+              className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success"
+              role="status"
+            >
               <CheckCircle2 className="h-4 w-4" aria-hidden />
               {t("patient_portal.adherence_success")}
             </p>
           )}
-          {error && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}
+          {queued && (
+            <p
+              className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning"
+              role="status"
+            >
+              <CloudOff className="h-4 w-4" aria-hidden />
+              {t("patient_portal.adherence_queued")}
+            </p>
+          )}
+          {syncedCount > 0 && (
+            <p
+              className="flex items-center gap-2 rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success"
+              role="status"
+            >
+              <CheckCircle2 className="h-4 w-4" aria-hidden />
+              {t("patient_portal.adherence_queue_synced", {
+                count: syncedCount,
+              })}
+            </p>
+          )}
+          {pendingCount > 0 && (
+            <p
+              className="rounded-lg border border-warning/20 bg-warning/5 p-3 text-xs text-warning"
+              role="status"
+            >
+              {t("patient_portal.adherence_pending_count", {
+                count: pendingCount,
+              })}
+            </p>
+          )}
+          {error && (
+            <p
+              className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+              role="alert"
+            >
+              {error}
+            </p>
+          )}
 
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? t("patient_portal.adherence_saving") : t("patient_portal.adherence_submit")}
+            {submitting
+              ? t("patient_portal.adherence_saving")
+              : t("patient_portal.adherence_submit")}
           </Button>
         </form>
       </CardContent>
@@ -291,12 +535,28 @@ function AdherenceSubmissionCard({ token }: { token: string }) {
   );
 }
 
-function PortalScoreSlider({ id, label, value, onChange }: { id: string; label: string; value: number; onChange: (value: number) => void }) {
+function PortalScoreSlider({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}) {
   return (
     <div className="grid gap-1.5">
       <div className="flex items-center justify-between gap-3">
         <Label htmlFor={id}>{label}</Label>
-        <Badge variant={value >= 80 ? "success" : value >= 60 ? "warning" : "destructive"}>{value}%</Badge>
+        <Badge
+          variant={
+            value >= 80 ? "success" : value >= 60 ? "warning" : "destructive"
+          }
+        >
+          {value}%
+        </Badge>
       </div>
       <input
         id={id}
@@ -308,7 +568,10 @@ function PortalScoreSlider({ id, label, value, onChange }: { id: string; label: 
         onChange={(event) => onChange(Number(event.target.value))}
         className="h-2 w-full cursor-pointer appearance-none rounded-full bg-secondary [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
       />
-      <div className="flex justify-between text-[10px] text-muted-foreground" aria-hidden>
+      <div
+        className="flex justify-between text-[10px] text-muted-foreground"
+        aria-hidden
+      >
         <span>0</span>
         <span>50</span>
         <span>100</span>
@@ -317,11 +580,26 @@ function PortalScoreSlider({ id, label, value, onChange }: { id: string; label: 
   );
 }
 
-function PortalTextarea({ id, label, value, onChange }: { id: string; label: string; value: string; onChange: (value: string) => void }) {
+function PortalTextarea({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      <Textarea id={id} rows={2} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Textarea
+        id={id}
+        rows={2}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }
@@ -340,7 +618,13 @@ function defaultAdherenceForm(): SubmitPortalAdherenceInput {
   };
 }
 
-function ActivePlanCard({ plan, locale }: { plan: PatientPortalPlan | null; locale: string }) {
+function ActivePlanCard({
+  plan,
+  locale,
+}: {
+  plan: PatientPortalPlan | null;
+  locale: string;
+}) {
   const { t } = useTranslation();
 
   if (!plan) {
@@ -348,7 +632,9 @@ function ActivePlanCard({ plan, locale }: { plan: PatientPortalPlan | null; loca
       <Card>
         <CardHeader>
           <CardTitle>{t("patient_portal.plan_title")}</CardTitle>
-          <CardDescription>{t("patient_portal.no_active_plan")}</CardDescription>
+          <CardDescription>
+            {t("patient_portal.no_active_plan")}
+          </CardDescription>
         </CardHeader>
       </Card>
     );
@@ -366,21 +652,39 @@ function ActivePlanCard({ plan, locale }: { plan: PatientPortalPlan | null; loca
               {plan.endDate ? ` - ${formatDate(plan.endDate, locale)}` : ""}
             </p>
           </div>
-          <Badge variant="success">{t(`patient_portal.status_${plan.status.replace(/-/g, "_")}`)}</Badge>
+          <Badge variant="success">
+            {t(`patient_portal.status_${plan.status.replace(/-/g, "_")}`)}
+          </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-5">
-        {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
+        {plan.description && (
+          <p className="text-sm text-muted-foreground">{plan.description}</p>
+        )}
         <div className="grid gap-3 sm:grid-cols-4">
           <TargetStat label="kcal" value={plan.kcalTarget} />
-          <TargetStat label={t("patient_portal.protein")} value={plan.proteinTargetG} unit="g" />
-          <TargetStat label={t("patient_portal.carbs")} value={plan.carbsTargetG} unit="g" />
-          <TargetStat label={t("patient_portal.fat")} value={plan.fatTargetG} unit="g" />
+          <TargetStat
+            label={t("patient_portal.protein")}
+            value={plan.proteinTargetG}
+            unit="g"
+          />
+          <TargetStat
+            label={t("patient_portal.carbs")}
+            value={plan.carbsTargetG}
+            unit="g"
+          />
+          <TargetStat
+            label={t("patient_portal.fat")}
+            value={plan.fatTargetG}
+            unit="g"
+          />
         </div>
         <MealsList meals={plan.meals} />
         {plan.notes && (
           <div className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">{t("patient_portal.plan_notes")}</p>
+            <p className="font-medium text-foreground">
+              {t("patient_portal.plan_notes")}
+            </p>
             <p className="mt-1 whitespace-pre-wrap">{plan.notes}</p>
           </div>
         )}
@@ -392,28 +696,47 @@ function ActivePlanCard({ plan, locale }: { plan: PatientPortalPlan | null; loca
 function MealsList({ meals }: { meals: PatientPortalMeal[] }) {
   const { t } = useTranslation();
   const orderedMeals = [
-    ...MEAL_SLOT_ORDER.map((slot) => meals.find((meal) => meal.slot === slot)).filter((meal): meal is PatientPortalMeal => Boolean(meal)),
-    ...meals.filter((meal) => !MEAL_SLOT_ORDER.some((slot) => slot === meal.slot)),
+    ...MEAL_SLOT_ORDER.map((slot) =>
+      meals.find((meal) => meal.slot === slot),
+    ).filter((meal): meal is PatientPortalMeal => Boolean(meal)),
+    ...meals.filter(
+      (meal) => !MEAL_SLOT_ORDER.some((slot) => slot === meal.slot),
+    ),
   ].filter((meal) => meal.exchanges.length > 0);
 
   if (orderedMeals.length === 0) {
-    return <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t("patient_portal.no_meals")}</p>;
+    return (
+      <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+        {t("patient_portal.no_meals")}
+      </p>
+    );
   }
 
   return (
     <div className="space-y-3">
-      <h2 className="text-base font-semibold">{t("patient_portal.meals_title")}</h2>
+      <h2 className="text-base font-semibold">
+        {t("patient_portal.meals_title")}
+      </h2>
       <div className="grid gap-3 md:grid-cols-2">
         {orderedMeals.map((meal) => (
           <div key={meal.slot} className="rounded-lg border bg-muted/20 p-3">
-            <p className="text-sm font-semibold">{mealSlotLabel(t, meal.slot)}</p>
+            <p className="text-sm font-semibold">
+              {mealSlotLabel(t, meal.slot)}
+            </p>
             <ul className="mt-2 space-y-2">
               {meal.exchanges.map((exchange, index) => {
                 const food = getSystemFoodById(exchange.foodId);
                 return (
                   <li key={`${exchange.foodId}-${index}`} className="text-sm">
-                    <span className="font-medium">{exchange.count}x {food?.shortName ?? exchange.foodId}</span>
-                    {food && <span className="text-muted-foreground"> - {food.serving}</span>}
+                    <span className="font-medium">
+                      {exchange.count}x {food?.shortName ?? exchange.foodId}
+                    </span>
+                    {food && (
+                      <span className="text-muted-foreground">
+                        {" "}
+                        - {food.serving}
+                      </span>
+                    )}
                   </li>
                 );
               })}
@@ -425,7 +748,15 @@ function MealsList({ meals }: { meals: PatientPortalMeal[] }) {
   );
 }
 
-function AppointmentsCard({ token, appointments, locale }: { token: string; appointments: PatientPortalPayload["upcomingAppointments"]; locale: string }) {
+function AppointmentsCard({
+  token,
+  appointments,
+  locale,
+}: {
+  token: string;
+  appointments: PatientPortalPayload["upcomingAppointments"];
+  locale: string;
+}) {
   const { t } = useTranslation();
   const [sending, setSending] = React.useState(false);
   const [sent, setSent] = React.useState(false);
@@ -452,26 +783,45 @@ function AppointmentsCard({ token, appointments, locale }: { token: string; appo
       </CardHeader>
       <CardContent>
         {appointments.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("patient_portal.no_appointments")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("patient_portal.no_appointments")}
+          </p>
         ) : (
           <ul className="space-y-3">
             {appointments.map((appointment) => (
               <li key={appointment.id} className="rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-sm font-medium">{formatDateTime(appointment.consultationDate, locale)}</p>
-                  <Badge variant="info">{t(`patient_portal.status_${appointment.status.replace(/-/g, "_")}`)}</Badge>
+                  <p className="text-sm font-medium">
+                    {formatDateTime(appointment.consultationDate, locale)}
+                  </p>
+                  <Badge variant="info">
+                    {t(
+                      `patient_portal.status_${appointment.status.replace(/-/g, "_")}`,
+                    )}
+                  </Badge>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">{appointment.reason}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {appointment.reason}
+                </p>
               </li>
             ))}
           </ul>
         )}
         <div className="mt-3 flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={handleSendReminder} disabled={sending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSendReminder}
+            disabled={sending}
+          >
             <Mail className="mr-1 h-3 w-3" />
             {sending ? t("common.sending") : t("patient_portal.reminder_send")}
           </Button>
-          {sent && <span className="text-xs text-green-600">{t("patient_portal.reminder_sent")}</span>}
+          {sent && (
+            <span className="text-xs text-green-600">
+              {t("patient_portal.reminder_sent")}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -479,17 +829,31 @@ function AppointmentsCard({ token, appointments, locale }: { token: string; appo
 }
 
 function NotificationsCard({ token }: { token: string }) {
-  const { t } = useTranslation();
-  const [notifications, setNotifications] = React.useState<Array<{ id: string; type: string; to: string; subject: string; error: string | null; sentAt: string }>>([]);
+  const { t, i18n } = useTranslation();
+  const [notifications, setNotifications] = React.useState<
+    PortalNotification[]
+  >([]);
+  const [cacheState, setCacheState] = React.useState<{
+    source: "network" | "cache";
+    cachedAt: string;
+  } | null>(null);
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (!token) return;
+    const controller = new AbortController();
     setLoading(true);
-    getPortalNotifications(token)
-      .then(setNotifications)
+    getPortalNotificationsWithCache(token, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setNotifications(result.notifications);
+        setCacheState({ source: result.source, cachedAt: result.cachedAt });
+      })
       .catch(() => {})
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
   }, [token]);
 
   return (
@@ -504,30 +868,61 @@ function NotificationsCard({ token }: { token: string }) {
         {loading ? (
           <Skeleton className="h-16 w-full" />
         ) : notifications.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("patient_portal.no_notifications")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("patient_portal.no_notifications")}
+          </p>
         ) : (
-          <ul className="space-y-2">
-            {notifications.map((n) => (
-              <li key={n.id} className="flex items-center justify-between rounded-lg border p-2 text-xs">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{n.subject}</p>
-                  <p className="text-muted-foreground">{formatDateTime(n.sentAt, "es-MX")}</p>
-                </div>
-                {n.error ? (
-                  <Badge variant="destructive" className="shrink-0 text-[10px]">{t("common.error")}</Badge>
-                ) : (
-                  <Badge variant="success" className="shrink-0 text-[10px]">{t("patient_portal.notification_sent")}</Badge>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-2">
+            {cacheState?.source === "cache" && (
+              <p className="rounded-lg border border-warning/20 bg-warning/5 p-2 text-xs text-warning">
+                {t("patient_portal.notifications_cached", {
+                  date: formatDateTime(cacheState.cachedAt, i18n.language),
+                })}
+              </p>
+            )}
+            <ul className="space-y-2">
+              {notifications.map((n) => (
+                <li
+                  key={n.id}
+                  className="flex items-center justify-between rounded-lg border p-2 text-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{n.subject}</p>
+                    <p className="text-muted-foreground">
+                      {formatDateTime(n.sentAt, i18n.language)}
+                    </p>
+                  </div>
+                  {n.error ? (
+                    <Badge
+                      variant="destructive"
+                      className="shrink-0 text-[10px]"
+                    >
+                      {t("common.error")}
+                    </Badge>
+                  ) : (
+                    <Badge variant="success" className="shrink-0 text-[10px]">
+                      {t("patient_portal.notification_sent")}
+                    </Badge>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function DocumentsCard({ token, documents, locale }: { token: string; documents: PatientPortalPayload["documents"]; locale: string }) {
+function DocumentsCard({
+  token,
+  documents,
+  locale,
+}: {
+  token: string;
+  documents: PatientPortalPayload["documents"];
+  locale: string;
+}) {
   const { t } = useTranslation();
   return (
     <Card>
@@ -539,32 +934,56 @@ function DocumentsCard({ token, documents, locale }: { token: string; documents:
       </CardHeader>
       <CardContent>
         {documents.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{t("patient_portal.no_documents")}</p>
+          <p className="text-sm text-muted-foreground">
+            {t("patient_portal.no_documents")}
+          </p>
         ) : (
           <ul className="space-y-3">
             {documents.map((document) => (
               <li key={document.id} className="rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="break-words text-sm font-medium">{document.fileName}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {t(`patient_portal.document_type_${document.type}`, { defaultValue: document.type })} &middot; {formatFileSize(document.sizeBytes)}
+                    <p className="break-words text-sm font-medium">
+                      {document.fileName}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(document.documentDate ?? document.createdAt, locale)}
+                      {t(`patient_portal.document_type_${document.type}`, {
+                        defaultValue: document.type,
+                      })}{" "}
+                      &middot; {formatFileSize(document.sizeBytes)}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDate(
+                        document.documentDate ?? document.createdAt,
+                        locale,
+                      )}
                     </p>
                     <div className="mt-2 flex items-center gap-2">
-                      <ShieldCheck className="h-3 w-3 text-green-600" aria-hidden />
+                      <ShieldCheck
+                        className="h-3 w-3 text-green-600"
+                        aria-hidden
+                      />
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <button type="button" className="text-xs text-green-600 underline decoration-dotted underline-offset-2 hover:text-green-700" onClick={(e) => e.preventDefault()}>
+                            <button
+                              type="button"
+                              className="text-xs text-green-600 underline decoration-dotted underline-offset-2 hover:text-green-700"
+                              onClick={(e) => e.preventDefault()}
+                            >
                               {t("patient_portal.document_sha_verified")}
                             </button>
                           </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[300px] break-all text-xs">
-                            <p className="font-medium">{t("patient_portal.document_sha_title")}</p>
-                            <code className="mt-1 block font-mono text-[10px]">{document.sha256}</code>
+                          <TooltipContent
+                            side="bottom"
+                            className="max-w-[300px] break-all text-xs"
+                          >
+                            <p className="font-medium">
+                              {t("patient_portal.document_sha_title")}
+                            </p>
+                            <code className="mt-1 block font-mono text-[10px]">
+                              {document.sha256}
+                            </code>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -572,13 +991,20 @@ function DocumentsCard({ token, documents, locale }: { token: string; documents:
                   </div>
                   <div className="flex shrink-0 flex-col gap-1.5">
                     <Button asChild variant="outline" size="sm">
-                      <a href={getDocumentPreviewUrl(token, document.id)} target="_blank" rel="noreferrer">
+                      <a
+                        href={getDocumentPreviewUrl(token, document.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         <Eye className="mr-1 h-3 w-3" />
                         {t("patient_portal.document_preview")}
                       </a>
                     </Button>
                     <Button asChild variant="default" size="sm">
-                      <a href={getDocumentDownloadUrl(token, document.id)} download={document.fileName}>
+                      <a
+                        href={getDocumentDownloadUrl(token, document.id)}
+                        download={document.fileName}
+                      >
                         <Download className="mr-1 h-3 w-3" />
                         {t("patient_portal.document_download")}
                       </a>
@@ -609,16 +1035,29 @@ function PortalLoading() {
   );
 }
 
-function PortalError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function PortalError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
   const { t } = useTranslation();
   return (
     <Card className="border-destructive/30">
       <CardHeader>
         <CardTitle>{t("patient_portal.unavailable_title")}</CardTitle>
-        <CardDescription>{t("patient_portal.unavailable_desc")}</CardDescription>
+        <CardDescription>
+          {t("patient_portal.unavailable_desc")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{message}</p>
+        <p
+          className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive"
+          role="alert"
+        >
+          {message}
+        </p>
         <Button onClick={onRetry} variant="outline">
           <RefreshCcw className="h-4 w-4" aria-hidden />
           {t("common.retry")}
@@ -628,7 +1067,15 @@ function PortalError({ message, onRetry }: { message: string; onRetry: () => voi
   );
 }
 
-function SummaryCard({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string }) {
+function SummaryCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+}) {
   return (
     <Card>
       <CardContent className="flex items-center gap-3 p-4">
@@ -644,18 +1091,37 @@ function SummaryCard({ icon: Icon, label, value }: { icon: React.ComponentType<{
   );
 }
 
-function TargetStat({ label, value, unit = "" }: { label: string; value: number; unit?: string }) {
+function TargetStat({
+  label,
+  value,
+  unit = "",
+}: {
+  label: string;
+  value: number;
+  unit?: string;
+}) {
   return (
     <div className="rounded-lg border bg-muted/20 p-3">
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-xl font-semibold tabular-nums">
-        {value}{unit}
+        {value}
+        {unit}
       </p>
     </div>
   );
 }
 
-function InfoLine({ label, value, icon: Icon }: { label: string; value: string; icon?: React.ComponentType<{ className?: string }> }) {
+function InfoLine({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}) {
   return (
     <div>
       <p className="text-xs text-primary-foreground/70">{label}</p>
@@ -667,8 +1133,13 @@ function InfoLine({ label, value, icon: Icon }: { label: string; value: string; 
   );
 }
 
-function mealSlotLabel(t: ReturnType<typeof useTranslation>["t"], slot: string): string {
-  return t(`patient_portal.meal_slot_${slot.replace(/-/g, "_")}`, { defaultValue: slot });
+function mealSlotLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  slot: string,
+): string {
+  return t(`patient_portal.meal_slot_${slot.replace(/-/g, "_")}`, {
+    defaultValue: slot,
+  });
 }
 
 function formatDate(value: string | null, locale: string): string {
@@ -682,7 +1153,10 @@ function formatDateTime(value: string | null, locale: string): string {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function formatFileSize(bytes: number): string {
