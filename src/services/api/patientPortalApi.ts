@@ -225,6 +225,24 @@ export async function listPatientPortalAdherence(
   return z.object({ records: z.array(PortalAdherenceRecordSchema) }).parse(response).records;
 }
 
+/** Base URL del backend para construir URLs absolutas de descarga. */
+function getBackendBaseUrl(): string {
+  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
+  if (fromVite) return fromVite;
+  const fromProcess = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
+  return fromProcess ?? 'http://localhost:3000';
+}
+
+/** URL para descargar un documento del portal. */
+export function getDocumentDownloadUrl(token: string, documentId: string): string {
+  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download`;
+}
+
+/** URL para previsualizar un documento del portal en el navegador. */
+export function getDocumentPreviewUrl(token: string, documentId: string): string {
+  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
+}
+
 export async function submitPatientPortalAdherence(
   token: string,
   input: SubmitPortalAdherenceInput,

@@ -156,7 +156,7 @@ interface PortalAdherenceRecordRow {
   updated_at: Date;
 }
 
-type PortalAuditEventType = 'created' | 'revoked' | 'accessed' | 'adherence_submitted';
+type PortalAuditEventType = 'created' | 'revoked' | 'accessed' | 'adherence_submitted' | 'document_downloaded';
 
 interface PortalMealExchange {
   foodId: string;
@@ -926,5 +926,97 @@ async function loadDocuments(pool: sql.ConnectionPool, pacienteId: string) {
     createdAt: iso(row.created_at),
   }));
 }
+
+router.get('/:token/documents/:documentId/download', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) {
+      notFound(res);
+      return;
+    }
+    const documentId = String(req.params.documentId);
+    if (!isUuid(documentId)) {
+      res.status(400).json({ error: 'documentId debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) {
+      notFound(res);
+      return;
+    }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('documents')) {
+      throw new ForbiddenError('Este enlace no permite descargar documentos');
+    }
+
+    const docResult = await pool
+      .request()
+      .input('document_id', sql.UniqueIdentifier(), documentId)
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .query<PortalDocumentRow>(
+        `SELECT id, tipo, nombre_archivo, mime_type, tamano_bytes, url_storage,
+                hash_sha256, fecha_documento, notas, created_at
+           FROM documentos
+          WHERE id = @document_id
+            AND paciente_id = @paciente_id
+            AND deleted_at IS NULL`,
+      );
+    const doc = docResult.recordset[0];
+    if (!doc) {
+      res.status(404).json({ error: 'Documento no encontrado' });
+      return;
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const isPreview = req.query.preview === '1';
+
+    try {
+      const fileResponse = await fetch(doc.url_storage, { signal: AbortSignal.timeout(30_000) });
+      if (!fileResponse.ok) {
+        res.status(502).json({ error: 'No se pudo recuperar el archivo del almacenamiento' });
+        return;
+      }
+
+      const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+      const computedHash = createHash('sha256').update(fileBuffer).digest('hex');
+      const hashMatch = computedHash === doc.hash_sha256;
+
+      res.setHeader('Content-Type', doc.mime_type);
+      res.setHeader('Content-Disposition', isPreview ? 'inline' : `attachment; filename="${doc.nombre_archivo}"`);
+      res.setHeader('Content-Length', fileBuffer.length);
+      res.setHeader('X-Document-SHA256', doc.hash_sha256);
+      res.setHeader('X-Document-SHA256-Verified', hashMatch ? 'true' : 'false');
+
+      await recordPortalAudit(pool, {
+        tokenId: access.token_id,
+        sucursalId: access.sucursal_id,
+        pacienteId: access.paciente_id,
+        eventType: 'document_downloaded',
+        req,
+        details: {
+          documentId: doc.id,
+          fileName: doc.nombre_archivo,
+          fileSize: doc.tamano_bytes,
+          sha256: doc.hash_sha256,
+          hashMatch,
+          preview: isPreview,
+        },
+        auditEntityType: 'documento',
+        auditEntityId: doc.id,
+        auditOperation: 'read',
+      });
+
+      res.end(fileBuffer);
+    } catch (fetchErr) {
+      res.status(502).json({ error: 'No se pudo recuperar el archivo del almacenamiento externo' });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

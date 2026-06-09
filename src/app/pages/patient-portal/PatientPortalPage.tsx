@@ -5,6 +5,8 @@ import {
   Activity,
   CalendarClock,
   CheckCircle2,
+  Download,
+  Eye,
   FileText,
   LockKeyhole,
   Mail,
@@ -20,9 +22,12 @@ import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Skeleton } from "@components/ui/skeleton";
 import { Textarea } from "@components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@components/ui/tooltip";
 import { getSystemFoodById } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "@modules/mealplan/domain/MealSlot";
 import {
+  getDocumentDownloadUrl,
+  getDocumentPreviewUrl,
   getPatientPortalPayload,
   submitPatientPortalAdherence,
   type PatientPortalMeal,
@@ -163,7 +168,7 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
           <AppointmentsCard appointments={data.upcomingAppointments} locale={locale} />
-          <DocumentsCard documents={data.documents} locale={locale} />
+          <DocumentsCard token={token ?? ""} documents={data.documents} locale={locale} />
         </div>
       </section>
     </>
@@ -447,7 +452,7 @@ function AppointmentsCard({ appointments, locale }: { appointments: PatientPorta
   );
 }
 
-function DocumentsCard({ documents, locale }: { documents: PatientPortalPayload["documents"]; locale: string }) {
+function DocumentsCard({ token, documents, locale }: { token: string; documents: PatientPortalPayload["documents"]; locale: string }) {
   const { t } = useTranslation();
   return (
     <Card>
@@ -465,20 +470,45 @@ function DocumentsCard({ documents, locale }: { documents: PatientPortalPayload[
             {documents.map((document) => (
               <li key={document.id} className="rounded-lg border p-3">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium">{document.fileName}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {t(`patient_portal.document_type_${document.type}`, { defaultValue: document.type })} - {formatFileSize(document.sizeBytes)}
+                      {t(`patient_portal.document_type_${document.type}`, { defaultValue: document.type })} &middot; {formatFileSize(document.sizeBytes)}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDate(document.documentDate ?? document.createdAt, locale)}
                     </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <ShieldCheck className="h-3 w-3 text-green-600" aria-hidden />
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-xs text-green-600 underline decoration-dotted underline-offset-2 hover:text-green-700" onClick={(e) => e.preventDefault()}>
+                              {t("patient_portal.document_sha_verified")}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-[300px] break-all text-xs">
+                            <p className="font-medium">{t("patient_portal.document_sha_title")}</p>
+                            <code className="mt-1 block font-mono text-[10px]">{document.sha256}</code>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
-                  <Button asChild variant="outline" size="sm">
-                    <a href={document.url} target="_blank" rel="noreferrer">
-                      {t("common.open")}
-                    </a>
-                  </Button>
+                  <div className="flex shrink-0 flex-col gap-1.5">
+                    <Button asChild variant="outline" size="sm">
+                      <a href={getDocumentPreviewUrl(token, document.id)} target="_blank" rel="noreferrer">
+                        <Eye className="mr-1 h-3 w-3" />
+                        {t("patient_portal.document_preview")}
+                      </a>
+                    </Button>
+                    <Button asChild variant="default" size="sm">
+                      <a href={getDocumentDownloadUrl(token, document.id)} download={document.fileName}>
+                        <Download className="mr-1 h-3 w-3" />
+                        {t("patient_portal.document_download")}
+                      </a>
+                    </Button>
+                  </div>
                 </div>
               </li>
             ))}
