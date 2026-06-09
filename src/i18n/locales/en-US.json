@@ -119,7 +119,27 @@
     "quick_access": "Quick access",
     "quick_access_desc": "Shortcuts to clinical modules",
     "biochemical_calculations": "Biochemical calculations",
-    "smae_edition": "SMAE 5th edition"
+    "smae_edition": "SMAE 5th edition",
+    "metrics": {
+      "new_patients": "New patients",
+      "this_month": "This month",
+      "consultations_pending_payment": "Pending payments",
+      "unpaid": "Billable unpaid consultations",
+      "avg_adherence": "Average adherence",
+      "adherence_records": "{{count}} adherence records",
+      "expiring_plans_count": "Expiring plans",
+      "plans_expiring_30d": "Next 30 days",
+      "patient_demographics": "Patient demographics",
+      "total_patients": "{{count}} registered patients",
+      "consultation_stats": "Clinical activity",
+      "total_consultations": "Total consultations",
+      "consultations_this_month": "Consultations this month",
+      "pending_payments": "Pending payments",
+      "active_plans": "Active plans",
+      "plans_expiring": "Expiring plans",
+      "sex_distribution": "Sex distribution",
+      "pathology_distribution": "Pathology distribution"
+    }
   },
   "theme": {
     "light": "Light",
@@ -341,6 +361,14 @@
     "birth_date": "Date of birth",
     "email": "Email",
     "phone": "Phone",
+    "reminder_send": "Send email reminder",
+    "reminder_sent": "Reminder sent",
+    "notifications_title": "Notifications",
+    "no_notifications": "No notifications sent.",
+    "notification_sent": "Sent",
+    "substitutions_title": "Food Preferences",
+    "substitutions_desc": "Saved substitutions for this patient",
+    "no_substitutions": "No preferences saved yet.",
     "security_title": "Protected link",
     "security_desc": "This link allows viewing shared clinical information. It can only submit adherence records if your nutritionist enabled that permission.",
     "expires_at": "Expires: {{date}}",
@@ -783,6 +811,7 @@
         "select_food": "Select food..."
       },
       "btn": {
+        "apply_preferences": "Apply saved preferences",
         "suggest_distribution": "View suggested distribution by meal time",
         "add_food": "Add food",
         "cancel": "Cancel",
@@ -794,7 +823,9 @@
         "suggested_distribution": "Suggested calorie distribution",
         "plan_created": "Meal plan created",
         "plan_created_desc": "{{count}} exchanges registered · {{kcal}} kcal",
-        "save_error": "Could not save the plan"
+        "save_error": "Could not save the plan",
+        "preference_saved": "Preference saved",
+        "preferences_applied": "Preferences applied to plan"
       },
       "empty": {
         "no_foods": "No foods registered",
@@ -804,7 +835,8 @@
         "expand": "Expand",
         "collapse": "Collapse",
         "drag": "Drag to another meal time",
-        "delete": "Delete"
+        "delete": "Delete",
+        "save_preference": "Save as preference"
       },
       "macro": {
         "kcal": "kcal",

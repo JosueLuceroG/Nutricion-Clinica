@@ -243,6 +243,43 @@ export function getDocumentPreviewUrl(token: string, documentId: string): string
   return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
 }
 
+export async function sendPortalReminder(
+  token: string,
+  signal?: AbortSignal,
+): Promise<{ sent: boolean; messageId?: string; to?: string; appointmentDate?: string }> {
+  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}/send-reminder`, {
+    method: "POST",
+    skipAuth: true,
+    skipSucursalHeader: true,
+    signal,
+  });
+  return z.object({
+    sent: z.boolean(),
+    messageId: z.string().optional(),
+    to: z.string().optional(),
+    appointmentDate: z.string().optional(),
+  }).parse(response);
+}
+
+export async function getPortalNotifications(
+  token: string,
+  signal?: AbortSignal,
+): Promise<Array<{ id: string; type: string; to: string; subject: string; error: string | null; sentAt: string }>> {
+  const response = await httpRequest<unknown>(`/patient-portal/${encodeURIComponent(token)}/notifications`, {
+    skipAuth: true,
+    skipSucursalHeader: true,
+    signal,
+  });
+  return z.object({ notifications: z.array(z.object({
+    id: z.string(),
+    type: z.string(),
+    to: z.string(),
+    subject: z.string(),
+    error: z.string().nullable(),
+    sentAt: z.string(),
+  })) }).parse(response).notifications;
+}
+
 export async function submitPatientPortalAdherence(
   token: string,
   input: SubmitPortalAdherenceInput,

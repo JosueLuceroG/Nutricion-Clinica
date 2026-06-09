@@ -25,6 +25,8 @@ import {
   Target,
   Apple,
   GripVertical,
+  Star,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -52,6 +54,7 @@ import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { FoodPicker } from "./FoodPicker";
+import { createPatientSubstitution, getPatientSubstitutions } from "@services/api/patientSubstitutionApi";
 
 interface MealPlanFormProps {
   patientId: PatientId;
@@ -77,6 +80,57 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
   const proteinTargetG = watch("proteinTargetG");
   const carbsTargetG = watch("carbsTargetG");
   const fatTargetG = watch("fatTargetG");
+
+  const patientIdString = typeof patientId === "string" ? patientId : patientId.toString();
+
+  const [applyingPrefs, setApplyingPrefs] = React.useState(false);
+
+  const handleSavePreference = React.useCallback(async (foodId: string) => {
+    if (!foodId) return;
+    const slot = watch("meals").find((m) =>
+      m.exchanges.some((e) => e.foodId === foodId),
+    )?.slot ?? null;
+    try {
+      await createPatientSubstitution(patientIdString, {
+        originalFoodId: null,
+        substituteFoodId: foodId,
+        mealSlot: slot,
+      });
+      toast.success(t("mealplan.form.toast.preference_saved"));
+    } catch (err) {
+      toast.error(t("mealplan.form.toast.save_error"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }, [patientIdString, watch, t]);
+
+  const handleApplyPreferences = React.useCallback(async () => {
+    setApplyingPrefs(true);
+    try {
+      const subs = await getPatientSubstitutions(patientIdString);
+      for (const meal of meals) {
+        const idx = MEAL_SLOT_ORDER.indexOf(meal.slot);
+        if (idx < 0) continue;
+        const newExchanges = meal.exchanges.map((ex) => {
+          const matchingSub = subs.find(
+            (s) => s.substituteFoodId === ex.foodId || (s.mealSlot === meal.slot && s.originalFoodId === null),
+          );
+          if (matchingSub) {
+            return { ...ex, foodId: matchingSub.substituteFoodId };
+          }
+          return ex;
+        });
+        setValue(`meals.${idx}.exchanges`, newExchanges, { shouldDirty: true });
+      }
+      toast.success(t("mealplan.form.toast.preferences_applied"));
+    } catch (err) {
+      toast.error(t("mealplan.form.toast.save_error"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setApplyingPrefs(false);
+    }
+  }, [patientIdString, meals, setValue, t]);
 
   const totals = React.useMemo(() => {
     return meals.reduce(
@@ -277,7 +331,11 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
               <Input id="field-plan-fat" type="number" step="1" {...register("fatTargetG", { valueAsNumber: true })} aria-describedby={errors.fatTargetG ? "field-plan-fat-error" : undefined} />
             </Field>
           </div>
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={handleApplyPreferences} disabled={applyingPrefs}>
+              <Sparkles className="mr-2 h-4 w-4" />
+              {applyingPrefs ? t("common.sending") : t("mealplan.form.btn.apply_preferences")}
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={suggestDistribution}>
               <Target className="mr-2 h-4 w-4" />
               {t("mealplan.form.btn.suggest_distribution")}
@@ -303,6 +361,7 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
             register={register}
             watch={watch}
             slotKcalTarget={Math.round((kcalTarget ?? 0) * DEFAULT_KCAL_DISTRIBUTION[slot])}
+            onSavePreference={handleSavePreference}
           />
         ))}
       </DndContext>
@@ -451,12 +510,14 @@ function MealSection({
   register,
   watch,
   slotKcalTarget,
+  onSavePreference,
 }: {
   slot: MealSlot;
   control: ReturnType<typeof useForm<MealPlanFormValues>>["control"];
   register: ReturnType<typeof useForm<MealPlanFormValues>>["register"];
   watch: ReturnType<typeof useForm<MealPlanFormValues>>["watch"];
   slotKcalTarget: number;
+  onSavePreference: (foodId: string) => void;
 }) {
   const { t } = useTranslation();
   const idx = MEAL_SLOT_ORDER.indexOf(slot);
@@ -542,9 +603,11 @@ function MealSection({
                 key={row.id}
                 slot={slot}
                 rowIdx={rowIdx}
+                foodId={row.foodId ?? ""}
                 foodName={food?.name ?? null}
                 onClickFood={() => openPickerForEdit(rowIdx)}
                 onDelete={() => remove(rowIdx)}
+                onSavePreference={onSavePreference}
                 countProps={register(`meals.${idx}.exchanges.${rowIdx}.count`, {
                   valueAsNumber: true,
                 })}
@@ -584,18 +647,22 @@ function DroppableMealCard({ slot, children }: { slot: MealSlot; children: React
 interface DraggableFoodRowProps {
   slot: MealSlot;
   rowIdx: number;
+  foodId: string;
   foodName: string | null;
   onClickFood: () => void;
   onDelete: () => void;
+  onSavePreference: (foodId: string) => void;
   countProps: ReturnType<ReturnType<typeof useForm<MealPlanFormValues>>["register"]>;
 }
 
 function DraggableFoodRow({
   slot,
   rowIdx,
+  foodId,
   foodName,
   onClickFood,
   onDelete,
+  onSavePreference,
   countProps,
 }: DraggableFoodRowProps) {
   const { t } = useTranslation();
@@ -622,7 +689,7 @@ function DraggableFoodRow({
           <GripVertical className="h-4 w-4" />
         </button>
       </div>
-      <div className="col-span-6">
+      <div className="col-span-5">
         <Label className="text-xs">{t("mealplan.form.field.food")}</Label>
         <Button
           type="button"
@@ -642,7 +709,12 @@ function DraggableFoodRow({
         <Label className="text-xs" htmlFor={`servings-${slot}-${rowIdx}`}>{t("mealplan.form.field.servings")}</Label>
         <Input type="number" step="0.5" min="0" {...countProps} id={`servings-${slot}-${rowIdx}`} />
       </div>
-      <div className="col-span-2 flex items-end justify-end">
+      <div className="col-span-2 flex items-end justify-end gap-1">
+        {foodId && (
+          <Button type="button" variant="ghost" size="icon-sm" aria-label={t("mealplan.form.aria.save_preference")} onClick={() => onSavePreference(foodId)}>
+            <Star className="h-4 w-4" />
+          </Button>
+        )}
         <Button type="button" variant="ghost" size="icon-sm" aria-label={t("mealplan.form.aria.delete")} onClick={onDelete}>
           <Trash2 className="h-4 w-4" />
         </Button>

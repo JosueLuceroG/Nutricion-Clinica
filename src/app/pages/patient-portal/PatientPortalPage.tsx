@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
+  Bell,
   CalendarClock,
   CheckCircle2,
   Download,
@@ -29,6 +30,8 @@ import {
   getDocumentDownloadUrl,
   getDocumentPreviewUrl,
   getPatientPortalPayload,
+  getPortalNotifications,
+  sendPortalReminder,
   submitPatientPortalAdherence,
   type PatientPortalMeal,
   type PatientPortalPayload,
@@ -167,7 +170,8 @@ function PortalContent({ data, locale, token }: { data: PatientPortalPayload; lo
         <ActivePlanCard plan={data.activePlan} locale={locale} />
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
-          <AppointmentsCard appointments={data.upcomingAppointments} locale={locale} />
+          <AppointmentsCard token={token ?? ""} appointments={data.upcomingAppointments} locale={locale} />
+          <NotificationsCard token={token ?? ""} />
           <DocumentsCard token={token ?? ""} documents={data.documents} locale={locale} />
         </div>
       </section>
@@ -421,8 +425,23 @@ function MealsList({ meals }: { meals: PatientPortalMeal[] }) {
   );
 }
 
-function AppointmentsCard({ appointments, locale }: { appointments: PatientPortalPayload["upcomingAppointments"]; locale: string }) {
+function AppointmentsCard({ token, appointments, locale }: { token: string; appointments: PatientPortalPayload["upcomingAppointments"]; locale: string }) {
   const { t } = useTranslation();
+  const [sending, setSending] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+
+  const handleSendReminder = async () => {
+    setSending(true);
+    try {
+      await sendPortalReminder(token);
+      setSent(true);
+    } catch {
+      // silent
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -443,6 +462,62 @@ function AppointmentsCard({ appointments, locale }: { appointments: PatientPorta
                   <Badge variant="info">{t(`patient_portal.status_${appointment.status.replace(/-/g, "_")}`)}</Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">{appointment.reason}</p>
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="mt-3 flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={handleSendReminder} disabled={sending}>
+            <Mail className="mr-1 h-3 w-3" />
+            {sending ? t("common.sending") : t("patient_portal.reminder_send")}
+          </Button>
+          {sent && <span className="text-xs text-green-600">{t("patient_portal.reminder_sent")}</span>}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function NotificationsCard({ token }: { token: string }) {
+  const { t } = useTranslation();
+  const [notifications, setNotifications] = React.useState<Array<{ id: string; type: string; to: string; subject: string; error: string | null; sentAt: string }>>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    getPortalNotifications(token)
+      .then(setNotifications)
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Bell className="h-4 w-4 text-primary" aria-hidden />
+          {t("patient_portal.notifications_title")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : notifications.length === 0 ? (
+          <p className="text-sm text-muted-foreground">{t("patient_portal.no_notifications")}</p>
+        ) : (
+          <ul className="space-y-2">
+            {notifications.map((n) => (
+              <li key={n.id} className="flex items-center justify-between rounded-lg border p-2 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{n.subject}</p>
+                  <p className="text-muted-foreground">{formatDateTime(n.sentAt, "es-MX")}</p>
+                </div>
+                {n.error ? (
+                  <Badge variant="destructive" className="shrink-0 text-[10px]">{t("common.error")}</Badge>
+                ) : (
+                  <Badge variant="success" className="shrink-0 text-[10px]">{t("patient_portal.notification_sent")}</Badge>
+                )}
               </li>
             ))}
           </ul>

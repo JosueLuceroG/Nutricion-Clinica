@@ -12,6 +12,7 @@ import planRouter from "./modules/planes/planRoutes.js";
 import adherenceRouter from "./modules/adherence/adherenceRoutes.js";
 import patientPortalRouter from "./modules/patientPortal/patientPortalRoutes.js";
 import syncRouter from "./modules/sync/syncRoutes.js";
+import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/planes", planRouter);
 app.use("/adherence", adherenceRouter);
 app.use("/patient-portal", patientPortalRouter);
 app.use("/sync", syncRouter);
+app.use("/dashboard", dashboardRouter);
 
 app.use(errorHandler);
 

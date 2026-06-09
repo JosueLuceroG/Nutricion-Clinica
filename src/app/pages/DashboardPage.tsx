@@ -20,6 +20,7 @@ import { Skeleton } from "@components/ui/skeleton";
 import { EmptyState } from "@components/layout/EmptyState";
 import { useDashboardKpis } from "@app/hooks/useDashboardKpis";
 import { ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
+import { ClinicMetricsCards } from "./DashboardPageClinicMetrics";
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -88,6 +89,8 @@ export function DashboardPage() {
             </CardContent>
           </Card>
         )}
+
+        <ClinicMetricsCards />
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
           <Card>

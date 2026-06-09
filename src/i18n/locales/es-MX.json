@@ -17,6 +17,7 @@
     "no": "No",
     "open": "Abrir",
     "loading": "Cargando...",
+    "sending": "Enviando...",
     "no_data": "No hay datos suficientes para mostrar",
     "no_results": "No se encontraron resultados",
     "view_all": "Ver todos",
@@ -119,7 +120,27 @@
     "quick_access": "Accesos rápidos",
     "quick_access_desc": "Atajos a módulos clínicos",
     "biochemical_calculations": "Cálculos bioquímicos",
-    "smae_edition": "SMAE 5ª edición"
+    "smae_edition": "SMAE 5ª edición",
+    "metrics": {
+      "new_patients": "Pacientes nuevos",
+      "this_month": "Este mes",
+      "consultations_pending_payment": "Pagos pendientes",
+      "unpaid": "Consultas con costo sin liquidar",
+      "avg_adherence": "Adherencia promedio",
+      "adherence_records": "{{count}} registros de adherencia",
+      "expiring_plans_count": "Planes por vencer",
+      "plans_expiring_30d": "Próximos 30 días",
+      "patient_demographics": "Demografía de pacientes",
+      "total_patients": "{{count}} pacientes registrados",
+      "consultation_stats": "Actividad clínica",
+      "total_consultations": "Consultas totales",
+      "consultations_this_month": "Consultas este mes",
+      "pending_payments": "Pagos pendientes",
+      "active_plans": "Planes activos",
+      "plans_expiring": "Planes por vencer",
+      "sex_distribution": "Distribución por sexo",
+      "pathology_distribution": "Distribución por patologías"
+    }
   },
   "theme": {
     "light": "Claro",
@@ -341,6 +362,14 @@
     "birth_date": "Fecha de nacimiento",
     "email": "Correo",
     "phone": "Teléfono",
+    "reminder_send": "Enviar recordatorio por correo",
+    "reminder_sent": "Recordatorio enviado",
+    "notifications_title": "Notificaciones",
+    "no_notifications": "No hay notificaciones enviadas.",
+    "notification_sent": "Enviado",
+    "substitutions_title": "Preferencias de alimentos",
+    "substitutions_desc": "Sustituciones guardadas para este paciente",
+    "no_substitutions": "No hay preferencias guardadas.",
     "security_title": "Enlace protegido",
     "security_desc": "Este enlace permite ver información clínica compartida. Solo puede enviar registros de adherencia si tu nutrióloga habilitó ese permiso.",
     "expires_at": "Expira: {{date}}",
@@ -783,6 +812,7 @@
         "select_food": "Seleccionar alimento…"
       },
       "btn": {
+        "apply_preferences": "Aplicar preferencias guardadas",
         "suggest_distribution": "Ver distribución sugerida por tiempo",
         "add_food": "Añadir alimento",
         "cancel": "Cancelar",
@@ -794,7 +824,9 @@
         "suggested_distribution": "Distribución calórica sugerida",
         "plan_created": "Plan alimentario creado",
         "plan_created_desc": "{{count}} equivalentes registrados · {{kcal}} kcal",
-        "save_error": "No se pudo guardar el plan"
+        "save_error": "No se pudo guardar el plan",
+        "preference_saved": "Preferencia guardada",
+        "preferences_applied": "Preferencias aplicadas al plan"
       },
       "empty": {
         "no_foods": "Sin alimentos registrados",
@@ -804,7 +836,8 @@
         "expand": "Expandir",
         "collapse": "Colapsar",
         "drag": "Arrastrar a otro tiempo",
-        "delete": "Eliminar"
+        "delete": "Eliminar",
+        "save_preference": "Guardar como preferencia"
       },
       "macro": {
         "kcal": "kcal",

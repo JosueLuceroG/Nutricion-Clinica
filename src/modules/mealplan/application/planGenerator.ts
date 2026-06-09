@@ -125,3 +125,30 @@ export function generatePlanMealsFromSkeleton(
     })),
   }));
 }
+
+/**
+ * Aplica sustituciones guardadas del paciente a un array de PlanMeal.
+ * Recorre cada intercambio y si encuentra un original_food_id que coincida,
+ * lo reemplaza por substitute_food_id.
+ */
+export interface SubstitutionMap {
+  /** key = originalFoodId, value = substituteFoodId */
+  [originalFoodId: string]: string;
+}
+
+export function applySubstitutions(
+  meals: PlanMeal[],
+  substitutions: SubstitutionMap,
+): PlanMeal[] {
+  if (Object.keys(substitutions).length === 0) return meals;
+  return meals.map((meal) => ({
+    ...meal,
+    exchanges: meal.exchanges.map((ex) => {
+      const substitute = substitutions[ex.foodId];
+      if (substitute) {
+        return { ...ex, foodId: substitute as FoodId };
+      }
+      return ex;
+    }),
+  }));
+}

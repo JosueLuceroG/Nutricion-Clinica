@@ -6,6 +6,7 @@ import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
+import { sendEmail, logEmailSent, renderTemplate } from '../../services/email/emailService.js';
 
 const router: Router = ExpressRouter();
 
@@ -765,6 +766,29 @@ router.post('/:token/adherence', async (req: Request, res: Response, next: NextF
       auditOperation: 'create',
     });
 
+    if (access.email) {
+      const html = renderTemplate('adherence_confirmation', {
+        patientName: fullName(access),
+        recordDate,
+        adherenceMenu: String(body.adherenceMenu),
+        adherenceWater: String(body.adherenceWater),
+        adherenceActivity: String(body.adherenceActivity),
+        adherenceSupplements: String(body.adherenceSupplements),
+        adherenceSleep: String(body.adherenceSleep),
+      });
+      const subject = 'Registro de adherencia recibido - NutriClínica';
+      const emailResult = await sendEmail({ to: access.email, subject, html });
+      await logEmailSent({
+        pacienteId: access.paciente_id,
+        tipo: 'adherence_confirmation',
+        destinatario: access.email,
+        asunto: subject,
+        contenidoHtml: html,
+        messageId: emailResult.messageId,
+        error: emailResult.success ? null : (emailResult.error ?? null),
+      });
+    }
+
     res.status(201).json({ record: row ? rowToPortalAdherenceRecord(row) : { id } });
   } catch (err) {
     next(err);
@@ -926,6 +950,92 @@ async function loadDocuments(pool: sql.ConnectionPool, pacienteId: string) {
     createdAt: iso(row.created_at),
   }));
 }
+
+router.post('/:token/send-reminder', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    if (!access.email) {
+      res.status(400).json({ error: 'El paciente no tiene correo registrado' });
+      return;
+    }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('appointments')) {
+      throw new ForbiddenError('Este enlace no permite consultar citas');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const appointment = await loadUpcomingAppointments(pool, access.paciente_id, access.sucursal_id);
+    const nextAppt = appointment[0];
+
+    const patientName = fullName(access);
+    const variables: Record<string, string> = {
+      patientName,
+      appointmentDate: nextAppt ? new Date(nextAppt.consultationDate ?? '').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'No programada',
+      appointmentReason: nextAppt?.reason ?? 'Consulta de seguimiento',
+    };
+
+    const html = renderTemplate('appointment_reminder', variables);
+    const subject = 'Recordatorio de cita - NutriClínica';
+    const result = await sendEmail({ to: access.email, subject, html, text: `Hola ${patientName}, tienes una cita el ${variables.appointmentDate}. Motivo: ${variables.appointmentReason}` });
+
+    await logEmailSent({
+      pacienteId: access.paciente_id,
+      tipo: 'appointment_reminder',
+      destinatario: access.email,
+      asunto: subject,
+      contenidoHtml: html,
+      messageId: result.messageId,
+      error: result.success ? null : (result.error ?? 'Error desconocido'),
+    });
+
+    res.json({
+      sent: result.success,
+      messageId: result.messageId,
+      to: access.email,
+      appointmentDate: variables.appointmentDate,
+    });
+  } catch (err) { next(err); }
+});
+
+router.get('/:token/notifications', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const result = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .query(
+        `SELECT TOP 20 id, tipo, destinatario, asunto, error, enviado_en
+           FROM notificaciones_email
+          WHERE paciente_id = @paciente_id
+          ORDER BY enviado_en DESC`,
+      );
+
+    res.json({
+      notifications: result.recordset.map((row: Record<string, unknown>) => ({
+        id: row.id,
+        type: row.tipo,
+        to: row.destinatario,
+        subject: row.asunto,
+        error: row.error || null,
+        sentAt: row.enviado_en instanceof Date ? row.enviado_en.toISOString() : String(row.enviado_en),
+      })),
+    });
+  } catch (err) { next(err); }
+});
 
 router.get('/:token/documents/:documentId/download', async (req: Request, res: Response, next: NextFunction) => {
   try {

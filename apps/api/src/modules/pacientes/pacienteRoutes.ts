@@ -5,6 +5,7 @@ import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
+import pacienteSubstitutionRouter from './pacienteSubstitutionRoutes.js';
 
 const router: Router = ExpressRouter();
 
@@ -273,5 +274,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     next(err);
   }
 });
+
+router.use('/:pacienteId/substitutions', pacienteSubstitutionRouter);
 
 export default router;
