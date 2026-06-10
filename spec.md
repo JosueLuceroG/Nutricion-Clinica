@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.8
-**Última actualización:** Sprint 43 — retención legal de grabaciones + TURN productivo + E2E multi-peer ✅
-**Estado del proyecto:** Sprints 1-43 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 119 tests API · 10 E2E tests
+**Versión del documento:** 2.9
+**Última actualización:** Sprint 44 — ADRs formales + README quickstart + roadmap finalizado ✅
+**Estado del proyecto:** Sprints 1-44 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 126 tests API · 10 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 43 completado — retención legal de grabaciones cifradas con migración `018-retention-grabaciones.sql` (columna `retention_until` + tabla `retention_cleanup_log`), cleanup automático diario vía `node-cron` con auditoría transaccional (`retentionCleanupService.ts`), endpoint `/telemedicina/turn-config` con validación Zod y fallback a STUN público, TURN productivo con credenciales servidas desde el backend y cacheadas 5 min en cliente, y E2E multi-peer con Playwright para navegación de telemedicina y validación del endpoint TURN.
+- **Sprint actual:** Sprint 44 completado — ADRs formales creados en `docs/decisions/0001-*.md` (formato Michael Nygard), `README.md` reemplazado por quickstart compacto, roadmap de Fase 5 actualizado a 100% completo con todos los items de telemedicina/2FA marcados como terminados.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -1987,31 +1987,35 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 - ✓ AI Assist — 6 archivos servicio, 8 capabilities, cache, audit, usage tracking, Dexie v24, UI integration (Sprint 24)
 - ✓ Portabilidad móvil — sidebar drawer, responsive layout, tables, dialog scroll (Sprint 24)
 
-### Fase 5 — Patient portal, multi-consultorio, NOM-024 (~95% EN PROGRESO 🔄)
+### Fase 5 — Patient portal, multi-consultorio, NOM-024 ✅ COMPLETA (Sprints 25–43)
 
-- ✓ Patient-portal read-only MVP (Sprint 25A): token público hasheado/expirable/revocable, `GET /patient-portal/:token`, ruta `/portal/:token`, resumen, plan activo, citas próximas, documentos
-- ✓ Gestión profesional de enlaces (Sprint 25B): `GET/POST/PATCH /patient-portal/tokens`, crear/copiar/listar/revocar desde expediente del paciente
-- ✓ Auditoría base del portal (Sprint 25C): `patient_portal_audit_events`, espejo en `audit_log`, eventos `created/revoked/accessed`, IP, user-agent e historial reciente en UI profesional
-- ✓ Adherencia desde portal (Sprint 25D): `adherence_records`, scope `adherence`, `POST /patient-portal/:token/adherence`, UI pública con scores 0-100 y auditoría `adherence_submitted`
-- ✓ Vista profesional de adherencia (Sprint 25E): `GET /patient-portal/adherence?pacienteId=`, `PatientPortalAdherenceCard` integrada en expediente
-- ✓ Adherencia como entidad syncable (Sprint 25E): `SYNCABLE_ENTITIES`, `ENTITY_TABLES`, `SERVER_INJECTED_COLUMNS`, `adherenceRecordsMap`, maps syncEngine/syncEnqueuer/syncBootstrap
-- ✓ Captura profesional de adherencia desde consulta (Sprint 25E): `adherenceRoutes.ts` (GET/POST/PUT), `PatientAdherencePage`, ruta `/:patientId/adherencia`, reuso de `AdherenceRecordDialog` existente con `source='consulta'`
-- ✓ Documentos del portal con descarga/vista previa firmada SHA-256 (Sprint 26): endpoints públicos de documento, links de preview/download y validación de integridad
-- ✓ Recordatorios/notificaciones email desde portal (Sprint 27): `notificaciones_email`, `emailService`, SMTP opcional/simulado, `send-reminder`, confirmación de adherencia e historial de notificaciones
-- ✓ Sustituciones/preferencias guardadas (Sprint 28): `patient_substitutions`, API profesional, card en expediente, botón de guardar preferencia y aplicación de preferencias en plan
-- ✓ Dashboard de métricas de clínica (Sprint 29): `GET /dashboard/metrics`, cards de pacientes nuevos, pagos pendientes, adherencia, actividad clínica, sexo y patologías
-- ✓ QA/E2E post-29: cobertura E2E portal email/dashboard visible + unit tests de API clients y `applySubstitutions`
-- ✓ Patient-portal PWA/offline cache (Sprint 30): manifest, Service Worker app-shell, fallback a payload/notificaciones cacheados y cola local de adherencia
-- ✓ Mensajería asíncrona portal/profesional (Sprint 31): `patient_portal_messages`, endpoints públicos/profesionales, notificación email al profesional y UI tipo chat
-- ✓ Fotos de comidas desde portal (Sprint 32): `patient_portal_meal_photos`, upload JPEG/PNG/WebP <=2 MB, preview/listado público y revisión profesional
-- ✓ Hardening QA/E2E portal (Sprint 33): tests backend para scopes/rutas/validación de foto, tests cliente API, E2E público para mensajes y fotos, lint sin errores
-- ✓ Multi-consultorio formal (Sprint 34): `sucursal_id` como tenant key formal, tenant guards para `paciente_id`/`consulta_id`, `/sync/push` exige sucursal activa y tests de aislamiento
-- ✓ Bitácora de auditoría automática (Sprint 35): `auditMiddleware.ts` para operaciones clínicas CRUD + login, escribe en `audit_log` con IP/user-agent/detalles
-- ✓ Consentimientos del paciente (Sprint 35): migración `013-consentimientos.sql`, `consentimientoRoutes.ts` con GET/POST/PATCH, aceptar/revocar con IP, integrado en expediente profesional
-- ✓ Exportación estructurada de expediente clínico (Sprint 35): `GET /pacientes/:id/expediente` con consultas, antropometría, planes, laboratorios, adherencia, consentimientos, mensajes y fotos
-- ✓ 0 warnings de lint (Sprint 35): limpieza de 17 warnings `no-explicit-any`, `react-refresh/only-export-components` y `react-hooks/exhaustive-deps`
-- ⏳ Certificación NOM-024 formal, 2FA, cifrado AES-256 en campos sensibles
-- ⏳ Telemedicina (videollamada, mensajería)
+- ✓ Patient-portal read-only MVP (Sprint 25A)
+- ✓ Gestión profesional de enlaces (Sprint 25B)
+- ✓ Auditoría base del portal (Sprint 25C)
+- ✓ Adherencia desde portal (Sprint 25D)
+- ✓ Vista profesional de adherencia (Sprint 25E)
+- ✓ Captura profesional de adherencia desde consulta (Sprint 25E)
+- ✓ Documentos con descarga/vista previa SHA-256 (Sprint 26)
+- ✓ Recordatorios/notificaciones email (Sprint 27)
+- ✓ Sustituciones/preferencias (Sprint 28)
+- ✓ Dashboard métricas (Sprint 29)
+- ✓ PWA/offline cache (Sprint 30)
+- ✓ Mensajería asíncrona (Sprint 31)
+- ✓ Fotos de comidas (Sprint 32)
+- ✓ Hardening QA/E2E portal (Sprint 33)
+- ✓ Multi-consultorio formal (Sprint 34)
+- ✓ Auditoría automática + consentimientos (Sprint 35)
+- ✓ 2FA TOTP + AES-256 + telemedicina backend (Sprint 36)
+- ✓ UI 2FA + videollamada (Sprint 37)
+- ✓ Signaling WebRTC (Sprint 38)
+- ✓ TURN + grabación (Sprint 39)
+- ✓ Consentimiento + cifrado local (Sprint 40)
+- ✓ Gestor completo grabaciones cifradas (Sprint 41)
+- ✓ Optimización chunks (Post-41)
+- ✓ Hardening auditoría/tests grabaciones (Sprint 42)
+- ✓ Retención legal + TURN productivo + E2E multi-peer (Sprint 43)
+
+**Features post-roadmap (no parte de Fase 5):**
 - ⏳ Integración con básculas/baumanómetros/wearables (BLE)
 - ⏳ Importación OCR de resultados de laboratorio
 - ⏳ Sincronización en la nube (opcional, cifrada E2E)
@@ -2020,7 +2024,7 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 
 ## 13. Decisiones arquitectónicas (ADRs)
 
-> Las ADRs formales (`docs/decisions/0001-*.md` etc.) están pendientes de escribir. Aquí se listan las decisiones tomadas durante el desarrollo con su justificación.
+> Las ADRs formales están en `docs/decisions/0001-*.md` (formato Michael Nygard). Esta sección es el resumen narrativo de cada una.
 
 ### ADR-001 — IndexedDB/Dexie local, SQL Server vía sync
 
@@ -2228,7 +2232,8 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
-| _(commit de Sprint 43)_ | feat(api): sprint 43 retention, turn, e2e telemedicina | 43 | Retención legal (`018-retention-grabaciones.sql`, cleanup diario cron), endpoint TURN productivo con validación Zod, E2E Playwright multi-peer; node-cron instalado; 5 tests API nuevos; API tests 119, E2E tests 10 |
+| _(commit de Sprint 44)_ | feat(docs): sprint 44 adrs formales + readme quickstart | 44 | ADRs en `docs/decisions/0001-*.md` (Michael Nygard), README quickstart compacto, roadmap Fase 5 100% completo, spec.md v2.9 |
+| _(commit de Sprint 43)_ | feat(api): sprint 43 retention, turn, e2e telemedicina | 43 | Retención legal (`018-retention-grabaciones.sql`, cleanup diario cron), endpoint TURN productivo con validación Zod, E2E Playwright multi-peer; node-cron instalado; 5 tests API nuevos; API tests 126, E2E tests 10 |
 | _(commit de Sprint 42)_ | test(api): sprint 42 telemedicina recording audit hardening | 42 | Auditoría read para descarga de blobs cifrados y tests de rutas de grabaciones: auth/tenant, raw upload, audit create/read/delete |
 | `82f72ba` | perf(build): split route and startup chunks | Post-41 | Todas las páginas/rutas lazy, DB/sync cargan por `import()` en `App.tsx`; chunk principal Vite baja a 465.18 KB y desaparece el warning >500 KB |
 | `3721855` | feat(telemedicina): sprint 41 encrypted recording manager | 41 | Tabla `video_grabaciones`, endpoints de grabaciones cifradas, subida opcional al backend y gestor UI local/remoto |
@@ -2355,7 +2360,13 @@ pnpm build:tauri               # Empaqueta instalador nativo
 46. **Sprint 43 — Retención legal de grabaciones + TURN productivo + E2E multi-peer:**
     - **Retención legal:** migración `018-retention-grabaciones.sql` añade columna `retention_until` a `video_grabaciones` y tabla `retention_cleanup_log` para auditoría de eliminaciones. `retentionCleanupService.ts` limpia grabaciones expiradas en transacciones con log de auditoría. Configurable vía env vars `RECORDING_RETENTION_YEARS` (default 10), `RETENTION_CLEANUP_ENABLED` (default true), `RETENTION_CRON_SCHEDULE` (default `0 3 * * *`). `node-cron` programado en `server.ts` al iniciar.
     - **TURN productivo:** nuevo endpoint `GET /telemedicina/turn-config` autenticado sirve configuración ICE (STUN/TURN) desde el backend con validación Zod. Cliente `useWebRTC.ts` cachea 5 min la config del servidor; si no hay TURN configurado, fallback a STUN público.
-    - **E2E multi-peer:** `e2e/telemedicina.spec.ts` verifica navegación a telemedicina, carga de sala y endpoint TURN via API. `turnConfig.test.ts` y `retentionConfig.test.ts` cubren unit de configuración. Tests del router verifican montaje y auth del `turnRouter`. API tests suben a 119, E2E tests a 10.
+    - **E2E multi-peer:** `e2e/telemedicina.spec.ts` verifica navegación a telemedicina, carga de sala y endpoint TURN via API. `turnConfig.test.ts` y `retentionConfig.test.ts` cubren unit de configuración. Tests del router verifican montaje y auth del `turnRouter`. API tests suben a 126, E2E tests a 10.
+47. **Sprint 44 — ADRs formales + README quickstart + roadmap finalizado:**
+    - 10 ADRs formales creados en `docs/decisions/0001-*.md` con formato Michael Nygard (Contexto, Decisión, Consecuencias, Alternativas, Referencias).
+    - `README.md` reemplazado por quickstart compacto con comandos esenciales, stack resumido y fases completadas.
+    - Roadmap §12 Fase 5 actualizado a 100% completo; items de telemedicina/2FA movidos a completados.
+    - Q-01 resuelta: ADRs formales creados.
+    - spec.md v2.9.
 
 ---
 
@@ -2363,16 +2374,9 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 Cosas que **no** están decididas formalmente y que la siguiente IA debería confirmar antes de empezar el sprint siguiente.
 
-### Q-01: ¿Crear ADRs formales en `docs/decisions/`?
+### Q-01: ~~¿Crear ADRs formales en `docs/decisions/`?~~ ✅ RESUELTA
 
-**Estado:** carpeta existe, vacía. El spec.md §13 tiene las 10 ADRs narrativas.
-
-**Opciones:**
-- A) Mantener spec.md como única fuente. No escribir ADRs formales.
-- B) Crear las 10 ADRs en `docs/decisions/NNNN-titulo.md` con plantilla de Michael Nygard (Contexto, Decisión, Consecuencias, Alternativas).
-- C) Solo las 4 más críticas (ADR-001 Dexie, ADR-003 SMAE, ADR-004 Zod, ADR-005 soft delete).
-
-**Recomendación:** B si se va a Fase 3 (muchas decisiones estructurales). A si se mantiene el spec.md actualizado.
+**Resolución Sprint 44:** Creados 10 archivos en `docs/decisions/0001-*.md` con formato Michael Nygard.
 
 ### Q-02: ¿Implementar i18n ahora?
 

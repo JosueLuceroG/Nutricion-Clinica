@@ -1,74 +1,35 @@
-# 0002 — Use hash routing for Tauri webview
+# ADR-002: Hash routing para Tauri
 
-* Status: Accepted
-* Date: 2026-05-20
-* Deciders: José Manuel, IA agent
-* Source: `spec.md` §13 ADR-002
+**Estado:** Aceptada · **Contexto:** Sprint 1 · **Última revisión:** Sprint 14
 
-## Context and Problem Statement
+## Contexto
 
-The app will run inside a Tauri webview (Windows: `tauri://`, Linux: `tauri://localhost`,
-macOS: `tauri://`). The browser history API does not behave well with custom protocols
-or `file://` URLs, and we cannot rely on a server rewriting paths.
+Tauri sirve desde `tauri://` (Windows), `tauri://localhost` (Linux) y
+`tauri://localhost` (macOS). La History API de HTML5 no funciona
+correctamente con protocolos personalizados ni con `file://`.
 
-## Decision Drivers
+## Decisión
 
-* Routing must work identically in dev (Vite, `http://localhost:5173`) and in
-  production (Tauri, `tauri://`).
-* Deep links to a specific patient or consultation must survive page reloads.
-* No server-side routing layer (this is a local-first desktop app).
-* Minimal bundle size impact.
+Usar `createHashRouter` de React Router en lugar de
+`createBrowserRouter`.
 
-## Considered Options
+## Consecuencias
 
-* **A) `createHashRouter` (React Router 7)** — URL is `/#/pacientes/{id}`.
-* **B) `createBrowserRouter` (history API)** — URL is `/pacientes/{id}`, requires
-  history fallback config in Tauri.
-* **C) Custom router** — minimal, but reinventing the wheel.
+- **Positivas:** 100% compatible con todos los entornos de Tauri.
+  Sin problemas de ruteo en producción. Sin configuración extra de
+  servidor (fallback a `index.html`).
+- **Negativas:** URLs son `/#/pacientes/{id}` en lugar de
+  `/pacientes/{id}`. Ligeramente menos estéticas, irrelevante en app
+  desktop sin SEO.
 
-## Decision Outcome
+## Alternativas consideradas
 
-Chosen option: **A) `createHashRouter`**, because it works identically in any
-environment (dev, Tauri, static hosting) without requiring Tauri to intercept
-navigation events. SEO is irrelevant (desktop app), so the `#` in URLs is a
-non-issue.
+1. **BrowserRouter con servidor configurado** — funcionaría en dev con
+   Vite pero falla en producción Tauri.
+2. **MemoryRouter** — perderías la navegación por URL (marcadores,
+   compartir enlaces de consulta).
 
-### Positive Consequences
+## Referencias
 
-* Zero environment-specific configuration.
-* Deep links work via plain `<a href="#/pacientes/abc">`.
-* No 404s on page reload (no server rewrite needed).
-* React Router 7 ships with TypeScript types out of the box.
-
-### Negative Consequences
-
-* URLs are uglier (`/#/pacientes/abc` vs `/pacientes/abc`).
-* The `#` fragment is technically a different "page" for analytics tools (irrelevant here).
-* Cannot use the URL path for static asset routing (irrelevant for an SPA).
-
-## Pros and Cons of the Options
-
-### A) `createHashRouter`
-
-* Good, because it works in any environment with no extra config.
-* Good, because React Router 7 supports it as a first-class API.
-* Bad, because URLs have a `#` prefix.
-
-### B) `createBrowserRouter` with Tauri history fallback
-
-* Good, because URLs are prettier.
-* Bad, because Tauri must intercept navigation and serve `index.html` for unknown routes
-  (more moving parts).
-* Bad, because the history API can be flaky inside webviews.
-
-### C) Custom router
-
-* Good, because total control.
-* Bad, because re-implementing nested routes, params, and code splitting is wasteful.
-* Bad, because the React Router team ships fixes for webview edge cases we don't see.
-
-## Links
-
-* ADR source: `spec.md` §13 ADR-002.
-* React Router 7 docs: https://reactrouter.com/start/data/routing
-* Router setup: `src/app/router.tsx`.
+- Especificación §7.2 (Stack técnico)
+- `src/app/router.tsx` — configuración del router
