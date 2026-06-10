@@ -67,7 +67,7 @@ export function RecipeDialog({ open, onOpenChange, onSubmit }: RecipeDialogProps
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label>{t("recipes.category")}</Label>
-                  <Select value={form.watch("category")} onValueChange={(v) => form.setValue("category", v as any)}>
+                  <Select value={form.watch("category")} onValueChange={(v) => form.setValue("category", v as never)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {RECIPE_CATEGORIES.map((c) => (<SelectItem key={c} value={c}>{t(`recipes.category_${c}`, { defaultValue: RecipeCategoryLabel[c] })}</SelectItem>))}
@@ -76,7 +76,7 @@ export function RecipeDialog({ open, onOpenChange, onSubmit }: RecipeDialogProps
                 </div>
                 <div className="grid gap-2">
                   <Label>{t("recipes.difficulty")}</Label>
-                  <Select value={form.watch("difficulty")} onValueChange={(v) => form.setValue("difficulty", v as any)}>
+                  <Select value={form.watch("difficulty")} onValueChange={(v) => form.setValue("difficulty", v as never)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="facil">{t("recipes.difficulty_easy")}</SelectItem>

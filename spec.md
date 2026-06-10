@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 34 completado — multi-consultorio formal con tenant guards para referencias clínicas y sync. Siguiente slice recomendado: NOM-024 avanzada/interoperabilidad o limpieza de warnings/refactor técnico.
+- **Sprint actual:** Sprint 35 completado — NOM-024 avanzada (audit middleware, consentimientos, expediente export) + limpieza de 17 warnings de lint. Siguiente slice recomendado: certificación NOM-024 formal, 2FA, cifrado AES-256 o telemedicina.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -457,13 +457,13 @@ src/modules/
 
 ### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
 
-**Pendiente:** autenticación con Argon2 + 2FA TOTP, RBAC con roles predefinidos (`nutriologa_principal`, `asistente`, `administrador`, `soporte_tecnico`, `auditor`, `facturacion`), cifrado AES-256 en campos sensibles, bitácora de auditoría con retención 5 años (NOM-024), consentimientos del paciente, opt-in para IA.
+**Pendiente:** autenticación con 2FA TOTP, cifrado AES-256 en campos sensibles, opt-in para IA.
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
 ### 3.18 `patient-portal` (Fase 5, ~90% en progreso) — Portal del paciente (PWA)
 
-**Implementado (Sprints 25A-34):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. Sprint 31 añadió mensajería asíncrona paciente-nutrióloga con `patient_portal_messages`, endpoints `GET/POST /patient-portal/:token/messages` con scope `messaging`, endpoints profesionales y notificación email al profesional. Sprint 32 añadió fotos de comidas con `patient_portal_meal_photos`, subida pública `POST /patient-portal/:token/meal-photos`, listado/preview por token, revisión profesional y storage de bytes en SQL Server con SHA-256. Sprint 33 endureció backend, cliente y E2E para scopes, validación de fotos, orden de rutas, envío de mensajes y subida/listado de fotos en portal. Sprint 34 formalizó multi-consultorio usando `sucursal_id` como tenant key, tenant guards para FKs clínicas y `/sync/push` protegido por sucursal activa. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia, mensajería, fotos de comidas y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). **Pendiente:** NOM-024 avanzada/interoperabilidad/certificación, telemedicina, wearables/OCR opcionales.
+**Implementado (Sprints 25A-35):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. Sprint 31 añadió mensajería asíncrona paciente-nutrióloga con `patient_portal_messages`, endpoints `GET/POST /patient-portal/:token/messages` con scope `messaging`, endpoints profesionales y notificación email al profesional. Sprint 32 añadió fotos de comidas con `patient_portal_meal_photos`, subida pública `POST /patient-portal/:token/meal-photos`, listado/preview por token, revisión profesional y storage de bytes en SQL Server con SHA-256. Sprint 33 endureció backend, cliente y E2E para scopes, validación de fotos, orden de rutas, envío de mensajes y subida/listado de fotos en portal. Sprint 34 formalizó multi-consultorio usando `sucursal_id` como tenant key, tenant guards para FKs clínicas y `/sync/push` protegido por sucursal activa. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia, mensajería, fotos de comidas y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). Sprint 35 limpió 17 warnings de lint, implementó audit middleware NOM-024 para bitácora automática de operaciones clínicas + login, migración `013-consentimientos.sql` + API CRUD de consentimientos, y endpoint `GET /pacientes/:id/expediente` para exportación estructurada. **Pendiente:** certificación NOM-024 formal, telemedicina, wearables/OCR opcionales.
 
 ### 3.19 `ai-assist` (Fase 4, planificado) — Sistema de IA
 
@@ -477,7 +477,7 @@ src/modules/
 | **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
 | **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
 | **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
-| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | 🔄 ~95% (Sprint 34: multi-consultorio formal) |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | 🔄 ~97% (Sprint 35: NOM-024 avanzada + lint cleanup) |
 
 ---
 
@@ -2006,7 +2006,11 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 - ✓ Fotos de comidas desde portal (Sprint 32): `patient_portal_meal_photos`, upload JPEG/PNG/WebP <=2 MB, preview/listado público y revisión profesional
 - ✓ Hardening QA/E2E portal (Sprint 33): tests backend para scopes/rutas/validación de foto, tests cliente API, E2E público para mensajes y fotos, lint sin errores
 - ✓ Multi-consultorio formal (Sprint 34): `sucursal_id` como tenant key formal, tenant guards para `paciente_id`/`consulta_id`, `/sync/push` exige sucursal activa y tests de aislamiento
-- ⏳ NOM-024 avanzada: consentimientos, interoperabilidad, retención/certificación formal
+- ✓ Bitácora de auditoría automática (Sprint 35): `auditMiddleware.ts` para operaciones clínicas CRUD + login, escribe en `audit_log` con IP/user-agent/detalles
+- ✓ Consentimientos del paciente (Sprint 35): migración `013-consentimientos.sql`, `consentimientoRoutes.ts` con GET/POST/PATCH, aceptar/revocar con IP, integrado en expediente profesional
+- ✓ Exportación estructurada de expediente clínico (Sprint 35): `GET /pacientes/:id/expediente` con consultas, antropometría, planes, laboratorios, adherencia, consentimientos, mensajes y fotos
+- ✓ 0 warnings de lint (Sprint 35): limpieza de 17 warnings `no-explicit-any`, `react-refresh/only-export-components` y `react-hooks/exhaustive-deps`
+- ⏳ Certificación NOM-024 formal, 2FA, cifrado AES-256 en campos sensibles
 - ⏳ Telemedicina (videollamada, mensajería)
 - ⏳ Integración con básculas/baumanómetros/wearables (BLE)
 - ⏳ Importación OCR de resultados de laboratorio

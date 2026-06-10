@@ -69,7 +69,7 @@ export function MealPlannerPage() {
 
   const handleLoadShoppingList = async (id: string) => {
     const lists = await mealPlannerService.listShoppingLists("all");
-    const list = lists.find((l: any) => l.id === id);
+    const list = lists.find((l) => l.id === id);
     if (!list) return { items: [], name: "" };
     const parsedItems = typeof list.items === "string" ? JSON.parse(list.items) : (list.items ?? []);
     return {

@@ -45,6 +45,7 @@ export function Breadcrumbs({ items, className }: { items: BreadcrumbItem[]; cla
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBreadcrumbsFromParams() {
   const params = useParams();
   return params;

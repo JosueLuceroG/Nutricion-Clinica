@@ -115,7 +115,7 @@ export function GoalDialog({ open, onOpenChange, onSubmit, editingGoal }: GoalDi
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>{t("common.type")}</Label>
-              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as any)}>
+              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(GoalTypeLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`goals.type_${k}`, { defaultValue: v })}</SelectItem>))}
@@ -157,7 +157,7 @@ export function GoalDialog({ open, onOpenChange, onSubmit, editingGoal }: GoalDi
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>{t("goals.priority")}</Label>
-              <Select value={form.watch("priority")} onValueChange={(v) => form.setValue("priority", v as any)}>
+              <Select value={form.watch("priority")} onValueChange={(v) => form.setValue("priority", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(GoalPriorityLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`goals.priority_${k}`, { defaultValue: v })}</SelectItem>))}
@@ -166,7 +166,7 @@ export function GoalDialog({ open, onOpenChange, onSubmit, editingGoal }: GoalDi
             </div>
             <div className="grid gap-2">
               <Label>{t("goals.criterion")}</Label>
-              <Select value={form.watch("criterion")} onValueChange={(v) => form.setValue("criterion", v as any)}>
+              <Select value={form.watch("criterion")} onValueChange={(v) => form.setValue("criterion", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(SuccessCriterionLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`goals.criterion_${k}`, { defaultValue: v })}</SelectItem>))}
@@ -178,7 +178,7 @@ export function GoalDialog({ open, onOpenChange, onSubmit, editingGoal }: GoalDi
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>{t("goals.origin")}</Label>
-              <Select value={form.watch("source")} onValueChange={(v) => form.setValue("source", v as any)}>
+              <Select value={form.watch("source")} onValueChange={(v) => form.setValue("source", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(GoalSourceLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`goals.source_${k}`, { defaultValue: v })}</SelectItem>))}

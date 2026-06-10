@@ -47,7 +47,7 @@ export function ShoppingListDialog({ open, onOpenChange, shoppingListId, loadSho
       map.get(cat)!.push(item);
     }
     return Array.from(map.entries());
-  }, [items]);
+  }, [items, t]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

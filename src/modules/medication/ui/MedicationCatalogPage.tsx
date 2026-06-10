@@ -177,7 +177,7 @@ export function MedicationCatalogPage() {
             </div>
             <div className="grid gap-2">
               <Label>{t("medication.column_route")}</Label>
-              <Select value={form.watch("via_administracion")} onValueChange={(v) => form.setValue("via_administracion", v as any)}>
+              <Select value={form.watch("via_administracion")} onValueChange={(v) => form.setValue("via_administracion", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {MEDICATION_ROUTES.map((r) => (<SelectItem key={r} value={r}>{t(`medication.route_${r}`, { defaultValue: MedicationRouteLabel[r] })}</SelectItem>))}

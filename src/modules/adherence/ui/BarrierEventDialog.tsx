@@ -77,7 +77,7 @@ export function BarrierEventDialog({ open, onOpenChange, patientId: _patientId, 
             </div>
             <div className="grid gap-2">
               <Label>{t("common.type")}</Label>
-              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as any)}>
+              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(BarrierTypeLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`adherence.barrier_type_${k}`, { defaultValue: v })}</SelectItem>))}

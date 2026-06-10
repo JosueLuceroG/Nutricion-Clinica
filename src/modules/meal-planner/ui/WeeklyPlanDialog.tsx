@@ -86,7 +86,7 @@ export function WeeklyPlanDialog({ open, onOpenChange, onSubmit }: WeeklyPlanDia
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label>Tipo</Label>
-              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as any)}>
+              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="daily">Diario</SelectItem>

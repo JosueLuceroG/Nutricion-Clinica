@@ -66,7 +66,7 @@ export function DocumentDialog({ open, onOpenChange, onSubmit }: DocumentDialogP
             </div>
             <div className="grid gap-2">
               <Label>Tipo</Label>
-              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as any)}>
+              <Select value={form.watch("type")} onValueChange={(v) => form.setValue("type", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(DocumentTypeLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{v}</SelectItem>))}

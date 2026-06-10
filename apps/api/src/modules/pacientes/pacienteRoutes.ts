@@ -192,6 +192,75 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+router.get('/:id/expediente', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pacienteId = String(req.params.id);
+    if (!UUID_REGEX.test(pacienteId)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+    const pacienteResult = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<PacienteRow>(`${SELECT_PACIENTE} AND id = @id AND sucursal_id = @sucursal_id`);
+    if (pacienteResult.recordset.length === 0) {
+      res.status(404).json({ error: 'Paciente no encontrado' });
+      return;
+    }
+    const [consultas, antropometrias, planes, labs, adherencia, consentimientos, messages, mealPhotos] = await Promise.all([
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, fecha_consulta, subjective, objective, assessment, plan, created_at FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_consulta DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, fecha, peso, talla, imc, cintura, cadera, porcentaje_grasa, created_at FROM antropometrias WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, nombre, tipo, objetivo_calorico, created_at FROM planes WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, panel, fecha, created_at FROM lab_panels WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, fecha, source, puntuacion FROM adherence_records WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, tipo, titulo, version, aceptado, fecha_aceptacion, created_at FROM consentimientos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, remitente, contenido, leido, created_at FROM patient_portal_messages WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
+      pool.request()
+        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query(`SELECT id, meal_date, meal_slot, caption, adherence_rating, mime_type, created_at FROM patient_portal_meal_photos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY meal_date DESC`),
+    ]);
+    res.json({
+      paciente: rowToPaciente(pacienteResult.recordset[0]),
+      consultas: consultas.recordset,
+      antropometrias: antropometrias.recordset,
+      planes: planes.recordset,
+      laboratorios: labs.recordset,
+      adherencia: adherencia.recordset,
+      consentimientos: consentimientos.recordset,
+      mensajesPortal: messages.recordset,
+      fotosComidasPortal: mealPhotos.recordset,
+      exportadoEn: new Date().toISOString(),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user || !canMutate(req.user.rol)) {
@@ -275,6 +344,9 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
+import consentimientoRouter from './consentimientoRoutes.js';
+
 router.use('/:pacienteId/substitutions', pacienteSubstitutionRouter);
+router.use('/:pacienteId/consentimientos', consentimientoRouter);
 
 export default router;

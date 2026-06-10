@@ -121,7 +121,7 @@ export function AdherenceRecordDialog({ open, onOpenChange, patientId, onSubmit 
             </div>
             <div className="grid gap-2">
               <Label>{t("adherence.source")}</Label>
-              <Select value={form.watch("source")} onValueChange={(v) => form.setValue("source", v as any)}>
+              <Select value={form.watch("source")} onValueChange={(v) => form.setValue("source", v as never)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(AdherenceSourceLabel).map(([k, v]) => (<SelectItem key={k} value={k}>{t(`adherence.source_${k}`, { defaultValue: v })}</SelectItem>))}
