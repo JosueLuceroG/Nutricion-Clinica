@@ -1,9 +1,11 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Circle, Square } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
 import { useWebRTC } from "./useWebRTC";
+import { useCallRecording } from "./useCallRecording";
 
 interface VideoCallRoomProps {
   salaId: string;
@@ -21,6 +23,7 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
   const [mediaError, setMediaError] = React.useState<string | null>(null);
 
   const { remoteStream, peers, connected, startCall: startSignaling, endCall: endSignaling, error: signalingError } = useWebRTC({ salaId, localStream });
+  const { isRecording, error: recordingError, startRecording, stopRecording } = useCallRecording({ salaId, localStream, remoteStream });
 
   React.useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -51,13 +54,14 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
       setLocalStream(stream);
       setInCall(true);
       setMediaError(null);
-      startSignaling();
+      startSignaling(stream);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : "Error al acceder a c\u00e1mara/micr\u00f3fono");
     }
   };
 
   const endCall = () => {
+    if (isRecording) stopRecording();
     endSignaling();
     localStream?.getTracks().forEach((t) => t.stop());
     setLocalStream(null);
@@ -80,6 +84,16 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
   };
 
   const error = mediaError ?? signalingError;
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+      toast.success(t("telemedicina.recording_saved"));
+      return;
+    }
+    const started = startRecording();
+    if (started) toast.success(t("telemedicina.recording_started"));
+  };
 
   return (
     <div className="relative flex h-full flex-col">
@@ -115,6 +129,20 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
                 {connected ? t("telemedicina.connected") : t("telemedicina.connecting")} ({peers.length})
               </span>
             )}
+            {recordingError && (
+              <span className="text-xs text-destructive">
+                {t(`telemedicina.recording_error_${recordingError}`)}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleRecording}
+              className={cn("h-12 w-12 rounded-full", isRecording && "border-destructive bg-destructive/10 text-destructive")}
+              aria-label={isRecording ? t("telemedicina.stop_recording") : t("telemedicina.record")}
+            >
+              {isRecording ? <Square className="h-4 w-4 fill-current" /> : <Circle className="h-5 w-5" />}
+            </Button>
             <Button
               variant="outline"
               size="icon"

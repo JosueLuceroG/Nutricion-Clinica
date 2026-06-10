@@ -2227,7 +2227,14 @@
     "hide_video": "Apagar cámara",
     "show_video": "Encender cámara",
     "connecting": "Conectando...",
-    "connected": "Conectado"
+    "connected": "Conectado",
+    "record": "Grabar sesión",
+    "stop_recording": "Detener grabación",
+    "recording_started": "Grabación iniciada",
+    "recording_saved": "Grabación guardada",
+    "recording_error_unsupported": "Tu navegador no soporta grabación",
+    "recording_error_missing-stream": "Inicia la llamada antes de grabar",
+    "recording_error_start-failed": "No fue posible iniciar la grabación"
   },
   "ai": {
     "title": "Asistente IA",

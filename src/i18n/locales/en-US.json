@@ -2227,7 +2227,14 @@
     "hide_video": "Turn off camera",
     "show_video": "Turn on camera",
     "connecting": "Connecting...",
-    "connected": "Connected"
+    "connected": "Connected",
+    "record": "Record session",
+    "stop_recording": "Stop recording",
+    "recording_started": "Recording started",
+    "recording_saved": "Recording saved",
+    "recording_error_unsupported": "Your browser does not support recording",
+    "recording_error_missing-stream": "Start the call before recording",
+    "recording_error_start-failed": "Could not start recording"
   },
   "ai": {
     "title": "AI Assistant",

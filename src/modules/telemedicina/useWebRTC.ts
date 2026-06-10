@@ -1,12 +1,7 @@
 import * as React from "react";
 import { useAuthStore } from "@store/authStore";
 
-const STUN_SERVERS: RTCConfiguration = {
-  iceServers: [
-    { urls: "stun:stun.l.google.com:19302" },
-    { urls: "stun:stun1.l.google.com:19302" },
-  ],
-};
+const DEFAULT_STUN_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
 
 interface PeerInfo {
   userId: string;
@@ -22,7 +17,7 @@ interface UseWebRtcReturn {
   remoteStream: MediaStream | null;
   peers: PeerInfo[];
   connected: boolean;
-  startCall: () => void;
+  startCall: (stream?: MediaStream) => void;
   endCall: () => void;
   error: string | null;
 }
@@ -31,6 +26,31 @@ function getWsUrl(): string {
   const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
   const base = apiUrl.replace(/^http/, "ws");
   return `${base}/ws/telemedicina`;
+}
+
+function env(): Record<string, string | undefined> {
+  return (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+}
+
+function csv(value: string | undefined): string[] {
+  return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
+}
+
+function buildRtcConfig(): RTCConfiguration {
+  const e = env();
+  const stunUrls = csv(e.VITE_STUN_URLS);
+  const turnUrls = csv(e.VITE_TURN_URLS);
+  const iceServers: RTCIceServer[] = [{ urls: stunUrls.length > 0 ? stunUrls : DEFAULT_STUN_URLS }];
+
+  if (turnUrls.length > 0) {
+    iceServers.push({
+      urls: turnUrls,
+      username: e.VITE_TURN_USERNAME,
+      credential: e.VITE_TURN_CREDENTIAL,
+    });
+  }
+
+  return { iceServers };
 }
 
 export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcReturn {
@@ -42,7 +62,17 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
 
   const wsRef = React.useRef<WebSocket | null>(null);
   const pcRef = React.useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = React.useRef<MediaStream | null>(null);
   const remoteStreamRef = React.useRef<MediaStream | null>(null);
+
+  React.useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
+
+  const assignRemoteStream = React.useCallback((stream: MediaStream | null) => {
+    remoteStreamRef.current = stream;
+    setRemoteStream(stream);
+  }, []);
 
   const cleanup = React.useCallback(() => {
     pcRef.current?.close();
@@ -65,7 +95,8 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
   }, [cleanup]);
 
   const handleSignalingMessage = React.useCallback(async (ws: WebSocket, data: string) => {
-    if (!localStream) return;
+    const currentLocalStream = localStreamRef.current;
+    if (!currentLocalStream) return;
 
     let msg: { type: string; salaId?: string; targetId?: string; payload?: unknown };
     try {
@@ -80,7 +111,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         setPeers(existingPeers);
         setConnected(true);
         if (existingPeers.length > 0) {
-          const pc = createPeerConnection(ws, localStream, setRemoteStream);
+          const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
           pcRef.current = pc;
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -92,7 +123,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         const peer = msg.payload as PeerInfo;
         setPeers((prev) => (prev.some((p) => p.userId === peer.userId) ? prev : [...prev, peer]));
         if (!pcRef.current) {
-          const pc = createPeerConnection(ws, localStream, setRemoteStream);
+          const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
           pcRef.current = pc;
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -109,7 +140,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         break;
       }
       case "offer": {
-        const pc = createPeerConnection(ws, localStream, setRemoteStream);
+        const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
         pcRef.current = pc;
         await pc.setRemoteDescription(new RTCSessionDescription((msg.payload as { sdp: RTCSessionDescription }).sdp));
         const answer = await pc.createAnswer();
@@ -137,18 +168,20 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         break;
       }
     }
-  }, [salaId, localStream]);
+  }, [salaId, assignRemoteStream]);
 
-  const startCall = React.useCallback(() => {
+  const startCall = React.useCallback((stream?: MediaStream) => {
     if (!token) {
       setError("No autenticado");
       return;
     }
-    if (!localStream) {
+    const currentLocalStream = stream ?? localStreamRef.current;
+    if (!currentLocalStream) {
       setError("C\u00e1mara no disponible");
       return;
     }
 
+    localStreamRef.current = currentLocalStream;
     setError(null);
     const ws = new WebSocket(`${getWsUrl()}?token=${encodeURIComponent(token)}`);
     wsRef.current = ws;
@@ -168,7 +201,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
     ws.onclose = () => {
       setConnected(false);
     };
-  }, [token, salaId, localStream, handleSignalingMessage]);
+  }, [token, salaId, handleSignalingMessage]);
 
   const endCall = React.useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -182,10 +215,11 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
 
 function createPeerConnection(
   ws: WebSocket,
+  salaId: string,
   localStream: MediaStream,
   setRemoteStream: (stream: MediaStream | null) => void,
 ): RTCPeerConnection {
-  const pc = new RTCPeerConnection(STUN_SERVERS);
+  const pc = new RTCPeerConnection(buildRtcConfig());
 
   localStream.getTracks().forEach((track) => {
     pc.addTrack(track, localStream);
@@ -193,7 +227,7 @@ function createPeerConnection(
 
   pc.onicecandidate = (event) => {
     if (event.candidate) {
-      ws.send(JSON.stringify({ type: "ice-candidate", payload: { candidate: event.candidate } }));
+      ws.send(JSON.stringify({ type: "ice-candidate", salaId, payload: { candidate: event.candidate } }));
     }
   };
 
