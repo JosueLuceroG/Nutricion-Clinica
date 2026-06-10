@@ -399,7 +399,7 @@ function rowToPortalMessage(row: PortalMessageRow): Record<string, unknown> {
   };
 }
 
-function parseMealPhotoDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+export function parseMealPhotoDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
   const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
   if (!match) return null;
   const mimeType = match[1]!;
@@ -1698,7 +1698,7 @@ router.get('/:token/documents/:documentId/download', async (req: Request, res: R
       });
 
       res.end(fileBuffer);
-    } catch (fetchErr) {
+    } catch {
       res.status(502).json({ error: 'No se pudo recuperar el archivo del almacenamiento externo' });
     }
   } catch (err) {

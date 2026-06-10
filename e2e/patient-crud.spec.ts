@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
 
 /**
@@ -20,7 +20,7 @@ const PATIENT_FIRST = "E2E";
 const PATIENT_LAST = "SmokeTest";
 const SYNC_BUTTON_NAME = /^(Sincronizar|Forzar un ciclo de sync ahora)$/i;
 
-async function forceSync(page: import("@playwright/test").Page) {
+async function forceSync(page: Page) {
   const syncBtn = page.getByRole("button", { name: SYNC_BUTTON_NAME });
   await expect(syncBtn).toBeEnabled({ timeout: 30_000 });
   await syncBtn.click();

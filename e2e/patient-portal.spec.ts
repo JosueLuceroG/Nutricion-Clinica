@@ -71,11 +71,144 @@ test.describe("Patient portal", () => {
     page,
   }) => {
     let adherenceBody: unknown = null;
+    let messageBody: unknown = null;
+    let mealPhotoBody: Record<string, unknown> | null = null;
     let reminderRequests = 0;
     await page.route(
       "http://localhost:3000/patient-portal/**",
       async (route) => {
         const url = route.request().url();
+        if (
+          route.request().method() === "GET" &&
+          url.endsWith("/messages")
+        ) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              messages: [
+                {
+                  id: "msg-1",
+                  tokenId: "token-publico",
+                  pacienteId: "paciente-1",
+                  sucursalId: "sucursal-centro",
+                  profesionalId: "prof-1",
+                  content: "Puedes escribirme tus dudas por aquí.",
+                  direction: "professional_to_patient",
+                  readAt: null,
+                  createdAt: "2026-06-19T09:00:00.000Z",
+                },
+              ],
+            }),
+          });
+          return;
+        }
+
+        if (
+          route.request().method() === "POST" &&
+          url.endsWith("/messages")
+        ) {
+          messageBody = route.request().postDataJSON();
+          await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+              message: {
+                id: "msg-2",
+                tokenId: "token-publico",
+                pacienteId: "paciente-1",
+                sucursalId: "sucursal-centro",
+                profesionalId: null,
+                content: "Tengo una duda sobre mi cena",
+                direction: "patient_to_professional",
+                readAt: null,
+                createdAt: "2026-06-19T09:05:00.000Z",
+              },
+            }),
+          });
+          return;
+        }
+
+        if (
+          route.request().method() === "GET" &&
+          /\/meal-photos\/[^/]+\/image$/.test(new URL(url).pathname)
+        ) {
+          await route.fulfill({
+            status: 200,
+            contentType: "image/png",
+            body: Buffer.from(
+              "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+              "base64",
+            ),
+          });
+          return;
+        }
+
+        if (
+          route.request().method() === "GET" &&
+          url.endsWith("/meal-photos")
+        ) {
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              mealPhotos: [
+                {
+                  id: "meal-photo-1",
+                  tokenId: "token-publico",
+                  pacienteId: "paciente-1",
+                  sucursalId: "sucursal-centro",
+                  mealDate: "2026-06-19",
+                  mealSlot: "breakfast",
+                  caption: "Avena con fruta",
+                  adherenceRating: 4,
+                  mimeType: "image/png",
+                  fileName: "desayuno.png",
+                  sizeBytes: 128,
+                  sha256: "a".repeat(64),
+                  reviewedAt: null,
+                  reviewedByProfesionalId: null,
+                  createdAt: "2026-06-19T08:00:00.000Z",
+                  updatedAt: "2026-06-19T08:00:00.000Z",
+                },
+              ],
+            }),
+          });
+          return;
+        }
+
+        if (
+          route.request().method() === "POST" &&
+          url.endsWith("/meal-photos")
+        ) {
+          mealPhotoBody = route.request().postDataJSON() as Record<string, unknown>;
+          await route.fulfill({
+            status: 201,
+            contentType: "application/json",
+            body: JSON.stringify({
+              mealPhoto: {
+                id: "meal-photo-2",
+                tokenId: "token-publico",
+                pacienteId: "paciente-1",
+                sucursalId: "sucursal-centro",
+                mealDate: "2026-06-19",
+                mealSlot: mealPhotoBody.mealSlot,
+                caption: mealPhotoBody.caption,
+                adherenceRating: mealPhotoBody.adherenceRating,
+                mimeType: "image/jpeg",
+                fileName: "cena.jpg",
+                sizeBytes: 4,
+                sha256: "b".repeat(64),
+                reviewedAt: null,
+                reviewedByProfesionalId: null,
+                createdAt: "2026-06-19T21:00:00.000Z",
+                updatedAt: "2026-06-19T21:00:00.000Z",
+              },
+            }),
+          });
+          return;
+        }
+
         if (
           route.request().method() === "GET" &&
           url.endsWith("/notifications")
@@ -146,6 +279,8 @@ test.describe("Patient portal", () => {
                 "appointments",
                 "documents",
                 "adherence",
+                "messaging",
+                "meal_photos",
               ],
             },
             patient: {
@@ -227,9 +362,35 @@ test.describe("Patient portal", () => {
     await expect(page.getByText("Seguimiento mensual")).toBeVisible();
     await expect(page.getByText("receta-nutricional.pdf")).toBeVisible();
     await expect(page.getByText("Registro rápido de adherencia")).toBeVisible();
+    await expect(page.getByText("Fotos de comidas").first()).toBeVisible();
+    await expect(page.getByText("Avena con fruta")).toBeVisible();
+    await expect(page.getByText("Mensajes con tu nutrióloga")).toBeVisible();
+    await expect(page.getByText("Puedes escribirme tus dudas por aquí.")).toBeVisible();
     await expect(
       page.getByText("Recordatorio de cita - NutriClínica"),
     ).toBeVisible();
+
+    await page.getByPlaceholder("Escribe tu mensaje...").fill("Tengo una duda sobre mi cena");
+    await page.getByPlaceholder("Escribe tu mensaje...").press("Enter");
+    await expect(page.getByText("Tengo una duda sobre mi cena")).toBeVisible();
+    expect(messageBody).toMatchObject({ content: "Tengo una duda sobre mi cena" });
+
+    await page.locator("#portal-meal-photo-file").setInputFiles({
+      name: "cena.jpg",
+      mimeType: "image/jpeg",
+      buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+    });
+    await page.getByLabel("Descripción o comentarios").fill("Cena con verduras");
+    await page.locator("#portal-meal-photo-rating").fill("5");
+    await page.getByRole("button", { name: /Enviar comida/i }).click();
+    await expect(page.getByText(/Comida enviada/i)).toBeVisible();
+    expect(mealPhotoBody).toMatchObject({
+      mealSlot: "breakfast",
+      caption: "Cena con verduras",
+      adherenceRating: 5,
+      fileName: "cena.jpg",
+    });
+    expect(String(mealPhotoBody?.photoDataUrl)).toContain("data:image/jpeg;base64,");
 
     await page
       .getByRole("button", { name: /Enviar recordatorio por correo/i })
