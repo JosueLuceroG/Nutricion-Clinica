@@ -178,14 +178,54 @@ export class Recipe {
   }
 }
 
-export function calculateNutrition(ingredients: RecipeIngredient[]): { kcal: number; proteinG: number; carbsG: number; fatG: number } {
+export interface FoodNutrition {
+  kcal: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  servingGrams: number;
+}
+
+export function calculateNutrition(
+  ingredients: RecipeIngredient[],
+  foodLookup: (equivalentId: string) => FoodNutrition | null,
+): { kcal: number; proteinG: number; carbsG: number; fatG: number } {
   const total = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 };
   for (const ing of ingredients) {
-    const servings = ing.weightG ? ing.weightG / 100 : ing.quantity;
-    total.kcal += servings * 0;
-    total.proteinG += servings * 0;
-    total.carbsG += servings * 0;
-    total.fatG += servings * 0;
+    if (!ing.equivalentId) continue;
+    const food = foodLookup(ing.equivalentId);
+    if (!food) continue;
+    const servings = (ing.weightG ?? 0) > 0
+      ? (ing.weightG ?? 0) / food.servingGrams
+      : ing.quantity;
+    total.kcal += servings * food.kcal;
+    total.proteinG += servings * food.proteinG;
+    total.carbsG += servings * food.carbsG;
+    total.fatG += servings * food.fatG;
   }
   return total;
+}
+
+export function deriveAllergensFromFoods(
+  ingredients: RecipeIngredient[],
+  foodLookup: (equivalentId: string) => { group: string; keywords: readonly string[] } | null,
+): string[] {
+  const found = new Set<string>();
+  for (const ing of ingredients) {
+    if (!ing.equivalentId) continue;
+    const food = foodLookup(ing.equivalentId);
+    if (!food) continue;
+    if (food.group.startsWith("leche-")) found.add("leche");
+    if (food.group.startsWith("aoa-")) {
+      if (food.keywords.some((k) => k.includes("huevo"))) found.add("huevo");
+      if (food.keywords.some((k) => k.includes("pescado"))) found.add("pescado");
+      if (food.keywords.some((k) => k.includes("mariscos"))) found.add("mariscos");
+    }
+    if (food.keywords.some((k) => k.includes("gluten"))) found.add("gluten");
+    if (food.keywords.some((k) => k.includes("soya"))) found.add("soya");
+    if (food.keywords.some((k) => k.includes("cacahuate"))) found.add("cacahuate");
+    if (food.keywords.some((k) => k.includes("nueces") || k === "nuez")) found.add("nueces");
+    if (food.keywords.some((k) => k.includes("sesamo"))) found.add("sesamo");
+  }
+  return Array.from(found);
 }

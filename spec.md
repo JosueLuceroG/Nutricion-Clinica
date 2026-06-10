@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.12
-**Última actualización:** Sprint 47 — Cloud sync E2E: pull pagination + sync_meta Dexie + gzip ✅
-**Estado del proyecto:** Sprints 1-44 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~440 archivos TS/TSX · ~2.2MB código fuente · 77 archivos de test frontend · 998 tests frontend · 126 tests API · 10 E2E tests
+**Versión del documento:** 2.13
+**Última actualización:** Sprint 48 — Recetas SMAE + Reportes Recharts + Indicadores CRUD ✅
+**Estado del proyecto:** Sprints 1-48 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~445 archivos TS/TSX · ~2.3MB código fuente · 77 archivos de test frontend · 998 tests frontend · 126 tests API · 10 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 47 completado — Cloud sync E2E: `syncEngine.ts` con pull pagination loop (while `hasMore`/`nextSince`), tabla `sync_meta` en Dexie v26 (`SyncMetaRow`), migración de `lastPullAt` de localStorage a Dexie (durable, no se pierde al limpiar cache), compresión `Accept-Encoding: gzip` en `httpClient.ts`, `SyncEngineDeps` soporta `getLastPullAt`/`setLastPullAt` asíncronos.
+- **Sprint actual:** Sprint 48 completado — Recetas SMAE + Reportes Recharts + Indicadores CRUD + Chef AI: `calculateNutrition()` en `Recipe.ts` con SMAE `foodLookup` (cálculo real de kcal/proteína/carbs/grasa), `deriveAllergensFromFoods()` (auto-alérgenos desde grupo/keywords SMAE), `recipeService.ts` con `listWithNutrition()` y cache lazy de SMAE, `RecipeDialog.tsx` con `IngredientFoodSearch` popover, `RecipeCard.tsx` con nutrientes mostrados. Reportes: gráficas Recharts (PieChart patologías, BarChart tendencias consultas) en `ReportsPage.tsx`, `IndicatorDialog.tsx` CRUD para crear/editar/eliminar indicadores. Chef AI: `chefService.ts` con integración OpenAI (gpt-4o-mini), `ChefDialog.tsx` con formulario de parámetros, vista previa de resultados y botón "Aplicar plan", integrado en `MealPlannerPage`. i18n ES/EN para todos los nuevos labels. spec.md v2.13.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -2232,6 +2232,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| _(commits de Sprint 48)_ | feat(s48): recetas smae + reportes recharts + indicadores crud + chef ai | 48 | calculateNutrition() con SMAE foodLookup, deriveAllergensFromFoods(), listWithNutrition(), IngredientFoodSearch popover, RecipeCard nutrientes, Recharts (PieChart+BarChart) en ReportsPage, IndicatorDialog CRUD, ChefDialog con OpenAI gpt-4o-mini + preview + aplicar plan, i18n ES/EN, spec.md v2.13 |
 | _(commit de Sprint 47)_ | feat(sync): sprint 47 cloud sync e2e pagination + sync_meta + gzip | 47 | Pull pagination loop (while hasMore/nextSince) en syncEngine.ts, tabla sync_meta Dexie v26 (SyncMetaRow), lastPullAt migrado de localStorage a Dexie (durable), gzip Accept-Encoding en httpClient.ts, spec.md v2.12 |
 | _(commit de Sprint 46)_ | feat(ocr): sprint 46 OCR laboratorios tesseract | 46 | Tesseract.js v7 con spa+eng, ocrService con progreso, labOcrParser con 24 patrones y 13 tests, ScanLabPanelPage con upload/review/apply, ruta /:patientId/laboratorio/scan, botón escanear en PatientLabPage, LabPanelForm acepta initialResults, i18n ES/EN OCR, spec.md v2.11 |
 | _(commit de Sprint 45)_ | chore(housekeeping): sprint 45 knip + tree-shake + ci hardening | 45 | knip config + script, 9 unused deps removidas (framer-motion, @tanstack/react-virtual, vaul, @tailwindcss/forms, @tailwindcss/typography, @testing-library/user-event, @types/i18next, msw, @types/uuid), tree-shake manualChunks, CI timeout-minutes + conditional sourcemap, spec.md v2.10 |

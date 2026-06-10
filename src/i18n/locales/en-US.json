@@ -948,7 +948,22 @@
     "status_draft": "Draft",
     "status_active": "Active",
     "status_completed": "Completed",
-    "status_cancelled": "Cancelled"
+    "status_cancelled": "Cancelled",
+    "chef_button": "AI Chef",
+    "chef_title": "AI Meal Plan Generator",
+    "chef_macro_hint": "Macros objetivo: {{protein}}g proteína, {{fat}}g grasa, {{carbs}}g carbohidratos ({{kcal}} kcal)",
+    "chef_result_title": "Resultado sugerido:",
+    "chef_applied": "Plan generado por IA aplicado correctamente",
+    "target_kcal": "Target kcal",
+    "meals_per_day": "Meals/day",
+    "restrictions": "Restrictions",
+    "restrictions_placeholder": "diabetes, hipertensión, alergias...",
+    "preferences": "Preferences",
+    "preferences_placeholder": "prefiere pollo, no le gusta el pescado...",
+    "generate_with_ai": "Generate with AI",
+    "generating": "Generating...",
+    "day_number": "Day {{n}}",
+    "apply_plan": "Apply plan"
   },
   "billing": {
     "title": "Billing",
@@ -1050,7 +1065,18 @@
     "kpi_avg_bmi": "Avg BMI",
     "period": "Period",
     "generated_on": "Generated on {{date}}",
-    "generate_error": "Error generating report"
+    "generate_error": "Error generating report",
+    "pathology_distribution": "Pathology Distribution",
+    "consultation_trends": "Consultation Trends",
+    "consultations": "Consultations",
+    "payments": "Payments",
+    "new_indicator": "New Indicator",
+    "edit_indicator": "Edit Indicator",
+    "description_label": "Description",
+    "category_label": "Category",
+    "unit_label": "Unit",
+    "calculation_type": "Calculation Type",
+    "refresh_frequency": "Refresh Frequency"
   },
   "settings": {
     "title": "Settings",
@@ -1500,7 +1526,11 @@
     "cancel": "Cancel",
     "ingredients_count": "{{n}} ingredients",
     "time_min": "{{n}} min",
-    "servings_count": "{{n}} servings"
+    "servings_count": "{{n}} servings",
+    "kcal": "Calories",
+    "protein": "Protein",
+    "carbs": "Carbs",
+    "fat": "Fat"
   },
   "documents": {
     "title": "Documents",

@@ -6,9 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
 import { Skeleton } from "@components/ui/skeleton";
-import { Plus, ShoppingCart } from "lucide-react";
+import { Plus, ShoppingCart, ChefHat } from "lucide-react";
 import { WeeklyPlanDialog } from "@modules/meal-planner/ui/WeeklyPlanDialog";
 import { ShoppingListDialog } from "@modules/meal-planner/ui/ShoppingListDialog";
+import { ChefDialog } from "@modules/meal-planner/ui/ChefDialog";
 import type { WeeklyPlan } from "@modules/meal-planner/domain/WeeklyPlan";
 import type { MealPlannerFormInput } from "@modules/meal-planner/application/mealPlannerFormSchema";
 
@@ -53,6 +54,7 @@ export function MealPlannerPage() {
   const { plans, loading, refresh } = useWeeklyPlans();
   const { create } = useCreateWeeklyPlan();
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [chefDialogOpen, setChefDialogOpen] = React.useState(false);
   const [shoppingListDialogOpen, setShoppingListDialogOpen] = React.useState(false);
   const [shoppingListPlanId, setShoppingListPlanId] = React.useState("");
 
@@ -86,13 +88,54 @@ export function MealPlannerPage() {
             <h1 className="text-xl font-semibold">{t("meal_planner.title")}</h1>
             <p className="text-sm text-muted-foreground">{t("meal_planner.plan_count", { count: plans.length })}</p>
           </div>
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" /> {t("meal_planner.create_plan")}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setChefDialogOpen(true)}>
+              <ChefHat className="mr-1 h-4 w-4 text-orange-500" /> {t("meal_planner.chef_button")}
+            </Button>
+            <Button onClick={() => setDialogOpen(true)}>
+              <Plus className="mr-1 h-4 w-4" /> {t("meal_planner.create_plan")}
+            </Button>
+          </div>
         </div>
       </div>
 
       <WeeklyPlanDialog open={dialogOpen} onOpenChange={setDialogOpen} onSubmit={handleCreatePlan} />
+
+      <ChefDialog
+        open={chefDialogOpen}
+        onOpenChange={setChefDialogOpen}
+        onApply={async (payload) => {
+          const today = new Date();
+          const startDate = today.toISOString().slice(0, 10);
+          const endDate = new Date(today.getTime() + (payload.daysCount - 1) * 86400000).toISOString().slice(0, 10);
+          await create({
+            name: `Plan generado por IA (${startDate})`,
+            type: payload.daysCount <= 7 ? "weekly" as const : "biweekly" as const,
+            startDate,
+            endDate,
+            targetKcal: payload.targetKcal,
+            targetProteinPct: 20,
+            targetFatPct: 25,
+            targetCarbPct: 55,
+            targetFiberG: 25,
+            timesPerDay: payload.timesPerDay,
+            restrictions: payload.restrictions,
+            professionalId: "chef-ai",
+            patientId: "all",
+            days: payload.days.map((d, i) => ({
+              dayNumber: d.dayNumber,
+              date: new Date(today.getTime() + i * 86400000).toISOString().slice(0, 10),
+              meals: d.meals.map((m) => ({
+                slot: m.slot,
+                exchanges: m.foods.map((f) => ({ count: 1, foodId: f })),
+                targetKcal: Math.round(payload.targetKcal / payload.timesPerDay),
+              })),
+              notes: "",
+            })),
+          });
+          await refresh();
+        }}
+      />
 
       <ShoppingListDialog
         open={shoppingListDialogOpen}

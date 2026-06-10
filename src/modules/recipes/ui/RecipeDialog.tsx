@@ -11,7 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@components/ui/scroll-area";
 import { RecipeFormSchema, type RecipeFormInput } from "../application/recipeFormSchema";
 import { RECIPE_CATEGORIES, RecipeCategoryLabel } from "../domain/RecipeTypes";
-import { Plus, Trash2, GripVertical } from "lucide-react";
+import { Plus, Trash2, GripVertical, Search } from "lucide-react";
+import { useSmaeFoods } from "@modules/smae/ui/useSmaeHooks";
+import { Badge } from "@components/ui/badge";
+import { FoodGroupLabel } from "@modules/smae/domain";
 
 interface RecipeDialogProps {
   open: boolean;
@@ -116,7 +119,17 @@ export function RecipeDialog({ open, onOpenChange, onSubmit }: RecipeDialogProps
                   <div key={field.id} className="mb-2 flex items-start gap-2 rounded border p-2">
                     <GripVertical className="mt-2 h-4 w-4 shrink-0 text-muted-foreground" />
                     <div className="grid flex-1 grid-cols-3 gap-2">
-                      <Input placeholder={t("common.name")} {...form.register(`ingredients.${idx}.name`)} />
+                      <div className="relative">
+                        <Input placeholder={t("common.name")} {...form.register(`ingredients.${idx}.name`)} />
+                        <IngredientFoodSearch
+                          onSelect={(food) => {
+                            form.setValue(`ingredients.${idx}.equivalentId`, food.id);
+                            form.setValue(`ingredients.${idx}.name`, food.name);
+                            form.setValue(`ingredients.${idx}.unit`, "porción");
+                            form.setValue(`ingredients.${idx}.weightG`, food.servingGrams);
+                          }}
+                        />
+                      </div>
                       <Input type="number" step="0.01" placeholder={t("recipes.quantity_abbr")} {...form.register(`ingredients.${idx}.quantity`, { valueAsNumber: true })} />
                       <Input placeholder={t("recipes.unit")} {...form.register(`ingredients.${idx}.unit`)} />
                     </div>
@@ -175,6 +188,50 @@ export function RecipeDialog({ open, onOpenChange, onSubmit }: RecipeDialogProps
             </div>
           </div>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function IngredientFoodSearch({ onSelect }: { onSelect: (food: { id: string; name: string; servingGrams: number }) => void }) {
+  const [q, setQ] = React.useState("");
+  const [open, setOpen] = React.useState(false);
+  const { data, loading } = useSmaeFoods({ q: q || undefined });
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6" onClick={() => setOpen(true)} title="Buscar en catálogo SMAE">
+        <Search className="h-3 w-3" />
+      </Button>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Buscar alimento SMAE</DialogTitle>
+        </DialogHeader>
+        <Input ref={inputRef} autoFocus placeholder="Escribe nombre del alimento..." value={q} onChange={(e) => setQ(e.target.value)} className="mb-2" />
+        <ScrollArea className="h-[300px]">
+          {loading ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">Buscando...</p>
+          ) : !data || data.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">Sin resultados</p>
+          ) : (
+            <div className="space-y-1">
+              {data.map((food) => (
+                <button key={food.id} type="button" onClick={() => { onSelect({ id: food.id, name: food.name, servingGrams: food.servingGrams }); setOpen(false); setQ(""); }} className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left hover:bg-muted">
+                  <div>
+                    <p className="text-sm font-medium">{food.name}</p>
+                    <p className="text-xs text-muted-foreground">{food.serving} ({food.servingGrams}g)</p>
+                  </div>
+                  <Badge variant="outline" className="text-xs">{FoodGroupLabel[food.group]}</Badge>
+                </button>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

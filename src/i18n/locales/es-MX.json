@@ -948,7 +948,22 @@
     "status_draft": "Borrador",
     "status_active": "Activo",
     "status_completed": "Completado",
-    "status_cancelled": "Cancelado"
+    "status_cancelled": "Cancelado",
+    "chef_button": "Cocinar con IA",
+    "chef_title": "Generador de planes con IA",
+    "chef_macro_hint": "Macros objetivo: {{protein}}g proteína, {{fat}}g grasa, {{carbs}}g carbohidratos ({{kcal}} kcal)",
+    "chef_result_title": "Resultado sugerido:",
+    "chef_applied": "Plan generado por IA aplicado correctamente",
+    "target_kcal": "Kcal objetivo",
+    "meals_per_day": "Comidas/día",
+    "restrictions": "Restricciones",
+    "restrictions_placeholder": "diabetes, hipertensión, alergias...",
+    "preferences": "Preferencias",
+    "preferences_placeholder": "prefiere pollo, no le gusta el pescado...",
+    "generate_with_ai": "Generar con IA",
+    "generating": "Generando...",
+    "day_number": "Día {{n}}",
+    "apply_plan": "Aplicar plan"
   },
   "billing": {
     "title": "Facturación",
@@ -1050,7 +1065,18 @@
     "kpi_avg_bmi": "IMC promedio",
     "period": "Periodo",
     "generated_on": "Generado el {{date}}",
-    "generate_error": "Error al generar reporte"
+    "generate_error": "Error al generar reporte",
+    "pathology_distribution": "Distribución de patologías",
+    "consultation_trends": "Tendencia de consultas",
+    "consultations": "Consultas",
+    "payments": "Pagos",
+    "new_indicator": "Nuevo indicador",
+    "edit_indicator": "Editar indicador",
+    "description_label": "Descripción",
+    "category_label": "Categoría",
+    "unit_label": "Unidad",
+    "calculation_type": "Tipo de cálculo",
+    "refresh_frequency": "Frecuencia de actualización"
   },
   "settings": {
     "title": "Configuración",
@@ -1500,7 +1526,11 @@
     "cancel": "Cancelar",
     "ingredients_count": "{{n}} ingredientes",
     "time_min": "{{n}} min",
-    "servings_count": "{{n}} porciones"
+    "servings_count": "{{n}} porciones",
+    "kcal": "Calorías",
+    "protein": "Proteína",
+    "carbs": "Carbohidratos",
+    "fat": "Grasa"
   },
   "documents": {
     "title": "Documentos",

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { Indicator } from "../domain/Indicator";
+import type { Indicator, IndicatorProps } from "../domain/Indicator";
 import type { IndicatorId } from "../domain/IndicatorId";
 import type { IndicatorValue } from "../domain/IndicatorValue";
 import type { GeneratedReport } from "../domain/GeneratedReport";
@@ -7,6 +7,9 @@ import type { GeneratedReport } from "../domain/GeneratedReport";
 export interface ReportService {
   listIndicators(): Promise<Indicator[]>;
   getIndicatorValues(indicatorId: IndicatorId): Promise<IndicatorValue[]>;
+  createIndicator(input: Omit<IndicatorProps, "id" | "createdAt" | "updatedAt" | "isActive"> & { isActive?: boolean }): Promise<Indicator>;
+  updateIndicator(id: IndicatorId, input: Partial<IndicatorProps>): Promise<Indicator>;
+  deleteIndicator(id: IndicatorId): Promise<void>;
   generateReport(params: {
     title: string;
     type: "operativo" | "financiero" | "kpi" | "regulatorio";

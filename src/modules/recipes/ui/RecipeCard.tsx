@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { RecipeCategory } from "../domain/RecipeTypes";
 import { Badge } from "@components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
-import { Clock, Users, ChefHat, AlertCircle } from "lucide-react";
+import { Clock, Users, ChefHat, AlertCircle, Flame, Beef, Wheat, Droplets } from "lucide-react";
 
 interface RecipeCardProps {
   id: string;
@@ -13,6 +13,10 @@ interface RecipeCardProps {
   totalTimeMin: number;
   status: string;
   ingredientCount: number;
+  kcal?: number;
+  proteinG?: number;
+  carbsG?: number;
+  fatG?: number;
   onClick?: () => void;
 }
 
@@ -34,7 +38,7 @@ const difficultyLabelKey: Record<string, string> = {
   dificil: "recipes.difficulty_hard",
 };
 
-export function RecipeCard({ name, category, difficulty, servings, totalTimeMin, status, ingredientCount, onClick }: RecipeCardProps) {
+export function RecipeCard({ name, category, difficulty, servings, totalTimeMin, status, ingredientCount, kcal, proteinG, carbsG, fatG, onClick }: RecipeCardProps) {
   const { t } = useTranslation();
   return (
     <button type="button" onClick={onClick} className="w-full text-left">
@@ -71,6 +75,26 @@ export function RecipeCard({ name, category, difficulty, servings, totalTimeMin,
               {t("recipes.ingredients_abbr", { count: ingredientCount })}
             </span>
           </div>
+          {kcal !== undefined && (
+            <div className="mt-2 flex items-center gap-3 border-t pt-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1" title={t("recipes.kcal")}>
+                <Flame className="h-3 w-3 text-orange-500" />
+                {Math.round(kcal)} kcal
+              </span>
+              <span className="flex items-center gap-1" title={t("recipes.protein")}>
+                <Beef className="h-3 w-3 text-red-500" />
+                {Math.round(proteinG ?? 0)}g
+              </span>
+              <span className="flex items-center gap-1" title={t("recipes.carbs")}>
+                <Wheat className="h-3 w-3 text-amber-500" />
+                {Math.round(carbsG ?? 0)}g
+              </span>
+              <span className="flex items-center gap-1" title={t("recipes.fat")}>
+                <Droplets className="h-3 w-3 text-blue-500" />
+                {Math.round(fatG ?? 0)}g
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </button>

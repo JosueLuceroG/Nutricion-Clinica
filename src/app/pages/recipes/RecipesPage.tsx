@@ -6,6 +6,7 @@ import { Input } from "@components/ui/input";
 import { RecipeCard } from "@modules/recipes/ui/RecipeCard";
 import { RecipeDialog } from "@modules/recipes/ui/RecipeDialog";
 import { useRecipes, useCreateRecipe } from "@modules/recipes/ui/useRecipeHooks";
+import { recipeService } from "@services/recipeService";
 import type { RecipeFormInput } from "@modules/recipes/application/recipeFormSchema";
 
 export function RecipesPage() {
@@ -14,6 +15,21 @@ export function RecipesPage() {
   const { create } = useCreateRecipe();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [recipesWithNutrition, setRecipesWithNutrition] = React.useState<Record<string, { kcal: number; proteinG: number; carbsG: number; fatG: number }>>({});
+
+  React.useEffect(() => {
+    if (recipes.length === 0) return;
+    let cancelled = false;
+    recipeService.listWithNutrition().then((enriched) => {
+      if (cancelled) return;
+      const map: Record<string, { kcal: number; proteinG: number; carbsG: number; fatG: number }> = {};
+      for (const r of enriched) {
+        map[r.id] = { kcal: (r as typeof enriched[0]).kcal, proteinG: (r as typeof enriched[0]).proteinG, carbsG: (r as typeof enriched[0]).carbsG, fatG: (r as typeof enriched[0]).fatG };
+      }
+      setRecipesWithNutrition(map);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [recipes]);
 
   const filtered = React.useMemo(() => {
     if (!search.trim()) return recipes;
@@ -73,6 +89,7 @@ export function RecipesPage() {
                 totalTimeMin={r.totalTimeMin}
                 status={r.status}
                 ingredientCount={r.ingredients.length}
+                {...(recipesWithNutrition[r.id] ?? {})}
               />
             ))}
           </div>
