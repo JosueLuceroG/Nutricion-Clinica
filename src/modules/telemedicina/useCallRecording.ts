@@ -4,7 +4,15 @@ import {
   type TelemedicinaRecordingSummary,
 } from "./recordingStorageService";
 
-type RecordingError = "unsupported" | "missing-stream" | "start-failed" | "save-failed" | "download-failed";
+type RecordingError =
+  | "unsupported"
+  | "missing-stream"
+  | "start-failed"
+  | "save-failed"
+  | "download-failed"
+  | "delete-failed"
+  | "upload-failed"
+  | "remote-delete-failed";
 
 interface UseCallRecordingOptions {
   salaId: string;
@@ -21,6 +29,10 @@ interface UseCallRecordingReturn {
   startRecording: (consentAcceptedAt: string) => boolean;
   stopRecording: () => void;
   downloadRecording: (id: string) => Promise<boolean>;
+  deleteRecording: (id: string) => Promise<boolean>;
+  uploadRecording: (id: string) => Promise<boolean>;
+  deleteRemoteRecording: (id: string) => Promise<boolean>;
+  refreshRecordings: () => Promise<void>;
 }
 
 export function useCallRecording({
@@ -127,7 +139,55 @@ export function useCallRecording({
     }
   }, []);
 
-  return { isRecording, isSaving, error, recordings, lastSavedRecording, startRecording, stopRecording, downloadRecording };
+  const deleteRecording = React.useCallback(async (id: string) => {
+    try {
+      await recordingStorageService.deleteLocal(id);
+      await refreshRecordings();
+      return true;
+    } catch {
+      setError("delete-failed");
+      return false;
+    }
+  }, [refreshRecordings]);
+
+  const uploadRecording = React.useCallback(async (id: string) => {
+    try {
+      const uploaded = await recordingStorageService.uploadRemote(id);
+      if (!uploaded) return false;
+      await refreshRecordings();
+      return true;
+    } catch {
+      setError("upload-failed");
+      return false;
+    }
+  }, [refreshRecordings]);
+
+  const deleteRemoteRecording = React.useCallback(async (id: string) => {
+    try {
+      const deleted = await recordingStorageService.deleteRemote(id);
+      if (!deleted) return false;
+      await refreshRecordings();
+      return true;
+    } catch {
+      setError("remote-delete-failed");
+      return false;
+    }
+  }, [refreshRecordings]);
+
+  return {
+    isRecording,
+    isSaving,
+    error,
+    recordings,
+    lastSavedRecording,
+    startRecording,
+    stopRecording,
+    downloadRecording,
+    deleteRecording,
+    uploadRecording,
+    deleteRemoteRecording,
+    refreshRecordings,
+  };
 }
 
 function buildRecordingStream(localStream: MediaStream | null, remoteStream: MediaStream | null): MediaStream | null {

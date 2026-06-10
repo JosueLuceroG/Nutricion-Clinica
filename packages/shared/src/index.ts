@@ -172,3 +172,18 @@ export interface TelemedicinaSalaDTO {
   notas: string | null;
   createdAt: string;
 }
+
+export interface TelemedicinaGrabacionDTO {
+  id: string;
+  salaId: string;
+  sucursalId: string;
+  createdBy: string;
+  createdAt: string;
+  durationMs: number;
+  mimeType: string;
+  originalSizeBytes: number;
+  encryptedSizeBytes: number;
+  iv: string;
+  consentAcceptedAt: string;
+  consentTextVersion: string;
+}

@@ -51,6 +51,8 @@ export interface TelemedicinaRecordingRow {
   encrypted_blob: Blob;
   consent_accepted_at: string;
   consent_text_version: string;
+  remote_id?: string | null;
+  remote_uploaded_at?: string | null;
 }
 
 const PATIENT_STORES = [

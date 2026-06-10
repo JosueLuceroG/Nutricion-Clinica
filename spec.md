@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.5
-**Última actualización:** Sprint 34 — multi-consultorio formal / tenant guard clínico ✅
-**Estado del proyecto:** Sprints 1-34 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 ~95% 🔄** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 109 tests API · 8 E2E tests
+**Versión del documento:** 2.6
+**Última actualización:** Sprint 41 — gestor completo de grabaciones cifradas de telemedicina ✅
+**Estado del proyecto:** Sprints 1-41 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 ~99% 🔄** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 109 tests API · 8 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 40 completado — consentimiento explícito antes de grabar, almacenamiento local cifrado de grabaciones (`telemedicina_recordings` en IndexedDB, AES-GCM con clave local por usuario), descarga bajo demanda de grabaciones descifradas, y UI para conteo/descarga de grabaciones cifradas por sala. Siguiente slice recomendado: gestión de grabaciones (listado completo/eliminación) + subida cifrada opcional al backend.
+- **Sprint actual:** Sprint 41 completado — gestor completo de grabaciones de telemedicina: listado local/remoto por sala, eliminación local, soft-delete remoto, descarga local descifrada, descarga remota cifrada, subida cifrada opcional al backend y tabla SQL `video_grabaciones` con blob cifrado + metadatos de consentimiento. Siguiente slice recomendado: hardening productivo de telemedicina (TURN propio, retención legal, E2E multi-peer en navegador real).
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -457,7 +457,7 @@ src/modules/
 
 ### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
 
-**Implementado (Sprint 36):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts` para `identificacion_oficial_encrypted`, telemedicina con migración `016-telemedicina.sql` y CRUD de salas vía `GET/POST/PATCH/DELETE /telemedicina/*`. **Pendiente:** opt-in para IA, UI frontend de 2FA/videollamada.
+**Implementado (Sprints 36-41):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts`, telemedicina con CRUD de salas (`016-telemedicina.sql`), UI de 2FA/videollamada, signaling WebRTC por WebSocket, configuración STUN/TURN, grabación local con consentimiento explícito y gestor completo de grabaciones cifradas. Sprint 41 agregó `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints `GET/POST/GET blob/DELETE /telemedicina/:id/grabaciones/*`, subida cifrada opcional al backend, soft-delete remoto y descarga de blobs cifrados. **Pendiente:** hardening productivo de telemedicina (TURN propio, política de retención, E2E multi-peer real).
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
@@ -477,7 +477,7 @@ src/modules/
 | **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
 | **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
 | **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
-| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024), telemedicina | 🔄 ~99% (Sprint 36: 2FA + AES-256 + telemedicina) |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024), telemedicina | 🔄 ~99% (Sprint 41: grabaciones cifradas local/remoto) |
 
 ---
 
@@ -2228,6 +2228,12 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| _(working)_ | feat(telemedicina): sprint 41 encrypted recording manager | 41 | Tabla `video_grabaciones`, endpoints de grabaciones cifradas, subida opcional al backend y gestor UI local/remoto |
+| `1a6351d` | feat(telemedicina): sprint 40 encrypted recording consent | 40 | Consentimiento explícito, grabaciones locales AES-GCM en IndexedDB y descarga descifrada bajo demanda |
+| `eac72d7` | feat(telemedicina): sprint 39 TURN config + call recording | 39 | STUN/TURN configurable, fix signaling/ICE y grabación MediaRecorder |
+| `79bc147` | feat: sprint 38 signaling server WebRTC + useWebRTC hook | 38 | WebSocket signaling `/ws/telemedicina`, relay SDP/ICE y hook WebRTC |
+| `7c7bb6e` | feat(portal): sprint 37 2FA UI + telemedicina videollamada | 37 | UI 2FA, rutas de telemedicina y sala de videollamada |
+| `51cdd82` | feat(api): sprint 36 2FA TOTP + AES-256 + telemedicina | 36 | 2FA backend, AES-256-GCM server-side y CRUD inicial de salas |
 | _(working)_ | feat(api): sprint 34 tenant guards multi-consultorio | 34 | `sucursal_id` formal como tenant, guard de FKs clínicas y `/sync/push` aislado por sucursal activa |
 | _(working)_ | test(patient-portal): sprint 33 hardening | 33 | Backend/client/E2E para scopes, validación de fotos, orden de rutas, mensajes y fotos en portal |
 | `563ec7a` | feat(patient-portal): sprint 32 meal photos | 32 | Fotos de comidas desde portal con revisión profesional y storage SQL Server |
@@ -2335,6 +2341,12 @@ pnpm build:tauri               # Empaqueta instalador nativo
 35. **Sprint 32 — Fotos de comidas:** tabla `patient_portal_meal_photos`, upload JPEG/PNG/WebP <=2 MB, preview/listado público, revisión profesional, storage SQL Server con SHA-256 y constraints de auditoría/email.
 36. **Sprint 33 — Hardening QA/E2E del portal:** tests API de scopes/rutas/validación de foto, tests cliente API, E2E público para mensajes y fotos, fix lint de artefactos `dist` y quality gate completo.
 37. **Sprint 34 — Multi-consultorio formal:** `tenantGuards` para validar `paciente_id`/`consulta_id` contra `sucursal_id`, POSTs clínicos protegidos contra FKs cross-sucursal, `pullChanges` con detalle scoped, `/sync/push` requiere sucursal activa y body/header consistente. 109 tests API.
+38. **Sprint 36 — 2FA + AES-256 + telemedicina backend:** 2FA TOTP backend, QR setup, login en 2 pasos, `serverCryptoService.ts`, migración `016-telemedicina.sql` y CRUD de salas.
+39. **Sprint 37 — UI 2FA + videollamada:** login con TOTP, página `/seguridad/2fa`, rutas `/telemedicina/*` y `VideoCallRoom` con cámara/micrófono/toggles/colgar.
+40. **Sprint 38 — WebRTC signaling:** servidor WebSocket `/ws/telemedicina?token=`, relay `join-room/offer/answer/ice-candidate`, `useWebRTC` con `RTCPeerConnection` y STUN.
+41. **Sprint 39 — TURN + grabación:** STUN/TURN configurable con variables Vite, fixes de signaling/ICE y `useCallRecording` con MediaRecorder.
+42. **Sprint 40 — Consentimiento + cifrado local:** consentimiento explícito antes de grabar, AES-GCM local por usuario, tabla IndexedDB `telemedicina_recordings` y descarga descifrada bajo demanda.
+43. **Sprint 41 — Gestor de grabaciones cifradas:** migración `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints backend para listar/subir/descargar blob/eliminar, API cliente binaria, metadatos remotos en IndexedDB y UI para descargar, subir cifrada, eliminar remoto y eliminar local.
 
 ---
 
