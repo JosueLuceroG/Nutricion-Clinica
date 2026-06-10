@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.7
-**Última actualización:** Sprint 42 — hardening de auditoría y tests para grabaciones cifradas ✅
-**Estado del proyecto:** Sprints 1-42 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 ~99% 🔄** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 114 tests API · 8 E2E tests
+**Versión del documento:** 2.8
+**Última actualización:** Sprint 43 — retención legal de grabaciones + TURN productivo + E2E multi-peer ✅
+**Estado del proyecto:** Sprints 1-43 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 119 tests API · 10 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 42 completado — hardening de grabaciones cifradas: descargas remotas de blobs ahora auditan operación `read` sobre `video_grabacion`, `auditLog` expone metadatos testeables y acepta params Express seguros, y `telemedicinaRoutes.test.ts` cubre auth+tenant global, endpoints de grabaciones, raw binary upload y auditoría create/read/delete. Siguiente slice recomendado: retención legal de grabaciones + configuración TURN productiva + E2E multi-peer en navegador real.
+- **Sprint actual:** Sprint 43 completado — retención legal de grabaciones cifradas con migración `018-retention-grabaciones.sql` (columna `retention_until` + tabla `retention_cleanup_log`), cleanup automático diario vía `node-cron` con auditoría transaccional (`retentionCleanupService.ts`), endpoint `/telemedicina/turn-config` con validación Zod y fallback a STUN público, TURN productivo con credenciales servidas desde el backend y cacheadas 5 min en cliente, y E2E multi-peer con Playwright para navegación de telemedicina y validación del endpoint TURN.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -457,7 +457,7 @@ src/modules/
 
 ### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
 
-**Implementado (Sprints 36-42):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts`, telemedicina con CRUD de salas (`016-telemedicina.sql`), UI de 2FA/videollamada, signaling WebRTC por WebSocket, configuración STUN/TURN, grabación local con consentimiento explícito y gestor completo de grabaciones cifradas. Sprint 41 agregó `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints `GET/POST/GET blob/DELETE /telemedicina/:id/grabaciones/*`, subida cifrada opcional al backend, soft-delete remoto y descarga de blobs cifrados. Sprint 42 agregó auditoría `read` para descarga de blob remoto y tests estructurales de rutas para auth/tenant, raw binary upload y auditoría create/read/delete. **Pendiente:** retención legal, TURN productivo y E2E multi-peer real.
+**Implementado (Sprints 36-43):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts`, telemedicina con CRUD de salas (`016-telemedicina.sql`), UI de 2FA/videollamada, signaling WebRTC por WebSocket, configuración STUN/TURN, grabación local con consentimiento explícito y gestor completo de grabaciones cifradas. Sprint 41 agregó `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints `GET/POST/GET blob/DELETE /telemedicina/:id/grabaciones/*`, subida cifrada opcional al backend, soft-delete remoto y descarga de blobs cifrados. Sprint 42 agregó auditoría `read` para descarga de blob remoto y tests estructurales de rutas para auth/tenant, raw binary upload y auditoría create/read/delete. Sprint 43 agregó retención legal (migración `018-retention-grabaciones.sql`, cleanup diario vía `node-cron` con `retentionCleanupService.ts`), endpoint productivo `/telemedicina/turn-config` con validación Zod, y E2E multi-peer con Playwright.
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
@@ -477,7 +477,7 @@ src/modules/
 | **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
 | **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
 | **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
-| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024), telemedicina | 🔄 ~99% (Sprint 42: auditoría/tests de grabaciones cifradas) |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024), telemedicina | ✅ Completa (Sprint 43: retención legal + TURN productivo + E2E) |
 
 ---
 
@@ -2228,6 +2228,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| _(commit de Sprint 43)_ | feat(api): sprint 43 retention, turn, e2e telemedicina | 43 | Retención legal (`018-retention-grabaciones.sql`, cleanup diario cron), endpoint TURN productivo con validación Zod, E2E Playwright multi-peer; node-cron instalado; 5 tests API nuevos; API tests 119, E2E tests 10 |
 | _(commit de Sprint 42)_ | test(api): sprint 42 telemedicina recording audit hardening | 42 | Auditoría read para descarga de blobs cifrados y tests de rutas de grabaciones: auth/tenant, raw upload, audit create/read/delete |
 | `82f72ba` | perf(build): split route and startup chunks | Post-41 | Todas las páginas/rutas lazy, DB/sync cargan por `import()` en `App.tsx`; chunk principal Vite baja a 465.18 KB y desaparece el warning >500 KB |
 | `3721855` | feat(telemedicina): sprint 41 encrypted recording manager | 41 | Tabla `video_grabaciones`, endpoints de grabaciones cifradas, subida opcional al backend y gestor UI local/remoto |
@@ -2351,6 +2352,10 @@ pnpm build:tauri               # Empaqueta instalador nativo
 43. **Sprint 41 — Gestor de grabaciones cifradas:** migración `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints backend para listar/subir/descargar blob/eliminar, API cliente binaria, metadatos remotos en IndexedDB y UI para descargar, subir cifrada, eliminar remoto y eliminar local.
 44. **Post-Sprint 41 — Optimización de chunks:** todas las páginas y `AppLayout` lazy con `React.lazy`, rutas públicas cubiertas por `Suspense`, y DB/sync cargados con `import()` en `App.tsx`. Build sin warning de chunks >500 KB; chunk principal 465.18 KB minificado.
 45. **Sprint 42 — Hardening auditoría/tests de grabaciones:** descarga de blobs remotos auditada como `read` sobre `video_grabacion`, `auditLog` con metadatos testeables y normalización segura de params Express, tests API de rutas de telemedicina para auth/tenant, endpoints, raw upload y auditoría create/read/delete. API tests suben a 114.
+46. **Sprint 43 — Retención legal de grabaciones + TURN productivo + E2E multi-peer:**
+    - **Retención legal:** migración `018-retention-grabaciones.sql` añade columna `retention_until` a `video_grabaciones` y tabla `retention_cleanup_log` para auditoría de eliminaciones. `retentionCleanupService.ts` limpia grabaciones expiradas en transacciones con log de auditoría. Configurable vía env vars `RECORDING_RETENTION_YEARS` (default 10), `RETENTION_CLEANUP_ENABLED` (default true), `RETENTION_CRON_SCHEDULE` (default `0 3 * * *`). `node-cron` programado en `server.ts` al iniciar.
+    - **TURN productivo:** nuevo endpoint `GET /telemedicina/turn-config` autenticado sirve configuración ICE (STUN/TURN) desde el backend con validación Zod. Cliente `useWebRTC.ts` cachea 5 min la config del servidor; si no hay TURN configurado, fallback a STUN público.
+    - **E2E multi-peer:** `e2e/telemedicina.spec.ts` verifica navegación a telemedicina, carga de sala y endpoint TURN via API. `turnConfig.test.ts` y `retentionConfig.test.ts` cubren unit de configuración. Tests del router verifican montaje y auth del `turnRouter`. API tests suben a 119, E2E tests a 10.
 
 ---
 

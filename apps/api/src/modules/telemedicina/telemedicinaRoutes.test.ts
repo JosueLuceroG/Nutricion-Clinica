@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import router from './telemedicinaRoutes.js';
+import router, { turnRouter } from './telemedicinaRoutes.js';
 import type { AuditMiddleware, AuditOperation } from '../../middleware/auditMiddleware.js';
 
 interface ExpressLayerLike {
@@ -69,5 +69,20 @@ describe('telemedicinaRoutes', () => {
 
     expect(audit?.name).toBe('auditMiddleware');
     expect(audit?.auditEntityType).toBe('video_grabacion');
+  });
+
+  describe('turnRouter', () => {
+    it('expone ruta GET /turn-config con auth', () => {
+      const stack = (turnRouter as unknown as { stack: Array<{ route?: { path: string; methods: Record<string, boolean> } }> }).stack;
+      const turnRoute = stack.find((layer) => layer.route?.path === '/turn-config' && layer.route.methods?.get);
+      expect(turnRoute).toBeDefined();
+    });
+
+    it('protege turnRouter con requireAuth', () => {
+      const stack = (turnRouter as unknown as { stack: Array<{ handle?: { name: string } }> }).stack;
+      const beforeRoute = stack.findIndex((layer) => layer.route);
+      const globalMiddlewareNames = stack.slice(0, beforeRoute < 0 ? undefined : beforeRoute).map((l) => l.handle?.name);
+      expect(globalMiddlewareNames).toContain('requireAuth');
+    });
   });
 });

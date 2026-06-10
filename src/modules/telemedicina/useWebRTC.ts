@@ -1,7 +1,22 @@
 import * as React from "react";
 import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 
 const DEFAULT_STUN_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
+const TURN_CONFIG_CACHE_TTL = 300_000; // 5 min
+
+interface TurnIceServer {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+interface TurnConfigDTO {
+  iceServers: TurnIceServer[];
+  configured: boolean;
+}
+
+let turnConfigCache: { data: TurnConfigDTO; timestamp: number } | null = null;
 
 interface PeerInfo {
   userId: string;
@@ -36,7 +51,43 @@ function csv(value: string | undefined): string[] {
   return value?.split(",").map((v) => v.trim()).filter(Boolean) ?? [];
 }
 
-function buildRtcConfig(): RTCConfiguration {
+async function fetchTurnConfig(): Promise<TurnConfigDTO | null> {
+  const now = Date.now();
+  if (turnConfigCache && now - turnConfigCache.timestamp < TURN_CONFIG_CACHE_TTL) {
+    return turnConfigCache.data;
+  }
+
+  const apiUrl = getApiUrl();
+  const token = useAuthStore.getState().token;
+  const sucursalId = useSyncStore.getState().sucursalId;
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${apiUrl}/telemedicina/turn-config`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(sucursalId ? { 'X-Sucursal-Id': sucursalId } : {}),
+      },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as TurnConfigDTO;
+    turnConfigCache = { data, timestamp: now };
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function getApiUrl(): string {
+  return (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? 'http://localhost:3000';
+}
+
+async function buildRtcConfig(): Promise<RTCConfiguration> {
+  const serverConfig = await fetchTurnConfig();
+  if (serverConfig?.configured && serverConfig.iceServers.length > 0) {
+    return { iceServers: serverConfig.iceServers };
+  }
+
   const e = env();
   const stunUrls = csv(e.VITE_STUN_URLS);
   const turnUrls = csv(e.VITE_TURN_URLS);
@@ -105,14 +156,22 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
       return;
     }
 
+    const rtcConfig = await buildRtcConfig();
+
+    const ensurePeerConnection = async (): Promise<RTCPeerConnection> => {
+      if (pcRef.current) return pcRef.current;
+      const pc = createPeerConnection(rtcConfig, ws, salaId, currentLocalStream, assignRemoteStream);
+      pcRef.current = pc;
+      return pc;
+    };
+
     switch (msg.type) {
       case "join-room": {
         const existingPeers: PeerInfo[] = (msg.payload as { peers?: PeerInfo[] })?.peers ?? [];
         setPeers(existingPeers);
         setConnected(true);
         if (existingPeers.length > 0) {
-          const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
-          pcRef.current = pc;
+          const pc = await ensurePeerConnection();
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           ws.send(JSON.stringify({ type: "offer", salaId, payload: { sdp: offer } }));
@@ -123,8 +182,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         const peer = msg.payload as PeerInfo;
         setPeers((prev) => (prev.some((p) => p.userId === peer.userId) ? prev : [...prev, peer]));
         if (!pcRef.current) {
-          const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
-          pcRef.current = pc;
+          const pc = await ensurePeerConnection();
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
           ws.send(JSON.stringify({ type: "offer", salaId, payload: { sdp: offer } }));
@@ -140,8 +198,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
         break;
       }
       case "offer": {
-        const pc = createPeerConnection(ws, salaId, currentLocalStream, assignRemoteStream);
-        pcRef.current = pc;
+        const pc = await ensurePeerConnection();
         await pc.setRemoteDescription(new RTCSessionDescription((msg.payload as { sdp: RTCSessionDescription }).sdp));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -214,12 +271,13 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
 }
 
 function createPeerConnection(
+  rtcConfig: RTCConfiguration,
   ws: WebSocket,
   salaId: string,
   localStream: MediaStream,
   setRemoteStream: (stream: MediaStream | null) => void,
 ): RTCPeerConnection {
-  const pc = new RTCPeerConnection(buildRtcConfig());
+  const pc = new RTCPeerConnection(rtcConfig);
 
   localStream.getTracks().forEach((track) => {
     pc.addTrack(track, localStream);

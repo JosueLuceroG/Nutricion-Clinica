@@ -2,10 +2,11 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
+import cron from "node-cron";
 import { healthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
 import twoFactorRouter from "./modules/auth/twoFactorRoutes.js";
-import telemedicinaRouter from "./modules/telemedicina/telemedicinaRoutes.js";
+import telemedicinaRouter, { turnRouter } from "./modules/telemedicina/telemedicinaRoutes.js";
 import sucursalRouter from "./modules/sucursales/sucursalRoutes.js";
 import pacienteRouter from "./modules/pacientes/pacienteRoutes.js";
 import consultaRouter from "./modules/consultas/consultaRoutes.js";
@@ -18,6 +19,7 @@ import syncRouter from "./modules/sync/syncRoutes.js";
 import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
 import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { runRetentionCleanup, RETENTION_CONFIG } from "./services/retention/index.js";
 
 const app = express();
 
@@ -28,6 +30,7 @@ app.use("/health", healthRouter);
 app.use("/auth", authRouter);
 app.use("/auth", twoFactorRouter);
 app.use("/telemedicina", telemedicinaRouter);
+app.use("/telemedicina", turnRouter);
 app.use("/sucursales", sucursalRouter);
 app.use("/pacientes", pacienteRouter);
 app.use("/consultas", consultaRouter);
@@ -49,3 +52,16 @@ createSignalingServer(httpServer);
 httpServer.listen(port, () => {
   console.log(`[nutriclinica-api] listening on http://localhost:${port}`);
 });
+
+if (RETENTION_CONFIG.cleanupEnabled) {
+  const schedule = RETENTION_CONFIG.cronSchedule;
+  console.log(`[retention] scheduling cleanup cron: "${schedule}" (${RETENTION_CONFIG.years} years)`);
+  cron.schedule(schedule, () => {
+    console.log('[retention] running scheduled cleanup...');
+    void runRetentionCleanup().then((result) => {
+      console.log(`[retention] cleanup done: ${result.deletedCount} deleted, ${result.errors.length} errors`);
+    });
+  });
+} else {
+  console.log('[retention] cleanup disabled via RETENTION_CLEANUP_ENABLED=false');
+}

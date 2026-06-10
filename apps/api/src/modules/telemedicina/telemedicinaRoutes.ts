@@ -6,11 +6,21 @@ import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { auditLog } from '../../middleware/auditMiddleware.js';
+import { buildTurnConfig } from './turnConfig.js';
 import type { TelemedicinaGrabacionDTO, TelemedicinaSalaDTO } from '@nutriclinica/shared';
 
 const router: Router = ExpressRouter();
+const turnRouter: Router = ExpressRouter();
 
 router.use(requireAuth, requireSucursalAccess);
+turnRouter.use(requireAuth);
+
+turnRouter.get('/turn-config', (_req: Request, res: Response) => {
+  const config = buildTurnConfig(process.env as Record<string, string | undefined>);
+  res.json(config);
+});
+
+export { turnRouter };
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
