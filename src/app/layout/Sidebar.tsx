@@ -22,6 +22,8 @@ import {
   BarChart3,
   Database,
   Upload,
+  Video,
+  Shield,
 } from "lucide-react";
 import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
@@ -57,6 +59,7 @@ const clinicalNav: NavItem[] = [
   { to: "/objetivos", labelKey: "nav.goals", icon: Target },
   { to: "/adherencia", labelKey: "nav.adherence", icon: HeartPulse },
   { to: "/medicamentos", labelKey: "nav.medications", icon: Pill },
+  { to: "/telemedicina", labelKey: "nav.telemedicina", icon: Video },
 ];
 
 const planningNav: NavItem[] = [
@@ -73,6 +76,7 @@ const reportsNav: NavItem[] = [
 const secondaryNav: NavItem[] = [
   { to: "/smae", labelKey: "nav.smae_catalog", icon: Database },
   { to: "/importar", labelKey: "nav.import", icon: Upload },
+  { to: "/seguridad/2fa", labelKey: "nav.security", icon: Shield },
   { to: "/configuracion", labelKey: "nav.settings", icon: Settings },
   { to: "/ayuda", labelKey: "nav.help", icon: HelpCircle },
 ];

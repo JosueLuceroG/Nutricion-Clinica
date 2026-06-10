@@ -27,6 +27,10 @@ import { HelpPage } from "@app/pages/HelpPage";
 import { NotFoundPage } from "@app/pages/NotFoundPage";
 import { NotificationsPage } from "@app/pages/NotificationsPage";
 import { ProfilePage } from "@app/pages/ProfilePage";
+import { TelemedicinaListPage } from "@app/pages/telemedicina/TelemedicinaListPage";
+import { VideoCallRoomPage } from "@app/pages/telemedicina/VideoCallRoomPage";
+import { NewTelemedicinaSalaPage } from "@app/pages/telemedicina/NewTelemedicinaSalaPage";
+import { TwoFactorSetupPage } from "@modules/auth/ui/TwoFactorSetupPage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
 import { PatientPortalPage } from "@app/pages/patient-portal/PatientPortalPage";
 import { LoginPage } from "@modules/auth/ui/LoginPage";
@@ -219,6 +223,21 @@ const router = createHashRouter([
       { path: "notificaciones", element: <NotificationsPage /> },
       { path: "perfil", element: <ProfilePage /> },
       { path: "configuracion", element: <SettingsPage /> },
+      {
+        path: "seguridad",
+        children: [
+          { index: true, element: <Navigate to="/seguridad/2fa" replace /> },
+          { path: "2fa", element: <TwoFactorSetupPage /> },
+        ],
+      },
+      {
+        path: "telemedicina",
+        children: [
+          { index: true, element: <TelemedicinaListPage /> },
+          { path: "nueva", element: <NewTelemedicinaSalaPage /> },
+          { path: ":id", element: <VideoCallRoomPage /> },
+        ],
+      },
       { path: "ayuda", element: <HelpPage /> },
       { path: "*", element: <NotFoundPage /> },
     ],

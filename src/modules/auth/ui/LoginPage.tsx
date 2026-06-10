@@ -1,7 +1,7 @@
 import * as React from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, LogIn, AlertCircle } from "lucide-react";
+import { Eye, EyeOff, LogIn, AlertCircle, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { authApi } from "@services/api/authApi";
 import { useAuthStore } from "@store/authStore";
@@ -30,6 +30,9 @@ export function LoginPage() {
     token: string;
     user: { id: string; email: string; nombreCompleto: string; rol: "admin" | "nutriologa" | "asistente" | "soporte_tecnico" | "auditor" | "facturacion" };
   } | null>(null);
+  const [requires2fa, setRequires2fa] = React.useState(false);
+  const [pending2faToken, setPending2faToken] = React.useState<string | null>(null);
+  const [totpCode, setTotpCode] = React.useState("");
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -41,6 +44,12 @@ export function LoginPage() {
     setLoading(true);
     try {
       const response = await authApi.login({ email, password });
+      if (response.requires2fa && response.pending2faToken) {
+        setRequires2fa(true);
+        setPending2faToken(response.pending2faToken);
+        setLoading(false);
+        return;
+      }
       if (response.sucursales.length > 1) {
         setPendingSession({ token: response.token, user: response.profesional });
         setSucursales(response.sucursales);
@@ -58,6 +67,30 @@ export function LoginPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "No fue posible iniciar sesi\u00f3n");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pending2faToken) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await authApi.login({ email, password, totpCode, pending2faToken });
+      const sucursalActivaId = response.sucursalActivaId ?? response.sucursales[0]?.id ?? null;
+      setSession({
+        token: response.token,
+        user: response.profesional,
+        sucursales: response.sucursales,
+        sucursalActivaId,
+      });
+      if (sucursalActivaId) setSucursalId(sucursalActivaId);
+      toast.success(`Bienvenido/a, ${response.profesional.nombreCompleto}`);
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "C\u00f3digo inv\u00e1lido o expirado");
     } finally {
       setLoading(false);
     }
@@ -98,6 +131,60 @@ export function LoginPage() {
                 {s.esTitular && <span className="text-xs text-muted-foreground">Titular</span>}
               </Button>
             ))}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (requires2fa) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5" aria-hidden />
+              {t("auth.2fa_title")}
+            </CardTitle>
+            <CardDescription>
+              {t("auth.2fa_description")}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleTotpSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="totp">{t("auth.2fa_code")}</Label>
+                <Input
+                  id="totp"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  required
+                  autoFocus
+                  className="text-center text-lg tracking-widest"
+                  placeholder="000000"
+                />
+              </div>
+
+              {error && (
+                <div
+                  role="alert"
+                  className={cn(
+                    "flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive",
+                  )}
+                >
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={loading || totpCode.length !== 6}>
+                {loading ? t("auth.verifying") : t("auth.verify")}
+              </Button>
+            </form>
           </CardContent>
         </Card>
       </div>
