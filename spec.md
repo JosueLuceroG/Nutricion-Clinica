@@ -3,8 +3,8 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.9
-**Última actualización:** Sprint 44 — ADRs formales + README quickstart + roadmap finalizado ✅
+**Versión del documento:** 2.10
+**Última actualización:** Sprint 45 — Housekeeping: knip + tree-shake + CI hardening ✅
 **Estado del proyecto:** Sprints 1-44 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~440 archivos TS/TSX · ~2.2MB código fuente · 76 archivos de test frontend · 985 tests frontend · 126 tests API · 10 E2E tests
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 44 completado — ADRs formales creados en `docs/decisions/0001-*.md` (formato Michael Nygard), `README.md` reemplazado por quickstart compacto, roadmap de Fase 5 actualizado a 100% completo con todos los items de telemedicina/2FA marcados como terminados.
+- **Sprint actual:** Sprint 45 completado — Housekeeping: `knip` instalado con config (`knip.json`), 9 dependencias no usadas removidas (framer-motion, @tanstack/react-virtual, vaul, @tailwindcss/forms, @tailwindcss/typography, @testing-library/user-event, @types/i18next, msw, @types/uuid), tree-shake en `manualChunks` + `optimizeDeps.exclude` limpiados, CI hardening con `timeout-minutes` y `sourcemap` condicional según entorno CI, `knip` script agregado a `package.json`.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -2232,6 +2232,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| _(commit de Sprint 45)_ | chore(housekeeping): sprint 45 knip + tree-shake + ci hardening | 45 | knip config + script, 9 unused deps removidas (framer-motion, @tanstack/react-virtual, vaul, @tailwindcss/forms, @tailwindcss/typography, @testing-library/user-event, @types/i18next, msw, @types/uuid), tree-shake manualChunks, CI timeout-minutes + conditional sourcemap, spec.md v2.10 |
 | _(commit de Sprint 44)_ | feat(docs): sprint 44 adrs formales + readme quickstart | 44 | ADRs en `docs/decisions/0001-*.md` (Michael Nygard), README quickstart compacto, roadmap Fase 5 100% completo, spec.md v2.9 |
 | _(commit de Sprint 43)_ | feat(api): sprint 43 retention, turn, e2e telemedicina | 43 | Retención legal (`018-retention-grabaciones.sql`, cleanup diario cron), endpoint TURN productivo con validación Zod, E2E Playwright multi-peer; node-cron instalado; 5 tests API nuevos; API tests 126, E2E tests 10 |
 | _(commit de Sprint 42)_ | test(api): sprint 42 telemedicina recording audit hardening | 42 | Auditoría read para descarga de blobs cifrados y tests de rutas de grabaciones: auth/tenant, raw upload, audit create/read/delete |

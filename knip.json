@@ -1,0 +1,37 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/main.tsx",
+    "src/index.ts",
+    "apps/api/src/server.ts",
+    "apps/api/src/**/*.test.ts",
+    "**/*.spec.ts",
+    "**/*.config.{ts,js}",
+    "vite.config.ts",
+    "postcss.config.js",
+    "tailwind.config.ts"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "apps/api/src/**/*.ts",
+    "packages/**/*.ts"
+  ],
+  "ignoreDependencies": [
+    "@tauri-apps/api",
+    "@tauri-apps/plugin-dialog",
+    "@tauri-apps/plugin-fs",
+    "@tauri-apps/plugin-notification",
+    "@tauri-apps/plugin-os",
+    "@tauri-apps/plugin-sql",
+    "@tauri-apps/plugin-store",
+    "@tauri-apps/cli"
+  ],
+  "ignoreBinaries": [
+    "husky"
+  ],
+  "rules": {
+    "files": "warn",
+    "dependencies": "warn",
+    "unused": "warn"
+  }
+}

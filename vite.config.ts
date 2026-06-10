@@ -43,7 +43,7 @@ export default defineConfig({
   build: {
     target: "es2022",
     minify: "esbuild",
-    sourcemap: true,
+    sourcemap: process.env.CI ? false : true,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -56,16 +56,12 @@ export default defineConfig({
             "@radix-ui/react-toast",
           ],
           forms: ["react-hook-form", "@hookform/resolvers", "zod"],
-          table: ["@tanstack/react-table", "@tanstack/react-virtual"],
+          table: ["@tanstack/react-table"],
           charts: ["recharts"],
           dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
-          motion: ["framer-motion"],
         },
       },
     },
-  },
-  optimizeDeps: {
-    exclude: ["@tauri-apps/api"],
   },
   worker: {
     format: "es",
