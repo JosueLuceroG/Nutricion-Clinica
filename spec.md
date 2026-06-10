@@ -2228,7 +2228,8 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
-| _(working)_ | feat(telemedicina): sprint 41 encrypted recording manager | 41 | Tabla `video_grabaciones`, endpoints de grabaciones cifradas, subida opcional al backend y gestor UI local/remoto |
+| _(working)_ | perf(build): split route and startup chunks | Post-41 | Todas las páginas/rutas lazy, DB/sync cargan por `import()` en `App.tsx`; chunk principal Vite baja a 465.18 KB y desaparece el warning >500 KB |
+| `3721855` | feat(telemedicina): sprint 41 encrypted recording manager | 41 | Tabla `video_grabaciones`, endpoints de grabaciones cifradas, subida opcional al backend y gestor UI local/remoto |
 | `1a6351d` | feat(telemedicina): sprint 40 encrypted recording consent | 40 | Consentimiento explícito, grabaciones locales AES-GCM en IndexedDB y descarga descifrada bajo demanda |
 | `eac72d7` | feat(telemedicina): sprint 39 TURN config + call recording | 39 | STUN/TURN configurable, fix signaling/ICE y grabación MediaRecorder |
 | `79bc147` | feat: sprint 38 signaling server WebRTC + useWebRTC hook | 38 | WebSocket signaling `/ws/telemedicina`, relay SDP/ICE y hook WebRTC |
@@ -2788,14 +2789,18 @@ interface AIProvider {
 | Renderizado de tabla (1000 filas) | < 500 ms | Por medir (TanStack Virtual) |
 | Sincronización (100 ítems) | < 5 s | N/A (Fase 3 — sin servidor) |
 | Generación de PDF | < 3 s | N/A (Sprint 11 — `services/pdf/`) |
+| Chunk principal Vite | < 500 KB minificado | 465.18 KB tras lazy routes + startup `import()` |
 
 ### 20.2 Estrategias (alineadas al stack React 19 + Vite + Tauri v2)
 
 #### 20.2.1 Code splitting
 
-- **Lazy loading por ruta**: `React.lazy(() => import('./pages/...'))` + `<Suspense>`.
+- **Lazy loading por ruta**: todas las páginas y `AppLayout` se cargan con `React.lazy` desde `src/app/router.tsx`.
+- **Suspense por frontera**: `AppRouter` cubre rutas públicas (`/login`, `/portal/:token`) y `AppLayout` cubre rutas internas con fallback local.
+- **Startup diferido**: `App.tsx` carga `@services/db`, sync bootstrap, enqueuer y migración legacy con `import()` dentro de `useEffect` para no inflar el bundle inicial.
 - **Lazy loading por feature**: `import()` dinámico en componentes pesados.
 - **Vite chunks**: `manualChunks` separa `react`, `radix-ui`, `recharts`, `dnd-kit`, `framer-motion`.
+- **Regla de build**: si Vite vuelve a emitir `Some chunks are larger than 500 kB`, primero mover imports eager a lazy/dynamic; solo subir `chunkSizeWarningLimit` si el chunk grande es intencional y no está en el camino crítico.
 - **Tauri v2 tree-shaking**: imports nombrados; evitar `import * as`.
 
 #### 20.2.2 Virtualización
@@ -2860,7 +2865,9 @@ interface AIProvider {
 
 ### 20.4 Estado actual
 
-✅ Code splitting por ruta activo en Vite.
+✅ Code splitting por ruta activo en Vite para todas las páginas.
+✅ Chunk principal bajo 500 KB: `index-*.js` 465.18 KB minificado / 146.70 KB gzip en build post-Sprint 41.
+✅ DB/sync bootstrap diferido fuera del bundle inicial (`import()` en `App.tsx`).
 ✅ Memoización selectiva (KPICard, SlotProgress, Vitals).
 ✅ Dexie v3 con índices en `smae_custom_foods` (id, group, name, created_at).
 ⏳ TanStack Virtual aún no usado (no hay listas > 100 filas).

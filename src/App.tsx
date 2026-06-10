@@ -4,24 +4,37 @@ import { NotificationProvider } from "@app/providers/NotificationProvider";
 import { AppRouter } from "@app/router";
 import { Toaster } from "sonner";
 import { TooltipProvider } from "@components/ui/tooltip";
-import { db } from "@services/db";
-import { startSync, stopSync } from "@services/sync/syncBootstrap";
-import { getSyncEnqueuer } from "@services/sync/syncEnqueuerBootstrap";
-import { fixLegacyJsonColumns } from "@services/db/fixLegacyJsonColumns";
 
 export function App() {
   React.useEffect(() => {
-    // Migración one-time: repara filas con JSON columns como objeto/array
-    // (legacy anterior al fix toLocalRow en syncEngine). Corre una vez por
-    // sesión, no bloquea el render.
-    void fixLegacyJsonColumns(db);
+    let disposed = false;
+    let stop: (() => void) | null = null;
 
-    // Singleton a nivel de módulo: una sola instancia para toda la vida
-    // del bundle. Evita que StrictMode/HMR acumulen hooks de Dexie.
-    getSyncEnqueuer();
-    startSync(db, { intervalMs: 30_000, runOnStart: false });
+    void (async () => {
+      const [{ db }, { startSync, stopSync }, { getSyncEnqueuer }, { fixLegacyJsonColumns }] = await Promise.all([
+        import("@services/db"),
+        import("@services/sync/syncBootstrap"),
+        import("@services/sync/syncEnqueuerBootstrap"),
+        import("@services/db/fixLegacyJsonColumns"),
+      ]);
+
+      if (disposed) return;
+
+      // Migración one-time: repara filas con JSON columns como objeto/array
+      // (legacy anterior al fix toLocalRow en syncEngine). Corre una vez por
+      // sesión, no bloquea el render.
+      void fixLegacyJsonColumns(db);
+
+      // Singleton a nivel de módulo: una sola instancia para toda la vida
+      // del bundle. Evita que StrictMode/HMR acumulen hooks de Dexie.
+      getSyncEnqueuer();
+      startSync(db, { intervalMs: 30_000, runOnStart: false });
+      stop = stopSync;
+    })();
+
     return () => {
-      stopSync();
+      disposed = true;
+      stop?.();
     };
     // Si aparece en consola "Cannot update a component while rendering",
     // ver docs/development/setState-during-render.md.

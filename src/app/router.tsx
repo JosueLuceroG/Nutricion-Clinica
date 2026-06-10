@@ -1,42 +1,16 @@
 import { Outlet, RouterProvider, createHashRouter, Navigate } from "react-router-dom";
 import * as React from "react";
-import { AppLayout } from "@app/layout/AppLayout";
-import { NewPatientPage } from "@app/pages/patients/NewPatientPage";
-import { NewConsultationPage } from "@app/pages/consultations/NewConsultationPage";
-import { PatientConsultationsPage } from "@app/pages/consultations/PatientConsultationsPage";
-import { PatientMeasurementsPage } from "@app/pages/anthropometry/PatientMeasurementsPage";
-import { NewMeasurementPage } from "@app/pages/anthropometry/NewMeasurementPage";
-import { PatientLabPage } from "@app/pages/laboratory/PatientLabPage";
-import { NewLabPanelPage } from "@app/pages/laboratory/NewLabPanelPage";
-import { CalculationsPage } from "@app/pages/CalculationsPage";
-import { PatientMealPlansPage } from "@app/pages/plans/PatientMealPlansPage";
-import { NewMealPlanPage } from "@app/pages/plans/NewMealPlanPage";
-import { SettingsPage } from "@app/pages/SettingsPage";
-import { SmaeCatalogPage } from "@app/pages/SmaeCatalogPage";
-import { AgendaPage } from "@app/pages/agenda/AgendaPage";
-import { RecipesPage } from "@app/pages/recipes/RecipesPage";
-import { DocumentsPage } from "@app/pages/documents/DocumentsPage";
-import { MealPlannerPage } from "@app/pages/meal-planner/MealPlannerPage";
-import { GoalsPage } from "@app/pages/goals/GoalsPage";
-import { AdherencePage } from "@app/pages/adherence/AdherencePage";
-import { PatientAdherencePage } from "@app/pages/patients/PatientAdherencePage";
-import { MedicationsPage } from "@app/pages/medications/MedicationsPage";
-import { ReportsPage } from "@app/pages/reports/ReportsPage";
-import { ImporterPage } from "@app/pages/ImporterPage";
-import { HelpPage } from "@app/pages/HelpPage";
-import { NotFoundPage } from "@app/pages/NotFoundPage";
-import { NotificationsPage } from "@app/pages/NotificationsPage";
-import { ProfilePage } from "@app/pages/ProfilePage";
-import { TelemedicinaListPage } from "@app/pages/telemedicina/TelemedicinaListPage";
-import { VideoCallRoomPage } from "@app/pages/telemedicina/VideoCallRoomPage";
-import { NewTelemedicinaSalaPage } from "@app/pages/telemedicina/NewTelemedicinaSalaPage";
-import { TwoFactorSetupPage } from "@modules/auth/ui/TwoFactorSetupPage";
 import { ErrorBoundary } from "@app/ErrorBoundary";
-import { PatientPortalPage } from "@app/pages/patient-portal/PatientPortalPage";
-import { LoginPage } from "@modules/auth/ui/LoginPage";
 import { RequireRole } from "@modules/auth/RequireRole";
 import { BILLING_ROLES, BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
 import { useAuthStore } from "@store/authStore";
+
+function lazyPage(loader: () => Promise<unknown>, exportName: string) {
+  return React.lazy(async () => {
+    const module = await loader() as Record<string, React.ComponentType>;
+    return { default: module[exportName]! };
+  });
+}
 
 /**
  * Code-splitting con `React.lazy`.
@@ -54,43 +28,50 @@ import { useAuthStore } from "@store/authStore";
  * Si una página es tan pequeña que el chunk es ridículo (<2KB), podría
  * dejarse eager, pero el patrón uniforme simplifica el mantenimiento.
  */
-const DashboardPage = React.lazy(() =>
-  import("@app/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
-);
-const PatientsListPage = React.lazy(() =>
-  import("@app/pages/patients/PatientsListPage").then((m) => ({ default: m.PatientsListPage })),
-);
-const PatientDetailPage = React.lazy(() =>
-  import("@app/pages/patients/PatientDetailPage").then((m) => ({ default: m.PatientDetailPage })),
-);
-const ConsultationsListPage = React.lazy(() =>
-  import("@app/pages/consultations/ConsultationsListPage").then((m) => ({
-    default: m.ConsultationsListPage,
-  })),
-);
-const ConsultationDetailPage = React.lazy(() =>
-  import("@app/pages/consultations/ConsultationDetailPage").then((m) => ({
-    default: m.ConsultationDetailPage,
-  })),
-);
-const PlansListPage = React.lazy(() =>
-  import("@app/pages/plans/PlansListPage").then((m) => ({ default: m.PlansListPage })),
-);
-const MealPlanDetailPage = React.lazy(() =>
-  import("@app/pages/plans/MealPlanDetailPage").then((m) => ({ default: m.MealPlanDetailPage })),
-);
-const LaboratoryPage = React.lazy(() =>
-  import("@app/pages/LaboratoryPage").then((m) => ({ default: m.LaboratoryPage })),
-);
-const BillingPage = React.lazy(() =>
-  import("@app/pages/billing/BillingPage").then((m) => ({ default: m.BillingPage })),
-);
-const BillingReportPage = React.lazy(() =>
-  import("@app/pages/billing/BillingReportPage").then((m) => ({ default: m.BillingReportPage })),
-);
-const ReceiptPage = React.lazy(() =>
-  import("@app/pages/billing/ReceiptPage").then((m) => ({ default: m.ReceiptPage })),
-);
+const AppLayout = lazyPage(() => import("@app/layout/AppLayout"), "AppLayout");
+const LoginPage = lazyPage(() => import("@modules/auth/ui/LoginPage"), "LoginPage");
+const PatientPortalPage = lazyPage(() => import("@app/pages/patient-portal/PatientPortalPage"), "PatientPortalPage");
+const DashboardPage = lazyPage(() => import("@app/pages/DashboardPage"), "DashboardPage");
+const PatientsListPage = lazyPage(() => import("@app/pages/patients/PatientsListPage"), "PatientsListPage");
+const NewPatientPage = lazyPage(() => import("@app/pages/patients/NewPatientPage"), "NewPatientPage");
+const PatientDetailPage = lazyPage(() => import("@app/pages/patients/PatientDetailPage"), "PatientDetailPage");
+const PatientMeasurementsPage = lazyPage(() => import("@app/pages/anthropometry/PatientMeasurementsPage"), "PatientMeasurementsPage");
+const NewMeasurementPage = lazyPage(() => import("@app/pages/anthropometry/NewMeasurementPage"), "NewMeasurementPage");
+const PatientLabPage = lazyPage(() => import("@app/pages/laboratory/PatientLabPage"), "PatientLabPage");
+const NewLabPanelPage = lazyPage(() => import("@app/pages/laboratory/NewLabPanelPage"), "NewLabPanelPage");
+const PatientConsultationsPage = lazyPage(() => import("@app/pages/consultations/PatientConsultationsPage"), "PatientConsultationsPage");
+const NewConsultationPage = lazyPage(() => import("@app/pages/consultations/NewConsultationPage"), "NewConsultationPage");
+const PatientMealPlansPage = lazyPage(() => import("@app/pages/plans/PatientMealPlansPage"), "PatientMealPlansPage");
+const NewMealPlanPage = lazyPage(() => import("@app/pages/plans/NewMealPlanPage"), "NewMealPlanPage");
+const PatientAdherencePage = lazyPage(() => import("@app/pages/patients/PatientAdherencePage"), "PatientAdherencePage");
+const ConsultationsListPage = lazyPage(() => import("@app/pages/consultations/ConsultationsListPage"), "ConsultationsListPage");
+const ConsultationDetailPage = lazyPage(() => import("@app/pages/consultations/ConsultationDetailPage"), "ConsultationDetailPage");
+const LaboratoryPage = lazyPage(() => import("@app/pages/LaboratoryPage"), "LaboratoryPage");
+const BillingPage = lazyPage(() => import("@app/pages/billing/BillingPage"), "BillingPage");
+const BillingReportPage = lazyPage(() => import("@app/pages/billing/BillingReportPage"), "BillingReportPage");
+const ReceiptPage = lazyPage(() => import("@app/pages/billing/ReceiptPage"), "ReceiptPage");
+const CalculationsPage = lazyPage(() => import("@app/pages/CalculationsPage"), "CalculationsPage");
+const SmaeCatalogPage = lazyPage(() => import("@app/pages/SmaeCatalogPage"), "SmaeCatalogPage");
+const RecipesPage = lazyPage(() => import("@app/pages/recipes/RecipesPage"), "RecipesPage");
+const GoalsPage = lazyPage(() => import("@app/pages/goals/GoalsPage"), "GoalsPage");
+const AdherencePage = lazyPage(() => import("@app/pages/adherence/AdherencePage"), "AdherencePage");
+const DocumentsPage = lazyPage(() => import("@app/pages/documents/DocumentsPage"), "DocumentsPage");
+const MealPlannerPage = lazyPage(() => import("@app/pages/meal-planner/MealPlannerPage"), "MealPlannerPage");
+const ImporterPage = lazyPage(() => import("@app/pages/ImporterPage"), "ImporterPage");
+const PlansListPage = lazyPage(() => import("@app/pages/plans/PlansListPage"), "PlansListPage");
+const MealPlanDetailPage = lazyPage(() => import("@app/pages/plans/MealPlanDetailPage"), "MealPlanDetailPage");
+const MedicationsPage = lazyPage(() => import("@app/pages/medications/MedicationsPage"), "MedicationsPage");
+const ReportsPage = lazyPage(() => import("@app/pages/reports/ReportsPage"), "ReportsPage");
+const AgendaPage = lazyPage(() => import("@app/pages/agenda/AgendaPage"), "AgendaPage");
+const NotificationsPage = lazyPage(() => import("@app/pages/NotificationsPage"), "NotificationsPage");
+const ProfilePage = lazyPage(() => import("@app/pages/ProfilePage"), "ProfilePage");
+const SettingsPage = lazyPage(() => import("@app/pages/SettingsPage"), "SettingsPage");
+const TwoFactorSetupPage = lazyPage(() => import("@modules/auth/ui/TwoFactorSetupPage"), "TwoFactorSetupPage");
+const TelemedicinaListPage = lazyPage(() => import("@app/pages/telemedicina/TelemedicinaListPage"), "TelemedicinaListPage");
+const NewTelemedicinaSalaPage = lazyPage(() => import("@app/pages/telemedicina/NewTelemedicinaSalaPage"), "NewTelemedicinaSalaPage");
+const VideoCallRoomPage = lazyPage(() => import("@app/pages/telemedicina/VideoCallRoomPage"), "VideoCallRoomPage");
+const HelpPage = lazyPage(() => import("@app/pages/HelpPage"), "HelpPage");
+const NotFoundPage = lazyPage(() => import("@app/pages/NotFoundPage"), "NotFoundPage");
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -252,6 +233,21 @@ function ErrorBoundaryRoute() {
   );
 }
 
+function RouterFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-8 text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+        Cargando...
+      </div>
+    </div>
+  );
+}
+
 export function AppRouter() {
-  return <RouterProvider router={router} />;
+  return (
+    <React.Suspense fallback={<RouterFallback />}>
+      <RouterProvider router={router} />
+    </React.Suspense>
+  );
 }
