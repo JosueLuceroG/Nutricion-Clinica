@@ -1,7 +1,8 @@
 /**
  * Bootstrap del SyncEngine: persistencia de lastPullAt + helpers de start/stop.
  *
- * - lastPullAt se guarda en localStorage (pequeño, sin necesidad de tabla).
+ * - lastPullAt se guarda en la tabla Dexie sync_meta (durable, no se pierde
+ *   al limpiar localStorage).
  * - El engine se crea lazy (en el primer sync()) y se reusa entre llamadas.
  * - start() arranca el ciclo peri\u00f3dico; stop() lo cancela.
  */
@@ -25,22 +26,14 @@ const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
   adherence_records: 'adherence_records',
 };
 
-const LAST_PULL_AT_KEY = 'nutriclinica.lastPullAt';
+const LAST_PULL_AT_KEY = 'lastPullAt';
 
-function getLastPullAt(): string | null {
-  try {
-    return localStorage.getItem(LAST_PULL_AT_KEY);
-  } catch {
-    return null;
-  }
+function getLastPullAt(db: NutriClinicaDB): Promise<string | null> {
+  return db.sync_meta.get(LAST_PULL_AT_KEY).then((row) => row?.value ?? null).catch(() => null);
 }
 
-function setLastPullAt(iso: string): void {
-  try {
-    localStorage.setItem(LAST_PULL_AT_KEY, iso);
-  } catch {
-    /* ignore */
-  }
+function setLastPullAt(db: NutriClinicaDB, iso: string): Promise<void> {
+  return db.sync_meta.put({ key: LAST_PULL_AT_KEY, value: iso }).then(() => undefined).catch(() => undefined);
 }
 
 let engineInstance: SyncEngine | null = null;
@@ -53,8 +46,8 @@ export function getSyncEngine(db: NutriClinicaDB): SyncEngine {
   const deps: SyncEngineDeps = {
     db,
     queue,
-    getLastPullAt,
-    setLastPullAt,
+    getLastPullAt: () => getLastPullAt(db),
+    setLastPullAt: (iso: string) => setLastPullAt(db, iso),
     api: syncApi,
   };
   engineInstance = new SyncEngine(deps);

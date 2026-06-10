@@ -189,6 +189,12 @@ const PATIENT_CONSENTS_STORES = "id, patient_id, type, signed_at, revoked_at";
 const AI_CACHE_STORES = ["key", "capability", "created_at", "expires_at"].join(", ");
 const AI_USAGE_LOGS_STORES = ["id", "capability", "created_at"].join(", ");
 const TELEMEDICINA_RECORDINGS_STORES = "id, sala_id, created_by, created_at";
+const SYNC_META_STORES = "key";
+
+export interface SyncMetaRow {
+  key: string;
+  value: string;
+}
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
@@ -236,6 +242,7 @@ export class NutriClinicaDB extends Dexie {
   ai_cache!: Table<AICacheRow>;
   ai_usage_logs!: Table<AIUsageLogRow>;
   telemedicina_recordings!: Table<TelemedicinaRecordingRow, string>;
+  sync_meta!: Table<SyncMetaRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -372,6 +379,10 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(25).stores({
       telemedicina_recordings: TELEMEDICINA_RECORDINGS_STORES,
+    });
+
+    this.version(26).stores({
+      sync_meta: SYNC_META_STORES,
     });
   }
 }

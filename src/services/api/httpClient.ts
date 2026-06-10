@@ -4,6 +4,7 @@
  * Wrapper sobre fetch que:
  * - Inyecta Authorization: Bearer <token> desde el authStore.
  * - Inyecta X-Sucursal-Id desde el syncStore.
+ * - Solicita compresi\u00f3n gzip via Accept-Encoding.
  * - Lanza HttpError tipado con status + body.
  * - Base URL configurable via VITE_API_URL.
  */
@@ -62,6 +63,7 @@ export async function httpRequest<T = unknown>(path: string, options: HttpClient
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    'Accept-Encoding': 'gzip',
     ...(options.headers ?? {}),
   };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';

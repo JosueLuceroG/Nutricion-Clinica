@@ -75,8 +75,8 @@ export interface SyncEngineDeps {
   db: NutriClinicaDB;
   queue: SyncQueueRepository;
   /** Devuelve el lastPullAt persistido (puede ser null la primera vez). */
-  getLastPullAt: () => string | null;
-  setLastPullAt: (iso: string) => void;
+  getLastPullAt: () => string | null | Promise<string | null>;
+  setLastPullAt: (iso: string) => void | Promise<void>;
   /** Caller puede sobreescribir el cliente HTTP (test). */
   api?: typeof syncApi;
   /** Hook opcional para notificar al UI. */
@@ -126,11 +126,20 @@ export class SyncEngine {
       const sucursalId = useSyncStore.getState().sucursalId ?? useAuthStore.getState().sucursalActivaId;
       if (!sucursalId) throw new SyncAuthError('No hay sucursal activa');
 
-      const lastPullAt = this.deps.getLastPullAt();
-      const pullResp = await this.deps.api!.pull({ since: lastPullAt, sucursalId });
-      await this.applyPull(pullResp.changes);
-      this.deps.setLastPullAt(pullResp.serverTime);
-      this.emit({ type: 'pull', received: pullResp.changes.length });
+      let since = await this.deps.getLastPullAt();
+      let totalReceived = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const pullResp = await this.deps.api!.pull({ since, sucursalId });
+        await this.applyPull(pullResp.changes);
+        totalReceived += pullResp.changes.length;
+        hasMore = pullResp.hasMore;
+        since = pullResp.nextSince;
+      }
+
+      await this.deps.setLastPullAt(since ?? new Date().toISOString());
+      this.emit({ type: 'pull', received: totalReceived });
 
       const pushSummary = await this.pushPending(sucursalId);
       this.emit({ type: 'push', ...pushSummary });
