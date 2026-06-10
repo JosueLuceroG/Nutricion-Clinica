@@ -740,7 +740,17 @@
     "trend_normal": "Normal",
     "trend_high": "High",
     "trend_low": "Low",
-    "select_patient": "Select a patient"
+    "select_patient": "Select a patient",
+    "scan_title": "Scan Lab Report",
+    "scan_drop": "Drop an image of the lab report here, or click to select",
+    "scan_formats": "Supports JPG, PNG — the image is processed locally and never uploaded",
+    "scan_select": "Select image",
+    "scan_processing": "Processing image with OCR…",
+    "scan_results": "Recognized tests",
+    "scan_no_results": "No recognized tests. Try a clearer image.",
+    "scan_unrecognized": "unrecognized measurement(s) found",
+    "scan_apply": "Apply to form",
+    "scan_error": "Could not process the image. Please try again with a clearer photo."
   },
   "mealplan": {
     "title": "Meal Plans",

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
   Plus,
+  Scan,
   FlaskConical,
   Trash2,
   Calendar,
@@ -146,6 +147,12 @@ export function PatientLabPage() {
               <Link to={`/pacientes/${patient.id.toString()}`}>
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {t("patient.back_to_patient")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to={`/pacientes/${patient.id.toString()}/laboratorio/scan`}>
+                <Scan className="mr-2 h-4 w-4" />
+                {t("lab.scan_title")}
               </Link>
             </Button>
             <Button asChild>

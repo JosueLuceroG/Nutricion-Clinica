@@ -39,6 +39,7 @@ const PatientMeasurementsPage = lazyPage(() => import("@app/pages/anthropometry/
 const NewMeasurementPage = lazyPage(() => import("@app/pages/anthropometry/NewMeasurementPage"), "NewMeasurementPage");
 const PatientLabPage = lazyPage(() => import("@app/pages/laboratory/PatientLabPage"), "PatientLabPage");
 const NewLabPanelPage = lazyPage(() => import("@app/pages/laboratory/NewLabPanelPage"), "NewLabPanelPage");
+const ScanLabPanelPage = lazyPage(() => import("@app/pages/laboratory/ScanLabPanelPage"), "ScanLabPanelPage");
 const PatientConsultationsPage = lazyPage(() => import("@app/pages/consultations/PatientConsultationsPage"), "PatientConsultationsPage");
 const NewConsultationPage = lazyPage(() => import("@app/pages/consultations/NewConsultationPage"), "NewConsultationPage");
 const PatientMealPlansPage = lazyPage(() => import("@app/pages/plans/PatientMealPlansPage"), "PatientMealPlansPage");
@@ -125,6 +126,7 @@ const router = createHashRouter([
             children: [
               { index: true, element: <PatientLabPage /> },
               { path: "nuevo", element: <NewLabPanelPage /> },
+              { path: "scan", element: <ScanLabPanelPage /> },
             ],
           },
           {

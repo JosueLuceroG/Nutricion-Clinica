@@ -13,7 +13,7 @@ import { LAB_TEST_CODES, LabTestCategoryLabel, getLabTestsByCategory, type LabTe
 import { classifyLabValue } from "@modules/laboratory/domain/LabResult";
 import { findReferenceRange } from "@modules/laboratory/domain/LabReferenceRange";
 import { MEXICO_REFERENCE_RANGES } from "@modules/laboratory/data/mexicoReferenceRanges";
-import { LabResult } from "@modules/laboratory/domain/LabResult";
+import { LabResult, type LabResultInput } from "@modules/laboratory/domain/LabResult";
 import { labPanelService } from "@services/labPanelService";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { Sex } from "@modules/patient/domain/Sex";
@@ -29,25 +29,30 @@ interface LabPanelFormProps {
   patientId: PatientId;
   patientAge: number;
   patientSex: Sex;
+  initialResults?: LabResultInput[];
 }
 
 const grouped = getLabTestsByCategory();
 
-export function LabPanelForm({ patientId, patientAge, patientSex }: LabPanelFormProps) {
+export function LabPanelForm({ patientId, patientAge, patientSex, initialResults }: LabPanelFormProps) {
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-  } = useForm<LabPanelFormValues>({
+  const form = useForm<LabPanelFormValues>({
     resolver: zodResolver(LabPanelFormSchema),
     defaultValues: labPanelFormDefaultValues,
   });
 
+  const { register, handleSubmit, formState: { errors }, watch, setValue } = form;
   const values = watch();
+
+  React.useEffect(() => {
+    if (initialResults && initialResults.length > 0) {
+      for (const result of initialResults) {
+        setValue(result.test, result.value);
+      }
+    }
+  }, [initialResults, setValue]);
 
   const onSubmit = async (data: LabPanelFormValues) => {
     setSubmitting(true);

@@ -740,7 +740,17 @@
     "trend_normal": "Normal",
     "trend_high": "Alto",
     "trend_low": "Bajo",
-    "select_patient": "Selecciona un paciente"
+    "select_patient": "Selecciona un paciente",
+    "scan_title": "Escanear resultado",
+    "scan_drop": "Arrastra una imagen del resultado aquí, o haz clic para seleccionar",
+    "scan_formats": "Soporta JPG, PNG — la imagen se procesa localmente y nunca se sube",
+    "scan_select": "Seleccionar imagen",
+    "scan_processing": "Procesando imagen con OCR…",
+    "scan_results": "Pruebas reconocidas",
+    "scan_no_results": "No se reconocieron pruebas. Intenta con una imagen más clara.",
+    "scan_unrecognized": "medición(es) no reconocida(s)",
+    "scan_apply": "Aplicar al formulario",
+    "scan_error": "No se pudo procesar la imagen. Intenta de nuevo con una foto más clara."
   },
   "mealplan": {
     "title": "Planes de alimentación",
