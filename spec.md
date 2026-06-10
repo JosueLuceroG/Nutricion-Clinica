@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 30 completado — portal paciente con cache offline/PWA básica. Siguiente slice recomendado: mensajería paciente-nutrióloga o fotos de comidas del portal.
+- **Sprint actual:** Sprint 31 completado — mensajería asíncrona paciente-nutrióloga. Siguiente slice recomendado: fotos de comidas del portal.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -463,7 +463,7 @@ src/modules/
 
 ### 3.18 `patient-portal` (Fase 5, ~70% en progreso) — Portal del paciente (PWA)
 
-**Implementado (Sprints 25A-30):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). **Pendiente:** fotos de comidas, mensajería, multi-consultorio formal si excede sucursales, NOM-024 avanzada/interoperabilidad/certificación, telemedicina, wearables/OCR opcionales.
+**Implementado (Sprints 25A-31):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. Sprint 31 añadió mensajería asíncrona paciente-nutrióloga con `patient_portal_messages`, endpoints `GET/POST /patient-portal/:token/messages` con scope `messaging`, endpoints profesionales y notificación email al profesional. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia, mensajería y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). **Pendiente:** fotos de comidas, multi-consultorio formal si excede sucursales, NOM-024 avanzada/interoperabilidad/certificación, telemedicina, wearables/OCR opcionales.
 
 ### 3.19 `ai-assist` (Fase 4, planificado) — Sistema de IA
 
@@ -4059,7 +4059,9 @@ PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, ag
 - Frontend: ruta pública `/portal/:token` fuera de `AppLayout`, cliente `src/services/api/patientPortalApi.ts` con métodos públicos/profesionales/adherencia/email/documentos, UI responsive, card de adherencia pública, `PatientPortalLinksCard` y `PatientSubstitutionsCard` en detalle de paciente con historial reciente y traducciones `patient_portal.*`.
 - Tests: backend utilities, cliente API público/profesional/adherencia/email/cache offline, UUID estándar de rutas de portal, E2E Playwright público con payload interceptado incluyendo envío de adherencia, recordatorio, notificaciones y fallback offline cacheado.
 
-**Pendiente futuro:** carga de fotos, mensajería, multi-consultorio formal, retención avanzada, consentimientos e interoperabilidad/certificación NOM-024 formal.
+**Implementado (Sprint 31):** mensajería asíncrona paciente-nutrióloga con tabla `patient_portal_messages` en `apps/api/migrations/011-patient-messaging.sql`. El paciente envía mensajes mediante `POST /patient-portal/:token/messages` y consulta el historial con `GET /patient-portal/:token/messages` (requiere scope `messaging`). La nutrióloga responde desde el expediente profesional vía `POST /patient-portal/messages`, lista con `GET /patient-portal/messages?pacienteId=...` y marca como leídos con `PATCH /patient-portal/messages/:id/read`. Cuando el paciente envía un mensaje, se notifica al profesional por email mediante el servicio `emailService` y se registra en `notificaciones_email`. En el portal del paciente se agregó `MessagingCard` con burbujas de chat estilo app, polling cada 30s y envío por Enter. En el expediente profesional se agregó `PatientMessagingCard` con vista similar y marcado automático de leídos al visualizar. Los nuevos enlaces del portal incluyen `messaging` en scopes por defecto.
+
+**Pendiente futuro:** carga de fotos, multi-consultorio formal, retención avanzada, consentimientos e interoperabilidad/certificación NOM-024 formal.
 
 ---
 
@@ -4129,7 +4131,7 @@ PWA donde el paciente ve su plan, registra adherencia, sube fotos de comidas, ag
 | 42 Medicamentos | 31 | 3 | Solo registro en paciente | 20+ |
 | 43 Documentos | 32 | 2 | No | 11 (PDF) + 16-17 (firmas) |
 | 44 Dashboard | (ya en §20) | 3 | MVP (4 KPIs) | 19-20 |
-| 45 Portal paciente | 33 | 5 | Parcial (~70%) | Fotos/mensajería |
+| 45 Portal paciente | 33 | 5 | Parcial (~80%) | Fotos |
 | 46 Seguridad | (ya en §9) | 3 | MVP (datos locales) | 17-18 |
 | 47 Arquitectura técnica | (ya en §6) | 1-3 | MVP | Continuo |
 

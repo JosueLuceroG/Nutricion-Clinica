@@ -16,10 +16,10 @@ const PortalTokenParam = z
   .max(256)
   .regex(/^[A-Za-z0-9._~-]+$/);
 
-const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence']);
+const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging']);
 type PortalScope = z.infer<typeof PortalScopeSchema>;
 
-const DEFAULT_SCOPES: PortalScope[] = ['summary', 'plan', 'appointments', 'documents', 'adherence'];
+const DEFAULT_SCOPES: PortalScope[] = ['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging'];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -157,7 +157,19 @@ interface PortalAdherenceRecordRow {
   updated_at: Date;
 }
 
-type PortalAuditEventType = 'created' | 'revoked' | 'accessed' | 'adherence_submitted' | 'document_downloaded';
+interface PortalMessageRow {
+  id: string;
+  token_id: string;
+  paciente_id: string;
+  sucursal_id: string;
+  profesional_id: string | null;
+  content: string;
+  direction: 'patient_to_professional' | 'professional_to_patient';
+  read_at: Date | null;
+  created_at: Date;
+}
+
+type PortalAuditEventType = 'created' | 'revoked' | 'accessed' | 'adherence_submitted' | 'document_downloaded' | 'message_sent';
 
 interface PortalMealExchange {
   foodId: string;
@@ -1124,6 +1136,304 @@ router.get('/:token/documents/:documentId/download', async (req: Request, res: R
     } catch (fetchErr) {
       res.status(502).json({ error: 'No se pudo recuperar el archivo del almacenamiento externo' });
     }
+  } catch (err) {
+    next(err);
+  }
+});
+
+function rowToPortalMessage(row: PortalMessageRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    tokenId: row.token_id,
+    pacienteId: row.paciente_id,
+    sucursalId: row.sucursal_id,
+    profesionalId: row.profesional_id,
+    content: row.content,
+    direction: row.direction,
+    readAt: iso(row.read_at),
+    createdAt: iso(row.created_at),
+  };
+}
+
+// ─── Protected: Professional messaging ─────────────────────────
+
+router.get('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pacienteId = typeof req.query.pacienteId === 'string' ? req.query.pacienteId : '';
+    if (!isUuid(pacienteId)) {
+      res.status(400).json({ error: 'pacienteId debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('sucursal_id', sql.UniqueIdentifier(), String(req.sucursalId))
+      .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE sucursal_id = @sucursal_id
+            AND paciente_id = @paciente_id
+          ORDER BY created_at ASC`,
+      );
+
+    res.json({ messages: result.recordset.map(rowToPortalMessage) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !canManagePortalTokens(req.user.rol)) {
+      throw new ForbiddenError('Rol sin permisos para enviar mensajes');
+    }
+
+    const MessageSendBody = z.object({
+      pacienteId: z.string().uuid(),
+      content: z.string().trim().min(1).max(2000),
+    });
+    const body = MessageSendBody.parse(req.body);
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+
+    const tokenResult = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<{ id: string }>(
+        `SELECT TOP 1 id
+           FROM patient_portal_tokens
+          WHERE paciente_id = @paciente_id
+            AND sucursal_id = @sucursal_id
+            AND revoked_at IS NULL
+            AND expires_at > SYSUTCDATETIME()
+          ORDER BY created_at DESC`,
+      );
+    const tokenId = tokenResult.recordset[0]?.id ?? null;
+
+    const id = randomUUID();
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('token_id', sql.UniqueIdentifier(), tokenId ?? randomUUID())
+      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .input('profesional_id', sql.UniqueIdentifier(), req.user.sub)
+      .input('content', sql.NVarChar(2000), body.content)
+      .input('direction', sql.NVarChar(30), 'professional_to_patient')
+      .query(
+        `INSERT INTO patient_portal_messages
+           (id, token_id, paciente_id, sucursal_id, profesional_id, content, direction)
+         VALUES
+           (@id, @token_id, @paciente_id, @sucursal_id, @profesional_id, @content, @direction)`,
+      );
+
+    const created = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE id = @id`,
+      );
+
+    if (tokenId) {
+      await recordPortalAudit(pool, {
+        tokenId,
+        sucursalId,
+        pacienteId: body.pacienteId,
+        profesionalId: req.user.sub,
+        eventType: 'message_sent',
+        req,
+        details: { messageId: id, direction: 'professional_to_patient' },
+        auditEntityType: 'patient_portal_message',
+        auditEntityId: id,
+        auditOperation: 'create',
+      });
+    }
+
+    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/messages/:id/read', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    if (!isUuid(id)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query(
+        `UPDATE patient_portal_messages
+            SET read_at = COALESCE(read_at, SYSUTCDATETIME())
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id`,
+      );
+
+    const result = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id`,
+      );
+    const row = result.recordset[0];
+    if (!row) {
+      res.status(404).json({ error: 'Mensaje no encontrado' });
+      return;
+    }
+
+    res.json({ message: rowToPortalMessage(row) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Public: Patient messaging via portal token ────────────────
+
+router.get('/:token/messages', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('messaging')) {
+      throw new ForbiddenError('Este enlace no permite mensajería');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const result = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE paciente_id = @paciente_id
+            AND sucursal_id = @sucursal_id
+          ORDER BY created_at ASC`,
+      );
+
+    res.json({ messages: result.recordset.map(rowToPortalMessage) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:token/messages', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const MessageSendBody = z.object({
+      content: z.string().trim().min(1).max(2000),
+    });
+    const body = MessageSendBody.parse(req.body);
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('messaging')) {
+      throw new ForbiddenError('Este enlace no permite mensajería');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const id = randomUUID();
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('token_id', sql.UniqueIdentifier(), access.token_id)
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+      .input('content', sql.NVarChar(2000), body.content)
+      .input('direction', sql.NVarChar(30), 'patient_to_professional')
+      .query(
+        `INSERT INTO patient_portal_messages
+           (id, token_id, paciente_id, sucursal_id, content, direction)
+         VALUES
+           (@id, @token_id, @paciente_id, @sucursal_id, @content, @direction)`,
+      );
+
+    const created = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE id = @id`,
+      );
+
+    await recordPortalAudit(pool, {
+      tokenId: access.token_id,
+      sucursalId: access.sucursal_id,
+      pacienteId: access.paciente_id,
+      eventType: 'message_sent',
+      req,
+      details: { messageId: id, direction: 'patient_to_professional' },
+      auditEntityType: 'patient_portal_message',
+      auditEntityId: id,
+      auditOperation: 'create',
+    });
+
+    // Notify professional by email
+    try {
+      const profResult = await pool
+        .request()
+        .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+        .query<{ id: string; email: string | null; nombre: string }>(
+          `SELECT TOP 1 id, email, CONCAT(nombres, ' ', apellido_paterno) AS nombre
+             FROM profesionales
+            WHERE sucursal_id = @sucursal_id
+              AND activo = 1
+            ORDER BY created_at ASC`,
+        );
+      const prof = profResult.recordset[0];
+      if (prof?.email) {
+        const html = `<p>El paciente <strong>${fullName(access)}</strong> ha enviado un mensaje desde el portal.</p>
+                      <blockquote style="padding:12px;margin:12px 0;border-left:4px solid #3b82f6;background:#f8fafc;">
+                        ${body.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                      </blockquote>
+                      <p><a href="${req.protocol}://${req.get('host')}/#/pacientes/${access.paciente_id}" style="color:#3b82f6;">Ver en NutriClínica</a></p>`;
+        const subject = `Nuevo mensaje de ${fullName(access)} - NutriClínica`;
+        const emailResult = await sendEmail({ to: prof.email, subject, html });
+        await logEmailSent({
+          pacienteId: access.paciente_id,
+          tipo: 'patient_message',
+          destinatario: prof.email,
+          asunto: subject,
+          contenidoHtml: html,
+          messageId: emailResult.messageId,
+          error: emailResult.success ? null : (emailResult.error ?? 'Error desconocido'),
+        });
+      }
+    } catch {
+      // Email notification failure should not block the message
+    }
+
+    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
   } catch (err) {
     next(err);
   }

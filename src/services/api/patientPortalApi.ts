@@ -531,6 +531,87 @@ function getBackendBaseUrl(): string {
   return fromProcess ?? "http://localhost:3000";
 }
 
+const PortalMessageSchema = z.object({
+  id: z.string(),
+  tokenId: z.string(),
+  pacienteId: z.string(),
+  sucursalId: z.string(),
+  profesionalId: z.string().nullable(),
+  content: z.string(),
+  direction: z.enum(["patient_to_professional", "professional_to_patient"]),
+  readAt: z.string().nullable(),
+  createdAt: z.string().nullable(),
+});
+
+const PortalMessagesResponseSchema = z.object({
+  messages: z.array(PortalMessageSchema),
+});
+
+const SendPortalMessageResponseSchema = z.object({
+  message: PortalMessageSchema,
+});
+
+export type PortalMessage = z.infer<typeof PortalMessageSchema>;
+
+export async function listPatientPortalMessages(
+  token: string,
+  signal?: AbortSignal,
+): Promise<PortalMessage[]> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/messages`,
+    { skipAuth: true, skipSucursalHeader: true, signal },
+  );
+  return PortalMessagesResponseSchema.parse(response).messages;
+}
+
+export async function sendPatientPortalMessage(
+  token: string,
+  content: string,
+): Promise<PortalMessage> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/messages`,
+    {
+      method: "POST",
+      body: { content },
+      skipAuth: true,
+      skipSucursalHeader: true,
+    },
+  );
+  return SendPortalMessageResponseSchema.parse(response).message;
+}
+
+export async function listProfessionalMessages(
+  pacienteId: string,
+  signal?: AbortSignal,
+): Promise<PortalMessage[]> {
+  const response = await httpRequest<unknown>("/patient-portal/messages", {
+    query: { pacienteId },
+    signal,
+  });
+  return PortalMessagesResponseSchema.parse(response).messages;
+}
+
+export async function sendProfessionalMessage(
+  pacienteId: string,
+  content: string,
+): Promise<PortalMessage> {
+  const response = await httpRequest<unknown>("/patient-portal/messages", {
+    method: "POST",
+    body: { pacienteId, content },
+  });
+  return SendPortalMessageResponseSchema.parse(response).message;
+}
+
+export async function markMessageAsRead(
+  messageId: string,
+): Promise<PortalMessage> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/messages/${encodeURIComponent(messageId)}/read`,
+    { method: "PATCH" },
+  );
+  return SendPortalMessageResponseSchema.parse(response).message;
+}
+
 /** URL para descargar un documento del portal. */
 export function getDocumentDownloadUrl(
   token: string,

@@ -22,6 +22,7 @@ import {
 import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
 import { PatientPortalLinksCard } from "./PatientPortalLinksCard";
 import { PatientPortalAdherenceCard } from "./PatientPortalAdherenceCard";
+import { PatientMessagingCard } from "./PatientMessagingCard";
 import { PatientSubstitutionsCard } from "./PatientSubstitutionsCard";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -259,6 +260,8 @@ export function PatientDetailPage() {
             <PatientPortalLinksCard patientId={patient.id.toString()} />
 
             <PatientPortalAdherenceCard patientId={patient.id.toString()} />
+
+            <PatientMessagingCard patientId={patient.id.toString()} />
 
             <PatientSubstitutionsCard patientId={patient.id.toString()} />
 

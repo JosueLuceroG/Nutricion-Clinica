@@ -12,6 +12,7 @@ import {
   FileText,
   LockKeyhole,
   Mail,
+  MessageCircle,
   Phone,
   RefreshCcw,
   ShieldCheck,
@@ -45,10 +46,13 @@ import {
   getPatientPortalPayloadWithCache,
   getPendingPortalAdherenceSubmissions,
   getPortalNotificationsWithCache,
+  listPatientPortalMessages,
+  sendPatientPortalMessage,
   sendPortalReminder,
   type PatientPortalMeal,
   type PatientPortalPayload,
   type PatientPortalPlan,
+  type PortalMessage,
   type PortalNotification,
   type SubmitPortalAdherenceInput,
   submitPatientPortalAdherenceWithQueue,
@@ -205,6 +209,7 @@ function PortalContent({
     data.patient.fullName.split(" ")[0] ?? data.patient.fullName;
   const nextAppointment = data.upcomingAppointments[0];
   const canSubmitAdherence = data.portal.scopes.includes("adherence");
+  const canSendMessages = data.portal.scopes.includes("messaging");
 
   return (
     <>
@@ -293,6 +298,7 @@ function PortalContent({
         <ActivePlanCard plan={data.activePlan} locale={locale} />
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
+          {canSendMessages && <MessagingCard token={token ?? ""} />}
           <AppointmentsCard
             token={token ?? ""}
             appointments={data.upcomingAppointments}
@@ -1015,6 +1021,129 @@ function DocumentsCard({
             ))}
           </ul>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MessagingCard({ token }: { token: string }) {
+  const { t, i18n } = useTranslation();
+  const [messages, setMessages] = React.useState<PortalMessage[]>([]);
+  const [input, setInput] = React.useState("");
+  const [loading, setLoading] = React.useState(true);
+  const [sending, setSending] = React.useState(false);
+  const bottomRef = React.useRef<HTMLDivElement>(null);
+
+  const loadMessages = React.useCallback(async () => {
+    try {
+      const msgs = await listPatientPortalMessages(token);
+      setMessages(msgs);
+    } catch { /* ignore polling errors */ }
+  }, [token]);
+
+  React.useEffect(() => {
+    setLoading(true);
+    loadMessages().finally(() => setLoading(false));
+    const interval = setInterval(() => void loadMessages(), 30_000);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
+
+  React.useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setSending(true);
+    try {
+      const msg = await sendPatientPortalMessage(token, text);
+      setMessages((prev) => [...prev, msg]);
+      setInput("");
+    } catch {
+      // Could add error toast
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSend();
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MessageCircle className="h-4 w-4 text-primary" aria-hidden />
+          {t("patient_portal.messages_title")}
+        </CardTitle>
+        <CardDescription>{t("patient_portal.messages_desc")}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          <div className="flex max-h-72 min-h-32 flex-col gap-2 overflow-y-auto rounded-lg border bg-muted/30 p-3">
+            {loading ? (
+              <Skeleton className="h-20 w-full rounded-lg" />
+            ) : messages.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                {t("patient_portal.messages_empty")}
+              </p>
+            ) : (
+              messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`flex ${msg.direction === "patient_to_professional" ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-4 py-2 text-sm ${
+                      msg.direction === "patient_to_professional"
+                        ? "bg-primary text-primary-foreground rounded-br-md"
+                        : "bg-muted text-foreground rounded-bl-md"
+                    }`}
+                  >
+                    <p className="break-words">{msg.content}</p>
+                    <p
+                      className={`mt-1 text-[10px] ${
+                        msg.direction === "patient_to_professional"
+                          ? "text-primary-foreground/70"
+                          : "text-muted-foreground"
+                      }`}
+                    >
+                      {formatDateTime(msg.createdAt, i18n.language)}
+                      {msg.direction === "professional_to_patient" && msg.readAt && " · Leído"}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+            <div ref={bottomRef} />
+          </div>
+
+          <div className="flex gap-2">
+            <Textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t("patient_portal.messages_placeholder")}
+              className="min-h-10 resize-none"
+              rows={2}
+            />
+            <Button
+              onClick={() => void handleSend()}
+              disabled={!input.trim() || sending}
+              className="self-end"
+              size="sm"
+            >
+              {sending
+                ? t("patient_portal.messages_sending")
+                : t("patient_portal.messages_send")}
+            </Button>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
