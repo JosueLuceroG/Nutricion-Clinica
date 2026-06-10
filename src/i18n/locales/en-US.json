@@ -2232,9 +2232,20 @@
     "stop_recording": "Stop recording",
     "recording_started": "Recording started",
     "recording_saved": "Recording saved",
+    "recording_encrypting": "Encrypting recording...",
+    "recording_saved_encrypted": "Encrypted recording saved locally",
+    "recording_downloaded": "Recording downloaded",
+    "recordings_saved": "{{count}} encrypted recording(s) in this room",
+    "download_latest_recording": "Download latest",
+    "recording_consent_title": "Recording consent",
+    "recording_consent_desc": "Before recording, confirm that the patient and professional agree to record this session. The file will be encrypted and stored locally on this device.",
+    "recording_consent_checkbox": "I confirm both parties gave explicit consent to record this video call.",
+    "start_recording": "Start recording",
     "recording_error_unsupported": "Your browser does not support recording",
     "recording_error_missing-stream": "Start the call before recording",
-    "recording_error_start-failed": "Could not start recording"
+    "recording_error_start-failed": "Could not start recording",
+    "recording_error_save-failed": "Could not encrypt and save the recording",
+    "recording_error_download-failed": "Could not decrypt the recording"
   },
   "ai": {
     "title": "AI Assistant",

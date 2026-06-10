@@ -1,8 +1,11 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Circle, Square } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff, Circle, Square, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@components/ui/button";
+import { Checkbox } from "@components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@components/ui/dialog";
+import { Label } from "@components/ui/label";
 import { cn } from "@utils/cn";
 import { useWebRTC } from "./useWebRTC";
 import { useCallRecording } from "./useCallRecording";
@@ -21,9 +24,20 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
   const [videoEnabled, setVideoEnabled] = React.useState(true);
   const [inCall, setInCall] = React.useState(false);
   const [mediaError, setMediaError] = React.useState<string | null>(null);
+  const [consentOpen, setConsentOpen] = React.useState(false);
+  const [consentAccepted, setConsentAccepted] = React.useState(false);
 
   const { remoteStream, peers, connected, startCall: startSignaling, endCall: endSignaling, error: signalingError } = useWebRTC({ salaId, localStream });
-  const { isRecording, error: recordingError, startRecording, stopRecording } = useCallRecording({ salaId, localStream, remoteStream });
+  const {
+    isRecording,
+    isSaving,
+    error: recordingError,
+    recordings,
+    lastSavedRecording,
+    startRecording,
+    stopRecording,
+    downloadRecording,
+  } = useCallRecording({ salaId, localStream, remoteStream });
 
   React.useEffect(() => {
     if (localVideoRef.current && localStream) {
@@ -47,6 +61,10 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
+
+  React.useEffect(() => {
+    if (lastSavedRecording) toast.success(t("telemedicina.recording_saved_encrypted"));
+  }, [lastSavedRecording, t]);
 
   const startCall = async () => {
     try {
@@ -88,11 +106,26 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
   const toggleRecording = () => {
     if (isRecording) {
       stopRecording();
-      toast.success(t("telemedicina.recording_saved"));
+      toast.success(t("telemedicina.recording_encrypting"));
       return;
     }
-    const started = startRecording();
-    if (started) toast.success(t("telemedicina.recording_started"));
+    setConsentAccepted(false);
+    setConsentOpen(true);
+  };
+
+  const confirmRecordingConsent = () => {
+    const started = startRecording(new Date().toISOString());
+    if (started) {
+      setConsentOpen(false);
+      toast.success(t("telemedicina.recording_started"));
+    }
+  };
+
+  const downloadLatestRecording = async () => {
+    const latest = recordings[0];
+    if (!latest) return;
+    const downloaded = await downloadRecording(latest.id);
+    if (downloaded) toast.success(t("telemedicina.recording_downloaded"));
   };
 
   return (
@@ -134,6 +167,7 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
                 {t(`telemedicina.recording_error_${recordingError}`)}
               </span>
             )}
+            {isSaving && <span className="text-xs text-muted-foreground">{t("telemedicina.recording_encrypting")}</span>}
             <Button
               variant="outline"
               size="icon"
@@ -178,6 +212,43 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
           </Button>
         )}
       </div>
+
+      {recordings.length > 0 && (
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+          <span>{t("telemedicina.recordings_saved", { count: recordings.length })}</span>
+          <Button variant="outline" size="sm" onClick={downloadLatestRecording}>
+            <Download className="mr-1 h-3.5 w-3.5" />
+            {t("telemedicina.download_latest_recording")}
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={consentOpen} onOpenChange={setConsentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("telemedicina.recording_consent_title")}</DialogTitle>
+            <DialogDescription>{t("telemedicina.recording_consent_desc")}</DialogDescription>
+          </DialogHeader>
+          <div className="flex items-start gap-3 rounded-md border bg-muted/30 p-3">
+            <Checkbox
+              id="recording-consent"
+              checked={consentAccepted}
+              onCheckedChange={(checked) => setConsentAccepted(checked === true)}
+            />
+            <Label htmlFor="recording-consent" className="text-sm leading-relaxed">
+              {t("telemedicina.recording_consent_checkbox")}
+            </Label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConsentOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={confirmRecordingConsent} disabled={!consentAccepted}>
+              {t("telemedicina.start_recording")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

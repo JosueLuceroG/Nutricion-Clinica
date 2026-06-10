@@ -2232,9 +2232,20 @@
     "stop_recording": "Detener grabación",
     "recording_started": "Grabación iniciada",
     "recording_saved": "Grabación guardada",
+    "recording_encrypting": "Cifrando grabación...",
+    "recording_saved_encrypted": "Grabación cifrada guardada localmente",
+    "recording_downloaded": "Grabación descargada",
+    "recordings_saved": "{{count}} grabación(es) cifrada(s) en esta sala",
+    "download_latest_recording": "Descargar última",
+    "recording_consent_title": "Consentimiento para grabar",
+    "recording_consent_desc": "Antes de grabar, confirma que el paciente y el profesional aceptan la grabación de esta sesión. El archivo se cifrará y se guardará localmente en este dispositivo.",
+    "recording_consent_checkbox": "Confirmo que ambas partes dieron consentimiento explícito para grabar esta videollamada.",
+    "start_recording": "Iniciar grabación",
     "recording_error_unsupported": "Tu navegador no soporta grabación",
     "recording_error_missing-stream": "Inicia la llamada antes de grabar",
-    "recording_error_start-failed": "No fue posible iniciar la grabación"
+    "recording_error_start-failed": "No fue posible iniciar la grabación",
+    "recording_error_save-failed": "No fue posible cifrar y guardar la grabación",
+    "recording_error_download-failed": "No fue posible descifrar la grabación"
   },
   "ai": {
     "title": "Asistente IA",

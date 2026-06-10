@@ -1,6 +1,10 @@
 import * as React from "react";
+import {
+  recordingStorageService,
+  type TelemedicinaRecordingSummary,
+} from "./recordingStorageService";
 
-type RecordingError = "unsupported" | "missing-stream" | "start-failed";
+type RecordingError = "unsupported" | "missing-stream" | "start-failed" | "save-failed" | "download-failed";
 
 interface UseCallRecordingOptions {
   salaId: string;
@@ -10,9 +14,13 @@ interface UseCallRecordingOptions {
 
 interface UseCallRecordingReturn {
   isRecording: boolean;
+  isSaving: boolean;
   error: RecordingError | null;
-  startRecording: () => boolean;
+  recordings: TelemedicinaRecordingSummary[];
+  lastSavedRecording: TelemedicinaRecordingSummary | null;
+  startRecording: (consentAcceptedAt: string) => boolean;
   stopRecording: () => void;
+  downloadRecording: (id: string) => Promise<boolean>;
 }
 
 export function useCallRecording({
@@ -21,9 +29,22 @@ export function useCallRecording({
   remoteStream,
 }: UseCallRecordingOptions): UseCallRecordingReturn {
   const [isRecording, setIsRecording] = React.useState(false);
+  const [isSaving, setIsSaving] = React.useState(false);
   const [error, setError] = React.useState<RecordingError | null>(null);
+  const [recordings, setRecordings] = React.useState<TelemedicinaRecordingSummary[]>([]);
+  const [lastSavedRecording, setLastSavedRecording] = React.useState<TelemedicinaRecordingSummary | null>(null);
   const recorderRef = React.useRef<MediaRecorder | null>(null);
   const chunksRef = React.useRef<Blob[]>([]);
+  const startedAtRef = React.useRef<number>(0);
+  const consentAcceptedAtRef = React.useRef<string>("");
+
+  const refreshRecordings = React.useCallback(async () => {
+    setRecordings(await recordingStorageService.listBySala(salaId));
+  }, [salaId]);
+
+  React.useEffect(() => {
+    void refreshRecordings();
+  }, [refreshRecordings]);
 
   const stopRecording = React.useCallback(() => {
     const recorder = recorderRef.current;
@@ -38,7 +59,7 @@ export function useCallRecording({
     };
   }, [stopRecording]);
 
-  const startRecording = React.useCallback(() => {
+  const startRecording = React.useCallback((consentAcceptedAt: string) => {
     if (typeof MediaRecorder === "undefined") {
       setError("unsupported");
       return false;
@@ -54,6 +75,8 @@ export function useCallRecording({
       chunksRef.current = [];
       const recorder = new MediaRecorder(stream, { mimeType: getSupportedMimeType() });
       recorderRef.current = recorder;
+      startedAtRef.current = Date.now();
+      consentAcceptedAtRef.current = consentAcceptedAt;
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -61,9 +84,26 @@ export function useCallRecording({
 
       recorder.onstop = () => {
         setIsRecording(false);
-        downloadRecording(salaId, chunksRef.current, recorder.mimeType);
+        const chunks = chunksRef.current;
         chunksRef.current = [];
         recorderRef.current = null;
+        if (chunks.length === 0) return;
+        const blob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+        const durationMs = Math.max(0, Date.now() - startedAtRef.current);
+        setIsSaving(true);
+        recordingStorageService
+          .saveEncrypted({
+            salaId,
+            blob,
+            durationMs,
+            consentAcceptedAt: consentAcceptedAtRef.current,
+          })
+          .then((saved) => {
+            setLastSavedRecording(saved);
+            return refreshRecordings();
+          })
+          .catch(() => setError("save-failed"))
+          .finally(() => setIsSaving(false));
       };
 
       recorder.start(1000);
@@ -74,9 +114,20 @@ export function useCallRecording({
       setError("start-failed");
       return false;
     }
-  }, [localStream, remoteStream, salaId]);
+  }, [localStream, refreshRecordings, remoteStream, salaId]);
 
-  return { isRecording, error, startRecording, stopRecording };
+  const downloadRecording = React.useCallback(async (id: string) => {
+    try {
+      const downloaded = await recordingStorageService.download(id);
+      if (!downloaded) setError("download-failed");
+      return downloaded;
+    } catch {
+      setError("download-failed");
+      return false;
+    }
+  }, []);
+
+  return { isRecording, isSaving, error, recordings, lastSavedRecording, startRecording, stopRecording, downloadRecording };
 }
 
 function buildRecordingStream(localStream: MediaStream | null, remoteStream: MediaStream | null): MediaStream | null {
@@ -93,16 +144,4 @@ function buildRecordingStream(localStream: MediaStream | null, remoteStream: Med
 function getSupportedMimeType(): string {
   const preferred = "video/webm;codecs=vp8,opus";
   return MediaRecorder.isTypeSupported(preferred) ? preferred : "video/webm";
-}
-
-function downloadRecording(salaId: string, chunks: Blob[], mimeType: string): void {
-  if (chunks.length === 0) return;
-  const blob = new Blob(chunks, { type: mimeType || "video/webm" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  a.href = url;
-  a.download = `nutriclinica-sala-${salaId.slice(0, 8)}-${stamp}.webm`;
-  a.click();
-  URL.revokeObjectURL(url);
 }

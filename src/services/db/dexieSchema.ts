@@ -38,6 +38,21 @@ export interface AIUsageLogRow {
   created_at: string;
 }
 
+export interface TelemedicinaRecordingRow {
+  id: string;
+  sala_id: string;
+  created_by: string | null;
+  created_at: string;
+  duration_ms: number;
+  mime_type: string;
+  original_size_bytes: number;
+  encrypted_size_bytes: number;
+  iv: string;
+  encrypted_blob: Blob;
+  consent_accepted_at: string;
+  consent_text_version: string;
+}
+
 const PATIENT_STORES = [
   "id",
   "first_name",
@@ -171,6 +186,7 @@ const DASHBOARD_CONFIGS_STORES = "id, user_id, widget_type, is_visible, position
 const PATIENT_CONSENTS_STORES = "id, patient_id, type, signed_at, revoked_at";
 const AI_CACHE_STORES = ["key", "capability", "created_at", "expires_at"].join(", ");
 const AI_USAGE_LOGS_STORES = ["id", "capability", "created_at"].join(", ");
+const TELEMEDICINA_RECORDINGS_STORES = "id, sala_id, created_by, created_at";
 
 export class NutriClinicaDB extends Dexie {
   patients!: Table<PatientRow, string>;
@@ -217,6 +233,7 @@ export class NutriClinicaDB extends Dexie {
   patient_consents!: Table<PatientConsent, string>;
   ai_cache!: Table<AICacheRow>;
   ai_usage_logs!: Table<AIUsageLogRow>;
+  telemedicina_recordings!: Table<TelemedicinaRecordingRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -349,6 +366,10 @@ export class NutriClinicaDB extends Dexie {
     this.version(24).stores({
       ai_cache: AI_CACHE_STORES,
       ai_usage_logs: AI_USAGE_LOGS_STORES,
+    });
+
+    this.version(25).stores({
+      telemedicina_recordings: TELEMEDICINA_RECORDINGS_STORES,
     });
   }
 }
