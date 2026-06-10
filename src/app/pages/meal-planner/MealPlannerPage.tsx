@@ -12,6 +12,7 @@ import { ShoppingListDialog } from "@modules/meal-planner/ui/ShoppingListDialog"
 import { ChefDialog } from "@modules/meal-planner/ui/ChefDialog";
 import type { WeeklyPlan } from "@modules/meal-planner/domain/WeeklyPlan";
 import type { MealPlannerFormInput } from "@modules/meal-planner/application/mealPlannerFormSchema";
+import { useAuthStore } from "@store/authStore";
 
 const statusColor: Record<string, string> = {
   draft: "bg-gray-100 text-gray-800",
@@ -53,6 +54,7 @@ export function MealPlannerPage() {
   const { t } = useTranslation();
   const { plans, loading, refresh } = useWeeklyPlans();
   const { create } = useCreateWeeklyPlan();
+  const currentUser = useAuthStore((s) => s.user);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [chefDialogOpen, setChefDialogOpen] = React.useState(false);
   const [shoppingListDialogOpen, setShoppingListDialogOpen] = React.useState(false);
@@ -120,7 +122,7 @@ export function MealPlannerPage() {
             targetFiberG: 25,
             timesPerDay: payload.timesPerDay,
             restrictions: payload.restrictions,
-            professionalId: "chef-ai",
+            professionalId: currentUser?.id ?? "chef-ai",
             patientId: "all",
             days: payload.days.map((d, i) => ({
               dayNumber: d.dayNumber,

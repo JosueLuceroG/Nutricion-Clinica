@@ -35,10 +35,12 @@ export function ChefDialog({ open, onOpenChange, onApply }: ChefDialogProps) {
   const [daysCount, setDaysCount] = React.useState(7);
   const [generating, setGenerating] = React.useState(false);
   const [result, setResult] = React.useState<Awaited<ReturnType<typeof generateMealPlan>> | null>(null);
+  const [streamText, setStreamText] = React.useState("");
 
   const handleGenerate = async () => {
     setGenerating(true);
     setResult(null);
+    setStreamText("");
     try {
       const res = await generateMealPlan({
         targetKcal, timesPerDay,
@@ -46,7 +48,7 @@ export function ChefDialog({ open, onOpenChange, onApply }: ChefDialogProps) {
         restrictions: restrictions.split(",").map((s) => s.trim()).filter(Boolean),
         preferences,
         daysCount,
-      });
+      }, (text) => setStreamText(text));
       if (res.error) {
         toast.error(res.error);
       }
@@ -140,6 +142,16 @@ export function ChefDialog({ open, onOpenChange, onApply }: ChefDialogProps) {
             {generating ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Sparkles className="mr-1 h-4 w-4" />}
             {generating ? t("meal_planner.generating") : t("meal_planner.generate_with_ai")}
           </Button>
+
+          {generating && streamText ? (
+            <div className="rounded-lg border p-3">
+              <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {t("meal_planner.generating")}
+              </div>
+              <pre className="max-h-32 overflow-y-auto whitespace-pre-wrap text-xs text-muted-foreground">{streamText}</pre>
+            </div>
+          ) : null}
 
           {result?.error ? (
             <p className="text-sm text-red-500">{result.error}</p>

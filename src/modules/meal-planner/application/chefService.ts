@@ -38,6 +38,8 @@ interface ChefResult {
   error?: string;
 }
 
+type ProgressCallback = (text: string) => void;
+
 function slotNamesForPrompt(count: number): string[] {
   const all = Object.values(SLOT_NAMES);
   if (count <= 3) return all.slice(0, count);
@@ -50,19 +52,14 @@ function mapSlotLabelToKey(label: string): MealSlot {
   return (entry?.[0] ?? "breakfast") as MealSlot;
 }
 
-export async function generateMealPlan(input: ChefInput): Promise<ChefResult> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
-  if (!apiKey) {
-    return { days: [], error: "VITE_OPENAI_API_KEY no configurada en .env" };
-  }
-
+function buildPrompt(input: ChefInput): string {
   const slots = slotNamesForPrompt(input.timesPerDay);
   const slotsJson = JSON.stringify(slots.map((s) => ({
     slot: s,
     targetKcal: Math.round(input.targetKcal / input.timesPerDay),
   })));
 
-  const prompt = `Eres un nutriólogo experto. Genera un plan de alimentación semanal con las siguientes características:
+  return `Eres un nutriólogo experto. Genera un plan de alimentación semanal con las siguientes características:
 
 - Calorías objetivo: ${input.targetKcal} kcal
 - Distribución: ${input.targetProteinPct}% proteína, ${input.targetFatPct}% grasa, ${input.targetCarbPct}% carbohidratos
@@ -89,7 +86,45 @@ Responde exclusivamente en formato JSON válido (sin markdown, sin explicación 
 }
 
 Cada día debe sumar aproximadamente ${input.targetKcal} kcal. Usa los nombres de slot exactamente como están en la lista de arriba. Los alimentos deben ser variados, realistas y adaptados a las restricciones/preferencias. Usa nombres de alimentos en español.`;
+}
 
+function parseJsonResponse(text: string): ChefResult {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return { days: [], error: "No se pudo extraer JSON de la respuesta" };
+  }
+  const parsed = JSON.parse(jsonMatch[0]) as { days: Array<{ dayNumber: number; meals: Array<{ slot: string; foods: string[]; kcal: number }>; totalKcal: number }> };
+  if (!parsed.days || !Array.isArray(parsed.days)) {
+    return { days: [], error: "Respuesta con formato inesperado" };
+  }
+  const days: DaySuggestion[] = parsed.days.map((d) => ({
+    dayNumber: d.dayNumber,
+    totalKcal: d.totalKcal,
+    meals: d.meals.map((m) => ({
+      slot: mapSlotLabelToKey(m.slot),
+      foods: m.foods,
+      kcal: m.kcal,
+    })),
+  }));
+  return { days };
+}
+
+export async function generateMealPlan(input: ChefInput, onProgress?: ProgressCallback): Promise<ChefResult> {
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
+  if (!apiKey) {
+    return { days: [], error: "VITE_OPENAI_API_KEY no configurada en .env" };
+  }
+
+  const prompt = buildPrompt(input);
+
+  if (onProgress) {
+    return generateStreaming(prompt, apiKey, onProgress);
+  }
+
+  return generateNonStreaming(prompt, apiKey);
+}
+
+async function generateNonStreaming(prompt: string, apiKey: string): Promise<ChefResult> {
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -112,25 +147,70 @@ Cada día debe sumar aproximadamente ${input.targetKcal} kcal. Usa los nombres d
 
     const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
     const text = data.choices?.[0]?.message?.content ?? "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return { days: [], error: "No se pudo extraer JSON de la respuesta" };
-    }
-    const parsed = JSON.parse(jsonMatch[0]) as { days: Array<{ dayNumber: number; meals: Array<{ slot: string; foods: string[]; kcal: number }>; totalKcal: number }> };
-    if (!parsed.days || !Array.isArray(parsed.days)) {
-      return { days: [], error: "Respuesta con formato inesperado" };
-    }
-    const days: DaySuggestion[] = parsed.days.map((d) => ({
-      dayNumber: d.dayNumber,
-      totalKcal: d.totalKcal,
-      meals: d.meals.map((m) => ({
-        slot: mapSlotLabelToKey(m.slot),
-        foods: m.foods,
-        kcal: m.kcal,
-      })),
-    }));
-    return { days };
+    return parseJsonResponse(text);
   } catch (err) {
     return { days: [], error: err instanceof Error ? err.message : "Error desconocido" };
   }
 }
+
+async function generateStreaming(prompt: string, apiKey: string, onProgress: ProgressCallback): Promise<ChefResult> {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        max_tokens: 4000,
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
+      return { days: [], error: `OpenAI API error ${response.status}: ${errBody}` };
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) {
+      return { days: [], error: "No se pudo iniciar streaming" };
+    }
+
+    const decoder = new TextDecoder();
+    let fullText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        const data = trimmed.slice(6);
+        if (data === "[DONE]") continue;
+
+        try {
+          const parsed = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> };
+          const content = parsed.choices?.[0]?.delta?.content ?? "";
+          fullText += content;
+          onProgress(fullText);
+        } catch {
+          // skip malformed JSON lines
+        }
+      }
+    }
+
+    return parseJsonResponse(fullText);
+  } catch (err) {
+    return { days: [], error: err instanceof Error ? err.message : "Error desconocido" };
+  }
+}
+
+
