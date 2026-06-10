@@ -5,11 +5,19 @@ import { getPool } from '../db/connection.js';
 
 export type AuditOperation = 'create' | 'read' | 'update' | 'delete' | 'login' | 'logout' | 'sync';
 
-export function auditLog(op: AuditOperation, entityType: string, getEntityId?: (req: Request) => string | null) {
-  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+export type AuditMiddleware = ((req: Request, res: Response, next: NextFunction) => Promise<void>) & {
+  auditOperation?: AuditOperation;
+  auditEntityType?: string;
+};
+
+export function auditLog(op: AuditOperation, entityType: string, getEntityId?: (req: Request) => string | string[] | null | undefined) {
+  const middleware: AuditMiddleware = async function auditMiddleware(req: Request, _res: Response, next: NextFunction): Promise<void> {
     try {
       const pool = await getPool();
-      const entityId = getEntityId?.(req) ?? null;
+      const rawEntityId = getEntityId?.(req);
+      const entityId = Array.isArray(rawEntityId) ? rawEntityId[0] ?? null : rawEntityId ?? null;
+      const reqRecord = req as unknown as Record<string, unknown>;
+      const userRecord = reqRecord.user as Record<string, unknown> | null | undefined;
       const detalles = JSON.stringify({
         method: req.method,
         path: req.originalUrl,
@@ -19,8 +27,8 @@ export function auditLog(op: AuditOperation, entityType: string, getEntityId?: (
       await pool
         .request()
         .input('id', sql.UniqueIdentifier(), randomUUID())
-        .input('sucursal_id', sql.UniqueIdentifier(), (req as Record<string, unknown>).sucursalId as string | null)
-        .input('profesional_id', sql.UniqueIdentifier(), ((req as Record<string, unknown>).user as Record<string, unknown> | null)?.sub as string | null)
+        .input('sucursal_id', sql.UniqueIdentifier(), reqRecord.sucursalId as string | null)
+        .input('profesional_id', sql.UniqueIdentifier(), userRecord?.sub as string | null)
         .input('entity_type', sql.NVarChar(60), entityType)
         .input('entity_id', sql.UniqueIdentifier(), entityId)
         .input('operacion', sql.NVarChar(20), op)
@@ -38,4 +46,7 @@ export function auditLog(op: AuditOperation, entityType: string, getEntityId?: (
     }
     next();
   };
+  middleware.auditOperation = op;
+  middleware.auditEntityType = entityType;
+  return middleware;
 }

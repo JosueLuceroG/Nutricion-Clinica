@@ -229,37 +229,40 @@ router.post('/:id/grabaciones',
   },
 );
 
-router.get('/:id/grabaciones/:grabacionId/blob', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = String(req.params.id);
-    const grabacionId = String(req.params.grabacionId);
-    if (!UUID_REGEX.test(id) || !UUID_REGEX.test(grabacionId)) { res.status(400).json({ error: 'ids deben ser UUID' }); return; }
-    const sucursalId = String(req.sucursalId);
-    const pool = await getPool();
-    const result = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), grabacionId)
-      .input('sala_id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<VideoGrabacionBlobRow>(
-        `SELECT id, sala_id, sucursal_id, created_by, created_at, duration_ms, mime_type,
-                original_size_bytes, encrypted_size_bytes, iv, consent_accepted_at, consent_text_version,
-                encrypted_blob
-           FROM video_grabaciones
-          WHERE id = @id AND sala_id = @sala_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`,
-      );
-    const row = result.recordset[0];
-    if (!row) { res.status(404).json({ error: 'Grabación no encontrada' }); return; }
-    res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('X-Mime-Type', row.mime_type);
-    res.setHeader('X-IV', row.iv);
-    res.setHeader('X-Duration-Ms', String(row.duration_ms));
-    res.setHeader('X-Original-Size-Bytes', String(row.original_size_bytes));
-    res.send(row.encrypted_blob);
-  } catch (err) {
-    next(err);
-  }
-});
+router.get('/:id/grabaciones/:grabacionId/blob',
+  auditLog('read', 'video_grabacion', (req) => req.params.grabacionId ?? null),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = String(req.params.id);
+      const grabacionId = String(req.params.grabacionId);
+      if (!UUID_REGEX.test(id) || !UUID_REGEX.test(grabacionId)) { res.status(400).json({ error: 'ids deben ser UUID' }); return; }
+      const sucursalId = String(req.sucursalId);
+      const pool = await getPool();
+      const result = await pool
+        .request()
+        .input('id', sql.UniqueIdentifier(), grabacionId)
+        .input('sala_id', sql.UniqueIdentifier(), id)
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query<VideoGrabacionBlobRow>(
+          `SELECT id, sala_id, sucursal_id, created_by, created_at, duration_ms, mime_type,
+                  original_size_bytes, encrypted_size_bytes, iv, consent_accepted_at, consent_text_version,
+                  encrypted_blob
+             FROM video_grabaciones
+            WHERE id = @id AND sala_id = @sala_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`,
+        );
+      const row = result.recordset[0];
+      if (!row) { res.status(404).json({ error: 'Grabación no encontrada' }); return; }
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('X-Mime-Type', row.mime_type);
+      res.setHeader('X-IV', row.iv);
+      res.setHeader('X-Duration-Ms', String(row.duration_ms));
+      res.setHeader('X-Original-Size-Bytes', String(row.original_size_bytes));
+      res.send(row.encrypted_blob);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 router.delete('/:id/grabaciones/:grabacionId',
   auditLog('delete', 'video_grabacion', (req) => req.params.grabacionId ?? null),
