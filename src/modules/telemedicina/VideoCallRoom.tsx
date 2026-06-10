@@ -3,12 +3,14 @@ import { useTranslation } from "react-i18next";
 import { Phone, PhoneOff, Mic, MicOff, Video, VideoOff } from "lucide-react";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
+import { useWebRTC } from "./useWebRTC";
 
 interface VideoCallRoomProps {
+  salaId: string;
   onEndCall: () => void;
 }
 
-export function VideoCallRoom({ onEndCall }: VideoCallRoomProps) {
+export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
   const { t } = useTranslation();
   const localVideoRef = React.useRef<HTMLVideoElement>(null);
   const remoteVideoRef = React.useRef<HTMLVideoElement>(null);
@@ -16,29 +18,47 @@ export function VideoCallRoom({ onEndCall }: VideoCallRoomProps) {
   const [audioEnabled, setAudioEnabled] = React.useState(true);
   const [videoEnabled, setVideoEnabled] = React.useState(true);
   const [inCall, setInCall] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
+  const [mediaError, setMediaError] = React.useState<string | null>(null);
+
+  const { remoteStream, peers, connected, startCall: startSignaling, endCall: endSignaling, error: signalingError } = useWebRTC({ salaId, localStream });
+
+  React.useEffect(() => {
+    if (localVideoRef.current && localStream) {
+      localVideoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  React.useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
+
+  const localStreamRef = React.useRef<MediaStream | null>(null);
+  React.useEffect(() => {
+    localStreamRef.current = localStream;
+  }, [localStream]);
 
   React.useEffect(() => {
     return () => {
-      localStream?.getTracks().forEach((t) => t.stop());
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
-  }, [localStream]);
+  }, []);
 
   const startCall = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream;
-      }
       setInCall(true);
-      setError(null);
+      setMediaError(null);
+      startSignaling();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al acceder a c\u00e1mara/micr\u00f3fono");
+      setMediaError(err instanceof Error ? err.message : "Error al acceder a c\u00e1mara/micr\u00f3fono");
     }
   };
 
   const endCall = () => {
+    endSignaling();
     localStream?.getTracks().forEach((t) => t.stop());
     setLocalStream(null);
     setInCall(false);
@@ -58,6 +78,8 @@ export function VideoCallRoom({ onEndCall }: VideoCallRoomProps) {
       setVideoEnabled((v) => !v);
     }
   };
+
+  const error = mediaError ?? signalingError;
 
   return (
     <div className="relative flex h-full flex-col">
@@ -88,6 +110,11 @@ export function VideoCallRoom({ onEndCall }: VideoCallRoomProps) {
       <div className="flex items-center justify-center gap-4 p-4">
         {inCall ? (
           <>
+            {peers.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {connected ? t("telemedicina.connected") : t("telemedicina.connecting")} ({peers.length})
+              </span>
+            )}
             <Button
               variant="outline"
               size="icon"

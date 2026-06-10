@@ -2225,7 +2225,9 @@
     "mute": "Mute microphone",
     "unmute": "Unmute microphone",
     "hide_video": "Turn off camera",
-    "show_video": "Turn on camera"
+    "show_video": "Turn on camera",
+    "connecting": "Connecting...",
+    "connected": "Connected"
   },
   "ai": {
     "title": "AI Assistant",

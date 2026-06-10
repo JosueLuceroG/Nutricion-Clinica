@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { createServer } from "node:http";
 import { healthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
 import twoFactorRouter from "./modules/auth/twoFactorRoutes.js";
@@ -15,6 +16,7 @@ import adherenceRouter from "./modules/adherence/adherenceRoutes.js";
 import patientPortalRouter from "./modules/patientPortal/patientPortalRoutes.js";
 import syncRouter from "./modules/sync/syncRoutes.js";
 import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
+import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
@@ -40,7 +42,10 @@ app.use("/dashboard", dashboardRouter);
 app.use(errorHandler);
 
 const port = Number(process.env.PORT ?? 3000);
+const httpServer = createServer(app);
 
-app.listen(port, () => {
+createSignalingServer(httpServer);
+
+httpServer.listen(port, () => {
   console.log(`[nutriclinica-api] listening on http://localhost:${port}`);
 });

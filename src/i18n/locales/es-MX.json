@@ -2225,7 +2225,9 @@
     "mute": "Silenciar micrófono",
     "unmute": "Activar micrófono",
     "hide_video": "Apagar cámara",
-    "show_video": "Encender cámara"
+    "show_video": "Encender cámara",
+    "connecting": "Conectando...",
+    "connected": "Conectado"
   },
   "ai": {
     "title": "Asistente IA",

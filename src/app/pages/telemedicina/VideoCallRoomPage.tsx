@@ -114,7 +114,7 @@ export function VideoCallRoomPage() {
         )}
 
         <div className="h-96">
-          <VideoCallRoom onEndCall={handleEndCall} />
+          <VideoCallRoom salaId={sala.id} onEndCall={handleEndCall} />
         </div>
       </PageContent>
     </>
