@@ -5,6 +5,7 @@ import {
   Activity,
   Bell,
   CalendarClock,
+  Camera,
   CheckCircle2,
   CloudOff,
   Download,
@@ -43,20 +44,27 @@ import {
   flushPendingPortalAdherenceSubmissions,
   getDocumentDownloadUrl,
   getDocumentPreviewUrl,
+  getMealPhotoImageUrl,
   getPatientPortalPayloadWithCache,
   getPendingPortalAdherenceSubmissions,
   getPortalNotificationsWithCache,
+  listPatientPortalMealPhotos,
   listPatientPortalMessages,
+  submitPatientPortalMealPhoto,
   sendPatientPortalMessage,
   sendPortalReminder,
   type PatientPortalMeal,
   type PatientPortalPayload,
   type PatientPortalPlan,
+  type PortalMealPhoto,
   type PortalMessage,
   type PortalNotification,
   type SubmitPortalAdherenceInput,
   submitPatientPortalAdherenceWithQueue,
 } from "@services/api/patientPortalApi";
+
+const PORTAL_MEAL_PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const PORTAL_MEAL_PHOTO_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 type PortalState =
   | { status: "loading"; data: null; error: null }
@@ -210,6 +218,7 @@ function PortalContent({
   const nextAppointment = data.upcomingAppointments[0];
   const canSubmitAdherence = data.portal.scopes.includes("adherence");
   const canSendMessages = data.portal.scopes.includes("messaging");
+  const canSubmitMealPhotos = data.portal.scopes.includes("meal_photos");
 
   return (
     <>
@@ -298,6 +307,7 @@ function PortalContent({
         <ActivePlanCard plan={data.activePlan} locale={locale} />
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
+          {canSubmitMealPhotos && <MealPhotosCard token={token} locale={locale} />}
           {canSendMessages && <MessagingCard token={token ?? ""} />}
           <AppointmentsCard
             token={token ?? ""}
@@ -1021,6 +1031,227 @@ function DocumentsCard({
             ))}
           </ul>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("Invalid file result"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
+  const { t } = useTranslation();
+  const [photos, setPhotos] = React.useState<PortalMealPhoto[]>([]);
+  const [mealDate, setMealDate] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [mealSlot, setMealSlot] = React.useState<string>(MEAL_SLOT_ORDER[0] ?? "breakfast");
+  const [caption, setCaption] = React.useState("");
+  const [adherenceRating, setAdherenceRating] = React.useState(3);
+  const [file, setFile] = React.useState<File | null>(null);
+  const [loading, setLoading] = React.useState(true);
+  const [saving, setSaving] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const loadPhotos = React.useCallback(
+    async (signal?: AbortSignal) => {
+      const result = await listPatientPortalMealPhotos(token, signal);
+      setPhotos(result);
+    },
+    [token],
+  );
+
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
+    loadPhotos(controller.signal)
+      .catch(() => setError(t("patient_portal.meal_photos_load_error")))
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [loadPhotos, t]);
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0] ?? null;
+    setMessage(null);
+    setError(null);
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    if (!PORTAL_MEAL_PHOTO_MIME_TYPES.includes(selected.type)) {
+      setFile(null);
+      setError(t("patient_portal.meal_photos_type_error"));
+      return;
+    }
+    if (selected.size > PORTAL_MEAL_PHOTO_MAX_BYTES) {
+      setFile(null);
+      setError(t("patient_portal.meal_photos_size_error"));
+      return;
+    }
+    setFile(selected);
+  };
+
+  const handleSubmit = async () => {
+    if (!file || saving) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const photoDataUrl = await fileToDataUrl(file);
+      const created = await submitPatientPortalMealPhoto(token, {
+        mealDate,
+        mealSlot,
+        caption,
+        adherenceRating,
+        fileName: file.name,
+        photoDataUrl,
+      });
+      setPhotos((current) => [created, ...current]);
+      setCaption("");
+      setAdherenceRating(3);
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setMessage(t("patient_portal.meal_photos_success"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("patient_portal.meal_photos_error"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Camera className="h-4 w-4 text-primary" aria-hidden />
+          {t("patient_portal.meal_photos_title")}
+        </CardTitle>
+        <CardDescription>{t("patient_portal.meal_photos_desc")}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-3 rounded-lg border bg-muted/20 p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="portal-meal-photo-date">{t("patient_portal.meal_photos_date")}</Label>
+              <Input
+                id="portal-meal-photo-date"
+                type="date"
+                value={mealDate}
+                onChange={(event) => setMealDate(event.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="portal-meal-photo-slot">{t("patient_portal.meal_photos_slot")}</Label>
+              <select
+                id="portal-meal-photo-slot"
+                value={mealSlot}
+                onChange={(event) => setMealSlot(event.target.value)}
+                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {MEAL_SLOT_ORDER.map((slot) => (
+                  <option key={slot} value={slot}>
+                    {mealSlotLabel(t, slot)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="portal-meal-photo-file">{t("patient_portal.meal_photos_file")}</Label>
+            <Input
+              ref={fileInputRef}
+              id="portal-meal-photo-file"
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleFileChange}
+            />
+            {file && (
+              <p className="text-xs text-muted-foreground">
+                {file.name} · {formatFileSize(file.size)}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="portal-meal-photo-rating">{t("patient_portal.meal_photos_rating")}</Label>
+            <Input
+              id="portal-meal-photo-rating"
+              type="range"
+              min={1}
+              max={5}
+              value={adherenceRating}
+              onChange={(event) => setAdherenceRating(Number(event.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">
+              {t("patient_portal.meal_photos_rating_value", { count: adherenceRating })}
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="portal-meal-photo-caption">{t("patient_portal.meal_photos_caption")}</Label>
+            <Textarea
+              id="portal-meal-photo-caption"
+              value={caption}
+              onChange={(event) => setCaption(event.target.value)}
+              maxLength={1000}
+              rows={3}
+            />
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          {message && <p className="text-sm text-success">{message}</p>}
+          <Button onClick={() => void handleSubmit()} disabled={!file || saving}>
+            {saving ? t("patient_portal.meal_photos_saving") : t("patient_portal.meal_photos_submit")}
+          </Button>
+        </div>
+
+        <div className="space-y-3">
+          <p className="text-sm font-medium">{t("patient_portal.meal_photos_recent")}</p>
+          {loading ? (
+            <Skeleton className="h-24 w-full rounded-lg" />
+          ) : photos.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              {t("patient_portal.meal_photos_empty")}
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {photos.map((photo) => (
+                <li key={photo.id} className="overflow-hidden rounded-lg border bg-card">
+                  <img
+                    src={getMealPhotoImageUrl(token, photo.id)}
+                    alt={photo.caption || t("patient_portal.meal_photos_image_alt")}
+                    className="h-44 w-full object-cover"
+                    loading="lazy"
+                  />
+                  <div className="space-y-1 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">{mealSlotLabel(t, photo.mealSlot)}</p>
+                      {photo.reviewedAt && (
+                        <Badge variant="success" className="shrink-0">
+                          {t("patient_portal.meal_photos_reviewed")}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(photo.mealDate ?? photo.createdAt, locale)} · {t("patient_portal.meal_photos_rating_value", { count: photo.adherenceRating })}
+                    </p>
+                    {photo.caption && <p className="break-words text-muted-foreground">{photo.caption}</p>}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

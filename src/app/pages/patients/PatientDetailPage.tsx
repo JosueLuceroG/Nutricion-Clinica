@@ -20,6 +20,7 @@ import {
   FileText,
 } from "lucide-react";
 import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
+import { PatientMealPhotosCard } from "./PatientMealPhotosCard";
 import { PatientPortalLinksCard } from "./PatientPortalLinksCard";
 import { PatientPortalAdherenceCard } from "./PatientPortalAdherenceCard";
 import { PatientMessagingCard } from "./PatientMessagingCard";
@@ -260,6 +261,8 @@ export function PatientDetailPage() {
             <PatientPortalLinksCard patientId={patient.id.toString()} />
 
             <PatientPortalAdherenceCard patientId={patient.id.toString()} />
+
+            <PatientMealPhotosCard patientId={patient.id.toString()} />
 
             <PatientMessagingCard patientId={patient.id.toString()} />
 

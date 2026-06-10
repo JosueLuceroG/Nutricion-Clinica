@@ -7,10 +7,14 @@ import {
   createPatientPortalLink,
   getPortalNotifications,
   getPortalNotificationsWithCache,
+  listPatientPortalMealPhotos,
   getPatientPortalPayload,
   listPatientPortalLinks,
+  listProfessionalMealPhotos,
+  reviewMealPhoto,
   revokePatientPortalLink,
   sendPortalReminder,
+  submitPatientPortalMealPhoto,
   submitPatientPortalAdherence,
   submitPatientPortalAdherenceWithQueue,
 } from "./patientPortalApi";
@@ -83,6 +87,25 @@ const portalLink = {
       occurredAt: "2026-06-01T00:00:00.000Z",
     },
   ],
+};
+
+const mealPhoto = {
+  id: "meal-photo-1",
+  tokenId: "token-1",
+  pacienteId: "p1",
+  sucursalId: "s1",
+  mealDate: "2026-06-09",
+  mealSlot: "breakfast",
+  caption: "Avena con fruta",
+  adherenceRating: 4,
+  mimeType: "image/jpeg",
+  fileName: "breakfast.jpg",
+  sizeBytes: 1024,
+  sha256: "a".repeat(64),
+  reviewedAt: null,
+  reviewedByProfesionalId: null,
+  createdAt: "2026-06-09T12:00:00.000Z",
+  updatedAt: "2026-06-09T12:00:00.000Z",
 };
 
 beforeEach(() => {
@@ -301,6 +324,72 @@ describe("portal notifications/reminders", () => {
 });
 
 describe("professional portal link API", () => {
+  it("meal photos public API lista y envia sin auth", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => JSON.stringify({ mealPhotos: [mealPhoto] }),
+    });
+
+    const list = await listPatientPortalMealPhotos("portal-token");
+
+    expect(list[0]!.caption).toBe("Avena con fruta");
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://test.local/patient-portal/portal-token/meal-photos",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(mockFetch.mock.calls[0]![1].headers.Authorization).toBeUndefined();
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => JSON.stringify({ mealPhoto }),
+    });
+
+    const created = await submitPatientPortalMealPhoto("portal-token", {
+      mealDate: "2026-06-09",
+      mealSlot: "breakfast",
+      caption: "Avena con fruta",
+      adherenceRating: 4,
+      fileName: "breakfast.jpg",
+      photoDataUrl: "data:image/jpeg;base64,AAAA",
+    });
+
+    expect(created.id).toBe("meal-photo-1");
+    expect(mockFetch.mock.calls[1]![0]).toBe(
+      "http://test.local/patient-portal/portal-token/meal-photos",
+    );
+    expect(mockFetch.mock.calls[1]![1].method).toBe("POST");
+  });
+
+  it("meal photos professional API usa auth y marca revisada", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => JSON.stringify({ mealPhotos: [mealPhoto] }),
+    });
+
+    const list = await listProfessionalMealPhotos("p1");
+
+    expect(list).toHaveLength(1);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://test.local/patient-portal/meal-photos?pacienteId=p1",
+      expect.objectContaining({ method: "GET" }),
+    );
+    expect(mockFetch.mock.calls[0]![1].headers.Authorization).toBe("Bearer jwt-token");
+    expect(mockFetch.mock.calls[0]![1].headers["X-Sucursal-Id"]).toBe("s-active");
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      text: async () => JSON.stringify({ mealPhoto: { ...mealPhoto, reviewedAt: "2026-06-09T13:00:00.000Z" } }),
+    });
+
+    const reviewed = await reviewMealPhoto("meal-photo-1");
+
+    expect(reviewed.reviewedAt).toBe("2026-06-09T13:00:00.000Z");
+    expect(mockFetch.mock.calls[1]![0]).toBe(
+      "http://test.local/patient-portal/meal-photos/meal-photo-1/review",
+    );
+    expect(mockFetch.mock.calls[1]![1].method).toBe("PATCH");
+  });
+
   it("listPatientPortalLinks usa auth y sucursal activa", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

@@ -16,12 +16,15 @@ const PortalTokenParam = z
   .max(256)
   .regex(/^[A-Za-z0-9._~-]+$/);
 
-const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging']);
+const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging', 'meal_photos']);
 type PortalScope = z.infer<typeof PortalScopeSchema>;
 
-const DEFAULT_SCOPES: PortalScope[] = ['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging'];
+const DEFAULT_SCOPES: PortalScope[] = ['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging', 'meal_photos'];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_MEAL_PHOTO_BYTES = 2 * 1024 * 1024;
+const MAX_MEAL_PHOTO_DATA_URL_LENGTH = 3_000_100;
+const MEAL_PHOTO_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 const PortalScoreSchema = z.number().finite().min(0).max(100);
 const PortalRatingSchema = z.number().finite().min(1).max(10).optional().nullable();
@@ -49,6 +52,15 @@ const PortalAdherenceBody = z.object({
   facilitators: z.string().trim().max(1000).optional().default(''),
   mealsLogged: z.string().trim().max(2000).optional().default(''),
   notes: z.string().trim().max(2000).optional().default(''),
+});
+
+const PortalMealPhotoBody = z.object({
+  mealDate: z.string().regex(DATE_ONLY_REGEX).optional(),
+  mealSlot: z.string().trim().min(1).max(50),
+  caption: z.string().trim().max(1000).optional().default(''),
+  adherenceRating: z.number().int().min(1).max(5),
+  fileName: z.string().trim().min(1).max(180).optional().default('meal-photo'),
+  photoDataUrl: z.string().min(20).max(MAX_MEAL_PHOTO_DATA_URL_LENGTH),
 });
 
 interface PortalAccessRow {
@@ -169,7 +181,35 @@ interface PortalMessageRow {
   created_at: Date;
 }
 
-type PortalAuditEventType = 'created' | 'revoked' | 'accessed' | 'adherence_submitted' | 'document_downloaded' | 'message_sent';
+interface PortalMealPhotoRow {
+  id: string;
+  token_id: string;
+  paciente_id: string;
+  sucursal_id: string;
+  meal_date: Date;
+  meal_slot: string;
+  caption: string;
+  adherence_rating: number;
+  mime_type: string;
+  file_name: string;
+  size_bytes: number;
+  sha256: string;
+  photo_bytes?: Buffer;
+  reviewed_at: Date | null;
+  reviewed_by_profesional_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+type PortalAuditEventType =
+  | 'created'
+  | 'revoked'
+  | 'accessed'
+  | 'adherence_submitted'
+  | 'document_downloaded'
+  | 'message_sent'
+  | 'meal_photo_submitted'
+  | 'meal_photo_reviewed';
 
 interface PortalMealExchange {
   foodId: string;
@@ -324,6 +364,64 @@ function rowToPortalAdherenceRecord(row: PortalAdherenceRecordRow): Record<strin
   };
 }
 
+function rowToPortalMealPhoto(row: PortalMealPhotoRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    tokenId: row.token_id,
+    pacienteId: row.paciente_id,
+    sucursalId: row.sucursal_id,
+    mealDate: dateOnly(row.meal_date),
+    mealSlot: row.meal_slot,
+    caption: row.caption,
+    adherenceRating: Number(row.adherence_rating),
+    mimeType: row.mime_type,
+    fileName: row.file_name,
+    sizeBytes: Number(row.size_bytes),
+    sha256: row.sha256,
+    reviewedAt: iso(row.reviewed_at),
+    reviewedByProfesionalId: row.reviewed_by_profesional_id,
+    createdAt: iso(row.created_at),
+    updatedAt: iso(row.updated_at),
+  };
+}
+
+function rowToPortalMessage(row: PortalMessageRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    tokenId: row.token_id,
+    pacienteId: row.paciente_id,
+    sucursalId: row.sucursal_id,
+    profesionalId: row.profesional_id,
+    content: row.content,
+    direction: row.direction,
+    readAt: iso(row.read_at),
+    createdAt: iso(row.created_at),
+  };
+}
+
+function parseMealPhotoDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+  const match = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!match) return null;
+  const mimeType = match[1]!;
+  if (!MEAL_PHOTO_MIME_TYPES.has(mimeType)) return null;
+  const buffer = Buffer.from(match[2]!, 'base64');
+  if (buffer.length <= 0 || buffer.length > MAX_MEAL_PHOTO_BYTES) return null;
+  return { mimeType, buffer };
+}
+
+function extensionForMealPhoto(mimeType: string): string {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/webp') return 'webp';
+  return 'jpg';
+}
+
+function sanitizeMealPhotoFileName(input: string, mimeType: string): string {
+  const ext = extensionForMealPhoto(mimeType);
+  const base = input.split(/[\\/]/).pop()?.trim() || `meal-photo.${ext}`;
+  const safe = base.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 160) || `meal-photo.${ext}`;
+  return /\.(jpe?g|png|webp)$/i.test(safe) ? safe : `${safe}.${ext}`;
+}
+
 function parseAuditDetails(raw: string | null): Record<string, unknown> | null {
   if (!raw) return null;
   try {
@@ -339,7 +437,10 @@ function parseAuditDetails(raw: string | null): Record<string, unknown> | null {
 function operationForAudit(eventType: PortalAuditEventType): 'create' | 'read' | 'update' {
   if (eventType === 'created') return 'create';
   if (eventType === 'adherence_submitted') return 'create';
+  if (eventType === 'message_sent') return 'create';
+  if (eventType === 'meal_photo_submitted') return 'create';
   if (eventType === 'revoked') return 'update';
+  if (eventType === 'meal_photo_reviewed') return 'update';
   return 'read';
 }
 
@@ -607,6 +708,293 @@ router.get('/adherence', requireAuth, requireSucursalAccess, async (req: Request
   }
 });
 
+// ─── Protected: Professional messaging ─────────────────────────
+
+router.get('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pacienteId = typeof req.query.pacienteId === 'string' ? req.query.pacienteId : '';
+    if (!isUuid(pacienteId)) {
+      res.status(400).json({ error: 'pacienteId debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('sucursal_id', sql.UniqueIdentifier(), String(req.sucursalId))
+      .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE sucursal_id = @sucursal_id
+            AND paciente_id = @paciente_id
+          ORDER BY created_at ASC`,
+      );
+
+    res.json({ messages: result.recordset.map(rowToPortalMessage) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !canManagePortalTokens(req.user.rol)) {
+      throw new ForbiddenError('Rol sin permisos para enviar mensajes');
+    }
+
+    const MessageSendBody = z.object({
+      pacienteId: z.string().uuid(),
+      content: z.string().trim().min(1).max(2000),
+    });
+    const body = MessageSendBody.parse(req.body);
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+
+    const tokenResult = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<{ id: string }>(
+        `SELECT TOP 1 id
+           FROM patient_portal_tokens
+          WHERE paciente_id = @paciente_id
+            AND sucursal_id = @sucursal_id
+            AND revoked_at IS NULL
+            AND expires_at > SYSUTCDATETIME()
+          ORDER BY created_at DESC`,
+      );
+    const tokenId = tokenResult.recordset[0]?.id ?? null;
+    if (!tokenId) {
+      res.status(400).json({ error: 'El paciente no tiene enlace activo del portal' });
+      return;
+    }
+
+    const id = randomUUID();
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('token_id', sql.UniqueIdentifier(), tokenId)
+      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .input('profesional_id', sql.UniqueIdentifier(), req.user.sub)
+      .input('content', sql.NVarChar(2000), body.content)
+      .input('direction', sql.NVarChar(30), 'professional_to_patient')
+      .query(
+        `INSERT INTO patient_portal_messages
+           (id, token_id, paciente_id, sucursal_id, profesional_id, content, direction)
+         VALUES
+           (@id, @token_id, @paciente_id, @sucursal_id, @profesional_id, @content, @direction)`,
+      );
+
+    const created = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE id = @id`,
+      );
+
+    await recordPortalAudit(pool, {
+      tokenId,
+      sucursalId,
+      pacienteId: body.pacienteId,
+      profesionalId: req.user.sub,
+      eventType: 'message_sent',
+      req,
+      details: { messageId: id, direction: 'professional_to_patient' },
+      auditEntityType: 'patient_portal_message',
+      auditEntityId: id,
+      auditOperation: 'create',
+    });
+
+    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/messages/:id/read', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    if (!isUuid(id)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query(
+        `UPDATE patient_portal_messages
+            SET read_at = COALESCE(read_at, SYSUTCDATETIME())
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id`,
+      );
+
+    const result = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<PortalMessageRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
+           FROM patient_portal_messages
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id`,
+      );
+    const row = result.recordset[0];
+    if (!row) {
+      res.status(404).json({ error: 'Mensaje no encontrado' });
+      return;
+    }
+
+    res.json({ message: rowToPortalMessage(row) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Protected: Professional meal-photo review ─────────────────
+
+router.get('/meal-photos', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const pacienteId = typeof req.query.pacienteId === 'string' ? req.query.pacienteId : '';
+    if (!isUuid(pacienteId)) {
+      res.status(400).json({ error: 'pacienteId debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('sucursal_id', sql.UniqueIdentifier(), String(req.sucursalId))
+      .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
+      .query<PortalMealPhotoRow>(
+        `SELECT TOP 50 id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE sucursal_id = @sucursal_id
+            AND paciente_id = @paciente_id
+            AND deleted_at IS NULL
+          ORDER BY meal_date DESC, created_at DESC`,
+      );
+
+    res.json({ mealPhotos: result.recordset.map(rowToPortalMealPhoto) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/meal-photos/:id/image', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = String(req.params.id);
+    if (!isUuid(id)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), String(req.sucursalId))
+      .query<PortalMealPhotoRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256, photo_bytes,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+    const row = result.recordset[0];
+    if (!row?.photo_bytes) {
+      res.status(404).json({ error: 'Foto no encontrada' });
+      return;
+    }
+
+    res.setHeader('Content-Type', row.mime_type);
+    res.setHeader('Content-Disposition', `inline; filename="${row.file_name}"`);
+    res.setHeader('Content-Length', row.photo_bytes.length);
+    res.setHeader('X-Document-SHA256', row.sha256);
+    res.end(row.photo_bytes);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/meal-photos/:id/review', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !canManagePortalTokens(req.user.rol)) {
+      throw new ForbiddenError('Rol sin permisos para revisar fotos');
+    }
+    const id = String(req.params.id);
+    if (!isUuid(id)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .input('profesional_id', sql.UniqueIdentifier(), req.user.sub)
+      .query(
+        `UPDATE patient_portal_meal_photos
+            SET reviewed_at = COALESCE(reviewed_at, SYSUTCDATETIME()),
+                reviewed_by_profesional_id = COALESCE(reviewed_by_profesional_id, @profesional_id),
+                updated_at = SYSUTCDATETIME()
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+
+    const result = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<PortalMealPhotoRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE id = @id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+    const row = result.recordset[0];
+    if (!row) {
+      res.status(404).json({ error: 'Foto no encontrada' });
+      return;
+    }
+
+    await recordPortalAudit(pool, {
+      tokenId: row.token_id,
+      sucursalId,
+      pacienteId: row.paciente_id,
+      profesionalId: req.user.sub,
+      eventType: 'meal_photo_reviewed',
+      req,
+      details: { mealPhotoId: id },
+      auditEntityType: 'patient_portal_meal_photo',
+      auditEntityId: id,
+      auditOperation: 'update',
+    });
+
+    res.json({ mealPhoto: rowToPortalMealPhoto(row) });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/tokens/:id/revoke', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user || !canManagePortalTokens(req.user.rol)) {
@@ -802,6 +1190,183 @@ router.post('/:token/adherence', async (req: Request, res: Response, next: NextF
     }
 
     res.status(201).json({ record: row ? rowToPortalAdherenceRecord(row) : { id } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:token/meal-photos', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('meal_photos')) {
+      throw new ForbiddenError('Este enlace no permite registrar comidas');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const result = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+      .query<PortalMealPhotoRow>(
+        `SELECT TOP 30 id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE paciente_id = @paciente_id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL
+          ORDER BY meal_date DESC, created_at DESC`,
+      );
+
+    res.json({ mealPhotos: result.recordset.map(rowToPortalMealPhoto) });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/:token/meal-photos', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const body = PortalMealPhotoBody.parse(req.body);
+    const parsedPhoto = parseMealPhotoDataUrl(body.photoDataUrl);
+    if (!parsedPhoto) {
+      res.status(400).json({ error: 'La foto debe ser JPEG, PNG o WebP y pesar máximo 2 MB' });
+      return;
+    }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('meal_photos')) {
+      throw new ForbiddenError('Este enlace no permite registrar comidas');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const id = randomUUID();
+    const mealDate = body.mealDate ?? todayDateOnly();
+    const fileName = sanitizeMealPhotoFileName(body.fileName, parsedPhoto.mimeType);
+    const sha256 = createHash('sha256').update(parsedPhoto.buffer).digest('hex');
+
+    await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('token_id', sql.UniqueIdentifier(), access.token_id)
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+      .input('meal_date', sql.Date(), dateFromDateOnly(mealDate))
+      .input('meal_slot', sql.NVarChar(50), body.mealSlot)
+      .input('caption', sql.NVarChar(1000), body.caption)
+      .input('adherence_rating', sql.TinyInt(), body.adherenceRating)
+      .input('mime_type', sql.NVarChar(80), parsedPhoto.mimeType)
+      .input('file_name', sql.NVarChar(180), fileName)
+      .input('size_bytes', sql.Int(), parsedPhoto.buffer.length)
+      .input('sha256', sql.NVarChar(64), sha256)
+      .input('photo_bytes', sql.VarBinary(sql.MAX), parsedPhoto.buffer)
+      .query(
+        `INSERT INTO patient_portal_meal_photos
+           (id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+            adherence_rating, mime_type, file_name, size_bytes, sha256, photo_bytes)
+         VALUES
+           (@id, @token_id, @paciente_id, @sucursal_id, @meal_date, @meal_slot, @caption,
+            @adherence_rating, @mime_type, @file_name, @size_bytes, @sha256, @photo_bytes)`,
+      );
+
+    const created = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .query<PortalMealPhotoRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE id = @id`,
+      );
+    const row = created.recordset[0];
+
+    await recordPortalAudit(pool, {
+      tokenId: access.token_id,
+      sucursalId: access.sucursal_id,
+      pacienteId: access.paciente_id,
+      eventType: 'meal_photo_submitted',
+      req,
+      details: {
+        mealPhotoId: id,
+        mealDate,
+        mealSlot: body.mealSlot,
+        adherenceRating: body.adherenceRating,
+        sizeBytes: parsedPhoto.buffer.length,
+        sha256,
+      },
+      auditEntityType: 'patient_portal_meal_photo',
+      auditEntityId: id,
+      auditOperation: 'create',
+    });
+
+    res.status(201).json({ mealPhoto: row ? rowToPortalMealPhoto(row) : { id } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/:token/meal-photos/:id/image', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+    const id = String(req.params.id);
+    if (!isUuid(id)) {
+      res.status(400).json({ error: 'id debe ser UUID' });
+      return;
+    }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('meal_photos')) {
+      throw new ForbiddenError('Este enlace no permite ver fotos de comidas');
+    }
+
+    const result = await pool
+      .request()
+      .input('id', sql.UniqueIdentifier(), id)
+      .input('paciente_id', sql.UniqueIdentifier(), access.paciente_id)
+      .input('sucursal_id', sql.UniqueIdentifier(), access.sucursal_id)
+      .query<PortalMealPhotoRow>(
+        `SELECT id, token_id, paciente_id, sucursal_id, meal_date, meal_slot, caption,
+                adherence_rating, mime_type, file_name, size_bytes, sha256, photo_bytes,
+                reviewed_at, reviewed_by_profesional_id, created_at, updated_at
+           FROM patient_portal_meal_photos
+          WHERE id = @id
+            AND paciente_id = @paciente_id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+    const row = result.recordset[0];
+    if (!row?.photo_bytes) {
+      res.status(404).json({ error: 'Foto no encontrada' });
+      return;
+    }
+
+    await touchPortalToken(pool, access.token_id);
+    res.setHeader('Content-Type', row.mime_type);
+    res.setHeader('Content-Disposition', `inline; filename="${row.file_name}"`);
+    res.setHeader('Content-Length', row.photo_bytes.length);
+    res.setHeader('X-Document-SHA256', row.sha256);
+    res.end(row.photo_bytes);
   } catch (err) {
     next(err);
   }
@@ -1136,169 +1701,6 @@ router.get('/:token/documents/:documentId/download', async (req: Request, res: R
     } catch (fetchErr) {
       res.status(502).json({ error: 'No se pudo recuperar el archivo del almacenamiento externo' });
     }
-  } catch (err) {
-    next(err);
-  }
-});
-
-function rowToPortalMessage(row: PortalMessageRow): Record<string, unknown> {
-  return {
-    id: row.id,
-    tokenId: row.token_id,
-    pacienteId: row.paciente_id,
-    sucursalId: row.sucursal_id,
-    profesionalId: row.profesional_id,
-    content: row.content,
-    direction: row.direction,
-    readAt: iso(row.read_at),
-    createdAt: iso(row.created_at),
-  };
-}
-
-// ─── Protected: Professional messaging ─────────────────────────
-
-router.get('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const pacienteId = typeof req.query.pacienteId === 'string' ? req.query.pacienteId : '';
-    if (!isUuid(pacienteId)) {
-      res.status(400).json({ error: 'pacienteId debe ser UUID' });
-      return;
-    }
-
-    const pool = await getPool();
-    const result = await pool
-      .request()
-      .input('sucursal_id', sql.UniqueIdentifier(), String(req.sucursalId))
-      .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-      .query<PortalMessageRow>(
-        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
-           FROM patient_portal_messages
-          WHERE sucursal_id = @sucursal_id
-            AND paciente_id = @paciente_id
-          ORDER BY created_at ASC`,
-      );
-
-    res.json({ messages: result.recordset.map(rowToPortalMessage) });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post('/messages', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user || !canManagePortalTokens(req.user.rol)) {
-      throw new ForbiddenError('Rol sin permisos para enviar mensajes');
-    }
-
-    const MessageSendBody = z.object({
-      pacienteId: z.string().uuid(),
-      content: z.string().trim().min(1).max(2000),
-    });
-    const body = MessageSendBody.parse(req.body);
-    const sucursalId = String(req.sucursalId);
-    const pool = await getPool();
-
-    const tokenResult = await pool
-      .request()
-      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<{ id: string }>(
-        `SELECT TOP 1 id
-           FROM patient_portal_tokens
-          WHERE paciente_id = @paciente_id
-            AND sucursal_id = @sucursal_id
-            AND revoked_at IS NULL
-            AND expires_at > SYSUTCDATETIME()
-          ORDER BY created_at DESC`,
-      );
-    const tokenId = tokenResult.recordset[0]?.id ?? null;
-
-    const id = randomUUID();
-    await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('token_id', sql.UniqueIdentifier(), tokenId ?? randomUUID())
-      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .input('profesional_id', sql.UniqueIdentifier(), req.user.sub)
-      .input('content', sql.NVarChar(2000), body.content)
-      .input('direction', sql.NVarChar(30), 'professional_to_patient')
-      .query(
-        `INSERT INTO patient_portal_messages
-           (id, token_id, paciente_id, sucursal_id, profesional_id, content, direction)
-         VALUES
-           (@id, @token_id, @paciente_id, @sucursal_id, @profesional_id, @content, @direction)`,
-      );
-
-    const created = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .query<PortalMessageRow>(
-        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
-           FROM patient_portal_messages
-          WHERE id = @id`,
-      );
-
-    if (tokenId) {
-      await recordPortalAudit(pool, {
-        tokenId,
-        sucursalId,
-        pacienteId: body.pacienteId,
-        profesionalId: req.user.sub,
-        eventType: 'message_sent',
-        req,
-        details: { messageId: id, direction: 'professional_to_patient' },
-        auditEntityType: 'patient_portal_message',
-        auditEntityId: id,
-        auditOperation: 'create',
-      });
-    }
-
-    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.patch('/messages/:id/read', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const id = String(req.params.id);
-    if (!isUuid(id)) {
-      res.status(400).json({ error: 'id debe ser UUID' });
-      return;
-    }
-
-    const sucursalId = String(req.sucursalId);
-    const pool = await getPool();
-
-    await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query(
-        `UPDATE patient_portal_messages
-            SET read_at = COALESCE(read_at, SYSUTCDATETIME())
-          WHERE id = @id
-            AND sucursal_id = @sucursal_id`,
-      );
-
-    const result = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<PortalMessageRow>(
-        `SELECT id, token_id, paciente_id, sucursal_id, profesional_id, content, direction, read_at, created_at
-           FROM patient_portal_messages
-          WHERE id = @id
-            AND sucursal_id = @sucursal_id`,
-      );
-    const row = result.recordset[0];
-    if (!row) {
-      res.status(404).json({ error: 'Mensaje no encontrado' });
-      return;
-    }
-
-    res.json({ message: rowToPortalMessage(row) });
   } catch (err) {
     next(err);
   }

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { NetworkError, httpRequest } from "./httpClient.js";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 
 const PORTAL_CACHE_VERSION = 1;
 const PORTAL_PAYLOAD_CACHE_PREFIX = "nutriclinica:patient-portal:payload:";
@@ -99,7 +101,16 @@ const PortalAuditEventSchema = z.object({
   sucursalId: z.string(),
   pacienteId: z.string(),
   profesionalId: z.string().nullable(),
-  type: z.enum(["created", "revoked", "accessed", "adherence_submitted"]),
+  type: z.enum([
+    "created",
+    "revoked",
+    "accessed",
+    "adherence_submitted",
+    "document_downloaded",
+    "message_sent",
+    "meal_photo_submitted",
+    "meal_photo_reviewed",
+  ]),
   ipAddress: z.string().nullable(),
   userAgent: z.string().nullable(),
   details: z.record(z.unknown()).nullable(),
@@ -551,7 +562,44 @@ const SendPortalMessageResponseSchema = z.object({
   message: PortalMessageSchema,
 });
 
+const PortalMealPhotoSchema = z.object({
+  id: z.string(),
+  tokenId: z.string(),
+  pacienteId: z.string(),
+  sucursalId: z.string(),
+  mealDate: z.string().nullable(),
+  mealSlot: z.string(),
+  caption: z.string(),
+  adherenceRating: z.number(),
+  mimeType: z.string(),
+  fileName: z.string(),
+  sizeBytes: z.number(),
+  sha256: z.string(),
+  reviewedAt: z.string().nullable(),
+  reviewedByProfesionalId: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  updatedAt: z.string().nullable(),
+});
+
+const PortalMealPhotosResponseSchema = z.object({
+  mealPhotos: z.array(PortalMealPhotoSchema),
+});
+
+const SubmitPortalMealPhotoResponseSchema = z.object({
+  mealPhoto: PortalMealPhotoSchema,
+});
+
 export type PortalMessage = z.infer<typeof PortalMessageSchema>;
+export type PortalMealPhoto = z.infer<typeof PortalMealPhotoSchema>;
+
+export interface SubmitPortalMealPhotoInput {
+  mealDate?: string;
+  mealSlot: string;
+  caption?: string;
+  adherenceRating: number;
+  fileName: string;
+  photoDataUrl: string;
+}
 
 export async function listPatientPortalMessages(
   token: string,
@@ -612,6 +660,54 @@ export async function markMessageAsRead(
   return SendPortalMessageResponseSchema.parse(response).message;
 }
 
+export async function listPatientPortalMealPhotos(
+  token: string,
+  signal?: AbortSignal,
+): Promise<PortalMealPhoto[]> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/meal-photos`,
+    { skipAuth: true, skipSucursalHeader: true, signal },
+  );
+  return PortalMealPhotosResponseSchema.parse(response).mealPhotos;
+}
+
+export async function submitPatientPortalMealPhoto(
+  token: string,
+  input: SubmitPortalMealPhotoInput,
+): Promise<PortalMealPhoto> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/meal-photos`,
+    {
+      method: "POST",
+      body: input,
+      skipAuth: true,
+      skipSucursalHeader: true,
+    },
+  );
+  return SubmitPortalMealPhotoResponseSchema.parse(response).mealPhoto;
+}
+
+export async function listProfessionalMealPhotos(
+  pacienteId: string,
+  signal?: AbortSignal,
+): Promise<PortalMealPhoto[]> {
+  const response = await httpRequest<unknown>("/patient-portal/meal-photos", {
+    query: { pacienteId },
+    signal,
+  });
+  return PortalMealPhotosResponseSchema.parse(response).mealPhotos;
+}
+
+export async function reviewMealPhoto(
+  mealPhotoId: string,
+): Promise<PortalMealPhoto> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/meal-photos/${encodeURIComponent(mealPhotoId)}/review`,
+    { method: "PATCH" },
+  );
+  return SubmitPortalMealPhotoResponseSchema.parse(response).mealPhoto;
+}
+
 /** URL para descargar un documento del portal. */
 export function getDocumentDownloadUrl(
   token: string,
@@ -626,6 +722,33 @@ export function getDocumentPreviewUrl(
   documentId: string,
 ): string {
   return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
+}
+
+export function getMealPhotoImageUrl(token: string, mealPhotoId: string): string {
+  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
+}
+
+export function getProfessionalMealPhotoImageUrl(mealPhotoId: string): string {
+  return `${getBackendBaseUrl()}/patient-portal/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
+}
+
+export async function fetchProfessionalMealPhotoObjectUrl(
+  mealPhotoId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const headers: Record<string, string> = { Accept: "image/*" };
+  const token = useAuthStore.getState().token;
+  const sucursalId = useSyncStore.getState().sucursalId;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (sucursalId) headers["X-Sucursal-Id"] = sucursalId;
+
+  const response = await fetch(getProfessionalMealPhotoImageUrl(mealPhotoId), {
+    method: "GET",
+    headers,
+    signal,
+  });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return URL.createObjectURL(await response.blob());
 }
 
 export async function sendPortalReminder(
