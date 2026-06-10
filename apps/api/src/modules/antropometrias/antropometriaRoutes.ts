@@ -4,6 +4,7 @@ import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
+import { assertPacienteInSucursal } from '../tenancy/application/tenantGuards.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
 
 const router: Router = ExpressRouter();
@@ -57,6 +58,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const id = randomUUID();
     const bmi = body.heightM > 0 ? body.weightKg / (body.heightM * body.heightM) : null;
     const pool = await getPool();
+    await assertPacienteInSucursal(pool, body.pacienteId, sucursalId);
     await pool
       .request()
       .input('id', sql.UniqueIdentifier(), id)

@@ -11,6 +11,7 @@ import {
   type SyncManifest,
 } from '@nutriclinica/shared';
 import { dbRowToClient, prepareColumnsForWrite } from './entityColumnMaps.js';
+import { assertConsultaInSucursal, assertPacienteInSucursal } from '../../tenancy/application/tenantGuards.js';
 
 const MAX_BATCH_SIZE = 500;
 const PULL_PAGE_SIZE = 1000;
@@ -70,7 +71,8 @@ export async function pullChanges(
       const detail = await pool
         .request()
         .input('id', sql.UniqueIdentifier(), r.id)
-        .query<Record<string, unknown>>(`SELECT * FROM ${table} WHERE id = @id`);
+        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+        .query<Record<string, unknown>>(`SELECT * FROM ${table} WHERE id = @id AND sucursal_id = @sucursal_id`);
       const dbRow = detail.recordset[0] ?? null;
       const clientPayload = dbRow ? dbRowToClient(entity, dbRow) : null;
       allChanges.push({
@@ -209,6 +211,8 @@ async function applyCreate(
     }
   }
 
+  await assertSyncReferencesInSucursal(pool, op.entity, sucursalId, op.payload);
+
   const cols: string[] = ['id', 'sucursal_id'];
   const values: string[] = ['@id', '@sucursal_id'];
   const req = pool.request().input('id', sql.UniqueIdentifier(), op.id).input('sucursal_id', sql.UniqueIdentifier(), sucursalId);
@@ -290,6 +294,8 @@ async function applyUpdate(
 
   const isReviving = exists.recordset[0]!.deleted_at !== null;
 
+  await assertSyncReferencesInSucursal(pool, op.entity, sucursalId, op.payload);
+
   if (prepared.length === 0 && !isReviving) {
     return { entity: op.entity, id: op.id, status: 'applied' };
   }
@@ -318,4 +324,28 @@ async function applyUpdate(
       : `UPDATE ${table} SET ${setClauses.join(', ')} WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`,
   );
   return { entity: op.entity, id: op.id, status: 'applied' };
+}
+
+function readString(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
+}
+
+async function assertSyncReferencesInSucursal(
+  pool: sql.ConnectionPool,
+  entity: SyncableEntity,
+  sucursalId: string,
+  payload: unknown,
+): Promise<void> {
+  const patientId = readString(payload, 'patient_id');
+  const consultaId = readString(payload, 'consulta_id') ?? readString(payload, 'consultation_id');
+
+  if (patientId && ['consultas', 'antropometrias', 'lab_panels', 'planes_alimenticios', 'adherence_records'].includes(entity)) {
+    await assertPacienteInSucursal(pool, patientId, sucursalId);
+  }
+
+  if (consultaId && ['planes_alimenticios', 'adherence_records'].includes(entity)) {
+    await assertConsultaInSucursal(pool, consultaId, sucursalId, patientId);
+  }
 }

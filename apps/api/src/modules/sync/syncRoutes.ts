@@ -51,18 +51,19 @@ const PushBodySchema = z.object({
   operations: z.array(PushOpSchema).min(1).max(500),
 });
 
-router.post('/push', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/push', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
     const body = PushBodySchema.parse(req.body) as SyncPushBatch;
-    if (req.user.rol !== 'admin' && !req.user.sucursalIds.includes(body.sucursalId)) {
-      res.status(403).json({ error: 'No tienes acceso a esa sucursal' });
+    const sucursalId = String(req.sucursalId);
+    if (body.sucursalId !== sucursalId) {
+      res.status(400).json({ error: 'sucursalId del body debe coincidir con la sucursal activa' });
       return;
     }
-    const result = await pushBatch(body, req.user.sub);
+    const result = await pushBatch({ ...body, sucursalId }, req.user.sub);
     res.json(result);
   } catch (err) {
     next(err);

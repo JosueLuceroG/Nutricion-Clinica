@@ -4,6 +4,7 @@ import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
+import { assertConsultaInSucursal, assertPacienteInSucursal } from '../tenancy/application/tenantGuards.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
 
 const router: Router = ExpressRouter();
@@ -75,6 +76,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const { randomUUID } = await import('node:crypto');
     const id = randomUUID();
     const pool = await getPool();
+    await assertPacienteInSucursal(pool, body.pacienteId, sucursalId);
+    if (body.consultaId) {
+      await assertConsultaInSucursal(pool, body.consultaId, sucursalId, body.pacienteId);
+    }
 
     await pool
       .request()
@@ -135,11 +140,15 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .request()
       .input('id', sql.UniqueIdentifier(), id)
       .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<{ id: string }>('SELECT id FROM adherence_records WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL');
+      .query<{ id: string; paciente_id: string }>('SELECT id, paciente_id FROM adherence_records WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL');
 
     if (existing.recordset.length === 0) {
       res.status(404).json({ error: 'Registro de adherencia no encontrado' });
       return;
+    }
+
+    if (body.consultaId) {
+      await assertConsultaInSucursal(pool, body.consultaId, sucursalId, existing.recordset[0]!.paciente_id);
     }
 
     const sets: string[] = [];

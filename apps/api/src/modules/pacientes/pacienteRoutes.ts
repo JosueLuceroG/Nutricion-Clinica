@@ -215,7 +215,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       return;
     }
     const sets: string[] = [];
-    const r = pool.request().input('id', sql.UniqueIdentifier(), id);
+    const r = pool.request().input('id', sql.UniqueIdentifier(), id).input('sucursal_id', sql.UniqueIdentifier(), sucursalId);
     const map: Record<string, { col: string; type: sql.ISqlType; val: unknown }> = {
       nombres: { col: 'nombres', type: sql.NVarChar(120), val: body.nombres },
       apellidoPaterno: { col: 'apellido_paterno', type: sql.NVarChar(80), val: body.apellidoPaterno },
@@ -245,7 +245,7 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       res.json({ updated: 0 });
       return;
     }
-    await r.query(`UPDATE pacientes SET ${sets.join(', ')} WHERE id = @id`);
+    await r.query(`UPDATE pacientes SET ${sets.join(', ')} WHERE id = @id AND sucursal_id = @sucursal_id`);
     res.json({ updated: 1 });
   } catch (err) {
     next(err);

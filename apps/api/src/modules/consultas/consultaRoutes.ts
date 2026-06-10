@@ -4,6 +4,7 @@ import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
+import { assertPacienteInSucursal } from '../tenancy/application/tenantGuards.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
 
 const router: Router = ExpressRouter();
@@ -64,12 +65,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const { randomUUID } = await import('node:crypto');
     const id = randomUUID();
     const pool = await getPool();
+    await assertPacienteInSucursal(pool, body.pacienteId, sucursalId);
     const consultNumResult = await pool
       .request()
       .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
       .query<{ next_num: number }>(
         `SELECT ISNULL(MAX(consultation_number), 0) + 1 AS next_num
-           FROM consultas WHERE paciente_id = @paciente_id AND deleted_at IS NULL`,
+           FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`,
       );
     const consultationNumber = consultNumResult.recordset[0]?.next_num ?? 1;
     await pool

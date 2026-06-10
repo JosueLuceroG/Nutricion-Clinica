@@ -193,6 +193,7 @@ describe('syncService.pushBatch', () => {
   it('consulta: inyecta profesional_id desde el JWT si el cliente no lo envía', async () => {
     mockRequestQuery
       .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'p1' }] })
       .mockResolvedValueOnce({ rowsAffected: [1] });
 
     await pushBatch({
@@ -216,15 +217,17 @@ describe('syncService.pushBatch', () => {
     const profCall = inputs.find((c) => (c[0] as string) === 'c_profesional_id');
     expect(profCall).toBeDefined();
     expect(profCall![2]).toBe(TEST_PROFESIONAL);
-    const insertSql = mockRequestQuery.mock.calls[1]![0] as string;
+    const insertSql = mockRequestQuery.mock.calls[2]![0] as string;
     expect(insertSql).toContain('[profesional_id]');
   });
 
   it('antropometria + lab_panel: inyecta profesional_id', async () => {
     mockRequestQuery
       .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'p1' }] })
       .mockResolvedValueOnce({ rowsAffected: [1] })
       .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'p1' }] })
       .mockResolvedValueOnce({ rowsAffected: [1] });
 
     await pushBatch({
@@ -284,6 +287,8 @@ describe('syncService.pushBatch', () => {
   it('plan CON consulta_id: inyecta profesional_id y crea', async () => {
     mockRequestQuery
       .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'p1' }] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'c1' }] })
       .mockResolvedValueOnce({ rowsAffected: [1] });
 
     const r = await pushBatch({
@@ -316,6 +321,7 @@ describe('syncService.pushBatch', () => {
   it('create: pasa tipos SQL correctos a mssql (Int, Decimal, NVarChar)', async () => {
     mockRequestQuery
       .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ id: 'p1' }] })
       .mockResolvedValueOnce({ rowsAffected: [1] });
 
     await pushBatch({
@@ -349,6 +355,34 @@ describe('syncService.pushBatch', () => {
     expect(typesByName['c_height_m']).toBe('Decimal');
     expect(typesByName['c_bmi']).toBe('Decimal');
     expect(typesByName['c_measured_at']).toBe('DateTime2');
+  });
+
+  it('create: rechaza referencias clínicas fuera de la sucursal del batch', async () => {
+    mockRequestQuery
+      .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [] });
+
+    const r = await pushBatch({
+      sucursalId: '00000000-0000-0000-0000-000000000001',
+      operations: [
+        {
+          entity: 'consultas',
+          id: '00000000-0000-0000-0000-000000000099',
+          op: 'create',
+          payload: {
+            patient_id: '00000000-0000-0000-0000-000000000010',
+            consultation_date: '2026-06-01T10:00:00.000Z',
+            reason: 'control',
+          },
+          clientUpdatedAt: '2026-06-04T00:00:00.000Z',
+        },
+      ],
+    }, TEST_PROFESIONAL);
+
+    expect(r.results[0]!.status).toBe('error');
+    expect(r.results[0]!.error).toContain('Paciente no encontrado');
+    const validationSql = mockRequestQuery.mock.calls[1]![0] as string;
+    expect(validationSql).toContain('sucursal_id = @sucursal_id');
   });
 
   it('create: clinical_tags se serializa a JSON string para NVARCHAR(MAX)', async () => {

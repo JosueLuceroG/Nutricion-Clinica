@@ -4,6 +4,7 @@ import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
+import { assertConsultaInSucursal, assertPacienteInSucursal } from '../tenancy/application/tenantGuards.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
 
 const router: Router = ExpressRouter();
@@ -65,6 +66,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const { randomUUID } = await import('node:crypto');
     const id = randomUUID();
     const pool = await getPool();
+    await assertPacienteInSucursal(pool, body.pacienteId, sucursalId);
+    await assertConsultaInSucursal(pool, body.consultaId, sucursalId, body.pacienteId);
     await pool
       .request()
       .input('id', sql.UniqueIdentifier(), id)
