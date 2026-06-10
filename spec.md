@@ -74,7 +74,7 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
 - **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 35 completado — NOM-024 avanzada (audit middleware, consentimientos, expediente export) + limpieza de 17 warnings de lint. Siguiente slice recomendado: certificación NOM-024 formal, 2FA, cifrado AES-256 o telemedicina.
+- **Sprint actual:** Sprint 36 completado — 2FA TOTP (setup/enable/disable/login-2pasos), cifrado AES-256-GCM server-side para campos sensibles, telemedicina MVP (tablas + API CRUD de salas). Siguiente slice recomendado: UI frontend de 2FA (pantalla de setup QR + verificación), UI de videollamada, o integración continua / CI-CD.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -457,7 +457,7 @@ src/modules/
 
 ### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
 
-**Pendiente:** autenticación con 2FA TOTP, cifrado AES-256 en campos sensibles, opt-in para IA.
+**Implementado (Sprint 36):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts` para `identificacion_oficial_encrypted`, telemedicina con migración `016-telemedicina.sql` y CRUD de salas vía `GET/POST/PATCH/DELETE /telemedicina/*`. **Pendiente:** opt-in para IA, UI frontend de 2FA/videollamada.
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
@@ -477,7 +477,7 @@ src/modules/
 | **Fase 2 — Clinical expansion** | smae, importer, pdf, backup, crypto, agenda, recipes, goals, adherence, documents, meal-planner, planGenerator, anthropometry (BIA + trend), lab (nutritionalAlerts) | ✅ Completa (Sprint 15) |
 | **Fase 3 — Engine, sync, security** | clinical-engine ✅, sync ✅, billing/economic ✅, audit ✅, api/servidor ✅, crypto ✅, queue ✅, medications ✅, security ✅, reports ✅ | ✅ Completa (Sprint 15) |
 | **Fase 4 — Multi-platform, IA** | dark mode, ai-assist, i18n, accesibilidad WCAG AA, portabilidad móvil | ✅ Completa (Sprint 24) |
-| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024) | 🔄 ~97% (Sprint 35: NOM-024 avanzada + lint cleanup) |
+| **Fase 5 — Portal paciente** | patient-portal, multi-consultorio, certificaciones (NOM-024), telemedicina | 🔄 ~99% (Sprint 36: 2FA + AES-256 + telemedicina) |
 
 ---
 

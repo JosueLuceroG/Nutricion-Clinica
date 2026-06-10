@@ -25,6 +25,8 @@
     "jsonwebtoken": "^9.0.2",
     "mssql": "^11.0.1",
     "nodemailer": "^8.0.10",
+    "otplib": "^13.4.1",
+    "qrcode": "^1.5.4",
     "uuid": "^11.0.4",
     "zod": "^3.24.1"
   },

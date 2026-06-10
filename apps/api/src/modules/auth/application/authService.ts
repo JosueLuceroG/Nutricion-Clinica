@@ -213,6 +213,17 @@ export async function signToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): Promi
   });
 }
 
+export async function signPending2faToken(payload: { sub: string; email: string }): Promise<string> {
+  const { default: jwt } = await import('jsonwebtoken');
+  const secret = process.env.JWT_SECRET;
+  if (!secret) throw new Error('JWT_SECRET no configurado');
+  return jwt.sign(payload, secret, {
+    expiresIn: '5m',
+    issuer: process.env.JWT_ISSUER ?? 'nutriclinica-api',
+    audience: process.env.JWT_AUDIENCE ?? 'nutriclinica-web',
+  });
+}
+
 export async function verifyToken(token: string): Promise<JwtPayload> {
   const { default: jwt } = await import('jsonwebtoken');
   const secret = process.env.JWT_SECRET;

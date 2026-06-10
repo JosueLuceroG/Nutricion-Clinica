@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import { healthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
+import twoFactorRouter from "./modules/auth/twoFactorRoutes.js";
+import telemedicinaRouter from "./modules/telemedicina/telemedicinaRoutes.js";
 import sucursalRouter from "./modules/sucursales/sucursalRoutes.js";
 import pacienteRouter from "./modules/pacientes/pacienteRoutes.js";
 import consultaRouter from "./modules/consultas/consultaRoutes.js";
@@ -22,6 +24,8 @@ app.use(express.json({ limit: "5mb" }));
 
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
+app.use("/auth", twoFactorRouter);
+app.use("/telemedicina", telemedicinaRouter);
 app.use("/sucursales", sucursalRouter);
 app.use("/pacientes", pacienteRouter);
 app.use("/consultas", consultaRouter);
