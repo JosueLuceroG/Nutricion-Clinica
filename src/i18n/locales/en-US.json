@@ -2335,5 +2335,17 @@
       "generate_meal_plan": "Initial menu",
       "generate_meal_plan_desc": "Generates a draft menu based on SMAE"
     }
+  },
+  "evolution": {
+    "title": "Patient Follow-up & Evolution",
+    "no_records": "No follow-up records",
+    "compliance": "Compliance",
+    "changes": "Changes since last visit",
+    "barriers": "Identified barriers",
+    "facilitators": "Facilitators",
+    "indicators": "Evolution indicators",
+    "alerts": "Stagnation alerts",
+    "timeline": "Follow-up history",
+    "new_record": "New follow-up record"
   }
 }

@@ -2335,5 +2335,17 @@
       "generate_meal_plan": "Menú inicial",
       "generate_meal_plan_desc": "Genera un menú borrador basado en SMAE"
     }
+  },
+  "evolution": {
+    "title": "Seguimiento y Evolución",
+    "no_records": "Sin registros de seguimiento",
+    "compliance": "Cumplimiento",
+    "changes": "Cambios desde última consulta",
+    "barriers": "Barreras identificadas",
+    "facilitators": "Facilitadores",
+    "indicators": "Indicadores de evolución",
+    "alerts": "Alertas de estancamiento",
+    "timeline": "Historial de seguimiento",
+    "new_record": "Nuevo registro de seguimiento"
   }
 }

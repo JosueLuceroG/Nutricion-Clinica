@@ -18,6 +18,7 @@ import type { WeeklyPlanRow, ShoppingListRow } from "@modules/meal-planner/infra
 import type { BiaDeviceProps } from "@modules/anthropometry/domain/BiaReading";
 import type { IndicatorRow, IndicatorValueRow, GeneratedReportRow, DashboardConfigRow } from "@modules/reports/infrastructure/reportMapper";
 import type { PatientConsent } from "@modules/auth/PatientConsentService";
+import type { EvolutionRecordRow, EvolutionIndicatorRow, TemporalComparisonRow, StagnationAlertRow } from "@modules/evolution/infrastructure/evolutionMapper";
 
 export interface AICacheRow {
   key: string;
@@ -191,6 +192,11 @@ const AI_USAGE_LOGS_STORES = ["id", "capability", "created_at"].join(", ");
 const TELEMEDICINA_RECORDINGS_STORES = "id, sala_id, created_by, created_at";
 const SYNC_META_STORES = "key";
 
+const EVOLUTION_RECORDS_STORES = "id, patient_id, consultation_id, professional_id, created_at";
+const EVOLUTION_INDICATORS_STORES = "id, patient_id, variable, status, calculated_at";
+const TEMPORAL_COMPARISONS_STORES = "id, patient_id, current_consultation_id, compared_consultation_id";
+const STAGNATION_ALERTS_STORES = "id, patient_id, variable, severity, generated_at";
+
 export interface SyncMetaRow {
   key: string;
   value: string;
@@ -243,6 +249,10 @@ export class NutriClinicaDB extends Dexie {
   ai_usage_logs!: Table<AIUsageLogRow>;
   telemedicina_recordings!: Table<TelemedicinaRecordingRow, string>;
   sync_meta!: Table<SyncMetaRow, string>;
+  evolution_records!: Table<EvolutionRecordRow, string>;
+  evolution_indicators!: Table<EvolutionIndicatorRow, string>;
+  temporal_comparisons!: Table<TemporalComparisonRow, string>;
+  stagnation_alerts!: Table<StagnationAlertRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -383,6 +393,13 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(26).stores({
       sync_meta: SYNC_META_STORES,
+    });
+
+    this.version(27).stores({
+      evolution_records: EVOLUTION_RECORDS_STORES,
+      evolution_indicators: EVOLUTION_INDICATORS_STORES,
+      temporal_comparisons: TEMPORAL_COMPARISONS_STORES,
+      stagnation_alerts: STAGNATION_ALERTS_STORES,
     });
   }
 }

@@ -26,6 +26,10 @@ const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
   lab_panels: 'lab_panels',
   meal_plans: 'planes_alimenticios',
   adherence_records: 'adherence_records',
+  evolution_records: 'evolution_records',
+  evolution_indicators: 'evolution_indicators',
+  temporal_comparisons: 'temporal_comparisons',
+  stagnation_alerts: 'stagnation_alerts',
 };
 
 declare global {
