@@ -51,6 +51,8 @@ const LaboratoryPage = lazyPage(() => import("@app/pages/LaboratoryPage"), "Labo
 const BillingPage = lazyPage(() => import("@app/pages/billing/BillingPage"), "BillingPage");
 const BillingReportPage = lazyPage(() => import("@app/pages/billing/BillingReportPage"), "BillingReportPage");
 const ReceiptPage = lazyPage(() => import("@app/pages/billing/ReceiptPage"), "ReceiptPage");
+const ExpensesPage = lazyPage(() => import("@app/pages/expenses/ExpensesPage"), "ExpensesPage");
+const PaymentsPage = lazyPage(() => import("@app/pages/payments/PaymentsPage"), "PaymentsPage");
 const CalculationsPage = lazyPage(() => import("@app/pages/CalculationsPage"), "CalculationsPage");
 const SmaeCatalogPage = lazyPage(() => import("@app/pages/SmaeCatalogPage"), "SmaeCatalogPage");
 const RecipesPage = lazyPage(() => import("@app/pages/recipes/RecipesPage"), "RecipesPage");
@@ -85,7 +87,11 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 const router = createHashRouter([
   {
     path: "/login",
-    element: <LoginPage />,
+    element: (
+      <ErrorBoundary>
+        <LoginPage />
+      </ErrorBoundary>
+    ),
   },
   {
     path: "/portal/:token",
@@ -182,6 +188,22 @@ const router = createHashRouter([
           {
             path: ":consultationId/receipt",
             element: <ReceiptPage />,
+          },
+          {
+            path: "expenses",
+            element: (
+              <RequireRole roles={BILLING_ROLES} redirectTo="/billing">
+                <ExpensesPage />
+              </RequireRole>
+            ),
+          },
+          {
+            path: "payments",
+            element: (
+              <RequireRole roles={BILLING_ROLES} redirectTo="/billing">
+                <PaymentsPage />
+              </RequireRole>
+            ),
           },
         ],
       },

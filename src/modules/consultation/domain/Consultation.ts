@@ -4,6 +4,8 @@ import type { AnthropometryId } from "@modules/anthropometry/domain/Anthropometr
 import type { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
 import type { ConsultationStatus } from "./ConsultationStatus";
 import type { PaymentMethod } from "./PaymentMethod";
+import type { PaymentStatus } from "./PaymentStatus";
+import type { PaymentConcept } from "./PaymentConcept";
 import { Vitals } from "./Vitals";
 
 /**
@@ -37,11 +39,14 @@ export class Consultation {
     public readonly status: ConsultationStatus,
     public readonly cost: number,
     public readonly paid: boolean,
+    public readonly paymentStatus: PaymentStatus,
+    public readonly paymentConcept: PaymentConcept,
     public readonly paymentMethod: PaymentMethod | null,
     public readonly paidAt: Date | null,
     public readonly reference: string | null,
     public readonly invoiceNumber: string | null,
     public readonly billingNotes: string | null,
+    public readonly amountPaid: number,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
     public readonly deletedAt: Date | null,
@@ -60,7 +65,7 @@ export class Consultation {
   }
 
   get isPendingPayment(): boolean {
-    return !this.paid && this.cost > 0;
+    return (this.paymentStatus === "pending" || this.paymentStatus === "partial") && this.cost > 0;
   }
 
   withStatus(newStatus: ConsultationStatus, now: Date = new Date()): Consultation {
@@ -123,8 +128,11 @@ export class Consultation {
     input: {
       cost?: number;
       paid: boolean;
+      paymentStatus?: PaymentStatus;
+      paymentConcept?: PaymentConcept;
       paymentMethod?: PaymentMethod | null;
       paidAt?: Date | null;
+      amountPaid?: number;
       reference?: string | null;
       invoiceNumber?: string | null;
       billingNotes?: string | null;
@@ -136,6 +144,9 @@ export class Consultation {
     }
     if (input.cost !== undefined && (input.cost < 0 || !Number.isFinite(input.cost))) {
       throw new Error("El costo de la consulta debe ser un número >= 0.");
+    }
+    if (input.amountPaid !== undefined && (input.amountPaid < 0 || !Number.isFinite(input.amountPaid))) {
+      throw new Error("El monto pagado debe ser un número >= 0.");
     }
     if (input.paid) {
       if (!input.paymentMethod) {
@@ -155,11 +166,14 @@ export class Consultation {
       ...this.toProps(),
       cost: input.cost !== undefined ? input.cost : this.cost,
       paid: input.paid,
+      paymentStatus: input.paymentStatus ?? (input.paid ? "paid" : "pending"),
+      paymentConcept: input.paymentConcept ?? this.paymentConcept,
       paymentMethod: input.paid ? (input.paymentMethod ?? null) : null,
       paidAt: input.paid ? (input.paidAt ?? null) : null,
       reference: input.paid ? ref : null,
       invoiceNumber: input.paid ? inv : null,
       billingNotes: notes,
+      amountPaid: input.amountPaid ?? (input.paid ? (input.cost ?? this.cost) : 0),
       updatedAt: now,
     });
   }
@@ -191,11 +205,14 @@ export class Consultation {
       status: this.status,
       cost: this.cost,
       paid: this.paid,
+      paymentStatus: this.paymentStatus,
+      paymentConcept: this.paymentConcept,
       paymentMethod: this.paymentMethod,
       paidAt: this.paidAt,
       reference: this.reference,
       invoiceNumber: this.invoiceNumber,
       billingNotes: this.billingNotes,
+      amountPaid: this.amountPaid,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,
       deletedAt: this.deletedAt,
@@ -235,11 +252,14 @@ export class Consultation {
       input.status ?? "scheduled",
       cost,
       false,
+      "pending",
+      "consulta",
       null,
       null,
       null,
       null,
       null,
+      0,
       new Date(),
       new Date(),
       null,
@@ -264,11 +284,14 @@ export class Consultation {
       props.status,
       props.cost,
       props.paid,
+      props.paymentStatus,
+      props.paymentConcept,
       props.paymentMethod,
       props.paidAt,
       props.reference,
       props.invoiceNumber,
       props.billingNotes,
+      props.amountPaid,
       props.createdAt,
       props.updatedAt,
       props.deletedAt,
@@ -320,11 +343,14 @@ export interface ConsultationProps {
   status: ConsultationStatus;
   cost: number;
   paid: boolean;
+  paymentStatus: PaymentStatus;
+  paymentConcept: PaymentConcept;
   paymentMethod: PaymentMethod | null;
   paidAt: Date | null;
   reference: string | null;
   invoiceNumber: string | null;
   billingNotes: string | null;
+  amountPaid: number;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -347,9 +373,12 @@ export interface ConsultationCreate {
   status?: ConsultationStatus;
   cost?: number;
   paid?: boolean;
+  paymentStatus?: PaymentStatus;
+  paymentConcept?: PaymentConcept;
   paymentMethod?: PaymentMethod | null;
   paidAt?: Date | null;
   reference?: string | null;
   invoiceNumber?: string | null;
   billingNotes?: string | null;
+  amountPaid?: number;
 }

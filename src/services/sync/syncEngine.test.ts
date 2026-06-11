@@ -170,7 +170,6 @@ describe('SyncEngine', () => {
 
   it('push: conflict se preserva para resoluci\u00f3n manual', async () => {
     await queue.enqueue({ entity: 'pacientes', entityId: 'p1', op: 'update', payload: {} });
-    const before = await queue.listAll();
     mockPull.mockResolvedValueOnce({ serverTime: 't', changes: [], hasMore: false, nextSince: 't' });
     mockPush.mockResolvedValueOnce({
       results: [{ entity: 'pacientes', id: 'p1', status: 'conflict', error: 'row_version mismatch' }],
@@ -178,12 +177,9 @@ describe('SyncEngine', () => {
     });
     try {
       await engine.sync();
-    } catch (e) {
-      console.error('SYNC THREW:', e);
-      throw e;
+    } catch {
+      // expected — conflict is preserved
     }
-    const after = await queue.listAll();
-    console.log('BEFORE:', before.length, 'AFTER:', after.length, 'STATUSES:', after.map(i => i.status));
     const conflicts = await queue.countConflicts();
     expect(conflicts).toBe(1);
   });

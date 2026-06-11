@@ -206,7 +206,11 @@ describe("ClinicalRuleEngine", () => {
         consentimientoInformadoId: ConsentId.fromUnsafe("consent-123"),
         fechaFirmaConsentimiento: new Date("2026-01-15"),
         versionPoliticaPrivacidad: null,
-        clinicalTags: [], status: "active",
+        clinicalTags: [],
+        claveInterna: null, birthPlace: null, address: null, nationality: null,
+        idType: null, idNumber: null, dischargeReason: null,
+        responsibleProfessionalId: null, externalRecordNumber: null, photoUrl: null,
+        status: "active",
         createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
       });
       const patientRepo = makeFakePatientRepo({
@@ -232,7 +236,11 @@ describe("ClinicalRuleEngine", () => {
         consentimientoInformadoId: null,
         fechaFirmaConsentimiento: null,
         versionPoliticaPrivacidad: null,
-        clinicalTags: [], status: "active",
+        clinicalTags: [],
+        claveInterna: null, birthPlace: null, address: null, nationality: null,
+        idType: null, idNumber: null, dischargeReason: null,
+        responsibleProfessionalId: null, externalRecordNumber: null, photoUrl: null,
+        status: "active",
         createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
       });
       const patientRepo = makeFakePatientRepo({

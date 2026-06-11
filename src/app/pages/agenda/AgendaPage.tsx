@@ -2,15 +2,24 @@ import * as React from "react";
 import { DayPicker } from "react-day-picker";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle, CalendarX, User, FileText, Clock } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { toast } from "sonner";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
 import { ScrollArea } from "@components/ui/scroll-area";
 import { Separator } from "@components/ui/separator";
+import { Badge } from "@components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@components/ui/dialog";
 import { AppointmentDialog } from "@modules/agenda/ui/AppointmentDialog";
 import { AppointmentCard } from "@modules/agenda/ui/AppointmentCard";
-import { useAppointmentsByRange, useCreateAppointment } from "@modules/agenda/ui/useAgendaHooks";
+import { useAppointmentsByRange, useCreateAppointment, useCancelAppointment, useMarkNoShow } from "@modules/agenda/ui/useAgendaHooks";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@services/db";
@@ -22,12 +31,24 @@ function toDateStr(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
+const statusLabelKey: Record<string, string> = {
+  scheduled: "agenda.status_scheduled",
+  confirmed: "agenda.status_confirmed",
+  in_progress: "agenda.status_in_progress",
+  completed: "agenda.status_completed",
+  cancelled: "agenda.status_cancelled",
+  no_show: "agenda.status_no_show",
+  rescheduled: "agenda.status_rescheduled",
+};
+
 export function AgendaPage() {
   const { t } = useTranslation();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = React.useState(today);
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [detailTarget, setDetailTarget] = React.useState<Appointment | null>(null);
+  const [detailBusy, setDetailBusy] = React.useState(false);
 
   const monthStart = toDateStr(startOfMonth(currentMonth));
   const monthEnd = toDateStr(endOfMonth(currentMonth));
@@ -35,6 +56,8 @@ export function AgendaPage() {
 
   const { appointments, loading, refresh } = useAppointmentsByRange(monthStart, monthEnd);
   const { create } = useCreateAppointment();
+  const { cancel } = useCancelAppointment();
+  const { markNoShow } = useMarkNoShow();
 
   const patients = useLiveQuery(
     () => db.patients
@@ -68,8 +91,42 @@ export function AgendaPage() {
     refresh();
   };
 
-  const handleAppointmentClick = (_appointment: Appointment) => {
-    // TODO: open detail dialog
+  const handleAppointmentClick = (appt: Appointment) => {
+    setDetailTarget(appt);
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!detailTarget) return;
+    setDetailBusy(true);
+    try {
+      await cancel(detailTarget.id, "cancelado por el profesional");
+      toast.success(t("agenda.cancelled_success"));
+      setDetailTarget(null);
+      refresh();
+    } catch (err) {
+      toast.error(t("common.error_occurred"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
+  const handleMarkNoShow = async () => {
+    if (!detailTarget) return;
+    setDetailBusy(true);
+    try {
+      await markNoShow(detailTarget.id);
+      toast.success(t("agenda.no_show_success"));
+      setDetailTarget(null);
+      refresh();
+    } catch (err) {
+      toast.error(t("common.error_occurred"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDetailBusy(false);
+    }
   };
 
   const modifiers = {
@@ -183,6 +240,57 @@ export function AgendaPage() {
         patients={patients}
         onSubmit={handleCreate}
       />
+
+      <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) setDetailTarget(null); }}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>{t("agenda.appointment_detail")}</DialogTitle>
+            <DialogDescription>
+              {detailTarget ? format(new Date(detailTarget.date + "T" + detailTarget.startTime), "PPPP", { locale: es }) : ""}
+            </DialogDescription>
+          </DialogHeader>
+          {detailTarget && (
+            <div className="space-y-4">
+              <div className="rounded-md border p-3 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-medium">{patients.find((p) => p.id === detailTarget.patientId)?.name ?? t("common.patient")}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>{detailTarget.startTime} - {detailTarget.endTime}</span>
+                </div>
+                {detailTarget.reason && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span>{detailTarget.reason}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    {t(statusLabelKey[detailTarget.status] ?? detailTarget.status)}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {detailTarget.status !== "cancelled" && detailTarget.status !== "completed" && detailTarget.status !== "no_show" && (
+                  <>
+                    <Button variant="destructive" size="sm" onClick={handleCancelAppointment} disabled={detailBusy}>
+                      <XCircle className="mr-1 h-4 w-4" />
+                      {t("agenda.cancel_appointment")}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleMarkNoShow} disabled={detailBusy}>
+                      <CalendarX className="mr-1 h-4 w-4" />
+                      {t("agenda.mark_no_show")}
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

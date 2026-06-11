@@ -19,6 +19,8 @@ import type { BiaDeviceProps } from "@modules/anthropometry/domain/BiaReading";
 import type { IndicatorRow, IndicatorValueRow, GeneratedReportRow, DashboardConfigRow } from "@modules/reports/infrastructure/reportMapper";
 import type { PatientConsent } from "@modules/auth/PatientConsentService";
 import type { EvolutionRecordRow, EvolutionIndicatorRow, TemporalComparisonRow, StagnationAlertRow } from "@modules/evolution/infrastructure/evolutionMapper";
+import type { PaymentRow } from "@modules/payment/infrastructure/paymentMapper";
+import type { ExpenseRow } from "@modules/expense/infrastructure/expenseMapper";
 
 export interface AICacheRow {
   key: string;
@@ -73,6 +75,16 @@ const PATIENT_STORES = [
   "consentimiento_informado_id",
   "fecha_firma_consentimiento",
   "clinical_tags",
+  "clave_interna",
+  "birth_place",
+  "address",
+  "nationality",
+  "id_type",
+  "id_number",
+  "discharge_reason",
+  "responsible_professional_id",
+  "external_record_number",
+  "photo_url",
   "created_at",
   "updated_at",
   "deleted_at",
@@ -119,7 +131,9 @@ const CONSULTATIONS_BILLING_STORES = [
   "[patient_id+consultation_date]",
   "status",
   "paid",
+  "payment_status",
   "[patient_id+paid+consultation_date]",
+  "[patient_id+payment_status+consultation_date]",
   "anthropometry_id",
   "lab_panel_id",
   "created_at",
@@ -253,6 +267,8 @@ export class NutriClinicaDB extends Dexie {
   evolution_indicators!: Table<EvolutionIndicatorRow, string>;
   temporal_comparisons!: Table<TemporalComparisonRow, string>;
   stagnation_alerts!: Table<StagnationAlertRow, string>;
+  payments!: Table<PaymentRow, string>;
+  expenses!: Table<ExpenseRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -400,6 +416,16 @@ export class NutriClinicaDB extends Dexie {
       evolution_indicators: EVOLUTION_INDICATORS_STORES,
       temporal_comparisons: TEMPORAL_COMPARISONS_STORES,
       stagnation_alerts: STAGNATION_ALERTS_STORES,
+    });
+
+    this.version(28).stores({
+      patients: PATIENT_STORES,
+    });
+
+    this.version(29).stores({
+      consultations: CONSULTATIONS_BILLING_STORES,
+      payments: "id, patient_id, consultation_id, status, concept, payment_date, [patient_id+status+payment_date], created_at",
+      expenses: "id, patient_id, category, expense_date, [patient_id+expense_date], created_at",
     });
   }
 }

@@ -13,6 +13,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Receipt,
+  DollarSign,
   BookOpen,
   Target,
   HeartPulse,
@@ -97,6 +98,16 @@ export function Sidebar() {
           labelKey: "nav.billing",
           icon: Receipt,
           liveCountFrom: "pending_payments",
+        },
+        {
+          to: "/billing/payments",
+          labelKey: "nav.payments",
+          icon: DollarSign,
+        },
+        {
+          to: "/billing/expenses",
+          labelKey: "nav.expenses",
+          icon: Receipt,
         },
       ]
     : [];

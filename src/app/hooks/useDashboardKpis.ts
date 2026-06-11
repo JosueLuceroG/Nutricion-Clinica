@@ -2,6 +2,7 @@ import * as React from "react";
 import { patientService } from "@services/patientService";
 import { consultationService } from "@services/consultationService";
 import { mealPlanService } from "@services/mealPlanService";
+import { db } from "@services/db";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
@@ -15,6 +16,9 @@ export interface DashboardKpis {
   expiringPlans: MealPlan[];
   recentPatients: Patient[];
   pendingSync: number;
+  pendingPayments: number;
+  pendingPaymentsAmount: number;
+  incomeThisMonth: number;
 }
 
 interface AsyncState<T> {
@@ -74,6 +78,24 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
         status: ["scheduled", "in-progress"],
         limit: 500,
       }),
+      db.consultations
+        .filter((r) => {
+          if (r.deleted_at) return false;
+          if (!(r.cost > 0)) return false;
+          const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
+          return ps === "pending" || ps === "partial";
+        })
+        .toArray(),
+      db.consultations
+        .filter((r) => {
+          if (r.deleted_at) return false;
+          if (!(r.cost > 0)) return false;
+          const t = new Date(r.consultation_date).getTime();
+          if (t < startOfMonth(now).getTime() || t > endOfMonth(now).getTime()) return false;
+          const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
+          return ps === "paid";
+        })
+        .toArray(),
     ])
       .then(
         ([
@@ -81,6 +103,8 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
           activePlansAll,
           consultsThisMonth,
           upcomingConsultations,
+          pendingRows,
+          incomeRows,
         ]) => {
           // Construimos el set de pacientes activos para filtrar
           // consultas / planes. Esto oculta del dashboard los pacientes
@@ -111,6 +135,19 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
             (c) => activePatientIds.has(c.patientId.toString()),
           );
 
+          const pendingPaymentsAmount = (pendingRows as any[]).reduce(
+            (sum: number, r: any) => {
+              const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
+              const ap = r.amount_paid ?? 0;
+              return ps === "partial" ? sum + Math.max(0, r.cost - ap) : sum + r.cost;
+            },
+            0,
+          );
+          const incomeThisMonth = (incomeRows as any[]).reduce(
+            (sum: number, r: any) => sum + r.cost,
+            0,
+          );
+
           setState({
             data: {
               totalPatients: patientsAll.total,
@@ -121,6 +158,9 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
               expiringPlans: expiring,
               recentPatients: recent,
               pendingSync: 0,
+              pendingPayments: pendingRows.length,
+              pendingPaymentsAmount,
+              incomeThisMonth,
             },
             error: null,
             loading: false,

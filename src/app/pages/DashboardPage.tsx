@@ -11,6 +11,8 @@ import {
   FlaskConical,
   ArrowRight,
   RefreshCw,
+  DollarSign,
+  AlertCircle,
 } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
@@ -21,6 +23,9 @@ import { EmptyState } from "@components/layout/EmptyState";
 import { useDashboardKpis } from "@app/hooks/useDashboardKpis";
 import { ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
 import { ClinicMetricsCards } from "./DashboardPageClinicMetrics";
+import { formatCurrency } from "@utils/formatCurrency";
+import i18n from "../../i18n/config";
+const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -79,6 +84,30 @@ export function DashboardPage() {
             icon={Activity}
             to="/configuracion"
             hint={t("dashboard.unsent_changes")}
+          />
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <KpiCard
+            label={t("billing.pending_collection")}
+            value={data?.pendingPaymentsAmount ?? 0}
+            icon={AlertCircle}
+            to="/billing"
+            hint={data?.pendingPaymentsAmount ? MXN(data.pendingPaymentsAmount) : t("billing.no_pending")}
+          />
+          <KpiCard
+            label={t("billing.income_this_month")}
+            value={data?.incomeThisMonth ?? 0}
+            icon={DollarSign}
+            to="/billing/report"
+            hint={data?.incomeThisMonth ? MXN(data.incomeThisMonth) : "$0"}
+          />
+          <KpiCard
+            label={t("billing.pending")}
+            value={(data?.pendingPayments ?? 0) > 0 ? data!.pendingPayments : 0}
+            icon={Calendar}
+            to="/billing"
+            hint={t("billing.pending_consultations")}
           />
         </div>
 

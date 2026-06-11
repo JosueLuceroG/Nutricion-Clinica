@@ -23,6 +23,16 @@ import {
   PAYMENT_METHODS,
   type PaymentMethod,
 } from "@modules/consultation/domain/PaymentMethod";
+import {
+  PAYMENT_STATUSES,
+  PAYMENT_STATUS_LABELS,
+  type PaymentStatus,
+} from "@modules/consultation/domain/PaymentStatus";
+import {
+  PAYMENT_CONCEPTS,
+  PAYMENT_CONCEPT_LABELS,
+  type PaymentConcept,
+} from "@modules/consultation/domain/PaymentConcept";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import { consultationService } from "@services/consultationService";
 
@@ -35,6 +45,9 @@ export interface MarkAsPaidDialogProps {
 
 interface FormState {
   cost: string;
+  paymentStatus: PaymentStatus;
+  paymentConcept: PaymentConcept;
+  amountPaid: string;
   paymentMethod: PaymentMethod;
   paidAt: string;
   reference: string;
@@ -50,6 +63,9 @@ const toIsoDateInput = (d: Date | null | undefined): string => {
 
 const defaultForm = (c: Consultation | null): FormState => ({
   cost: c && c.cost > 0 ? String(c.cost) : "",
+  paymentStatus: c?.paymentStatus ?? "pending",
+  paymentConcept: c?.paymentConcept ?? "consulta",
+  amountPaid: c && c.amountPaid > 0 ? String(c.amountPaid) : (c?.cost && c.cost > 0 ? String(c.cost) : ""),
   paymentMethod: c?.paymentMethod ?? "cash",
   paidAt: toIsoDateInput(c?.paidAt ?? new Date()),
   reference: c?.reference ?? "",
@@ -107,12 +123,19 @@ export const MarkAsPaidDialog = ({
         return;
       }
 
+      const isPaid = form.paymentStatus === "paid" || form.paymentStatus === "partial";
+      const amountPaidRaw = form.amountPaid?.trim();
+      const amountPaid = amountPaidRaw ? Number(amountPaidRaw) : 0;
+
       setBusy(true);
       const updated = await consultationService.payment.register(consultation.id, {
         cost,
-        paid: true,
-        paymentMethod: form.paymentMethod,
-        paidAt: paidAtDate,
+        paid: isPaid,
+        paymentStatus: form.paymentStatus,
+        paymentConcept: form.paymentConcept,
+        amountPaid: amountPaid || (isPaid ? cost : 0),
+        paymentMethod: isPaid ? form.paymentMethod : null,
+        paidAt: isPaid ? paidAtDate : null,
         reference: form.reference.trim() || null,
         invoiceNumber: form.invoiceNumber.trim() || null,
         billingNotes: form.billingNotes.trim() || null,
@@ -156,6 +179,62 @@ export const MarkAsPaidDialog = ({
                 onChange={(e) => setForm((f) => ({ ...f, cost: e.target.value }))}
                 required
                 data-testid="paid-cost"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="paid-status">{t("consultation.payment_status")}</Label>
+              <Select
+                value={form.paymentStatus}
+                onValueChange={(v) =>
+                  setForm((f) => ({ ...f, paymentStatus: v as PaymentStatus }))
+                }
+              >
+                <SelectTrigger id="paid-status" data-testid="paid-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_STATUSES.filter((s) => s !== "refunded" && s !== "cancelled").map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {PAYMENT_STATUS_LABELS[s]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="paid-concept">{t("consultation.payment_concept")}</Label>
+            <Select
+              value={form.paymentConcept}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, paymentConcept: v as PaymentConcept }))
+              }
+            >
+              <SelectTrigger id="paid-concept" data-testid="paid-concept">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_CONCEPTS.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {PAYMENT_CONCEPT_LABELS[c]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="paid-amount">{t("consultation.amount_paid")} (MXN)</Label>
+              <Input
+                id="paid-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.amountPaid}
+                onChange={(e) => setForm((f) => ({ ...f, amountPaid: e.target.value }))}
+                data-testid="paid-amount"
               />
             </div>
             <div className="space-y-1">

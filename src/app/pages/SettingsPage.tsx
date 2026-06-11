@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { Download, Upload, Lock, ShieldAlert, Sparkles } from "lucide-react";
+import { Download, Upload, Lock, ShieldAlert, Sparkles, Palette, Globe, Calendar, DollarSign, Hash } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
@@ -8,10 +8,105 @@ import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Switch } from "@components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@components/ui/dialog";
+import { useUIStore } from "@store/uiStore";
+import { usePreferencesStore } from "@store/preferencesStore";
 import { backupService } from "@services/backup/backupService";
 
 type PasswordMode = "export" | "import" | null;
+
+function PreferencesCard() {
+  const { t, i18n } = useTranslation();
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
+  const { language, dateFormat, currency, decimalPlaces, setLanguage, setDateFormat, setCurrency, setDecimalPlaces } = usePreferencesStore();
+
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value as "es-MX" | "en-US");
+    void i18n.changeLanguage(value);
+  };
+
+  const themes = [
+    { value: "light", label: "Claro", icon: "☀️" },
+    { value: "dark", label: "Oscuro", icon: "🌙" },
+    { value: "system", label: "Sistema", icon: "💻" },
+    { value: "high-contrast", label: "Alto contraste", icon: "♿" },
+  ] as const;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <ShieldAlert className="h-5 w-5" />
+          {t("settings.preferences")}
+        </CardTitle>
+        <CardDescription>
+          {t("settings.preferences_desc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Palette className="h-4 w-4" /> Tema</Label>
+          <Select value={theme} onValueChange={(v) => setTheme(v as typeof theme)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {themes.map((t) => (
+                <SelectItem key={t.value} value={t.value}>{t.icon} {t.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Globe className="h-4 w-4" /> Idioma</Label>
+          <Select value={language} onValueChange={handleLanguageChange}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="es-MX">Español (MX)</SelectItem>
+              <SelectItem value="en-US">English (US)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Calendar className="h-4 w-4" /> Formato de fecha</Label>
+          <Select value={dateFormat} onValueChange={(v) => setDateFormat(v as typeof dateFormat)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="dd/MM/yyyy">dd/MM/yyyy</SelectItem>
+              <SelectItem value="MM/dd/yyyy">MM/dd/yyyy</SelectItem>
+              <SelectItem value="yyyy-MM-dd">yyyy-MM-dd</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><DollarSign className="h-4 w-4" /> Moneda</Label>
+          <Select value={currency} onValueChange={(v) => setCurrency(v as typeof currency)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="MXN">MXN ($)</SelectItem>
+              <SelectItem value="USD">USD ($)</SelectItem>
+              <SelectItem value="EUR">EUR (€)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2"><Hash className="h-4 w-4" /> Decimales</Label>
+          <Select value={String(decimalPlaces)} onValueChange={(v) => setDecimalPlaces(parseInt(v) as 1 | 2)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">1 decimal</SelectItem>
+              <SelectItem value="2">2 decimales</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export function SettingsPage() {
   const { t } = useTranslation();
@@ -183,20 +278,7 @@ export function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldAlert className="h-5 w-5" />
-                {t("settings.preferences")}
-              </CardTitle>
-              <CardDescription>
-                {t("settings.preferences_desc")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              {t("settings.preferences_pending")}
-            </CardContent>
-          </Card>
+          <PreferencesCard />
 
           <Card>
             <CardHeader>

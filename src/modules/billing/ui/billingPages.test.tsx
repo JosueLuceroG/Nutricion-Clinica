@@ -152,23 +152,36 @@ const mockPendingItem = (overrides: Record<string, any> = {}) => ({
   },
   patientName: overrides.patientName ?? "Ana Pérez",
   patientId: overrides.patientId ?? "p1",
+  paymentStatus: overrides.paymentStatus ?? "pending",
+  amountPaid: overrides.amountPaid ?? 0,
+  remainingAmount: overrides.remainingAmount ?? 500,
 });
 
 const mockReport = () => ({
   totalIncome: 5000,
   totalPending: 1000,
+  totalExpenses: 800,
+  netIncome: 4200,
   paidCount: 10,
   pendingCount: 2,
   activePatients: 5,
   monthly: [
-    { monthKey: "2026-01", label: "Ene 2026", income: 3000, pending: 500, paidCount: 6, pendingCount: 1 },
-    { monthKey: "2026-02", label: "Feb 2026", income: 2000, pending: 500, paidCount: 4, pendingCount: 1 },
+    { monthKey: "2026-01", label: "Ene 2026", income: 3000, pending: 500, paidCount: 6, pendingCount: 1, expenses: 400 },
+    { monthKey: "2026-02", label: "Feb 2026", income: 2000, pending: 500, paidCount: 4, pendingCount: 1, expenses: 400 },
   ],
   rangeStart: new Date("2026-01-01"),
   rangeEnd: new Date("2026-06-01"),
   topPatients: [
     { patientId: "1", patientName: "Ana Pérez", consultations: 3, totalPaid: 3000 },
     { patientId: "2", patientName: "Luis López", consultations: 2, totalPaid: 2000 },
+  ],
+  conceptBreakdown: [
+    { concept: "consulta", total: 4500, count: 8 },
+    { concept: "plan", total: 500, count: 2 },
+  ],
+  methodBreakdown: [
+    { method: "cash", total: 3000, count: 5 },
+    { method: "card", total: 2000, count: 5 },
   ],
 });
 
@@ -221,7 +234,7 @@ describe("BillingReportPage", () => {
   it("renders KPIs and top patients when report data is loaded", () => {
     vi.mocked(useFinancialReport).mockReturnValue(mockReport());
     render(<BillingReportPage />, { wrapper });
-    expect(screen.getByText("billing.paid_consultations")).toBeInTheDocument();
+    expect(screen.getByText("billing.income_total")).toBeInTheDocument();
     expect(screen.getByText("billing.active_patients")).toBeInTheDocument();
     expect(screen.getByText("Ana Pérez")).toBeInTheDocument();
     expect(screen.getByText("Luis López")).toBeInTheDocument();

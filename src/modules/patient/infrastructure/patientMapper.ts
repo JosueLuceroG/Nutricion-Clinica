@@ -34,6 +34,16 @@ export interface PatientRow {
   fecha_firma_consentimiento: string | null;
   version_politica_privacidad: string | null;
   clinical_tags: string;
+  clave_interna: string | null;
+  birth_place: string | null;
+  address: string | null;
+  nationality: string | null;
+  id_type: string | null;
+  id_number: string | null;
+  discharge_reason: string | null;
+  responsible_professional_id: string | null;
+  external_record_number: string | null;
+  photo_url: string | null;
   status: PatientStatus;
   created_at: string;
   updated_at: string;
@@ -65,6 +75,16 @@ export const patientRowToDomain = (row: PatientRow): Patient => {
     fechaFirmaConsentimiento: safeDate(row.fecha_firma_consentimiento, null, "patient.fecha_firma_consentimiento"),
     versionPoliticaPrivacidad: row.version_politica_privacidad,
     clinicalTags: safeJsonParse<string[]>(row.clinical_tags, []),
+    claveInterna: row.clave_interna,
+    birthPlace: row.birth_place,
+    address: row.address,
+    nationality: row.nationality,
+    idType: row.id_type,
+    idNumber: row.id_number,
+    dischargeReason: row.discharge_reason,
+    responsibleProfessionalId: row.responsible_professional_id,
+    externalRecordNumber: row.external_record_number,
+    photoUrl: row.photo_url,
     status: row.status,
     createdAt: safeDate(row.created_at, undefined, "patient.created_at")!,
     updatedAt: safeDate(row.updated_at, undefined, "patient.updated_at")!,
@@ -97,6 +117,16 @@ export const patientDomainToRow = (patient: Patient): PatientRow => {
     fecha_firma_consentimiento: toIsoStringSafe(patient.fechaFirmaConsentimiento, null, "patient.fecha_firma_consentimiento"),
     version_politica_privacidad: patient.versionPoliticaPrivacidad,
     clinical_tags: JSON.stringify(patient.clinicalTags),
+    clave_interna: patient.claveInterna,
+    birth_place: patient.birthPlace,
+    address: patient.address,
+    nationality: patient.nationality,
+    id_type: patient.idType,
+    id_number: patient.idNumber,
+    discharge_reason: patient.dischargeReason,
+    responsible_professional_id: patient.responsibleProfessionalId,
+    external_record_number: patient.externalRecordNumber,
+    photo_url: patient.photoUrl,
     status: patient.status,
     created_at: toIsoStringSafe(patient.createdAt, new Date().toISOString(), "patient.created_at")!,
     updated_at: toIsoStringSafe(patient.updatedAt, new Date().toISOString(), "patient.updated_at")!,

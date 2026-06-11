@@ -6,7 +6,6 @@ import { hasAnyRole } from "./authRoles";
 export interface RequireRoleProps {
   /**
    * Roles permitidos para acceder al contenido.
-   * @deprecated Usa `allowedRoles` en su lugar.
    */
   roles?: readonly Role[];
   /**

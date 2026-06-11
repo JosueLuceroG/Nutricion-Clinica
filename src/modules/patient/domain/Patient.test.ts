@@ -29,6 +29,16 @@ describe("Patient.create", () => {
     expect(patient.occupation).toBeNull();
     expect(patient.education).toBeNull();
     expect(patient.deletedAt).toBeNull();
+    expect(patient.claveInterna).toBeNull();
+    expect(patient.birthPlace).toBeNull();
+    expect(patient.address).toBeNull();
+    expect(patient.nationality).toBeNull();
+    expect(patient.idType).toBeNull();
+    expect(patient.idNumber).toBeNull();
+    expect(patient.dischargeReason).toBeNull();
+    expect(patient.responsibleProfessionalId).toBeNull();
+    expect(patient.externalRecordNumber).toBeNull();
+    expect(patient.photoUrl).toBeNull();
   });
 
   it("crea paciente con campos opcionales completos", () => {
@@ -43,6 +53,16 @@ describe("Patient.create", () => {
       emergencyContactRelationship: "Cónyuge",
       generalNotes: "Paciente con antecedentes",
       clinicalTags: ["diabético", "embarazo"],
+      claveInterna: "CLI-001",
+      birthPlace: "Ciudad de México",
+      address: "Calle 123, Col. Centro",
+      nationality: "Mexicana",
+      idType: "INE",
+      idNumber: "INE123456",
+      dischargeReason: "Mejoría clínica",
+      responsibleProfessionalId: "PROF-001",
+      externalRecordNumber: "EXT-98765",
+      photoUrl: "https://example.com/photo.jpg",
     });
     expect(patient.gender).toBe("woman");
     expect(patient.maritalStatus).toBe("married");
@@ -52,6 +72,16 @@ describe("Patient.create", () => {
     expect(patient.emergencyContactRelationship).toBe("Cónyuge");
     expect(patient.generalNotes).toBe("Paciente con antecedentes");
     expect(patient.clinicalTags).toEqual(["diabético", "embarazo"]);
+    expect(patient.claveInterna).toBe("CLI-001");
+    expect(patient.birthPlace).toBe("Ciudad de México");
+    expect(patient.address).toBe("Calle 123, Col. Centro");
+    expect(patient.nationality).toBe("Mexicana");
+    expect(patient.idType).toBe("INE");
+    expect(patient.idNumber).toBe("INE123456");
+    expect(patient.dischargeReason).toBe("Mejoría clínica");
+    expect(patient.responsibleProfessionalId).toBe("PROF-001");
+    expect(patient.externalRecordNumber).toBe("EXT-98765");
+    expect(patient.photoUrl).toBe("https://example.com/photo.jpg");
   });
 
   it("calcula edad correcta", () => {

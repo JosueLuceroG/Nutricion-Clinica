@@ -34,9 +34,10 @@ export class IndicatorValue {
     return { ...this.props };
   }
 
-  static create(props: Omit<IndicatorValueProps, "createdAt"> & { createdAt?: number }): IndicatorValue {
+  static create(props: Omit<IndicatorValueProps, "createdAt" | "metadataJson"> & { createdAt?: number; metadataJson?: string }): IndicatorValue {
     return new IndicatorValue({
       ...props,
+      metadataJson: props.metadataJson ?? "{}",
       createdAt: props.createdAt ?? Date.now(),
     });
   }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../../i18n/config";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, X } from "lucide-react";
+import { ArrowLeft, Printer, X, DollarSign } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Card, CardContent } from "@components/ui/card";
@@ -13,6 +13,8 @@ import {
   usePatientLive,
 } from "@modules/consultation/ui/useBillingHooks";
 import { formatCurrency } from "@utils/formatCurrency";
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
+import { Badge } from "@components/ui/badge";
 
 const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
@@ -215,9 +217,15 @@ export const ReceiptPage = () => {
 
               {/* Pago */}
               <section>
-                  <h2 className="mb-2 text-sm font-semibold uppercase text-muted-foreground">
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="text-sm font-semibold uppercase text-muted-foreground">
                     {t("consultation.payment_section")}
                   </h2>
+                  <Badge variant={PAYMENT_STATUS_COLORS[c.paymentStatus] ?? "secondary"}>
+                    <DollarSign className="mr-1 h-3 w-3" />
+                    {PAYMENT_STATUS_LABELS[c.paymentStatus] ?? c.paymentStatus}
+                  </Badge>
+                </div>
                 <div className="overflow-hidden rounded-md border">
                   <table className="w-full text-sm">
                     <tbody>
@@ -225,6 +233,20 @@ export const ReceiptPage = () => {
                         <td className="p-3">{t("common.description")}</td>
                         <td className="p-3 text-right">{t("consultation.title_single")}</td>
                       </tr>
+                      {c.paymentConcept && (
+                        <tr className="border-b">
+                          <td className="p-3">{t("consultation.payment_concept")}</td>
+                          <td className="p-3 text-right">
+                            {t(`consultation.concept_${c.paymentConcept}`)}
+                          </td>
+                        </tr>
+                      )}
+                      {c.amountPaid > 0 && (
+                        <tr className="border-b">
+                          <td className="p-3">{t("consultation.amount_paid")}</td>
+                          <td className="p-3 text-right font-medium">{MXN(c.amountPaid)}</td>
+                        </tr>
+                      )}
                       <tr className="border-b">
                         <td className="p-3">{t("consultation.payment_method")}</td>
                         <td className="p-3 text-right">
@@ -243,13 +265,13 @@ export const ReceiptPage = () => {
                       </tr>
                       {c.reference && (
                         <tr className="border-b">
-                          <td className="p-3">{t("common.description")}</td>
+                          <td className="p-3">{t("consultation.reference")}</td>
                           <td className="p-3 text-right font-mono">{c.reference}</td>
                         </tr>
                       )}
                       {c.invoiceNumber && (
                         <tr className="border-b">
-                          <td className="p-3">{t("billing.receipt_no", { id: "" })}</td>
+                          <td className="p-3">{t("consultation.invoice")}</td>
                           <td className="p-3 text-right font-mono">{c.invoiceNumber}</td>
                         </tr>
                       )}

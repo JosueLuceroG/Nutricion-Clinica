@@ -1,20 +1,20 @@
 import type { Dexie } from "dexie";
 import type {
   EvolutionRecordProps,
-  EvolutionRecord,
 } from "../domain/EvolutionRecord";
+import { EvolutionRecord } from "../domain/EvolutionRecord";
 import type {
   EvolutionIndicatorProps,
-  EvolutionIndicator,
 } from "../domain/EvolutionIndicator";
+import { EvolutionIndicator } from "../domain/EvolutionIndicator";
 import type {
   TemporalComparisonProps,
-  TemporalComparison,
 } from "../domain/TemporalComparison";
+import { TemporalComparison } from "../domain/TemporalComparison";
 import type {
   StagnationAlertProps,
-  StagnationAlert,
 } from "../domain/StagnationAlert";
+import { StagnationAlert } from "../domain/StagnationAlert";
 import type { EvolutionRepository } from "../domain/EvolutionRepository";
 import {
   recordToRow, rowToRecord, type EvolutionRecordRow,

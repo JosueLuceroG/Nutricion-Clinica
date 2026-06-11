@@ -3,6 +3,10 @@ import { ConsultationId } from "../domain/ConsultationId";
 import type { ConsultationStatus } from "../domain/ConsultationStatus";
 import type { PaymentMethod } from "../domain/PaymentMethod";
 import { isPaymentMethod } from "../domain/PaymentMethod";
+import type { PaymentStatus } from "../domain/PaymentStatus";
+import { isPaymentStatus } from "../domain/PaymentStatus";
+import type { PaymentConcept } from "../domain/PaymentConcept";
+import { isPaymentConcept } from "../domain/PaymentConcept";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
@@ -26,11 +30,14 @@ export interface ConsultationRow {
   status: ConsultationStatus;
   cost: number;
   paid: boolean;
+  payment_status: string | null;
+  payment_concept: string | null;
   payment_method: string | null;
   paid_at: string | null;
   reference: string | null;
   invoice_number: string | null;
   billing_notes: string | null;
+  amount_paid: number | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -40,6 +47,12 @@ export const consultationRowToDomain = (row: ConsultationRow): Consultation => {
   const paymentMethod: PaymentMethod | null = isPaymentMethod(row.payment_method)
     ? row.payment_method
     : null;
+  const paymentStatus: PaymentStatus = isPaymentStatus(row.payment_status)
+    ? row.payment_status
+    : row.paid ? "paid" : "pending";
+  const paymentConcept: PaymentConcept = isPaymentConcept(row.payment_concept)
+    ? row.payment_concept
+    : "consulta";
   const props: ConsultationProps = {
     id: ConsultationId.fromUnsafe(row.id),
     patientId: PatientId.fromUnsafe(row.patient_id),
@@ -57,11 +70,14 @@ export const consultationRowToDomain = (row: ConsultationRow): Consultation => {
     status: row.status,
     cost: typeof row.cost === "number" && Number.isFinite(row.cost) ? row.cost : 0,
     paid: Boolean(row.paid),
+    paymentStatus,
+    paymentConcept,
     paymentMethod,
     paidAt: safeDate(row.paid_at, null, "consultation.paid_at"),
     reference: row.reference ?? null,
     invoiceNumber: row.invoice_number ?? null,
     billingNotes: row.billing_notes ?? null,
+    amountPaid: row.amount_paid != null && Number.isFinite(row.amount_paid) ? row.amount_paid : (row.paid ? (typeof row.cost === "number" ? row.cost : 0) : 0),
     createdAt: safeDate(row.created_at, undefined, "consultation.created_at")!,
     updatedAt: safeDate(row.updated_at, undefined, "consultation.updated_at")!,
     deletedAt: safeDate(row.deleted_at, null, "consultation.deleted_at"),
@@ -87,11 +103,14 @@ export const consultationDomainToRow = (c: Consultation): ConsultationRow => {
     status: c.status,
     cost: c.cost,
     paid: c.paid,
+    payment_status: c.paymentStatus,
+    payment_concept: c.paymentConcept,
     payment_method: c.paymentMethod,
     paid_at: toIsoStringSafe(c.paidAt, null, "consultation.paid_at"),
     reference: c.reference,
     invoice_number: c.invoiceNumber,
     billing_notes: c.billingNotes,
+    amount_paid: c.amountPaid > 0 ? c.amountPaid : null,
     created_at: toIsoStringSafe(c.createdAt, new Date().toISOString(), "consultation.created_at")!,
     updated_at: toIsoStringSafe(c.updatedAt, new Date().toISOString(), "consultation.updated_at")!,
     deleted_at: toIsoStringSafe(c.deletedAt, null, "consultation.deleted_at"),

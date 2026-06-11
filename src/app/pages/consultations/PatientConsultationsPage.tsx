@@ -15,6 +15,7 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import { ConsultationStatusColor, type ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
 import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
 import { consultationService } from "@services/consultationService";
 import { useUIStore } from "@store/uiStore";
@@ -152,15 +153,10 @@ export function PatientConsultationsPage() {
                       <Badge variant={ConsultationStatusColor[c.status] as never}>
                         {consultationStatusLabel(t, c.status)}
                       </Badge>
-                      {c.isPaid ? (
-                        <Badge variant="success">
+                      {c.cost > 0 ? (
+                        <Badge variant={PAYMENT_STATUS_COLORS[c.paymentStatus] ?? "secondary"}>
                           <DollarSign className="mr-1 h-3 w-3" />
-                          {t("consultation.paid")}
-                        </Badge>
-                      ) : c.cost > 0 ? (
-                        <Badge variant="warning">
-                          <DollarSign className="mr-1 h-3 w-3" />
-                          {t("consultation.unpaid")}
+                          {PAYMENT_STATUS_LABELS[c.paymentStatus] ?? c.paymentStatus}
                         </Badge>
                       ) : null}
                       <Button

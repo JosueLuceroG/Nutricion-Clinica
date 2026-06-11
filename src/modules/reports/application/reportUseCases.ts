@@ -42,7 +42,7 @@ export const listIndicatorsUC = async (repo: ReportsRepository): Promise<Indicat
 
 export const recordIndicatorValueUC = async (
   repo: ReportsRepository,
-  input: Omit<IndicatorValueProps, "createdAt"> & { createdAt?: number },
+  input: Omit<IndicatorValueProps, "createdAt" | "id" | "metadataJson"> & { createdAt?: number; metadataJson?: string },
 ): Promise<IndicatorValue> => {
   const value = IndicatorValue.create({
     ...input,
@@ -83,7 +83,7 @@ export const generateReportUC = async (
 
 export const saveDashboardConfigUC = async (
   repo: ReportsRepository,
-  input: Omit<DashboardConfigProps, "createdAt" | "updatedAt" | "isVisible"> & { isVisible?: boolean },
+  input: Omit<DashboardConfigProps, "createdAt" | "updatedAt" | "isVisible" | "id"> & { isVisible?: boolean },
 ): Promise<DashboardConfig> => {
   const config = DashboardConfig.create({
     ...input,

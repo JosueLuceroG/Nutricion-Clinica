@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
-import { Save, X, User, Mail, Phone, Calendar, FileText, Heart, Tags } from "lucide-react";
+import { Save, X, User, Mail, Phone, Calendar, FileText, Heart, Tags, IdCard } from "lucide-react";
 import { toast } from "sonner";
 import {
   PatientFormSchema,
@@ -76,6 +76,16 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
         emergencyContactPhone: initialPatient.emergencyContactPhone?.toString() ?? "",
         generalNotes: initialPatient.generalNotes ?? "",
         clinicalTags: initialPatient.clinicalTags.join(", "),
+        claveInterna: initialPatient.claveInterna ?? "",
+        birthPlace: initialPatient.birthPlace ?? "",
+        address: initialPatient.address ?? "",
+        nationality: initialPatient.nationality ?? "",
+        idType: initialPatient.idType ?? "",
+        idNumber: initialPatient.idNumber ?? "",
+        dischargeReason: initialPatient.dischargeReason ?? "",
+        responsibleProfessionalId: initialPatient.responsibleProfessionalId ?? "",
+        externalRecordNumber: initialPatient.externalRecordNumber ?? "",
+        photoUrl: initialPatient.photoUrl ?? "",
       });
     }
   }, [initialPatient, reset]);
@@ -108,6 +118,16 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
         emergencyContactPhone: values.emergencyContactPhone ? PhoneVO.from(values.emergencyContactPhone) : null,
         generalNotes: parseStr(values.generalNotes),
         clinicalTags: parseTags(values.clinicalTags),
+        claveInterna: parseStr(values.claveInterna),
+        birthPlace: parseStr(values.birthPlace),
+        address: parseStr(values.address),
+        nationality: parseStr(values.nationality),
+        idType: parseStr(values.idType),
+        idNumber: parseStr(values.idNumber),
+        dischargeReason: parseStr(values.dischargeReason),
+        responsibleProfessionalId: parseStr(values.responsibleProfessionalId),
+        externalRecordNumber: parseStr(values.externalRecordNumber),
+        photoUrl: parseStr(values.photoUrl),
       };
 
       if (mode === "create") {
@@ -210,6 +230,48 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
           </FormField>
           <FormField label={t("patient.phone")} error={errors.emergencyContactPhone?.message} htmlFor="field-patient-emergency-phone">
             <Input id="field-patient-emergency-phone" type="tel" {...register("emergencyContactPhone")} placeholder="+52 55 1234 5678" aria-describedby={errors.emergencyContactPhone ? "field-patient-emergency-phone-error" : undefined} />
+          </FormField>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <IdCard className="h-4 w-4" />
+            {t("patient.identification_and_record")}
+          </CardTitle>
+          <CardDescription>{t("patient.identification_and_record_desc")}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 sm:grid-cols-2">
+          <FormField label={t("patient.clave_interna")} error={errors.claveInterna?.message} htmlFor="field-patient-clave-interna">
+            <Input id="field-patient-clave-interna" {...register("claveInterna")} aria-describedby={errors.claveInterna ? "field-patient-clave-interna-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.birth_place")} error={errors.birthPlace?.message} htmlFor="field-patient-birth-place">
+            <Input id="field-patient-birth-place" {...register("birthPlace")} aria-describedby={errors.birthPlace ? "field-patient-birth-place-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.address")} error={errors.address?.message} className="sm:col-span-2" htmlFor="field-patient-address">
+            <Textarea id="field-patient-address" {...register("address")} rows={2} aria-describedby={errors.address ? "field-patient-address-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.nationality")} error={errors.nationality?.message} htmlFor="field-patient-nationality">
+            <Input id="field-patient-nationality" {...register("nationality")} aria-describedby={errors.nationality ? "field-patient-nationality-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.id_type")} error={errors.idType?.message} htmlFor="field-patient-id-type">
+            <Input id="field-patient-id-type" {...register("idType")} aria-describedby={errors.idType ? "field-patient-id-type-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.id_number")} error={errors.idNumber?.message} htmlFor="field-patient-id-number">
+            <Input id="field-patient-id-number" {...register("idNumber")} aria-describedby={errors.idNumber ? "field-patient-id-number-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.discharge_reason")} error={errors.dischargeReason?.message} className="sm:col-span-2" htmlFor="field-patient-discharge-reason">
+            <Textarea id="field-patient-discharge-reason" {...register("dischargeReason")} rows={2} aria-describedby={errors.dischargeReason ? "field-patient-discharge-reason-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.responsible_professional_id")} error={errors.responsibleProfessionalId?.message} htmlFor="field-patient-responsible-professional-id">
+            <Input id="field-patient-responsible-professional-id" {...register("responsibleProfessionalId")} aria-describedby={errors.responsibleProfessionalId ? "field-patient-responsible-professional-id-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.external_record_number")} error={errors.externalRecordNumber?.message} htmlFor="field-patient-external-record-number">
+            <Input id="field-patient-external-record-number" {...register("externalRecordNumber")} aria-describedby={errors.externalRecordNumber ? "field-patient-external-record-number-error" : undefined} />
+          </FormField>
+          <FormField label={t("patient.photo_url")} error={errors.photoUrl?.message} className="sm:col-span-2" htmlFor="field-patient-photo-url">
+            <Input id="field-patient-photo-url" {...register("photoUrl")} aria-describedby={errors.photoUrl ? "field-patient-photo-url-error" : undefined} />
           </FormField>
         </CardContent>
       </Card>

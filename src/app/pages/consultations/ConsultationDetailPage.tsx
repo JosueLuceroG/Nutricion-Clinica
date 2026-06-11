@@ -27,6 +27,7 @@ import { useConsultation } from "@modules/consultation/ui/useConsultationHooks";
 import { ConsultationId } from "@modules/consultation/domain/ConsultationId";
 import type { ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
+import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
 import { isBillingRole, useCurrentRole } from "@modules/auth/authRoles";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { Vitals } from "@modules/consultation/domain/Vitals";
@@ -331,11 +332,7 @@ export function ConsultationDetailPage() {
                   {t("consultation.payment_section")}
                 </CardTitle>
                 <CardDescription>
-                  {consultation.isPaid
-                    ? t("consultation.paid_desc")
-                    : consultation.cost > 0
-                      ? t("consultation.pending_payment")
-                      : t("consultation.no_cost_assigned")}
+                  {consultation.cost > 0 ? t("consultation.payment_section") : t("consultation.no_cost_assigned")}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
@@ -345,7 +342,19 @@ export function ConsultationDetailPage() {
                     {consultation.cost > 0 ? formatCurrency(consultation.cost) : "—"}
                   </span>
                 </div>
-                {consultation.isPaid && consultation.paymentMethod && (
+                {consultation.paymentConcept && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{t("consultation.payment_concept")}</span>
+                    <span className="text-sm">{t(`consultation.concept_${consultation.paymentConcept}`)}</span>
+                  </div>
+                )}
+                {consultation.amountPaid > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{t("consultation.amount_paid")}</span>
+                    <span className="text-sm font-medium">{formatCurrency(consultation.amountPaid)}</span>
+                  </div>
+                )}
+                {consultation.paymentStatus === "paid" && consultation.paymentMethod && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("consultation.payment_method")}</span>
                     <span className="text-sm">{t(`consultation.method_${consultation.paymentMethod}`)}</span>
@@ -359,22 +368,25 @@ export function ConsultationDetailPage() {
                     </span>
                   </div>
                 )}
-                {consultation.isPaid && consultation.reference && (
+                {consultation.reference && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("consultation.reference")}</span>
                     <span className="text-sm font-mono">{consultation.reference}</span>
                   </div>
                 )}
-                {consultation.isPaid && consultation.invoiceNumber && (
+                {consultation.invoiceNumber && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">{t("consultation.invoice")}</span>
                     <span className="text-sm font-mono">{consultation.invoiceNumber}</span>
                   </div>
                 )}
-                {consultation.isPaid && (
-                  <Badge variant="success" className="mt-2">
+                {consultation.cost > 0 && (
+                  <Badge
+                    variant={PAYMENT_STATUS_COLORS[consultation.paymentStatus] ?? "secondary"}
+                    className="mt-2"
+                  >
                     <DollarSign className="mr-1 h-3 w-3" />
-                    {t("consultation.paid")}
+                    {PAYMENT_STATUS_LABELS[consultation.paymentStatus] ?? consultation.paymentStatus}
                   </Badge>
                 )}
                 {canManagePayment && (

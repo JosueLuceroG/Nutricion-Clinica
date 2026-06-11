@@ -49,6 +49,16 @@ export const PatientFormSchema = z
     emergencyContactPhone: optionalPhone,
     generalNotes: z.string().max(2000, "Máximo 2000 caracteres").optional().or(z.literal("")),
     clinicalTags: z.string().optional().or(z.literal("")),
+    claveInterna: z.string().trim().max(50).optional().or(z.literal("")),
+    birthPlace: z.string().trim().max(200).optional().or(z.literal("")),
+    address: z.string().trim().max(500).optional().or(z.literal("")),
+    nationality: z.string().trim().max(100).optional().or(z.literal("")),
+    idType: z.string().trim().max(50).optional().or(z.literal("")),
+    idNumber: z.string().trim().max(100).optional().or(z.literal("")),
+    dischargeReason: z.string().trim().max(500).optional().or(z.literal("")),
+    responsibleProfessionalId: z.string().trim().max(50).optional().or(z.literal("")),
+    externalRecordNumber: z.string().trim().max(100).optional().or(z.literal("")),
+    photoUrl: z.string().trim().max(500).optional().or(z.literal("")),
   })
   .strict();
 
@@ -72,4 +82,14 @@ export const patientFormDefaultValues: PatientFormValues = {
   emergencyContactPhone: "",
   generalNotes: "",
   clinicalTags: "",
+  claveInterna: "",
+  birthPlace: "",
+  address: "",
+  nationality: "",
+  idType: "",
+  idNumber: "",
+  dischargeReason: "",
+  responsibleProfessionalId: "",
+  externalRecordNumber: "",
+  photoUrl: "",
 };

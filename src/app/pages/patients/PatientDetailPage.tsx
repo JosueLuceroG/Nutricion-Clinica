@@ -18,6 +18,7 @@ import {
   Heart,
   Tags,
   FileText,
+  DollarSign,
 } from "lucide-react";
 import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
 import { PatientMealPhotosCard } from "./PatientMealPhotosCard";
@@ -34,12 +35,14 @@ import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState, EmptyState } from "@components/layout/EmptyState";
 import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
+import { usePatientPaymentSummary } from "@modules/consultation/ui/useBillingHooks";
 import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
 import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import type { RecordStatus } from "@modules/patient/domain/RecordStatus";
 import type { PatientStatus } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
+import { formatCurrency } from "@utils/formatCurrency";
 
 function patientStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: PatientStatus) {
   if (status === "deceased") return t("patient.status_deceased");
@@ -61,6 +64,7 @@ export function PatientDetailPage() {
     [patientId],
   );
   const { data: patient, loading, error, reload, deleted } = usePatient(id);
+  const paymentSummary = usePatientPaymentSummary(patientId ?? null);
   const [busy, setBusy] = React.useState(false);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
 
@@ -257,6 +261,40 @@ export function PatientDetailPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {paymentSummary && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    {t("billing.payments_title")}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t("billing.total_transactions")}</span>
+                    <span className="font-medium">{paymentSummary.consultationCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t("billing.income_total")}</span>
+                    <span className="font-medium text-green-600">{formatCurrency(paymentSummary.totalPaid)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{t("billing.pending_collection")}</span>
+                    <span className="font-medium text-amber-600">{formatCurrency(paymentSummary.totalPending)}</span>
+                  </div>
+                  <div className="border-t pt-2 text-xs text-muted-foreground flex justify-between">
+                    <span>{paymentSummary.paidCount} {t("billing.paid_consultations").toLowerCase()}</span>
+                    <span>{paymentSummary.pendingCount} {t("billing.pending_consultations").toLowerCase()}</span>
+                  </div>
+                  <Button asChild variant="outline" size="sm" className="mt-1 w-full">
+                    <Link to={`/billing/payments?patientId=${patient.id.toString()}`}>
+                      {t("common.view_details")}
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             <PatientPortalLinksCard patientId={patient.id.toString()} />
 

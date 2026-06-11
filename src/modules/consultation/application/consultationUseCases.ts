@@ -2,6 +2,8 @@ import { Consultation, type ConsultationCreate } from "../domain/Consultation";
 import type { ConsultationId } from "../domain/ConsultationId";
 import type { ConsultationStatus } from "../domain/ConsultationStatus";
 import type { PaymentMethod } from "../domain/PaymentMethod";
+import type { PaymentStatus } from "../domain/PaymentStatus";
+import type { PaymentConcept } from "../domain/PaymentConcept";
 import {
   type ConsultationQuery,
   type ConsultationRepository,
@@ -91,8 +93,11 @@ export class DeleteConsultationUseCase {
 export interface RegisterPaymentInput {
   cost?: number;
   paid: boolean;
+  paymentStatus?: PaymentStatus;
+  paymentConcept?: PaymentConcept;
   paymentMethod?: PaymentMethod | null;
   paidAt?: Date | null;
+  amountPaid?: number;
   reference?: string | null;
   invoiceNumber?: string | null;
   billingNotes?: string | null;

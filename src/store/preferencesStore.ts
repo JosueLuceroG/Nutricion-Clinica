@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface PreferencesState {
   language: "es-MX" | "en-US";
@@ -11,13 +12,18 @@ interface PreferencesState {
   setDecimalPlaces: (decimals: PreferencesState["decimalPlaces"]) => void;
 }
 
-export const usePreferencesStore = create<PreferencesState>()((set) => ({
-  language: "es-MX",
-  dateFormat: "dd/MM/yyyy",
-  currency: "MXN",
-  decimalPlaces: 1,
-  setLanguage: (language) => set({ language }),
-  setDateFormat: (dateFormat) => set({ dateFormat }),
-  setCurrency: (currency) => set({ currency }),
-  setDecimalPlaces: (decimalPlaces) => set({ decimalPlaces }),
-}));
+export const usePreferencesStore = create<PreferencesState>()(
+  persist(
+    (set) => ({
+      language: "es-MX",
+      dateFormat: "dd/MM/yyyy",
+      currency: "MXN",
+      decimalPlaces: 1,
+      setLanguage: (language) => set({ language }),
+      setDateFormat: (dateFormat) => set({ dateFormat }),
+      setCurrency: (currency) => set({ currency }),
+      setDecimalPlaces: (decimalPlaces) => set({ decimalPlaces }),
+    }),
+    { name: "preferences-store" },
+  ),
+);

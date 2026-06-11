@@ -8,21 +8,6 @@ import type { RecordStatus } from "./RecordStatus";
 import type { Email, Phone } from "./Contact";
 import type { PatientStatus } from "./PatientStatus";
 
-/**
- * Entidad de dominio: Patient.
- *
- * Reglas:
- *  - Inmutable: cualquier cambio produce una nueva instancia.
- *  - Sin dependencias de React, Tauri, SQLite o cualquier framework.
- *  - El nombre completo es derivado (firstName + lastName).
- *  - RN-EXP-01: para considerarse "listo para consulta clínica", debe tener
- *    `consentimientoInformadoId` y `fechaFirmaConsentimiento` no nulos.
- *    Este invariante se valida con `hasSignedConsent()`.
- *  - El correo y teléfono se almacenan como tipos de valor (Email/Phone) con validación.
- *  - El expediente (`recordStatus` + `recordOpenedAt`) es independiente del
- *    `status` general (active/inactive); el primero refleja el estado clínico,
- *    el segundo la cuenta del paciente.
- */
 export class Patient {
   private constructor(
     public readonly id: PatientId,
@@ -48,6 +33,16 @@ export class Patient {
     public readonly fechaFirmaConsentimiento: Date | null,
     public readonly versionPoliticaPrivacidad: string | null,
     public readonly clinicalTags: string[],
+    public readonly claveInterna: string | null,
+    public readonly birthPlace: string | null,
+    public readonly address: string | null,
+    public readonly nationality: string | null,
+    public readonly idType: string | null,
+    public readonly idNumber: string | null,
+    public readonly dischargeReason: string | null,
+    public readonly responsibleProfessionalId: string | null,
+    public readonly externalRecordNumber: string | null,
+    public readonly photoUrl: string | null,
     public readonly status: PatientStatus,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
@@ -74,11 +69,6 @@ export class Patient {
     return this.status === "active" && this.deletedAt === null;
   }
 
-  /**
-   * RN-EXP-01: indica si el paciente ha firmado consentimiento informado.
-   * No es un lanzamiento de error: permite a la UI evaluar el gate de la consulta
-   * sin atrapar excepciones. La regla dura se aplica en `ClinicalRuleEngine.validateConsent`.
-   */
   get hasSignedConsent(): boolean {
     return this.consentimientoInformadoId !== null && this.fechaFirmaConsentimiento !== null;
   }
@@ -110,6 +100,16 @@ export class Patient {
       fechaFirmaConsentimiento: updates.fechaFirmaConsentimiento !== undefined ? updates.fechaFirmaConsentimiento : this.fechaFirmaConsentimiento,
       versionPoliticaPrivacidad: updates.versionPoliticaPrivacidad !== undefined ? updates.versionPoliticaPrivacidad : this.versionPoliticaPrivacidad,
       clinicalTags: updates.clinicalTags ?? this.clinicalTags,
+      claveInterna: updates.claveInterna !== undefined ? updates.claveInterna : this.claveInterna,
+      birthPlace: updates.birthPlace !== undefined ? updates.birthPlace : this.birthPlace,
+      address: updates.address !== undefined ? updates.address : this.address,
+      nationality: updates.nationality !== undefined ? updates.nationality : this.nationality,
+      idType: updates.idType !== undefined ? updates.idType : this.idType,
+      idNumber: updates.idNumber !== undefined ? updates.idNumber : this.idNumber,
+      dischargeReason: updates.dischargeReason !== undefined ? updates.dischargeReason : this.dischargeReason,
+      responsibleProfessionalId: updates.responsibleProfessionalId !== undefined ? updates.responsibleProfessionalId : this.responsibleProfessionalId,
+      externalRecordNumber: updates.externalRecordNumber !== undefined ? updates.externalRecordNumber : this.externalRecordNumber,
+      photoUrl: updates.photoUrl !== undefined ? updates.photoUrl : this.photoUrl,
       status: updates.status ?? this.status,
       createdAt: this.createdAt,
       updatedAt: new Date(),
@@ -143,6 +143,16 @@ export class Patient {
       fechaFirmaConsentimiento: this.fechaFirmaConsentimiento,
       versionPoliticaPrivacidad: this.versionPoliticaPrivacidad,
       clinicalTags: this.clinicalTags,
+      claveInterna: this.claveInterna,
+      birthPlace: this.birthPlace,
+      address: this.address,
+      nationality: this.nationality,
+      idType: this.idType,
+      idNumber: this.idNumber,
+      dischargeReason: this.dischargeReason,
+      responsibleProfessionalId: this.responsibleProfessionalId,
+      externalRecordNumber: this.externalRecordNumber,
+      photoUrl: this.photoUrl,
       status: "inactive",
       createdAt: this.createdAt,
       updatedAt: now,
@@ -183,6 +193,16 @@ export class Patient {
       fechaFirma,
       input.versionPoliticaPrivacidad?.trim() ?? null,
       input.clinicalTags ?? [],
+      input.claveInterna?.trim() ?? null,
+      input.birthPlace?.trim() ?? null,
+      input.address?.trim() ?? null,
+      input.nationality?.trim() ?? null,
+      input.idType?.trim() ?? null,
+      input.idNumber?.trim() ?? null,
+      input.dischargeReason?.trim() ?? null,
+      input.responsibleProfessionalId?.trim() ?? null,
+      input.externalRecordNumber?.trim() ?? null,
+      input.photoUrl?.trim() ?? null,
       input.status ?? "active",
       now,
       now,
@@ -215,6 +235,16 @@ export class Patient {
       props.fechaFirmaConsentimiento,
       props.versionPoliticaPrivacidad,
       props.clinicalTags,
+      props.claveInterna,
+      props.birthPlace,
+      props.address,
+      props.nationality,
+      props.idType,
+      props.idNumber,
+      props.dischargeReason,
+      props.responsibleProfessionalId,
+      props.externalRecordNumber,
+      props.photoUrl,
       props.status,
       props.createdAt,
       props.updatedAt,
@@ -247,6 +277,16 @@ export interface PatientProps {
   fechaFirmaConsentimiento: Date | null;
   versionPoliticaPrivacidad: string | null;
   clinicalTags: string[];
+  claveInterna: string | null;
+  birthPlace: string | null;
+  address: string | null;
+  nationality: string | null;
+  idType: string | null;
+  idNumber: string | null;
+  dischargeReason: string | null;
+  responsibleProfessionalId: string | null;
+  externalRecordNumber: string | null;
+  photoUrl: string | null;
   status: PatientStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -277,6 +317,16 @@ export interface PatientCreate {
   fechaFirmaConsentimiento?: Date | null;
   versionPoliticaPrivacidad?: string | null;
   clinicalTags?: string[];
+  claveInterna?: string | null;
+  birthPlace?: string | null;
+  address?: string | null;
+  nationality?: string | null;
+  idType?: string | null;
+  idNumber?: string | null;
+  dischargeReason?: string | null;
+  responsibleProfessionalId?: string | null;
+  externalRecordNumber?: string | null;
+  photoUrl?: string | null;
   status?: PatientStatus;
 }
 
