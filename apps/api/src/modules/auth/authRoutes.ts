@@ -48,7 +48,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
         res.status(400).json({ error: '2FA no está habilitado' });
         return;
       }
-      if (!verifyTotp(body.totpCode, secret)) {
+      if (!(await verifyTotp(body.totpCode, secret))) {
         res.status(401).json({ error: 'Código TOTP inválido' });
         return;
       }

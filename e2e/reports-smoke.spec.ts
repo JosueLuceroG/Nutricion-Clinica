@@ -1,17 +1,9 @@
 import { test, expect } from "@playwright/test";
-
-/**
- * Reports page smoke tests.
- *
- * Covers:
- * - Reports page renders with title.
- * - KPI cards render (even when data is empty).
- * - Indicator table renders the empty state.
- * - New indicator button is present.
- * - Generate report dialog can be opened.
- */
+import { fakeLogin } from "./helpers";
 
 test.describe("Reports page", () => {
+  test.beforeEach(async ({ page }) => { await fakeLogin(page); });
+
   test("renders the reports page title and KPI grid", async ({ page }) => {
     await page.goto("/#/reportes");
     await expect(page.locator("h1")).toContainText(/reportes|reports/i, {

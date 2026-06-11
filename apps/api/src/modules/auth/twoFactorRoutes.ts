@@ -37,7 +37,7 @@ router.post('/2fa/enable', auditLog('update', '2fa'), async (req: Request, res: 
   try {
     const profesionalId = req.user!.sub;
     const body = VerifyBodySchema.parse(req.body);
-    if (!verifyTotp(body.totpCode, body.secret)) {
+    if (!(await verifyTotp(body.totpCode, body.secret))) {
       res.status(400).json({ error: 'Código TOTP inválido' });
       return;
     }
@@ -66,7 +66,7 @@ router.post('/2fa/disable', auditLog('update', '2fa'), async (req: Request, res:
       res.status(400).json({ error: '2FA no está habilitado' });
       return;
     }
-    if (!verifyTotp(body.totpCode, currentSecret)) {
+    if (!(await verifyTotp(body.totpCode, currentSecret))) {
       res.status(400).json({ error: 'Código TOTP inválido' });
       return;
     }

@@ -13,7 +13,7 @@ import { generateMealPlan } from "../application/chefService";
 import type { MealSlot } from "@modules/mealplan/domain/MealSlot";
 
 export interface ChefApplyPayload {
-  days: Array<{ dayNumber: number; meals: Array<{ slot: MealSlot; foods: string[] }> }>;
+  days: Array<{ dayNumber: number; meals: Array<{ slot: MealSlot; foods: string[]; foodIds: string[] }> }>;
   targetKcal: number;
   timesPerDay: number;
   restrictions: string[];
@@ -74,7 +74,7 @@ export function ChefDialog({ open, onOpenChange, onApply }: ChefDialogProps) {
     await onApply({
       days: result.days.map((d) => ({
         dayNumber: d.dayNumber,
-        meals: d.meals.map((m) => ({ slot: m.slot, foods: m.foods })),
+        meals: d.meals.map((m) => ({ slot: m.slot, foods: m.foodIds?.length ? m.foodIds : m.foods, foodIds: m.foodIds ?? m.foods })),
       })),
       targetKcal, timesPerDay,
       restrictions: restrictions.split(",").map((s) => s.trim()).filter(Boolean),

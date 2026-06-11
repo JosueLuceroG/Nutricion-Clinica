@@ -10,6 +10,36 @@ import { expect, type Page } from "@playwright/test";
 export const ADMIN_EMAIL = "admin@nutriclinica.local";
 export const ADMIN_PASSWORD = "Admin123!Nutri";
 
+/**
+ * Fake login: inyecta un estado de auth en localStorage ANTES de que
+ * la app cargue, para que zustand persist lo recoja en `isAuthenticated=true`.
+ * Útil para tests que necesitan navegar páginas protegidas sin API server.
+ */
+export async function fakeLogin(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "auth-store",
+      JSON.stringify({
+        state: {
+          token: "e2e-test-token",
+          user: {
+            id: "e2e-test-user",
+            email: "admin@nutriclinica.local",
+            nombre: "Admin",
+            apellido: "Test",
+            nombreCompleto: "Admin Test",
+            rol: "admin",
+          },
+          sucursales: [],
+          sucursalActivaId: null,
+          isAuthenticated: true,
+        },
+        version: 0,
+      }),
+    );
+  });
+}
+
 /** URL base + hash. El router es `createHashRouter`. */
 export function hashUrl(path: string): string {
   return `/#${path.startsWith("/") ? path : `/${path}`}`;

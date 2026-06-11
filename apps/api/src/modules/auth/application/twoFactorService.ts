@@ -1,26 +1,25 @@
-import { authenticator } from 'otplib';
+import { generateSecret, generate, verify, generateURI } from 'otplib';
 import sql from 'mssql';
 import QRCode from 'qrcode';
 import { getPool } from '../../../db/connection.js';
 
-authenticator.options = { step: 30, window: 1 };
-
 const ISSUER = 'NutriClínica';
 
 export function generateTotpSecret(): string {
-  return authenticator.generateSecret();
+  return generateSecret();
 }
 
-export function generateTotpToken(secret: string): string {
-  return authenticator.generate(secret);
+export async function generateTotpToken(secret: string): Promise<string> {
+  return generate({ secret });
 }
 
-export function verifyTotp(token: string, secret: string): boolean {
-  return authenticator.verify({ token, secret });
+export async function verifyTotp(token: string, secret: string): Promise<boolean> {
+  const result = await verify({ token, secret });
+  return result.valid;
 }
 
 export function buildTotpUri(email: string, secret: string): string {
-  return authenticator.keyuri(email, ISSUER, secret);
+  return generateURI({ issuer: ISSUER, label: email, secret });
 }
 
 export async function generateQrCode(uri: string): Promise<string> {

@@ -1,4 +1,6 @@
 import type { MealSlot } from "@modules/mealplan/domain/MealSlot";
+import { smaeService } from "@services/smaeService";
+import type { Food } from "@modules/smae/domain";
 
 const SLOT_NAMES: Record<MealSlot, string> = {
   breakfast: "Desayuno",
@@ -24,6 +26,7 @@ interface ChefInput {
 interface MealSuggestion {
   slot: MealSlot;
   foods: string[];
+  foodIds: string[];
   kcal: number;
 }
 
@@ -103,10 +106,47 @@ function parseJsonResponse(text: string): ChefResult {
     meals: d.meals.map((m) => ({
       slot: mapSlotLabelToKey(m.slot),
       foods: m.foods,
+      foodIds: m.foods,
       kcal: m.kcal,
     })),
   }));
   return { days };
+}
+
+let smaeFoodCache: Food[] | null = null;
+
+async function ensureSmaeCache(): Promise<Food[]> {
+  if (smaeFoodCache) return smaeFoodCache;
+  smaeFoodCache = await smaeService.search({});
+  return smaeFoodCache;
+}
+
+async function enrichWithSmaeFoodIds(result: ChefResult): Promise<ChefResult> {
+  if (!result.days?.length) return result;
+  try {
+    const allFoods = await ensureSmaeCache();
+    return {
+      ...result,
+      days: result.days.map((day) => ({
+        ...day,
+        meals: day.meals.map((meal) => ({
+          ...meal,
+          foodIds: meal.foods.map((name) => {
+            const normalizedQ = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const matched = allFoods.find((f) => {
+              const haystack = [f.name, f.shortName, ...f.keywords].map(
+                (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""),
+              );
+              return haystack.some((h) => h.includes(normalizedQ) || normalizedQ.includes(h));
+            });
+            return matched?.id ?? name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+          }),
+        })),
+      })),
+    };
+  } catch {
+    return result;
+  }
 }
 
 export async function generateMealPlan(input: ChefInput, onProgress?: ProgressCallback): Promise<ChefResult> {
@@ -117,11 +157,11 @@ export async function generateMealPlan(input: ChefInput, onProgress?: ProgressCa
 
   const prompt = buildPrompt(input);
 
-  if (onProgress) {
-    return generateStreaming(prompt, apiKey, onProgress);
-  }
+  const result = onProgress
+    ? await generateStreaming(prompt, apiKey, onProgress)
+    : await generateNonStreaming(prompt, apiKey);
 
-  return generateNonStreaming(prompt, apiKey);
+  return enrichWithSmaeFoodIds(result);
 }
 
 async function generateNonStreaming(prompt: string, apiKey: string): Promise<ChefResult> {
