@@ -1,6 +1,6 @@
-import { Appointment, createAppointmentId, type AppointmentId } from "../domain";
+import { Appointment, Block, Schedule, createAppointmentId, createBlockId, createScheduleId, type AppointmentId, type BlockId, type ScheduleId } from "../domain";
 import type { AgendaRepository } from "../domain/AgendaRepository";
-import type { NewAppointmentFormInput, RescheduleAppointmentInput } from "./agendaFormSchema";
+import { BlockFormSchema, ScheduleFormSchema, type BlockFormInput, type NewAppointmentFormInput, type RescheduleAppointmentInput, type ScheduleFormInput } from "./agendaFormSchema";
 
 export const createAppointmentUC = async (
   repo: AgendaRepository,
@@ -18,6 +18,12 @@ export const createAppointmentUC = async (
   });
   if (hasConflict) {
     throw new Error("La cita se solapa con otra cita del profesional.");
+  }
+
+  const blocks = await repo.listBlocksByRange(input.date, input.date);
+  const hasBlockConflict = blocks.some((block) => block.professionalId === professionalId && blockOverlapsRange(block, input.date, requested));
+  if (hasBlockConflict) {
+    throw new Error("La cita se solapa con un bloqueo del profesional.");
   }
 
   const appointment = Appointment.create({
@@ -139,6 +145,88 @@ export const completeAppointmentUC = async (
   return updated;
 };
 
+export const listSchedulesUC = async (
+  repo: AgendaRepository,
+  professionalId: string,
+): Promise<Schedule[]> => {
+  return repo.listSchedulesByProfessional(professionalId);
+};
+
+export const saveScheduleUC = async (
+  repo: AgendaRepository,
+  input: ScheduleFormInput,
+  professionalId: string,
+): Promise<Schedule> => {
+  const parsed = ScheduleFormSchema.parse(input);
+  const existingForProfessional = await repo.listSchedulesByProfessional(professionalId);
+  const existingForDay = existingForProfessional.filter((schedule) => schedule.dayOfWeek === parsed.dayOfWeek);
+  const existing = existingForDay[0];
+  const schedule = existing
+    ? Schedule.reconstitute({
+      ...existing.toProps(),
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      active: parsed.active,
+      updatedAt: Date.now(),
+    })
+    : Schedule.create({
+      id: createScheduleId(),
+      professionalId,
+      dayOfWeek: parsed.dayOfWeek,
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      active: parsed.active,
+    });
+
+  await repo.saveSchedule(schedule);
+  await Promise.all(existingForDay.slice(1).map((duplicate) => repo.deleteSchedule(duplicate.id)));
+  return schedule;
+};
+
+export const deleteScheduleUC = async (
+  repo: AgendaRepository,
+  id: ScheduleId,
+): Promise<void> => {
+  await repo.deleteSchedule(id);
+};
+
+export const listBlocksByRangeUC = async (
+  repo: AgendaRepository,
+  startDate: string,
+  endDate: string,
+  professionalId?: string,
+): Promise<Block[]> => {
+  const blocks = await repo.listBlocksByRange(startDate, endDate);
+  return professionalId ? blocks.filter((block) => block.professionalId === professionalId) : blocks;
+};
+
+export const createBlockUC = async (
+  repo: AgendaRepository,
+  input: BlockFormInput,
+  professionalId: string,
+): Promise<Block> => {
+  const parsed = BlockFormSchema.parse(input);
+  const block = Block.create({
+    id: createBlockId(),
+    professionalId,
+    startDate: parsed.startDate,
+    endDate: parsed.endDate,
+    allDay: parsed.allDay,
+    startTime: parsed.allDay ? undefined : parsed.startTime,
+    endTime: parsed.allDay ? undefined : parsed.endTime,
+    reason: parsed.reason ?? "",
+  });
+  await repo.saveBlock(block);
+  return block;
+};
+
+export const deleteBlockUC = async (
+  repo: AgendaRepository,
+  id: BlockId,
+): Promise<void> => {
+  await repo.deleteBlock(id);
+};
+
 export interface TimeSlot {
   startTime: string;
   endTime: string;
@@ -152,6 +240,7 @@ export const getAvailableSlotsUC = async (
   slotDurationMin: number = 30,
 ): Promise<TimeSlot[]> => {
   const appointments = await repo.listAppointmentsByDate(date);
+  const blocks = await repo.listBlocksByRange(date, date);
   const dayOfWeek = dayOfWeekFromDateString(date);
   const schedules = await repo.listSchedulesByProfessional(professionalId);
   const daySchedule = schedules.find((s) => s.dayOfWeek === dayOfWeek && s.active);
@@ -167,7 +256,10 @@ export const getAvailableSlotsUC = async (
       const [sh, sm] = a.startTime.split(":").map(Number);
       const [eh, em] = a.endTime.split(":").map(Number);
       return { start: sh * 60 + sm, end: eh * 60 + em };
-    });
+    })
+    .concat(blocks
+      .filter((block) => block.professionalId === professionalId && dateIsWithinBlock(date, block))
+      .map(blockToBookedRange));
   while (currentMin + slotDurationMin <= endMin) {
     const slotStart = currentMin;
     const slotEnd = currentMin + slotDurationMin;
@@ -185,6 +277,23 @@ export const getAvailableSlotsUC = async (
   }
   return slots;
 };
+
+function blockToBookedRange(block: Block): { start: number; end: number } {
+  if (block.allDay || !block.startTime || !block.endTime) {
+    return { start: 0, end: 24 * 60 };
+  }
+  return timeRange(block.startTime, block.endTime);
+}
+
+function blockOverlapsRange(block: Block, date: string, requested: { start: number; end: number }): boolean {
+  if (!dateIsWithinBlock(date, block)) return false;
+  const blocked = blockToBookedRange(block);
+  return requested.start < blocked.end && requested.end > blocked.start;
+}
+
+function dateIsWithinBlock(date: string, block: Block): boolean {
+  return block.startDate <= date && block.endDate >= date;
+}
 
 function dayOfWeekFromDateString(date: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
   const [year, month, day] = date.split("-").map(Number);

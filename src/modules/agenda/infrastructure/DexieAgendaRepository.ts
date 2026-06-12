@@ -109,7 +109,8 @@ export class DexieAgendaRepository implements AgendaRepository {
   async listBlocksByRange(startDate: string, endDate: string): Promise<Block[]> {
     const rows = await this.db.blocks
       .where("start_date")
-      .between(startDate, endDate, true, true)
+      .belowOrEqual(endDate)
+      .filter((row) => row.end_date >= startDate)
       .toArray();
     return rows.map(blockRowToDomain);
   }

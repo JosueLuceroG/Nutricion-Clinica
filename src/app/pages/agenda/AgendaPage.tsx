@@ -2,7 +2,7 @@ import * as React from "react";
 import { DayPicker } from "react-day-picker";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle, CalendarX, User, FileText, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle, CalendarX, User, FileText, Clock, Settings } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { Button } from "@components/ui/button";
@@ -19,6 +19,7 @@ import {
 } from "@components/ui/dialog";
 import { AppointmentDialog } from "@modules/agenda/ui/AppointmentDialog";
 import { AppointmentCard } from "@modules/agenda/ui/AppointmentCard";
+import { AvailabilityDialog } from "@modules/agenda/ui/AvailabilityDialog";
 import { useAppointmentsByRange, useCreateAppointment, useAvailableSlots, useCancelAppointment, useMarkNoShow } from "@modules/agenda/ui/useAgendaHooks";
 
 import { useLiveQuery } from "dexie-react-hooks";
@@ -47,6 +48,7 @@ export function AgendaPage() {
   const [currentMonth, setCurrentMonth] = React.useState(today);
   const [selectedDate, setSelectedDate] = React.useState(today);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [availabilityOpen, setAvailabilityOpen] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<Appointment | null>(null);
   const [detailBusy, setDetailBusy] = React.useState(false);
 
@@ -154,14 +156,14 @@ export function AgendaPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b px-6 py-3">
+      <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div>
           <h1 className="text-xl font-semibold">{t("agenda.title")}</h1>
           <p className="text-sm text-muted-foreground">
             {format(currentMonth, "MMMM yyyy", { locale: es })}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" size="icon" aria-label={t("common.previous_month")} onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -174,6 +176,10 @@ export function AgendaPage() {
           <Separator orientation="vertical" className="h-6" />
           <Button variant="outline" size="icon" aria-label={t("common.refresh")} onClick={refresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button variant="outline" onClick={() => setAvailabilityOpen(true)}>
+            <Settings className="mr-1 h-4 w-4" />
+            {t("agenda.availability")}
           </Button>
           <Button onClick={() => setDialogOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
@@ -249,6 +255,15 @@ export function AgendaPage() {
         patients={patients}
         loadAvailableSlots={loadAvailableSlots}
         onSubmit={handleCreate}
+      />
+
+      <AvailabilityDialog
+        open={availabilityOpen}
+        onOpenChange={setAvailabilityOpen}
+        blockStartDate={monthStart}
+        blockEndDate={monthEnd}
+        initialBlockDate={selectedDayStr}
+        onChanged={refresh}
       />
 
       <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) setDetailTarget(null); }}>

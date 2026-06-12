@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 import { DexieAgendaRepository } from "../infrastructure/DexieAgendaRepository";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
-import { createAppointmentUC, listAppointmentsByDateUC, cancelAppointmentUC, getAvailableSlotsUC } from "./agendaUseCases";
-import { createAppointmentId } from "../domain";
+import { createAppointmentUC, listAppointmentsByDateUC, cancelAppointmentUC, getAvailableSlotsUC, createBlockUC, listSchedulesUC, saveScheduleUC } from "./agendaUseCases";
+import { Block, createAppointmentId, createBlockId } from "../domain";
 import { Schedule } from "../domain/Schedule";
 import { createScheduleId } from "../domain/ScheduleId";
 import type { NewAppointmentFormInput } from "./agendaFormSchema";
@@ -114,5 +114,96 @@ describe("agendaUseCases", () => {
       { startTime: "09:00", endTime: "09:30", available: true },
       { startTime: "09:30", endTime: "10:00", available: true },
     ]);
+  });
+
+  it("getAvailableSlotsUC bloquea horarios por bloqueos parciales", async () => {
+    await repo.saveSchedule(Schedule.create({
+      id: createScheduleId(),
+      professionalId,
+      dayOfWeek: 1,
+      startTime: "09:00",
+      endTime: "10:30",
+      active: true,
+    }));
+    await createBlockUC(repo, {
+      startDate: "2026-06-08",
+      endDate: "2026-06-08",
+      allDay: false,
+      startTime: "09:30",
+      endTime: "10:00",
+      reason: "Comida",
+    }, professionalId);
+
+    const slots = await getAvailableSlotsUC(repo, "2026-06-08", professionalId, 30);
+
+    expect(slots).toEqual([
+      { startTime: "09:00", endTime: "09:30", available: true },
+      { startTime: "09:30", endTime: "10:00", available: false },
+      { startTime: "10:00", endTime: "10:30", available: true },
+    ]);
+  });
+
+  it("getAvailableSlotsUC bloquea todo el día con bloqueos all-day", async () => {
+    await repo.saveSchedule(Schedule.create({
+      id: createScheduleId(),
+      professionalId,
+      dayOfWeek: 1,
+      startTime: "09:00",
+      endTime: "10:00",
+      active: true,
+    }));
+    await createBlockUC(repo, {
+      startDate: "2026-06-08",
+      endDate: "2026-06-08",
+      allDay: true,
+      reason: "Vacaciones",
+    }, professionalId);
+
+    const slots = await getAvailableSlotsUC(repo, "2026-06-08", professionalId, 30);
+
+    expect(slots).toEqual([
+      { startTime: "09:00", endTime: "09:30", available: false },
+      { startTime: "09:30", endTime: "10:00", available: false },
+    ]);
+  });
+
+  it("createAppointmentUC rechaza bloqueos del profesional", async () => {
+    await createBlockUC(repo, {
+      startDate: "2026-06-08",
+      endDate: "2026-06-08",
+      allDay: false,
+      startTime: "09:00",
+      endTime: "09:30",
+      reason: "Bloqueado",
+    }, professionalId);
+
+    await expect(createAppointmentUC(repo, baseInput, professionalId)).rejects.toThrow("bloqueo");
+  });
+
+  it("saveScheduleUC reemplaza horario del mismo día y limpia duplicados", async () => {
+    await repo.saveSchedule(Schedule.create({ id: createScheduleId(), professionalId, dayOfWeek: 1, startTime: "08:00", endTime: "12:00", active: true }));
+    await repo.saveSchedule(Schedule.create({ id: createScheduleId(), professionalId, dayOfWeek: 1, startTime: "13:00", endTime: "17:00", active: true }));
+
+    const saved = await saveScheduleUC(repo, { dayOfWeek: 1, startTime: "09:00", endTime: "15:00", active: true }, professionalId);
+    const schedules = await listSchedulesUC(repo, professionalId);
+
+    expect(saved.startTime).toBe("09:00");
+    expect(saved.endTime).toBe("15:00");
+    expect(schedules.filter((schedule) => schedule.dayOfWeek === 1)).toHaveLength(1);
+  });
+
+  it("listBlocksByRange incluye bloqueos que empiezan antes y terminan dentro del rango", async () => {
+    await repo.saveBlock(Block.create({
+      id: createBlockId(),
+      professionalId,
+      startDate: "2026-06-01",
+      endDate: "2026-06-10",
+      allDay: true,
+      reason: "Congreso",
+    }));
+
+    const slots = await repo.listBlocksByRange("2026-06-08", "2026-06-08");
+
+    expect(slots).toHaveLength(1);
   });
 });

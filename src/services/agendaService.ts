@@ -13,10 +13,17 @@ import {
   confirmAppointmentUC,
   completeAppointmentUC,
   getAvailableSlotsUC,
+  listSchedulesUC,
+  saveScheduleUC,
+  deleteScheduleUC,
+  listBlocksByRangeUC,
+  createBlockUC,
+  deleteBlockUC,
 } from "@modules/agenda/application/agendaUseCases";
 import type { AppointmentId } from "@modules/agenda/domain/AppointmentId";
 import type { Appointment } from "@modules/agenda/domain/Appointment";
-import type { NewAppointmentFormInput, RescheduleAppointmentInput } from "@modules/agenda/application/agendaFormSchema";
+import type { BlockId, ScheduleId } from "@modules/agenda/domain";
+import type { BlockFormInput, NewAppointmentFormInput, RescheduleAppointmentInput, ScheduleFormInput } from "@modules/agenda/application/agendaFormSchema";
 
 const repository = new DexieAgendaRepository(db);
 
@@ -72,6 +79,24 @@ export const agendaService = {
 
   getAvailableSlots: (date: string, professionalId?: string, slotDurationMin?: number) =>
     getAvailableSlotsUC(repository, date, resolveAgendaProfessionalId(professionalId), slotDurationMin),
+
+  listSchedules: (professionalId?: string) =>
+    listSchedulesUC(repository, resolveAgendaProfessionalId(professionalId)),
+
+  saveSchedule: (input: ScheduleFormInput, professionalId?: string) =>
+    saveScheduleUC(repository, input, resolveAgendaProfessionalId(professionalId)),
+
+  deleteSchedule: (id: ScheduleId) =>
+    deleteScheduleUC(repository, id),
+
+  listBlocks: (startDate: string, endDate: string, professionalId?: string) =>
+    listBlocksByRangeUC(repository, startDate, endDate, resolveAgendaProfessionalId(professionalId)),
+
+  createBlock: (input: BlockFormInput, professionalId?: string) =>
+    createBlockUC(repository, input, resolveAgendaProfessionalId(professionalId)),
+
+  deleteBlock: (id: BlockId) =>
+    deleteBlockUC(repository, id),
 };
 
 export type AgendaService = typeof agendaService;
