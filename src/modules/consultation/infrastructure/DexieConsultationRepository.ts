@@ -9,6 +9,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { ConsultationRow } from "./consultationMapper";
 import { consultationRowToDomain, consultationDomainToRow } from "./consultationMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
+import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 100;
@@ -19,7 +20,8 @@ export class DexieConsultationRepository implements ConsultationRepository {
 
   async save(consultation: Consultation): Promise<void> {
     const row = consultationDomainToRow(consultation);
-    await this.dbInstance.consultations.put(row);
+    const existing = await this.dbInstance.consultations.get(row.id).catch(() => null);
+    await this.dbInstance.consultations.put(withCurrentSucursalScope(row, existing));
   }
 
   async findById(id: ConsultationId): Promise<Consultation | null> {
@@ -56,7 +58,7 @@ export class DexieConsultationRepository implements ConsultationRepository {
       if (!existing) return;
       const domain = consultationRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.consultations.put(consultationDomainToRow(deleted));
+      await this.dbInstance.consultations.put(withCurrentSucursalScope(consultationDomainToRow(deleted), existing));
     } else {
       await this.dbInstance.consultations.delete(id.toString());
     }
@@ -78,22 +80,26 @@ export class DexieConsultationRepository implements ConsultationRepository {
     query: ConsultationQuery,
   ): Collection<ConsultationRow, string> {
     let collection: Collection<ConsultationRow, string> = source;
+    if (query.sucursalId) {
+      const sucursalId = query.sucursalId;
+      collection = collection.filter((row: ConsultationRow) => rowMatchesSucursal(row, sucursalId));
+    }
     if (query.patientId) {
       const pid = query.patientId.toString();
-      collection = source.filter((row: ConsultationRow) => row.patient_id === pid);
+      collection = collection.filter((row: ConsultationRow) => row.patient_id === pid);
     }
     if (query.status) {
       const statuses = Array.isArray(query.status) ? query.status : [query.status];
       const statusSet = new Set<ConsultationStatus>(statuses);
-      collection = source.filter((row: ConsultationRow) => statusSet.has(row.status));
+      collection = collection.filter((row: ConsultationRow) => statusSet.has(row.status));
     }
     if (query.from) {
       const fromIso = query.from.toISOString();
-      collection = source.filter((row: ConsultationRow) => row.consultation_date >= fromIso);
+      collection = collection.filter((row: ConsultationRow) => row.consultation_date >= fromIso);
     }
     if (query.to) {
       const toIso = query.to.toISOString();
-      collection = source.filter((row: ConsultationRow) => row.consultation_date <= toIso);
+      collection = collection.filter((row: ConsultationRow) => row.consultation_date <= toIso);
     }
     return collection;
   }

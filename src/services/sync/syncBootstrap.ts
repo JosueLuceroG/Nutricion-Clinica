@@ -26,14 +26,18 @@ const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
   adherence_records: 'adherence_records',
 };
 
-const LAST_PULL_AT_KEY = 'lastPullAt';
+const LAST_PULL_AT_PREFIX = 'lastPullAt:';
 
-function getLastPullAt(db: NutriClinicaDB): Promise<string | null> {
-  return db.sync_meta.get(LAST_PULL_AT_KEY).then((row) => row?.value ?? null).catch(() => null);
+function lastPullAtKey(sucursalId: string): string {
+  return `${LAST_PULL_AT_PREFIX}${sucursalId}`;
 }
 
-function setLastPullAt(db: NutriClinicaDB, iso: string): Promise<void> {
-  return db.sync_meta.put({ key: LAST_PULL_AT_KEY, value: iso }).then(() => undefined).catch(() => undefined);
+function getLastPullAt(db: NutriClinicaDB, sucursalId: string): Promise<string | null> {
+  return db.sync_meta.get(lastPullAtKey(sucursalId)).then((row) => row?.value ?? null).catch(() => null);
+}
+
+function setLastPullAt(db: NutriClinicaDB, sucursalId: string, iso: string): Promise<void> {
+  return db.sync_meta.put({ key: lastPullAtKey(sucursalId), value: iso }).then(() => undefined).catch(() => undefined);
 }
 
 let engineInstance: SyncEngine | null = null;
@@ -46,8 +50,8 @@ export function getSyncEngine(db: NutriClinicaDB): SyncEngine {
   const deps: SyncEngineDeps = {
     db,
     queue,
-    getLastPullAt: () => getLastPullAt(db),
-    setLastPullAt: (iso: string) => setLastPullAt(db, iso),
+    getLastPullAt: (sucursalId: string) => getLastPullAt(db, sucursalId),
+    setLastPullAt: (sucursalId: string, iso: string) => setLastPullAt(db, sucursalId, iso),
     api: syncApi,
   };
   engineInstance = new SyncEngine(deps);

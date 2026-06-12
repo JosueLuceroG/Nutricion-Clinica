@@ -3,6 +3,9 @@ import { patientService } from "@services/patientService";
 import { consultationService } from "@services/consultationService";
 import { mealPlanService } from "@services/mealPlanService";
 import { db } from "@services/db";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
@@ -62,24 +65,31 @@ const withinDays = (d: Date, days: number): boolean => {
  */
 export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => void } {
   const [state, setState] = React.useState<AsyncState<DashboardKpis>>(initial);
+  const syncSucursalId = useSyncStore((s) => s.sucursalId);
+  const authSucursalId = useAuthStore((s) => s.sucursalActivaId);
+  const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
 
   const load = React.useCallback(() => {
     setState((s) => ({ ...s, loading: true, error: null }));
     const now = new Date();
+    const scopedQuery = activeSucursalId ? { sucursalId: activeSucursalId } : {};
     Promise.all([
-      patientService.list.execute({ limit: 500 }),
-      mealPlanService.list.execute({ status: "active", limit: 500 }),
+      patientService.list.execute({ ...scopedQuery, limit: 500 }),
+      mealPlanService.list.execute({ ...scopedQuery, status: "active", limit: 500 }),
       consultationService.list.execute({
+        ...scopedQuery,
         from: startOfMonth(now),
         to: endOfMonth(now),
         limit: 500,
       }),
       consultationService.list.execute({
+        ...scopedQuery,
         status: ["scheduled", "in-progress"],
         limit: 500,
       }),
       db.consultations
         .filter((r) => {
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           if (r.deleted_at) return false;
           if (!(r.cost > 0)) return false;
           const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
@@ -88,6 +98,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
         .toArray(),
       db.consultations
         .filter((r) => {
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           if (r.deleted_at) return false;
           if (!(r.cost > 0)) return false;
           const t = new Date(r.consultation_date).getTime();
@@ -174,7 +185,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
           loading: false,
         }),
       );
-  }, []);
+  }, [activeSucursalId]);
 
   React.useEffect(() => {
     load();

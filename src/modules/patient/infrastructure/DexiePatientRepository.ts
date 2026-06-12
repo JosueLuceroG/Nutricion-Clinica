@@ -4,6 +4,7 @@ import type { PatientId } from "../domain/PatientId";
 import type { PatientRow } from "./patientMapper";
 import { patientRowToDomain, patientDomainToRow } from "./patientMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
+import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 50;
@@ -14,7 +15,8 @@ export class DexiePatientRepository implements PatientRepository {
 
   async save(patient: Patient): Promise<void> {
     const row = patientDomainToRow(patient);
-    await this.dbInstance.patients.put(row);
+    const existing = await this.dbInstance.patients.get(row.id).catch(() => null);
+    await this.dbInstance.patients.put(withCurrentSucursalScope(row, existing));
   }
 
   async findById(id: PatientId): Promise<Patient | null> {
@@ -76,7 +78,7 @@ export class DexiePatientRepository implements PatientRepository {
       if (!existing) return;
       const domain = patientRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.patients.put(patientDomainToRow(deleted));
+      await this.dbInstance.patients.put(withCurrentSucursalScope(patientDomainToRow(deleted), existing));
     } else {
       await this.dbInstance.patients.delete(id.toString());
     }
@@ -87,17 +89,21 @@ export class DexiePatientRepository implements PatientRepository {
     query: PatientQuery,
   ): Collection<PatientRow, string> {
     let collection: Collection<PatientRow, string> = source;
+    if (query.sucursalId) {
+      const sucursalId = query.sucursalId;
+      collection = collection.filter((row: PatientRow) => rowMatchesSucursal(row, sucursalId));
+    }
     if (query.status) {
       const status = query.status;
-      collection = source.filter((row: PatientRow) => row.status === status);
+      collection = collection.filter((row: PatientRow) => row.status === status);
     }
     if (query.sex) {
       const sex = query.sex;
-      collection = source.filter((row: PatientRow) => row.sex === sex);
+      collection = collection.filter((row: PatientRow) => row.sex === sex);
     }
     if (query.search) {
       const needle = query.search.toLowerCase().trim();
-      collection = source.filter(
+      collection = collection.filter(
         (row: PatientRow) =>
           row.first_name.toLowerCase().includes(needle) ||
           row.last_name.toLowerCase().includes(needle) ||

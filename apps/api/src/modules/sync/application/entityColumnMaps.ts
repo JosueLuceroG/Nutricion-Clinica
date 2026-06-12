@@ -367,6 +367,7 @@ export function clientPayloadToDb(
  */
 const SYSTEM_PASSTHROUGH_COLUMNS: ReadonlySet<string> = new Set([
   'id',
+  'sucursal_id',
   'created_at',
   'updated_at',
   'deleted_at',

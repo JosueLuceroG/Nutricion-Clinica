@@ -25,6 +25,7 @@ import { type syncApi } from './syncApiClient.js';
 import { withRetry } from './backoff.js';
 import { useAuthStore } from '@store/authStore';
 import { useSyncStore } from '@store/syncStore';
+import { withCurrentSucursalScope } from '@services/tenancy/sucursalScope';
 import { SyncAuthError, SyncSchemaMismatchError } from '@modules/sync/domain/errors.js';
 import { HttpError, NetworkError } from '../api/httpClient.js';
 
@@ -75,8 +76,8 @@ export interface SyncEngineDeps {
   db: NutriClinicaDB;
   queue: SyncQueueRepository;
   /** Devuelve el lastPullAt persistido (puede ser null la primera vez). */
-  getLastPullAt: () => string | null | Promise<string | null>;
-  setLastPullAt: (iso: string) => void | Promise<void>;
+  getLastPullAt: (sucursalId: string) => string | null | Promise<string | null>;
+  setLastPullAt: (sucursalId: string, iso: string) => void | Promise<void>;
   /** Caller puede sobreescribir el cliente HTTP (test). */
   api?: typeof syncApi;
   /** Hook opcional para notificar al UI. */
@@ -126,7 +127,7 @@ export class SyncEngine {
       const sucursalId = useSyncStore.getState().sucursalId ?? useAuthStore.getState().sucursalActivaId;
       if (!sucursalId) throw new SyncAuthError('No hay sucursal activa');
 
-      let since = await this.deps.getLastPullAt();
+      let since = await this.deps.getLastPullAt(sucursalId);
       let totalReceived = 0;
       let hasMore = true;
 
@@ -138,7 +139,7 @@ export class SyncEngine {
         since = pullResp.nextSince;
       }
 
-      await this.deps.setLastPullAt(since ?? new Date().toISOString());
+      await this.deps.setLastPullAt(sucursalId, since ?? new Date().toISOString());
       this.emit({ type: 'pull', received: totalReceived });
 
       const pushSummary = await this.pushPending(sucursalId);
@@ -193,7 +194,7 @@ export class SyncEngine {
             });
           }
         } else {
-          const localRow = toLocalRow(change.entity, change.payload as Record<string, unknown>);
+          const localRow = withCurrentSucursalScope(toLocalRow(change.entity, change.payload as Record<string, unknown>));
           await table.put(localRow);
         }
       }

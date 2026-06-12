@@ -8,6 +8,7 @@ export interface MealPlanQuery {
   status?: MealPlanStatus | MealPlanStatus[];
   from?: Date;
   to?: Date;
+  sucursalId?: string;
   limit?: number;
   offset?: number;
 }

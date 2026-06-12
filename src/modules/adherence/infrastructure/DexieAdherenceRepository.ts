@@ -9,12 +9,15 @@ import {
   barrierEventToRow, rowToBarrierEvent,
 } from "./adherenceMapper";
 import type { NutriClinicaDB } from "@services/db/dexieSchema";
+import { withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
 
 export class DexieAdherenceRepository implements AdherenceRepository {
   constructor(private readonly db: NutriClinicaDB) {}
 
   async saveRecord(record: AdherenceRecord): Promise<void> {
-    await this.db.adherence_records.put(adherenceRecordToRow(record));
+    const row = adherenceRecordToRow(record);
+    const existing = await this.db.adherence_records.get(row.id).catch(() => null);
+    await this.db.adherence_records.put(withCurrentSucursalScope(row, existing));
   }
 
   async findRecordById(id: AdherenceId): Promise<AdherenceRecord | null> {
@@ -40,7 +43,9 @@ export class DexieAdherenceRepository implements AdherenceRepository {
   }
 
   async saveIndex(index: AdherenceIndex): Promise<void> {
-    await this.db.adherence_indexes.put(adherenceIndexToRow(index));
+    const row = adherenceIndexToRow(index);
+    const existing = await this.db.adherence_indexes.get(row.id).catch(() => null);
+    await this.db.adherence_indexes.put(withCurrentSucursalScope(row, existing));
   }
 
   async findIndexesByPatient(patientId: string): Promise<AdherenceIndex[]> {

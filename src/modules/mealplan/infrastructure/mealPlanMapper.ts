@@ -9,6 +9,7 @@ import { safeDate, toIsoStringSafe, safeJsonParse } from "@services/db/safeDate"
 
 export interface MealPlanRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   consultation_id: string | null;
   name: string;

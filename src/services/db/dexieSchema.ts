@@ -60,6 +60,7 @@ export interface TelemedicinaRecordingRow {
 
 const PATIENT_STORES = [
   "id",
+  "sucursal_id",
   "first_name",
   "last_name",
   "second_last_name",
@@ -112,8 +113,10 @@ const LAB_PANELS_STORES = [
 
 const CONSULTATIONS_STORES = [
   "id",
+  "sucursal_id",
   "patient_id",
   "consultation_date",
+  "[sucursal_id+consultation_date]",
   "[patient_id+consultation_date]",
   "status",
   "paid",
@@ -126,8 +129,10 @@ const CONSULTATIONS_STORES = [
 
 const CONSULTATIONS_BILLING_STORES = [
   "id",
+  "sucursal_id",
   "patient_id",
   "consultation_date",
+  "[sucursal_id+consultation_date]",
   "[patient_id+consultation_date]",
   "status",
   "paid",
@@ -143,6 +148,7 @@ const CONSULTATIONS_BILLING_STORES = [
 
 const MEAL_PLANS_STORES = [
   "id",
+  "sucursal_id",
   "patient_id",
   "start_date",
   "[patient_id+start_date]",
@@ -187,8 +193,8 @@ const SCHEDULES_STORES = "id, professional_id, day_of_week";
 const BLOCKS_STORES = "id, professional_id, start_date, end_date";
 const RECIPES_STORES = "id, name, category, difficulty, status, created_at";
 const GOALS_STORES = "id, patient_id, type, variable, status, priority, start_date, target_date";
-const ADHERENCE_RECORDS_STORES = "id, patient_id, date, source, [patient_id+date]";
-const ADHERENCE_INDEXES_STORES = "id, patient_id, period_start, period_end";
+const ADHERENCE_RECORDS_STORES = "id, sucursal_id, patient_id, date, source, [patient_id+date]";
+const ADHERENCE_INDEXES_STORES = "id, sucursal_id, patient_id, period_start, period_end";
 const ADHERENCE_BARRIERS_STORES = "id, patient_id, type, date";
 const DOCUMENTS_STORES = "id, patient_id, type, status, generated_by, generated_at";
 const WEEKLY_PLANS_STORES = "id, patient_id, type, status, start_date, end_date";
@@ -426,6 +432,14 @@ export class NutriClinicaDB extends Dexie {
       consultations: CONSULTATIONS_BILLING_STORES,
       payments: "id, patient_id, consultation_id, status, concept, payment_date, [patient_id+status+payment_date], created_at",
       expenses: "id, patient_id, category, expense_date, [patient_id+expense_date], created_at",
+    });
+
+    this.version(30).stores({
+      patients: PATIENT_STORES,
+      consultations: CONSULTATIONS_BILLING_STORES,
+      meal_plans: MEAL_PLANS_STORES,
+      adherence_records: ADHERENCE_RECORDS_STORES,
+      adherence_indexes: ADHERENCE_INDEXES_STORES,
     });
   }
 }

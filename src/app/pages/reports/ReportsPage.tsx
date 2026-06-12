@@ -4,6 +4,9 @@ import { useIndicators } from "@modules/reports/ui/useReportHooks";
 import { reportService } from "@services/reportService";
 import { fetchDashboardMetrics, type DashboardMetrics } from "@services/api/dashboardApi";
 import { db } from "@services/db";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
 import type { AdherenceIndexRow } from "@modules/adherence/infrastructure/adherenceMapper";
@@ -18,11 +21,12 @@ const EMPTY_KPIS = {
 
 const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-type LocalPatientMetricRow = Pick<PatientRow, "status" | "deleted_at" | "clinical_tags" | "created_at">;
-type LocalConsultationMetricRow = Pick<ConsultationRow, "consultation_date" | "paid" | "deleted_at">;
-type LocalAdherenceMetricRow = Pick<AdherenceIndexRow, "score_global">;
+type LocalPatientMetricRow = Pick<PatientRow, "id" | "sucursal_id" | "status" | "deleted_at" | "clinical_tags" | "created_at">;
+type LocalConsultationMetricRow = Pick<ConsultationRow, "sucursal_id" | "patient_id" | "consultation_date" | "paid" | "deleted_at">;
+type LocalAdherenceMetricRow = Pick<AdherenceIndexRow, "sucursal_id" | "patient_id" | "score_global">;
 
 export interface LocalReportSource {
+  sucursalId?: string | null;
   patients: LocalPatientMetricRow[];
   totalConsultations: number;
   monthConsultations: LocalConsultationMetricRow[];
@@ -56,10 +60,15 @@ export function buildPathologyDistribution(metrics: DashboardMetrics | null): Ar
 export function buildLocalReportDashboardData(source: LocalReportSource): ReportDashboardData {
   const now = source.now ?? new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const activePatients = source.patients.filter((patient) => patient.status === "active" && patient.deleted_at === null);
+  const patientsInScope = source.patients.filter((patient) => rowMatchesSucursal(patient, source.sucursalId));
+  const activePatients = patientsInScope.filter((patient) => patient.status === "active" && patient.deleted_at === null);
+  const activePatientIds = new Set(activePatients.map((patient) => patient.id));
+  const monthConsultations = source.monthConsultations.filter((row) => consultationMatchesScope(row, source.sucursalId, activePatientIds));
+  const trendConsultations = source.trendConsultations.filter((row) => consultationMatchesScope(row, source.sucursalId, activePatientIds));
+  const adherenceIndexes = source.adherenceIndexes.filter((row) => adherenceMatchesScope(row, source.sucursalId, activePatientIds));
   const newThisMonth = activePatients.filter((patient) => new Date(patient.created_at).getTime() >= monthStart).length;
-  const adherenceAverage = source.adherenceIndexes.length > 0
-    ? source.adherenceIndexes.reduce((sum, row) => sum + row.score_global, 0) / source.adherenceIndexes.length
+  const adherenceAverage = adherenceIndexes.length > 0
+    ? adherenceIndexes.reduce((sum, row) => sum + row.score_global, 0) / adherenceIndexes.length
     : null;
 
   return {
@@ -74,7 +83,7 @@ export function buildLocalReportDashboardData(source: LocalReportSource): Report
       sexoDistribucion: [],
       consultas: {
         total: source.totalConsultations,
-        esteMes: source.monthConsultations.filter((row) => row.deleted_at === null).length,
+        esteMes: monthConsultations.filter((row) => row.deleted_at === null).length,
         pendientesPago: source.pendingPayments,
       },
       planesAlimenticios: {
@@ -83,15 +92,15 @@ export function buildLocalReportDashboardData(source: LocalReportSource): Report
       },
       adherencia: {
         promedioGlobal: adherenceAverage,
-        totalRegistros: source.adherenceIndexes.length,
+        totalRegistros: adherenceIndexes.length,
       },
       patologias: buildLocalPathologyCounts(activePatients),
     },
-    consultationTrends: buildLocalConsultationTrends(source.trendConsultations),
+    consultationTrends: buildLocalConsultationTrends(trendConsultations),
   };
 }
 
-async function fetchLocalReportDashboardData(now = new Date()): Promise<ReportDashboardData> {
+async function fetchLocalReportDashboardData(sucursalId: string | null, now = new Date()): Promise<ReportDashboardData> {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
   const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
@@ -101,32 +110,34 @@ async function fetchLocalReportDashboardData(now = new Date()): Promise<ReportDa
     db.patients
       .where("status")
       .equals("active")
-      .filter((row) => row.deleted_at === null)
+      .filter((row) => row.deleted_at === null && rowMatchesSucursal(row, sucursalId))
       .limit(2000)
       .toArray(),
     db.consultations
-      .filter((row) => row.deleted_at === null)
+      .filter((row) => row.deleted_at === null && rowMatchesSucursal(row, sucursalId))
       .count(),
     db.consultations
       .where("consultation_date")
       .between(monthStart, nextMonthStart, true, false)
-      .filter((row) => row.deleted_at === null)
+      .filter((row) => row.deleted_at === null && rowMatchesSucursal(row, sucursalId))
       .toArray(),
     db.consultations
-      .filter((row) => row.deleted_at === null && !row.paid && row.cost > 0)
+      .filter((row) => row.deleted_at === null && rowMatchesSucursal(row, sucursalId) && !row.paid && row.cost > 0)
       .count(),
     db.adherence_indexes
       .where("period_end")
       .aboveOrEqual(adherenceStart)
+      .filter((row) => rowMatchesSucursal(row, sucursalId))
       .toArray(),
     db.consultations
       .where("consultation_date")
       .between(trendStart, nextMonthStart, true, false)
-      .filter((row) => row.deleted_at === null)
+      .filter((row) => row.deleted_at === null && rowMatchesSucursal(row, sucursalId))
       .toArray(),
   ]);
 
   return buildLocalReportDashboardData({
+    sucursalId,
     patients,
     totalConsultations,
     monthConsultations,
@@ -135,6 +146,18 @@ async function fetchLocalReportDashboardData(now = new Date()): Promise<ReportDa
     trendConsultations,
     now,
   });
+}
+
+function consultationMatchesScope(row: LocalConsultationMetricRow, sucursalId: string | null | undefined, patientIds: Set<string>): boolean {
+  if (!sucursalId) return true;
+  if (row.sucursal_id === sucursalId) return true;
+  return !row.sucursal_id && patientIds.has(row.patient_id);
+}
+
+function adherenceMatchesScope(row: LocalAdherenceMetricRow, sucursalId: string | null | undefined, patientIds: Set<string>): boolean {
+  if (!sucursalId) return true;
+  if (row.sucursal_id === sucursalId) return true;
+  return !row.sucursal_id && patientIds.has(row.patient_id);
 }
 
 function buildLocalPathologyCounts(patients: LocalPatientMetricRow[]): Array<{ tag: string; count: number }> {
@@ -185,6 +208,9 @@ function toDateOnly(date: Date): string {
 
 export function ReportsPage() {
   const { indicators, loading: indicatorsLoading, refresh } = useIndicators(reportService);
+  const syncSucursalId = useSyncStore((s) => s.sucursalId);
+  const authSucursalId = useAuthStore((s) => s.sucursalActivaId);
+  const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
   const [dashboardMetrics, setDashboardMetrics] = React.useState<DashboardMetrics | null>(null);
   const [localConsultationTrends, setLocalConsultationTrends] = React.useState<Array<{ month: string; consultations: number; payments: number }> | undefined>(undefined);
   const [metricsLoading, setMetricsLoading] = React.useState(true);
@@ -204,7 +230,7 @@ export function ReportsPage() {
       } catch {
         if (cancelled || controller.signal.aborted) return;
         try {
-          const localData = await fetchLocalReportDashboardData();
+          const localData = await fetchLocalReportDashboardData(activeSucursalId);
           if (cancelled) return;
           setDashboardMetrics(localData.metrics);
           setLocalConsultationTrends(localData.consultationTrends);
@@ -223,7 +249,7 @@ export function ReportsPage() {
       cancelled = true;
       controller.abort();
     };
-  }, [reloadToken]);
+  }, [activeSucursalId, reloadToken]);
 
   const kpis = React.useMemo(() => buildReportKpis(dashboardMetrics), [dashboardMetrics]);
   const pathologyDistribution = React.useMemo(() => buildPathologyDistribution(dashboardMetrics), [dashboardMetrics]);

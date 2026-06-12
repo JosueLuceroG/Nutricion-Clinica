@@ -87,6 +87,21 @@ describe("DexieConsultationRepository", () => {
     expect(scheduled).toHaveLength(1);
   });
 
+  it("filtra por sucursalId", async () => {
+    const c1 = make(pid, { number: 1 });
+    const c2 = make(pid, { number: 2 });
+    await repo.save(c1);
+    await repo.save(c2);
+    await db.consultations.update(c1.id.toString(), { sucursal_id: "s1" });
+    await db.consultations.update(c2.id.toString(), { sucursal_id: "s2" });
+
+    const results = await repo.findAll({ sucursalId: "s1" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.consultationNumber).toBe(1);
+    expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+  });
+
   it("excluye soft-deleted por defecto", async () => {
     const a = make(pid, { number: 1 });
     const b = make(pid, { number: 2 });

@@ -5,6 +5,7 @@ import { AdherenceIndex, type AdherenceIndexProps } from "../domain/AdherenceInd
 
 export interface AdherenceRecordRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   date: string;
   consultation_id: string | null;
@@ -28,6 +29,7 @@ export interface AdherenceRecordRow {
 }
 export interface AdherenceIndexRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   period_start: string;
   period_end: string;

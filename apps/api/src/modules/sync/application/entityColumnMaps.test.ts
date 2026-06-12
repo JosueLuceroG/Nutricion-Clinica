@@ -164,6 +164,7 @@ describe('dbRowToClient', () => {
   it('pacientes: traduce columnas DB → campos cliente', () => {
     const client = dbRowToClient('pacientes', {
       id: 'abc-123',
+      sucursal_id: 'sucursal-1',
       nombres: 'Ana',
       apellido_paterno: 'Pérez',
       apellido_materno: null,
@@ -186,8 +187,9 @@ describe('dbRowToClient', () => {
     expect(client.id).toBe('abc-123');
     expect(client.created_at).toBe('2026-01-01');
     expect(client.deleted_at).toBeNull();
+    // sistema necesario para aislamiento multisucursal local se pasa
+    expect(client.sucursal_id).toBe('sucursal-1');
     // columnas que el cliente no quiere, se filtran
-    expect(client.sucursal_id).toBeUndefined();
     expect(client.row_version).toBeUndefined();
   });
 

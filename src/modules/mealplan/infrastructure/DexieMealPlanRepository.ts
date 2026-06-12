@@ -6,6 +6,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { MealPlanRow } from "./mealPlanMapper";
 import { mealPlanRowToDomain, mealPlanDomainToRow } from "./mealPlanMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
+import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 100;
@@ -16,7 +17,8 @@ export class DexieMealPlanRepository implements MealPlanRepository {
 
   async save(plan: MealPlan): Promise<void> {
     const row = mealPlanDomainToRow(plan);
-    await this.dbInstance.meal_plans.put(row);
+    const existing = await this.dbInstance.meal_plans.get(row.id).catch(() => null);
+    await this.dbInstance.meal_plans.put(withCurrentSucursalScope(row, existing));
   }
 
   async findById(id: MealPlanId): Promise<MealPlan | null> {
@@ -53,7 +55,7 @@ export class DexieMealPlanRepository implements MealPlanRepository {
       if (!existing) return;
       const domain = mealPlanRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.meal_plans.put(mealPlanDomainToRow(deleted));
+      await this.dbInstance.meal_plans.put(withCurrentSucursalScope(mealPlanDomainToRow(deleted), existing));
     } else {
       await this.dbInstance.meal_plans.delete(id.toString());
     }
@@ -64,26 +66,26 @@ export class DexieMealPlanRepository implements MealPlanRepository {
     query: MealPlanQuery,
   ): Collection<MealPlanRow, string> {
     let collection: Collection<MealPlanRow, string> = source;
+    if (query.sucursalId) {
+      const sucursalId = query.sucursalId;
+      collection = collection.filter((row: MealPlanRow) => rowMatchesSucursal(row, sucursalId));
+    }
     if (query.patientId) {
       const pid = query.patientId.toString();
-      const prev = collection;
-      collection = prev.filter((row: MealPlanRow) => row.patient_id === pid);
+      collection = collection.filter((row: MealPlanRow) => row.patient_id === pid);
     }
     if (query.status) {
       const statuses = Array.isArray(query.status) ? query.status : [query.status];
       const statusSet = new Set<MealPlanStatus>(statuses);
-      const prev = collection;
-      collection = prev.filter((row: MealPlanRow) => statusSet.has(row.status));
+      collection = collection.filter((row: MealPlanRow) => statusSet.has(row.status));
     }
     if (query.from) {
       const fromIso = query.from.toISOString();
-      const prev = collection;
-      collection = prev.filter((row: MealPlanRow) => row.start_date >= fromIso);
+      collection = collection.filter((row: MealPlanRow) => row.start_date >= fromIso);
     }
     if (query.to) {
       const toIso = query.to.toISOString();
-      const prev = collection;
-      collection = prev.filter((row: MealPlanRow) => row.start_date <= toIso);
+      collection = collection.filter((row: MealPlanRow) => row.start_date <= toIso);
     }
     return collection;
   }

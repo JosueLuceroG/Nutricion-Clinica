@@ -109,6 +109,21 @@ describe("DexieMealPlanRepository", () => {
     expect(drafts).toHaveLength(1);
   });
 
+  it("filtra por sucursalId", async () => {
+    const p1 = make(pid, { name: "Plan sucursal 1" });
+    const p2 = make(pid, { name: "Plan sucursal 2" });
+    await repo.save(p1);
+    await repo.save(p2);
+    await db.meal_plans.update(p1.id.toString(), { sucursal_id: "s1" });
+    await db.meal_plans.update(p2.id.toString(), { sucursal_id: "s2" });
+
+    const results = await repo.findAll({ sucursalId: "s1" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.name).toBe("Plan sucursal 1");
+    expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+  });
+
   it("excluye soft-deleted por defecto", async () => {
     const a = make(pid);
     const b = make(pid);

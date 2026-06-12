@@ -5,6 +5,7 @@ export interface PatientQuery {
   search?: string;
   status?: Patient["status"];
   sex?: Patient["sex"];
+  sucursalId?: string;
   limit?: number;
   offset?: number;
   /**

@@ -54,7 +54,7 @@ describe('SyncEngine', () => {
   let db: NutriClinicaDB;
   let queue: SyncQueueRepository;
   let engine: SyncEngine;
-  let lastPullAt: string | null;
+  let lastPullAtBySucursal: Record<string, string | null>;
   const api = { manifest: mockManifest, pull: mockPull, push: mockPush };
 
   beforeEach(async () => {
@@ -62,7 +62,7 @@ describe('SyncEngine', () => {
     db = new NutriClinicaDB(`test-engine-${Date.now()}-${Math.random()}`);
     await db.sync_queue.clear();
     queue = new SyncQueueRepository(db.sync_queue);
-    lastPullAt = null;
+    lastPullAtBySucursal = { 'suc-1': null };
 
     authGetState.mockReturnValue({ token: 'tok', sucursalActivaId: 'suc-1' });
     syncGetState.mockReturnValue({ sucursalId: 'suc-1' });
@@ -70,8 +70,8 @@ describe('SyncEngine', () => {
     const deps: SyncEngineDeps = {
       db,
       queue,
-      getLastPullAt: () => lastPullAt,
-      setLastPullAt: (iso: string) => { lastPullAt = iso; },
+      getLastPullAt: (sucursalId: string) => lastPullAtBySucursal[sucursalId] ?? null,
+      setLastPullAt: (sucursalId: string, iso: string) => { lastPullAtBySucursal[sucursalId] = iso; },
       api,
       onProgress: vi.fn(),
     };
@@ -119,7 +119,27 @@ describe('SyncEngine', () => {
     const stored = await db.patients.get('p1');
     expect(stored).toBeTruthy();
     expect((stored as { first_name: string }).first_name).toBe('Ana');
-    expect(lastPullAt).toBe('2026-06-04T00:00:01.000Z');
+    expect((stored as { sucursal_id: string | null }).sucursal_id).toBe('suc-1');
+    expect(lastPullAtBySucursal['suc-1']).toBe('2026-06-04T00:00:01.000Z');
+  });
+
+  it('guarda lastPullAt por sucursal activa', async () => {
+    lastPullAtBySucursal = { 'suc-1': '2026-06-01T00:00:00.000Z', 'suc-2': null };
+    syncGetState.mockReturnValue({ sucursalId: 'suc-2' });
+    authGetState.mockReturnValue({ token: 'tok', sucursalActivaId: 'suc-2' });
+    mockPull.mockResolvedValueOnce({
+      serverTime: '2026-06-04T00:00:01.000Z',
+      changes: [],
+      hasMore: false,
+      nextSince: '2026-06-04T00:00:01.000Z',
+    });
+    mockPush.mockResolvedValueOnce({ results: [], serverTime: '2026-06-04T00:00:02.000Z' });
+
+    await engine.sync();
+
+    expect(mockPull).toHaveBeenCalledWith({ since: null, sucursalId: 'suc-2' });
+    expect(lastPullAtBySucursal['suc-1']).toBe('2026-06-01T00:00:00.000Z');
+    expect(lastPullAtBySucursal['suc-2']).toBe('2026-06-04T00:00:01.000Z');
   });
 
   it('pull: op=delete hace soft-delete local (preserva la fila con deleted_at)', async () => {

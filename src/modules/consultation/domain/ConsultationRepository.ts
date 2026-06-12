@@ -8,6 +8,7 @@ export interface ConsultationQuery {
   status?: ConsultationStatus | ConsultationStatus[];
   from?: Date;
   to?: Date;
+  sucursalId?: string;
   limit?: number;
   offset?: number;
 }

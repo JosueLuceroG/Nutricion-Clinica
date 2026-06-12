@@ -99,6 +99,21 @@ describe("DexiePatientRepository", () => {
     expect(active[0]?.firstName).toBe("Ana");
   });
 
+  it("filtra por sucursalId", async () => {
+    const s1 = makePatient({ firstName: "SucursalUno" });
+    const s2 = makePatient({ firstName: "SucursalDos" });
+    await repo.save(s1);
+    await repo.save(s2);
+    await db.patients.update(s1.id.toString(), { sucursal_id: "s1" });
+    await db.patients.update(s2.id.toString(), { sucursal_id: "s2" });
+
+    const results = await repo.findAll({ sucursalId: "s1" });
+
+    expect(results).toHaveLength(1);
+    expect(results[0]?.firstName).toBe("SucursalUno");
+    expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+  });
+
   it("filtra por sexo", async () => {
     await repo.save(makePatient({ firstName: "Ana" }));
     await repo.save(
