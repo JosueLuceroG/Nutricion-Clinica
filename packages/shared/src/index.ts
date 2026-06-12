@@ -103,10 +103,6 @@ export const SYNCABLE_ENTITIES = [
   'lab_panels',
   'planes_alimenticios',
   'adherence_records',
-  'evolution_records',
-  'evolution_indicators',
-  'temporal_comparisons',
-  'stagnation_alerts',
 ] as const;
 
 export type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];

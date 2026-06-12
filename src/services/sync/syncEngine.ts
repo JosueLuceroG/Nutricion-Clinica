@@ -38,10 +38,6 @@ const ENTITY_TO_TABLE: Record<SyncableEntity, keyof NutriClinicaDB & string> = {
   lab_panels: 'lab_panels',
   planes_alimenticios: 'meal_plans',
   adherence_records: 'adherence_records',
-  evolution_records: 'evolution_records',
-  evolution_indicators: 'evolution_indicators',
-  temporal_comparisons: 'temporal_comparisons',
-  stagnation_alerts: 'stagnation_alerts',
 };
 
 /**

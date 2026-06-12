@@ -79,7 +79,7 @@ describe('telemedicinaRoutes', () => {
     });
 
     it('protege turnRouter con requireAuth', () => {
-      const stack = (turnRouter as unknown as { stack: Array<{ handle?: { name: string } }> }).stack;
+      const stack = (turnRouter as unknown as { stack: ExpressLayerLike[] }).stack;
       const beforeRoute = stack.findIndex((layer) => layer.route);
       const globalMiddlewareNames = stack.slice(0, beforeRoute < 0 ? undefined : beforeRoute).map((l) => l.handle?.name);
       expect(globalMiddlewareNames).toContain('requireAuth');

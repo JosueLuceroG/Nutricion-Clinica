@@ -64,7 +64,8 @@
     "processing": "Procesando...",
     "app_error_description": "La aplicación encontró un error inesperado. Puedes intentar recargar la vista o volver al inicio.",
     "counting": "Contando...",
-    "skip_to_content": "Saltar al contenido"
+    "skip_to_content": "Saltar al contenido",
+    "unsaved_changes_warning": "Hay cambios sin guardar. Si sales ahora, se perderán."
   },
   "nav": {
     "main_menu": "Menú principal",

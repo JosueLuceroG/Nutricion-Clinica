@@ -51,10 +51,10 @@ function buildUrl(base: string, path: string, query?: HttpClientOptions['query']
 }
 
 function getBaseUrl(): string {
-  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
-  if (fromVite) return fromVite;
   const fromProcess = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
-  return fromProcess ?? 'http://localhost:3000';
+  if (fromProcess) return fromProcess;
+  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
+  return fromVite ?? 'http://localhost:3000';
 }
 
 export async function httpRequest<T = unknown>(path: string, options: HttpClientOptions = {}): Promise<T> {

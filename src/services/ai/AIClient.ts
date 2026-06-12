@@ -1,3 +1,5 @@
+import { HttpError, httpRequest } from "@services/api/httpClient";
+
 export type AIProviderId = "openai" | "anthropic" | "ollama";
 
 export interface AIRequest {
@@ -42,20 +44,8 @@ function isEnabled(): boolean {
   }
 }
 
-class OpenAIProvider implements AIProvider {
+class BackendAIProvider implements AIProvider {
   readonly id: AIProviderId = "openai";
-
-  private get apiKey(): string {
-    try {
-      return import.meta.env.VITE_AI_API_KEY ?? "";
-    } catch {
-      return "";
-    }
-  }
-
-  private get baseUrl(): string {
-    return "https://api.openai.com/v1";
-  }
 
   async complete(req: AIRequest, opts?: { signal?: AbortSignal }): Promise<AIResponse> {
     const controller = new AbortController();
@@ -67,47 +57,16 @@ class OpenAIProvider implements AIProvider {
 
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         try {
-          const response = await fetch(`${this.baseUrl}/chat/completions`, {
+          return await httpRequest<AIResponse>("/ai/complete", {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${this.apiKey}`,
-            },
-            body: JSON.stringify({
-              model: req.model ?? "gpt-4o-mini",
-              messages: [
-                { role: "system", content: req.systemPrompt },
-                { role: "user", content: req.userPrompt },
-              ],
-              temperature: req.temperature ?? 0.3,
-              max_tokens: req.maxTokens ?? 1024,
-            }),
+            body: req,
             signal,
           });
-
-          if (!response.ok) {
-            throw new Error(`AI API error: ${response.status} ${response.statusText}`);
-          }
-
-          const data = (await response.json()) as {
-            choices: Array<{ message: { content: string }; finish_reason: string }>;
-            model: string;
-            usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
-          };
-
-          return {
-            content: data.choices[0]?.message?.content ?? "",
-            model: data.model,
-            provider: "openai",
-            finishReason: data.choices[0]?.finish_reason === "stop" ? "stop" : "length",
-            usage: {
-              promptTokens: data.usage?.prompt_tokens ?? 0,
-              completionTokens: data.usage?.completion_tokens ?? 0,
-              totalTokens: data.usage?.total_tokens ?? 0,
-            },
-          };
         } catch (err) {
           lastError = err instanceof Error ? err : new Error(String(err));
+          if (err instanceof HttpError && err.status < 500) {
+            throw err;
+          }
           if (attempt < MAX_RETRIES - 1) {
             await delay(1000 * Math.pow(2, attempt));
           }
@@ -148,7 +107,7 @@ export function createProvider(): AIProvider {
   switch (providerId) {
     case "openai":
     default:
-      cachedProvider = new OpenAIProvider();
+      cachedProvider = new BackendAIProvider();
       return cachedProvider;
   }
 }
@@ -158,7 +117,7 @@ export const aiClient = {
   getProvider: createProvider,
   async complete(req: AIRequest, opts?: { signal?: AbortSignal }): Promise<AIResponse> {
     if (!isEnabled()) {
-      throw new Error("AI is not enabled. Set VITE_AI_ENABLED=true in your environment.");
+      throw new Error("AI is not enabled. Set VITE_AI_ENABLED=true and configure OPENAI_API_KEY on the API server.");
     }
     return createProvider().complete(req, opts);
   },

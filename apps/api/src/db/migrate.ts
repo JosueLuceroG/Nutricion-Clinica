@@ -20,6 +20,39 @@ export function checksumOf(content: string): string {
   return createHash('sha256').update(content.replace(/\r\n/g, '\n'), 'utf8').digest('hex');
 }
 
+export function splitSqlBatches(content: string): string[] {
+  const batches: string[] = [];
+  const lines = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').split('\n');
+  let current: string[] = [];
+
+  for (const line of lines) {
+    if (/^\s*GO\s*(?:--.*)?$/i.test(line)) {
+      if (hasExecutableSql(current.join('\n'))) {
+        batches.push(current.join('\n').trim());
+      }
+      current = [];
+      continue;
+    }
+    current.push(line);
+  }
+
+  if (hasExecutableSql(current.join('\n'))) {
+    batches.push(current.join('\n').trim());
+  }
+
+  return batches;
+}
+
+function hasExecutableSql(batch: string): boolean {
+  const withoutBlockComments = batch.replace(/\/\*[\s\S]*?\*\//g, '');
+  return withoutBlockComments
+    .split('\n')
+    .some((line) => {
+      const trimmed = line.trim();
+      return trimmed.length > 0 && !trimmed.startsWith('--');
+    });
+}
+
 export async function listMigrations(): Promise<MigrationFile[]> {
   const entries = await readdir(MIGRATIONS_DIR);
   const sqlFiles = entries.filter((f) => f.endsWith('.sql')).sort();
@@ -72,23 +105,16 @@ export async function applyMigrations(
 
       log(`apply ${m.filename}`);
       try {
-        // mssql@11's `request.batch()` falla con archivos grandes que
-        // contienen `IF NOT EXISTS ... CREATE TABLE` anidados. Como ya
-        // chequeamos `schema_migrations` arriba (idempotente), los
-        // statements son seguros de re-ejecutar. Dividimos por `;` y
-        // enviamos cada uno con `request.query()`.
-        const statements = m.content
-          .split(/;\s*(?=\n|$)/)
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0 && !/^(--\s*)+$/.test(s))
-          .map((s) => (s.endsWith(';') ? s : s + ';'));
-        for (let i = 0; i < statements.length; i++) {
-          const stmt = statements[i];
+        // Split only on SQL Server batch separators so IF/BEGIN/END blocks
+        // remain intact even when they contain semicolon-terminated statements.
+        const batches = splitSqlBatches(m.content);
+        for (let i = 0; i < batches.length; i++) {
+          const stmt = batches[i]!;
           try {
             await pool.request().query(stmt);
           } catch (stmtErr) {
             const e = stmtErr as Error & { precedingErrors?: Array<{ message: string }> };
-            log(`  stmt ${i} fail (len=${stmt.length}): ${e.message}`);
+            log(`  batch ${i} fail (len=${stmt.length}): ${e.message}`);
             if (e.precedingErrors) {
               for (const pe of e.precedingErrors) log(`    pre: ${pe.message}`);
             }

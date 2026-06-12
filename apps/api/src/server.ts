@@ -17,13 +17,36 @@ import adherenceRouter from "./modules/adherence/adherenceRoutes.js";
 import patientPortalRouter from "./modules/patientPortal/patientPortalRoutes.js";
 import syncRouter from "./modules/sync/syncRoutes.js";
 import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
+import aiRouter from "./modules/ai/aiRoutes.js";
 import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { runRetentionCleanup, RETENTION_CONFIG } from "./services/retention/index.js";
 
 const app = express();
 
-app.use(cors());
+app.disable("x-powered-by");
+app.use((_req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  next();
+});
+
+const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || corsOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("Origen no permitido por CORS"));
+  },
+}));
 app.use(express.json({ limit: "5mb" }));
 
 app.use("/health", healthRouter);
@@ -41,6 +64,7 @@ app.use("/adherence", adherenceRouter);
 app.use("/patient-portal", patientPortalRouter);
 app.use("/sync", syncRouter);
 app.use("/dashboard", dashboardRouter);
+app.use("/ai", aiRouter);
 
 app.use(errorHandler);
 

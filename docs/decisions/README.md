@@ -14,16 +14,17 @@ decisions, suitable for code review and onboarding.
 
 | # | Decision | Status | Date |
 |---|----------|--------|------|
-| [0001](0001-dexie-now-sqlite-later.md) | Use Dexie/IndexedDB now, migrate to SQLite in Phase 3 | Accepted | 2026-05-20 |
+| [0001](0001-dexie-indexeddb-local-sqlserver-sync.md) | Use Dexie/IndexedDB now with SQL Server sync | Accepted | 2026-05-20 |
 | [0002](0002-hash-routing-tauri.md) | Use hash routing for Tauri webview | Accepted | 2026-05-20 |
-| [0003](0003-smae-5ta-como-fuente-nutricional.md) | SMAE 5ª edición as the single source of nutritional truth | Accepted | 2026-05-20 |
-| [0004](0004-zod-ssot-en-application.md) | Zod schemas in `application/` as single source of truth for validation | Accepted | 2026-05-20 |
+| [0003](0003-smae-unica-fuente-nutricional.md) | SMAE 5ª edición as the single source of nutritional truth | Accepted | 2026-05-20 |
+| [0004](0004-zod-single-source-of-truth.md) | Zod schemas in `application/` as single source of truth for validation | Accepted | 2026-05-20 |
 | [0005](0005-soft-delete-immutable-snapshots.md) | Soft delete + immutable snapshots for clinical data | Accepted | 2026-05-20 |
 | [0006](0006-branded-ids-uuidv7.md) | Branded ID types (UUIDv7) instead of plain strings | Accepted | 2026-05-20 |
 | [0007](0007-service-containers-manuales.md) | Manual service containers, no DI framework | Accepted | 2026-05-20 |
-| [0008](0008-bug-t1-zod-preprocess.md) | Zod preprocess for NaN, null, undefined, empty strings (Bug T1) | Accepted | 2026-05-20 |
-| [0009](0009-bug-t2-no-type-submit.md) | Guardar consulta is `type="button"`, not `type="submit"` (Bug T2) | Accepted | 2026-05-20 |
-| [0010](0010-native-checkbox-vs-radix.md) | Native `<input type="checkbox">` over shadcn/Radix Checkbox | Accepted | 2026-05-20 |
+| [0008](0008-zod-preprocess-nan-null-undefined.md) | Zod preprocess for NaN, null, undefined, empty strings (Bug T1) | Accepted | 2026-05-20 |
+| [0009](0009-boton-guardar-no-submit.md) | Guardar consulta is `type="button"`, not `type="submit"` (Bug T2) | Accepted | 2026-05-20 |
+| [0010](0010-native-checkbox-radix-checkbox.md) | Native `<input type="checkbox">` over shadcn/Radix Checkbox | Accepted | 2026-05-20 |
+| [0011](0011-ai-server-side-proxy.md) | Keep AI provider secrets behind the API | Accepted | 2026-06-12 |
 
 ## How to add a new ADR
 

@@ -8,6 +8,18 @@ export const createAppointmentUC = async (
   professionalId: string,
   officeId?: string,
 ): Promise<Appointment> => {
+  const existing = await repo.listAppointmentsByDate(input.date);
+  const requested = timeRange(input.startTime, input.endTime);
+  const hasConflict = existing.some((appointment) => {
+    if (appointment.professionalId !== professionalId) return false;
+    if (["cancelled", "no_show", "rescheduled"].includes(appointment.status)) return false;
+    const booked = timeRange(appointment.startTime, appointment.endTime);
+    return requested.start < booked.end && requested.end > booked.start;
+  });
+  if (hasConflict) {
+    throw new Error("La cita se solapa con otra cita del profesional.");
+  }
+
   const appointment = Appointment.create({
     id: createAppointmentId(),
     patientId: input.patientId,
@@ -24,6 +36,12 @@ export const createAppointmentUC = async (
   await repo.saveAppointment(appointment);
   return appointment;
 };
+
+function timeRange(startTime: string, endTime: string): { start: number; end: number } {
+  const [startH, startM] = startTime.split(":").map(Number);
+  const [endH, endM] = endTime.split(":").map(Number);
+  return { start: startH * 60 + startM, end: endH * 60 + endM };
+}
 
 export const listAppointmentsByDateUC = async (
   repo: AgendaRepository,
@@ -134,7 +152,7 @@ export const getAvailableSlotsUC = async (
   slotDurationMin: number = 30,
 ): Promise<TimeSlot[]> => {
   const appointments = await repo.listAppointmentsByDate(date);
-  const dayOfWeek = new Date(date).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const dayOfWeek = dayOfWeekFromDateString(date);
   const schedules = await repo.listSchedulesByProfessional(professionalId);
   const daySchedule = schedules.find((s) => s.dayOfWeek === dayOfWeek && s.active);
   if (!daySchedule) return [];
@@ -144,7 +162,7 @@ export const getAvailableSlotsUC = async (
   let currentMin = startH * 60 + startM;
   const endMin = endH * 60 + endM;
   const booked = appointments
-    .filter((a) => a.status !== "cancelled" && a.status !== "no_show")
+    .filter((a) => a.professionalId === professionalId && a.status !== "cancelled" && a.status !== "no_show" && a.status !== "rescheduled")
     .map((a) => {
       const [sh, sm] = a.startTime.split(":").map(Number);
       const [eh, em] = a.endTime.split(":").map(Number);
@@ -167,3 +185,8 @@ export const getAvailableSlotsUC = async (
   }
   return slots;
 };
+
+function dayOfWeekFromDateString(date: string): 0 | 1 | 2 | 3 | 4 | 5 | 6 {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(year, month - 1, day).getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+}

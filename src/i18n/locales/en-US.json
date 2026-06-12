@@ -64,7 +64,8 @@
     "processing": "Processing...",
     "app_error_description": "The application encountered an unexpected error. You can try reloading the view or going back home.",
     "counting": "Counting...",
-    "skip_to_content": "Skip to content"
+    "skip_to_content": "Skip to content",
+    "unsaved_changes_warning": "You have unsaved changes. If you leave now, they will be lost."
   },
   "nav": {
     "main_menu": "Main menu",

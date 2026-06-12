@@ -3,9 +3,9 @@
 > Plataforma profesional de nutrición clínica para consultorios.
 > Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
 
-**Versión del documento:** 2.13
-**Última actualización:** Sprint 48 — Recetas SMAE + Reportes Recharts + Indicadores CRUD ✅
-**Estado del proyecto:** Sprints 1-48 completos · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · ~445 archivos TS/TSX · ~2.3MB código fuente · 77 archivos de test frontend · 998 tests frontend · 126 tests API · 10 E2E tests
+**Versión del documento:** 2.14
+**Última actualización:** Hardening post-Sprint 48 — seguridad API, IA server-side, sync, agenda, reportes, auditoría y UX ✅
+**Estado del proyecto:** Sprints 1-48 completos + hardening técnico · Fase 1 ✅ · Fase 2 ✅ · Fase 3 ✅ · **Fase 4 ✅** · **Fase 5 completa ✅** · quality gate reciente: `pnpm typecheck`, API 145 tests, root 1725 tests (1 skipped conocido)
 **Para:** otra instancia de IA que retome el trabajo sin contexto previo.
 
 ---
@@ -72,9 +72,9 @@ Vas a continuar el desarrollo de una app de nutrición clínica. El usuario es *
 - **Dark mode (Fase 4):** ThemeToggle en sidebar (expandido/colapsado), 3 temas (light/dark/system), CSS vars `.dark`, ThemeProvider, uiStore persist vía zustand.
 - **i18n (Fase 4):** i18next + react-i18next, `defaultNS: "translation"`, español (`es-MX`) e inglés (`en-US`) completos con ~500+ claves en 22 namespaces. 100% de strings visibles envueltos con `t()`. LanguageSwitcher en sidebar. Command palette con comandos de idioma y tema.
 - **WCAG AA (Fase 4):** focus indicators (`ring-2` + `focus-visible:`), form labels con `htmlFor`+`id`+`aria-describedby` (43 campos), error announcements `role="alert"`, heading hierarchy semántica, LanguageSwitcher `aria-label`, Dialog scroll móvil, StatusBar touch targets (`min-h-7`), Header search colapsable, tablas responsive column hiding.
-- **AI Assist (Fase 4):** 6 archivos de servicio (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`, `index.ts`), `useAI` hook, `AIAssistButton`, cache in-memory con TTL, audit trail, usage tracking mensual, Dexie v24 (`ai_cache`, `ai_usage_logs`), opt-in toggle en SettingsPage, integración UI en ConsultationWizard (draft SOAP + summarize), AI consent card en ClinicalRecordCards.
+- **AI Assist (Fase 4):** servicios de IA en cliente (`AIClient`, `AIPrompts`, `AIResponseParser`, `AICapabilities`, `AIService`), `useAI` hook, `AIAssistButton`, cache/usage local, opt-in, consentimiento por paciente e integraciones UI. Hardening post-Sprint 48 movió las llaves y llamadas de proveedor a `POST /ai/complete` en backend; el cliente ya no usa `VITE_AI_API_KEY` ni `VITE_OPENAI_API_KEY`.
 - **Portabilidad móvil (Fase 4):** Sidebar drawer con backdrop overlay + hamburger button, PageContent padding `p-4 sm:p-6`, AgendaPage calendar `w-full lg:w-[400px]`, Dialog `max-h-[90dvh]`, StatusBar simplificado, Header search colapsable, tablas responsive.
-- **Sprint actual:** Sprint 48 completado — Recetas SMAE + Reportes Recharts + Indicadores CRUD + Chef AI: `calculateNutrition()` en `Recipe.ts` con SMAE `foodLookup` (cálculo real de kcal/proteína/carbs/grasa), `deriveAllergensFromFoods()` (auto-alérgenos desde grupo/keywords SMAE), `recipeService.ts` con `listWithNutrition()` y cache lazy de SMAE, `RecipeDialog.tsx` con `IngredientFoodSearch` popover, `RecipeCard.tsx` con nutrientes mostrados. Reportes: gráficas Recharts (PieChart patologías, BarChart tendencias consultas) en `ReportsPage.tsx`, `IndicatorDialog.tsx` CRUD para crear/editar/eliminar indicadores. Chef AI: `chefService.ts` con integración OpenAI (gpt-4o-mini), `ChefDialog.tsx` con formulario de parámetros, vista previa de resultados y botón "Aplicar plan", integrado en `MealPlannerPage`. i18n ES/EN para todos los nuevos labels. spec.md v2.13.
+- **Sprint actual:** Sprint 48 completado + hardening post-Sprint 48. Recetas SMAE + Reportes Recharts + Indicadores CRUD + Chef AI ya están integrados. Hardening adicional: headers/CORS/rate limit, `/auth/register` admin-only, TOTP cifrado con migración `019`, WebSocket de telemedicina validado por sala/sucursal, sync limitado a entidades soportadas, migrator SQL por `GO`, IA backend proxy, agenda sin UUID fantasma, reportes con métricas agregadas backend, auditoría clínica local y guard de cambios sin guardar en `PatientForm`.
 
 ### 0.3 Qué hacer primero cuando leas esto
 
@@ -455,9 +455,11 @@ src/modules/
 
 **Pendiente:** catálogo de medicamentos, registro por paciente, alertas de interacciones fármaco-nutriente (ej. warfarina + vitamina K), recordatorios de toma.
 
-### 3.17 `security` (Fase 3, planificado) — Seguridad, privacidad y cumplimiento
+### 3.17 `security` (Fase 3, implementado) — Seguridad, privacidad y cumplimiento
 
 **Implementado (Sprints 36-43):** 2FA TOTP con `otplib` + QR usando `qrcode`, flujo login en 2 pasos (`requires2fa` + `pending2faToken`), endpoints `/auth/2fa/*`, cifrado AES-256-GCM server-side con `serverCryptoService.ts`, telemedicina con CRUD de salas (`016-telemedicina.sql`), UI de 2FA/videollamada, signaling WebRTC por WebSocket, configuración STUN/TURN, grabación local con consentimiento explícito y gestor completo de grabaciones cifradas. Sprint 41 agregó `017-telemedicina-grabaciones.sql`, tabla `video_grabaciones`, endpoints `GET/POST/GET blob/DELETE /telemedicina/:id/grabaciones/*`, subida cifrada opcional al backend, soft-delete remoto y descarga de blobs cifrados. Sprint 42 agregó auditoría `read` para descarga de blob remoto y tests estructurales de rutas para auth/tenant, raw binary upload y auditoría create/read/delete. Sprint 43 agregó retención legal (migración `018-retention-grabaciones.sql`, cleanup diario vía `node-cron` con `retentionCleanupService.ts`), endpoint productivo `/telemedicina/turn-config` con validación Zod, y E2E multi-peer con Playwright.
+
+**Hardening post-Sprint 48:** Express deshabilita `x-powered-by`, agrega headers de seguridad, restringe CORS por `CORS_ORIGIN` y rate limit en login/IA. `POST /auth/register` requiere auth + rol `admin`. Los secretos TOTP se cifran para storage con `TOTP_ENCRYPTION_KEY`/`FIELD_ENCRYPTION_KEY` y compatibilidad legacy plaintext. WebSocket `/ws/telemedicina` valida JWT, sala existente, sucursal/admin y estado activo antes de relayar mensajes. La auditoría local registra escrituras clínicas de pacientes, consultas y planes sin persistir payload clínico completo.
 
 **Ver §9 para lo implementado y §21.6 para el modelo de auditoría completo.**
 
@@ -465,9 +467,9 @@ src/modules/
 
 **Implementado (Sprints 25A-35):** portal web público en `/portal/:token`, respaldado por `GET /patient-portal/:token`, para que el paciente vea resumen, plan activo, próximas citas y documentos compartidos. Con scope `adherence`, el paciente puede enviar adherencia por `POST /patient-portal/:token/adherence`; si falla la red, el registro se guarda en cola local y se reintenta al volver la conexión. El portal incluye descarga/vista previa documental firmada SHA-256, recordatorio de próxima cita por email (`POST /patient-portal/:token/send-reminder`) e historial de notificaciones (`GET /patient-portal/:token/notifications`) con cache local. Sprint 30 añadió `manifest.webmanifest`, Service Worker de app shell, cache local del payload público/notificaciones y banner de datos guardados sin cachear respuestas API/documentos en el SW. Sprint 31 añadió mensajería asíncrona paciente-nutrióloga con `patient_portal_messages`, endpoints `GET/POST /patient-portal/:token/messages` con scope `messaging`, endpoints profesionales y notificación email al profesional. Sprint 32 añadió fotos de comidas con `patient_portal_meal_photos`, subida pública `POST /patient-portal/:token/meal-photos`, listado/preview por token, revisión profesional y storage de bytes en SQL Server con SHA-256. Sprint 33 endureció backend, cliente y E2E para scopes, validación de fotos, orden de rutas, envío de mensajes y subida/listado de fotos en portal. Sprint 34 formalizó multi-consultorio usando `sucursal_id` como tenant key, tenant guards para FKs clínicas y `/sync/push` protegido por sucursal activa. En el expediente profesional se gestionan enlaces, auditoría reciente, adherencia, mensajería, fotos de comidas y preferencias de alimentos/sustituciones (`patient_substitutions`). Además, el dashboard profesional incluye métricas clínicas agregadas vía `GET /dashboard/metrics` (pacientes, consultas, pagos pendientes, planes, adherencia, sexo y patologías). Sprint 35 limpió 17 warnings de lint, implementó audit middleware NOM-024 para bitácora automática de operaciones clínicas + login, migración `013-consentimientos.sql` + API CRUD de consentimientos, y endpoint `GET /pacientes/:id/expediente` para exportación estructurada. **Pendiente:** certificación NOM-024 formal, telemedicina, wearables/OCR opcionales.
 
-### 3.19 `ai-assist` (Fase 4, planificado) — Sistema de IA
+### 3.19 `ai-assist` (Fase 4, implementado) — Sistema de IA
 
-**Pendiente:** 8 capabilities documentadas en §19 (summarizeConsultation, interpretLabResults, suggestSubstitutions, generateEducationContent, draftClinicalNotes, generateGoalSuggestions, explainDiagnosisToPatient, generateMealPlanInitial). Bounded context dedicado en `src/services/ai/`. Opt-in por profesional + consentimiento explícito por paciente.
+**Implementado:** 8 capabilities documentadas en §19 (summarizeConsultation, interpretLabResults, suggestSubstitutions, generateEducationContent, draftClinicalNotes, generateGoalSuggestions, explainDiagnosisToPatient, generateMealPlanInitial), bounded context en `src/services/ai/`, opt-in por profesional y consentimiento por paciente. Las llamadas externas pasan por `POST /ai/complete` en `apps/api`; las llaves de proveedor son server-side only.
 
 ### 3.20 Mapa de fases (resumen)
 
@@ -1178,12 +1180,16 @@ Referencia de la vista principal de consulta:
 - **TypeScript strict** previene errores de tipo en datos clínicos.
 - **UUIDv7** — ordenable, sin colisiones, sin泄露 de timestamp preciso.
 - **Soft-delete aware queries** — `DexieXRepository.findAll()` filtra `deletedAt === null` por defecto.
+- **API hardening** — CORS allowlist vía `CORS_ORIGIN`, headers de seguridad, `x-powered-by` deshabilitado, rate limit en login/IA y `/auth/register` admin-only.
+- **TOTP cifrado** — secretos 2FA protegidos server-side con AES-256-GCM y migración `019-totp-secret-length.sql`.
+- **IA server-side** — llaves `OPENAI_*` solo en backend; frontend usa `/ai/complete` autenticado.
+- **Telemedicina aislada por tenant** — signaling valida sala, sucursal y estado activo.
+- **Auditoría clínica local** — escrituras de pacientes, consultas y planes registran eventos best-effort sin payload sensible completo.
 
 ### 9.2 Planificado
 
 - **`services/crypto/`** — cifrado en reposo de la base IndexedDB (Web Crypto API + Tauri stronghold).
 - **`services/backup/`** — export JSON cifrado, import con merge/conflict resolution.
-- **`services/audit/`** — log inmutable de todas las acciones clínicas (quién, qué, cuándo, sobre qué paciente).
 - **`services/auth/`** — login local + opcional IdP (Fase 4).
 
 ### 9.3 Regulatorio (a documentar formalmente)
@@ -1211,7 +1217,7 @@ Referencia de la vista principal de consulta:
      ╱__________________________╲
 ```
 
-**Total: 207 tests, 19 archivos, ~22 segundos.**
+**Total reciente:** API 145 tests; suite root 1725 tests passing con 1 skipped conocido.
 
 ### 10.2 Convenciones
 
@@ -2232,6 +2238,7 @@ pnpm build:tauri               # Empaqueta instalador nativo
 
 | Hash | Mensaje | Sprint | Impacto |
 |------|---------|--------|---------|
+| _(working)_ | fix(hardening): seguridad API + IA backend + sync/agenda/reportes/audit | Post-48 | CORS/headers/rate limit, `/auth/register` admin-only, TOTP cifrado + migración 019, WebSocket telemedicina tenant-aware, sync contract reducido a entidades soportadas, migrator por `GO`, `/ai/complete` backend, agenda sin UUID fantasma, reportes con métricas agregadas, auditoría clínica local y guard de cambios sin guardar. Quality gate: typecheck, API 145 tests, root 1725 tests. |
 | _(commits de Sprint 48)_ | feat(s48): recetas smae + reportes recharts + indicadores crud + chef ai | 48 | calculateNutrition() con SMAE foodLookup, deriveAllergensFromFoods(), listWithNutrition(), IngredientFoodSearch popover, RecipeCard nutrientes, Recharts (PieChart+BarChart) en ReportsPage, IndicatorDialog CRUD, ChefDialog con OpenAI gpt-4o-mini + preview + aplicar plan, i18n ES/EN, spec.md v2.13 |
 | _(commit de Sprint 47)_ | feat(sync): sprint 47 cloud sync e2e pagination + sync_meta + gzip | 47 | Pull pagination loop (while hasMore/nextSince) en syncEngine.ts, tabla sync_meta Dexie v26 (SyncMetaRow), lastPullAt migrado de localStorage a Dexie (durable), gzip Accept-Encoding en httpClient.ts, spec.md v2.12 |
 | _(commit de Sprint 46)_ | feat(ocr): sprint 46 OCR laboratorios tesseract | 46 | Tesseract.js v7 con spa+eng, ocrService con progreso, labOcrParser con 24 patrones y 13 tests, ScanLabPanelPage con upload/review/apply, ruta /:patientId/laboratorio/scan, botón escanear en PatientLabPage, LabPanelForm acepta initialResults, i18n ES/EN OCR, spec.md v2.11 |
@@ -2371,6 +2378,12 @@ pnpm build:tauri               # Empaqueta instalador nativo
     - Roadmap §12 Fase 5 actualizado a 100% completo; items de telemedicina/2FA movidos a completados.
     - Q-01 resuelta: ADRs formales creados.
     - spec.md v2.9.
+48. **Hardening post-Sprint 48 — seguridad, IA y consistencia operacional:**
+    - API: CORS allowlist, headers de seguridad, login/IA rate limit, `/auth/register` admin-only, pruebas de rate limit y auth.
+    - 2FA/telemedicina: TOTP cifrado con migración `019`, compatibilidad legacy plaintext, signaling valida sala/sucursal/admin/estado.
+    - Sync/migraciones: `SYNCABLE_ENTITIES` alineado a mapeos reales y migrator SQL Server separa por `GO`.
+    - IA: `POST /ai/complete` backend autenticado/rate-limited; frontend y Chef AI ya no exponen llaves `VITE_*`.
+    - Producto: agenda rechaza contexto fantasma, slots por profesional, reportes usan métricas agregadas backend, auditoría local de escrituras clínicas y guard de cambios sin guardar en paciente.
 
 ---
 
@@ -2655,7 +2668,7 @@ game-01/
 | 1 | La IA **asiste, no sustituye** | Toda salida de IA es **sugerencia**, nunca acción directa. |
 | 2 | La nutrióloga **siempre aprueba** | El sistema no aplica cambios por sí solo a partir de IA. |
 | 3 | La IA **nunca** modifica SMAE ni reglas críticas | El SMAE 5ª y el motor de reglas son read-only para IA. |
-| 4 | Toda inferencia queda **trazada** | Cada llamada IA se registra en `audit_events` con prompt sanitizado y respuesta. |
+| 4 | Toda inferencia queda **trazada** | Cada llamada IA registra metadatos suficientes para auditoría sin persistir payload clínico completo. |
 
 ### 19.2 Arquitectura
 
@@ -2673,14 +2686,18 @@ game-01/
 │          └──────────┬───────────┘                            │
 │                     ▼                                        │
 │         ┌──────────────────────┐                            │
-│         │ AI Client            │                            │
-│         │ (HTTP / streaming)   │                            │
+│         │ Frontend AI Client   │                            │
+│         │ POST /ai/complete    │                            │
+│         └──────────┬───────────┘                            │
+│                     ▼                                        │
+│         ┌──────────────────────┐                            │
+│         │ API AI Proxy         │                            │
+│         │ auth + tenant + RL   │                            │
 │         └──────────┬───────────┘                            │
 │                     ▼                                        │
 │         ┌──────────────────────┐                            │
 │         │ AI Provider          │                            │
-│         │ (OpenAI / Anthropic / │                            │
-│         │  local Ollama)       │                            │
+│         │ OpenAI-compatible    │                            │
 │         └──────────────────────┘                            │
 │                                                              │
 │ ┌──────────────────────────────────────────────────────┐   │
@@ -2722,22 +2739,25 @@ game-01/
 | Modificar equivalentes | ❌ **Nunca** | ❌ **Nunca** |
 | Decisiones clínicas finales | ❌ No (asiste) | ❌ No (asiste) |
 | Determinismo | ✅ Total | ❌ Estocástico |
-| Trazabilidad | ✅ Total (regla explícita) | ⚠️ Audit log + prompt + response |
+| Trazabilidad | ✅ Total (regla explícita) | ⚠️ Audit log de metadatos + proveedor/modelo |
 
 > **Regla de oro:** si un cálculo o validación puede hacerse con una regla, **se hace con regla**. La IA solo entra cuando el output es texto libre, ambigüedad interpretativa o generación creativa.
 
 ### 19.5 Implementación en este codebase
 
-**Bounded context dedicado** en `src/services/ai/` (placeholder creado en Sprint 1).
+**Bounded context dedicado** en `src/services/ai/` y proxy backend en `apps/api/src/modules/ai/`.
 
 ```
 src/services/ai/
-├── AIClient.ts          # interfaz + impl HTTP fetch con streaming
+├── AIClient.ts          # cliente frontend hacia POST /ai/complete
 ├── AIPrompts.ts         # plantillas versionadas de prompts
 ├── AIResponseParser.ts  # valida Zod + extrae confidence
 ├── AICapabilities.ts    # registry de 8 capabilities
 ├── AIService.ts         # composition root
 └── index.ts
+
+apps/api/src/modules/ai/
+└── aiRoutes.ts          # auth, sucursal, rate limit, OpenAI-compatible API
 ```
 
 **Adaptadores por proveedor** (Strategy pattern):
@@ -2750,7 +2770,7 @@ interface AIProvider {
 }
 ```
 
-**Timeouts, retries, rate limiting**: configurables vía `src/services/ai/AIClient.ts`. Backoff exponencial con jitter; máx. 3 reintentos.
+**Timeouts, retries, rate limiting**: el cliente usa timeout/abort; el backend aplica rate limit y resuelve `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL` server-side.
 
 **Caché de respuestas frecuentes** en IndexedDB (store `ai_cache` con TTL configurable por capability).
 
@@ -2761,6 +2781,7 @@ interface AIProvider {
 - **Datos anonimizados** o pseudonimizados al construir el prompt (IDs, no nombres; rangos, no valores exactos cuando sea posible).
 - **Sin entrenamiento con datos de pacientes** (cláusula contractual con proveedor).
 - **Configuración de proveedor** por consultorio (self-hosted Ollama como opción offline).
+- **Sin secretos en frontend**: cualquier llave de proveedor debe vivir en `apps/api/.env`, nunca como `VITE_*`.
 
 ### 19.7 Costos
 
@@ -2771,10 +2792,11 @@ interface AIProvider {
 
 ### 19.8 Estado actual
 
-✅ **Implementado (Sprint 24):** infraestructura completa y 2 integraciones UI.
+✅ **Implementado (Sprint 24 + hardening post-48):** infraestructura completa, integraciones UI y proxy backend seguro.
 
 **Infraestructura implementada:**
-- `AIClient.ts` — HTTP client con OpenAI provider, retry (3 intentos, backoff exp.), timeout 30s, abort signal
+- `AIClient.ts` — cliente frontend que llama `/ai/complete` sin conocer llaves de proveedor
+- `apps/api/src/modules/ai/aiRoutes.ts` — proxy OpenAI-compatible con auth, sucursal, validación, rate limit y auditoría de metadatos
 - `AIPrompts.ts` — system prompts en español para 8 capabilities, contexto tipado
 - `AIResponseParser.ts` — Zod schemas por capability, parsing con confidence scoring
 - `AICapabilities.ts` — registry con metadata, modelo, temperatura, cacheabilidad
@@ -2785,6 +2807,7 @@ interface AIProvider {
 **Integraciones UI completadas:**
 - ConsultationWizard StepPlan — `draftClinicalNotes` para generar assessment y plan
 - ConsultationWizard StepReview — `summarizeConsultation` para resumen narrativo
+- Meal planner Chef AI — `chefService.ts` usa `AIClient.complete()` y aplica el resultado solo bajo aprobación explícita del usuario
 
 **Pendiente de UI:** GoalDialog (generateGoalSuggestions), LabResults (interpretLabResults), MealPlan (generateMealPlanInitial), etc.
 
@@ -5404,9 +5427,9 @@ Inicio
 
 ### 40.20 Estado actual
 
-✅ **MVP**: 100% offline con IndexedDB; sync diferido a Fase 3.
-⏳ **Fase 3**: SyncEngine, SyncQueue, ConflictResolver, EventBus.
+✅ **Actual**: 100% offline con IndexedDB y sync HTTP bidireccional para `pacientes`, `consultas`, `antropometrias`, `lab_panels`, `planes_alimenticios` y `adherence_records`.
+⏳ **Pendiente**: ampliar sync solo cuando existan mapeos SQL completos y pruebas por entidad.
 
 ---
 
-**Próximo paso recomendado:** reemplazar `README.md` con una versión corta (quickstart + links) y dejar `spec.md` como la fuente de verdad del producto y la arquitectura. Crear las ADRs formales en `docs/decisions/` siguiendo la plantilla de Michael Nygard.
+**Próximo paso recomendado:** aplicar `apps/api/migrations/019-totp-secret-length.sql` en entornos reales, configurar `TOTP_ENCRYPTION_KEY`/`FIELD_ENCRYPTION_KEY`, `OPENAI_API_KEY` y `CORS_ORIGIN`, y validar manualmente login 2FA, telemedicina, IA y agenda con usuarios/sucursales reales.

@@ -1,5 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { Server } from 'node:http';
+import sql from 'mssql';
+import { getPool } from '../../db/connection.js';
 import { verifyToken } from '../auth/application/authService.js';
 import type { JwtPayload } from '@nutriclinica/shared';
 
@@ -18,6 +20,7 @@ interface ClientInfo {
 }
 
 const clients = new Map<WebSocket, ClientInfo>();
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function send(ws: WebSocket, message: SignalingMessage): void {
   if (ws.readyState === WebSocket.OPEN) {
@@ -41,6 +44,18 @@ function getPeersInRoom(salaId: string): { userId: string; email: string }[] {
     }
   }
   return peers;
+}
+
+export async function canJoinSala(salaId: string, payload: JwtPayload): Promise<boolean> {
+  if (!UUID_REGEX.test(salaId)) return false;
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('id', sql.UniqueIdentifier(), salaId)
+    .query<{ sucursal_id: string }>(`SELECT TOP 1 sucursal_id FROM video_salas WHERE id = @id AND deleted_at IS NULL`);
+  const sala = result.recordset[0];
+  if (!sala) return false;
+  return payload.rol === 'admin' || payload.sucursalIds.includes(sala.sucursal_id);
 }
 
 export function createSignalingServer(httpServer: Server): WebSocketServer {
@@ -72,6 +87,7 @@ export function createSignalingServer(httpServer: Server): WebSocketServer {
     clients.set(ws, clientInfo);
 
     ws.on('message', (raw) => {
+      void (async () => {
       let msg: SignalingMessage;
       try {
         msg = JSON.parse(raw.toString()) as SignalingMessage;
@@ -81,6 +97,10 @@ export function createSignalingServer(httpServer: Server): WebSocketServer {
 
       switch (msg.type) {
         case 'join-room': {
+          if (!(await canJoinSala(msg.salaId, payload))) {
+            ws.close(4003, 'Sin acceso a la sala');
+            return;
+          }
           clientInfo.salaId = msg.salaId;
           broadcastToRoom(msg.salaId, { type: 'peer-joined', salaId: msg.salaId, targetId: payload.sub, payload: { userId: payload.sub, email: payload.email } }, ws);
           const peers = getPeersInRoom(msg.salaId).filter((p) => p.userId !== payload.sub);
@@ -88,6 +108,7 @@ export function createSignalingServer(httpServer: Server): WebSocketServer {
           break;
         }
         case 'leave-room': {
+          if (clientInfo.salaId !== msg.salaId) return;
           clientInfo.salaId = null;
           broadcastToRoom(msg.salaId, { type: 'peer-left', salaId: msg.salaId, targetId: payload.sub }, ws);
           break;
@@ -95,10 +116,12 @@ export function createSignalingServer(httpServer: Server): WebSocketServer {
         case 'offer':
         case 'answer':
         case 'ice-candidate': {
+          if (clientInfo.salaId !== msg.salaId) return;
           broadcastToRoom(msg.salaId, { ...msg, targetId: payload.sub }, ws);
           break;
         }
       }
+      })().catch(() => ws.close(1011, 'Error de señalización'));
     });
 
     ws.on('close', () => {

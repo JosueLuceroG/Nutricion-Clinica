@@ -1,5 +1,7 @@
 import { db } from "@services/db/dexieSchema";
 import { DexieAgendaRepository } from "@modules/agenda/infrastructure/DexieAgendaRepository";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 import {
   createAppointmentUC,
   listAppointmentsByDateUC,
@@ -18,15 +20,31 @@ import type { NewAppointmentFormInput, RescheduleAppointmentInput } from "@modul
 
 const repository = new DexieAgendaRepository(db);
 
-let defaultProfessionalId: string = crypto.randomUUID();
+let defaultProfessionalId: string | null = null;
 
-export function setDefaultProfessionalId(id: string): void {
+export function setDefaultProfessionalId(id: string | null): void {
   defaultProfessionalId = id;
+}
+
+export function resolveAgendaProfessionalId(professionalId?: string): string {
+  const resolved = professionalId ?? useAuthStore.getState().user?.id ?? defaultProfessionalId;
+  if (!resolved) {
+    throw new Error("No hay profesional autenticado para agendar la cita.");
+  }
+  return resolved;
+}
+
+export function resolveAgendaOfficeId(officeId?: string): string {
+  const resolved = officeId ?? useSyncStore.getState().sucursalId ?? useAuthStore.getState().sucursalActivaId;
+  if (!resolved) {
+    throw new Error("No hay sucursal activa para agendar la cita.");
+  }
+  return resolved;
 }
 
 export const agendaService = {
   create: (input: NewAppointmentFormInput, professionalId?: string, officeId?: string): Promise<Appointment> =>
-    createAppointmentUC(repository, input, professionalId ?? defaultProfessionalId, officeId),
+    createAppointmentUC(repository, input, resolveAgendaProfessionalId(professionalId), resolveAgendaOfficeId(officeId)),
 
   listByDate: (date: string): Promise<Appointment[]> =>
     listAppointmentsByDateUC(repository, date),
@@ -53,7 +71,7 @@ export const agendaService = {
     completeAppointmentUC(repository, id, consultationId),
 
   getAvailableSlots: (date: string, professionalId?: string, slotDurationMin?: number) =>
-    getAvailableSlotsUC(repository, date, professionalId ?? defaultProfessionalId, slotDurationMin),
+    getAvailableSlotsUC(repository, date, resolveAgendaProfessionalId(professionalId), slotDurationMin),
 };
 
 export type AgendaService = typeof agendaService;

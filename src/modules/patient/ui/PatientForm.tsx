@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@components/ui/skeleton";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { PatientId } from "@modules/patient/domain/PatientId";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
 
 interface PatientFormProps {
   mode: "create" | "edit";
@@ -55,6 +56,7 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
     resolver: zodResolver(PatientFormSchema),
     defaultValues: patientFormDefaultValues,
   });
+  useUnsavedChangesGuard(isDirty && !submitting, t("common.unsaved_changes_warning"));
 
   React.useEffect(() => {
     if (initialPatient) {

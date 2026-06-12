@@ -4,9 +4,10 @@ import { randomUUID } from 'node:crypto';
 import sql from 'mssql';
 import { type LoginRequest, type RegisterRequest, type Role, type AuthSucursalDTO } from '@nutriclinica/shared';
 import { login, register, findProfesionalById, listSucursalesForProfesional, signToken, signPending2faToken } from './application/authService.js';
-import { requireAuth } from './middleware/requireAuth.js';
+import { requireAuth, requireRole } from './middleware/requireAuth.js';
 import { getPool } from '../../db/connection.js';
 import { isTotpEnabled, verifyTotp, findTotpSecret } from './application/twoFactorService.js';
+import { rateLimit } from '../../middleware/rateLimit.js';
 
 const router: Router = ExpressRouter();
 
@@ -29,7 +30,9 @@ const RegisterBodySchema = z.object({
   sucursalIds: z.array(z.string().uuid()).min(1),
 });
 
-router.post('/login', async (req: Request, res: Response, next: NextFunction) => {
+const authRateLimit = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, keyPrefix: 'auth' });
+
+router.post('/login', authRateLimit, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = LoginBodySchema.parse(req.body) satisfies LoginRequest;
 
@@ -127,7 +130,7 @@ router.post('/login', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-router.post('/register', async (req: Request, res: Response, next: NextFunction) => {
+router.post('/register', requireAuth, requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const body = RegisterBodySchema.parse(req.body) as RegisterRequest;
     const result = await register(body);

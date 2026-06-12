@@ -1,6 +1,6 @@
 # NutriClinica API
 
-Backend HTTP para NutriClinica: autenticacion JWT, multi-tenancy, sync queue, RBAC, facturacion.
+Backend HTTP para NutriClinica: autenticacion JWT, multi-tenancy, sync queue, RBAC, facturacion, telemedicina e IA server-side.
 
 ## Stack
 - Node.js 20+
@@ -53,10 +53,9 @@ Desde la raiz del monorepo:
 
 ```bash
 pnpm install
-cd apps/api
-pnpm migrate         # corre las 4 migraciones SQL en orden
-pnpm seed            # crea 1 sucursal + 1 admin (idempotente)
-pnpm dev             # arranca API en http://localhost:3000
+pnpm --filter @nutriclinica/api migrate  # corre las migraciones SQL en orden
+pnpm --filter @nutriclinica/api seed     # crea 1 sucursal + 1 admin (idempotente)
+pnpm --filter @nutriclinica/api dev      # arranca API en http://localhost:3000
 ```
 
 ### 5. Verificar
@@ -75,11 +74,24 @@ idempotente (usa `IF NOT EXISTS`). El runner:
 - Si el archivo ya se aplico con el mismo checksum, lo salta.
 - Si el checksum cambio y no pasas `--force`, reporta error.
 - Si pasas `--force`, re-ejecuta (util cuando editas una migracion en dev).
+- Separa batches SQL Server solo por lineas `GO`; no parte bloques `IF/BEGIN/END` por `;`.
 
 ```bash
-pnpm migrate          # aplica lo nuevo
-pnpm migrate --force  # re-aplica todo
+pnpm --filter @nutriclinica/api migrate          # aplica lo nuevo
+pnpm --filter @nutriclinica/api migrate --force  # re-aplica todo
 ```
+
+## Seguridad operativa
+
+- `CORS_ORIGIN` debe listar los origenes permitidos. En dev Vite/Tauri usa `http://localhost:1420`, `http://127.0.0.1:1420` y `tauri://localhost`.
+- `POST /auth/login` tiene rate limit en memoria. En produccion multi-instancia, reemplazarlo por store compartido (Redis/SQL).
+- `POST /auth/register` requiere autenticacion y rol `admin`; no exponerlo como registro publico.
+- Los secretos TOTP se guardan cifrados. Configura `TOTP_ENCRYPTION_KEY` o `FIELD_ENCRYPTION_KEY`; si faltan, se usa `JWT_SECRET` como fallback para dev.
+- La migracion `019-totp-secret-length.sql` amplia `profesionales.totp_secret` para secretos cifrados.
+- Las llaves de IA son server-side only: `OPENAI_API_KEY`, `OPENAI_MODEL`, `OPENAI_BASE_URL`. Nunca uses prefijo `VITE_` para secretos.
+- `POST /ai/complete` requiere JWT, sucursal activa, validacion Zod y rate limit; audita metadatos, no payload clinico completo.
+- WebSocket de telemedicina valida token, existencia de sala, sucursal/admin y que la sala siga activa antes de relayar mensajes.
+- Sync soporta solo `pacientes`, `consultas`, `antropometrias`, `lab_panels`, `planes_alimenticios` y `adherence_records` hasta que existan mapeos SQL completos para mas entidades.
 
 ## Estructura
 
@@ -100,9 +112,9 @@ apps/api/
   .env.example
 ```
 
-## Proximos pasos (Sprint 14A)
+## Verificacion
 
-- 14A.4: rutas /auth/login, /auth/register, /auth/me + middleware `requireAuth`
-- 14A.5: middleware `requireSucursalAccess` (filtra queries por sucursal_id del JWT)
-- 14A.6: endpoints REST para pacientes, consultas, mediciones, lab, planes
-- 14A.7: endpoints /sync/pull, /sync/push, /sync/manifest
+```bash
+pnpm --filter @nutriclinica/api typecheck
+pnpm --filter @nutriclinica/api test
+```

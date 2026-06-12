@@ -2,50 +2,59 @@ import * as React from "react";
 import { ReportsPage as ReportsView } from "@modules/reports/ui/ReportsPage";
 import { useIndicators } from "@modules/reports/ui/useReportHooks";
 import { reportService } from "@services/reportService";
-import { calculateConsultationsPerWeek, calculateAverageAdherence, calculateActivePatientCount, calculateConsultationsThisMonth, calculatePendingPayments, calculatePathologyDistribution } from "@modules/reports/application/kpiEngine";
-import { db } from "@services/db/dexieSchema";
-import { useLiveQuery } from "dexie-react-hooks";
+import { fetchDashboardMetrics, type DashboardMetrics } from "@services/api/dashboardApi";
 
-const MONTH_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+const EMPTY_KPIS = {
+  consultationsPerWeek: 0,
+  averageAdherence: 0,
+  activePatients: 0,
+  consultationsThisMonth: 0,
+  pendingPayments: 0,
+};
+
+export function buildReportKpis(metrics: DashboardMetrics | null) {
+  if (!metrics) return EMPTY_KPIS;
+  return {
+    consultationsPerWeek: metrics.consultas.total,
+    averageAdherence: metrics.adherencia.promedioGlobal != null ? Math.round(metrics.adherencia.promedioGlobal * 100) / 100 : 0,
+    activePatients: metrics.pacientes.activos,
+    consultationsThisMonth: metrics.consultas.esteMes,
+    pendingPayments: metrics.consultas.pendientesPago,
+  };
+}
+
+export function buildPathologyDistribution(metrics: DashboardMetrics | null): Array<{ name: string; value: number }> | undefined {
+  if (!metrics?.patologias.length) return undefined;
+  return metrics.patologias.map((p) => ({ name: p.tag, value: p.count }));
+}
 
 export function ReportsPage() {
   const { indicators, loading: indicatorsLoading, refresh } = useIndicators(reportService);
+  const [dashboardMetrics, setDashboardMetrics] = React.useState<DashboardMetrics | null>(null);
+  const [metricsLoading, setMetricsLoading] = React.useState(true);
+  const [reloadToken, setReloadToken] = React.useState(0);
 
-  const consultations = useLiveQuery(() => db.consultations.toArray(), [], []);
-  const adherenceIndexes = useLiveQuery(() => db.adherence_indexes.toArray(), [], []);
-  const patients = useLiveQuery(() => db.patients.toArray(), [], []);
+  React.useEffect(() => {
+    const controller = new AbortController();
+    setMetricsLoading(true);
+    fetchDashboardMetrics(controller.signal)
+      .then(setDashboardMetrics)
+      .catch(() => setDashboardMetrics(null))
+      .finally(() => setMetricsLoading(false));
+    return () => controller.abort();
+  }, [reloadToken]);
 
-  const kpis = React.useMemo(() => ({
-    consultationsPerWeek: calculateConsultationsPerWeek(consultations ?? []),
-    averageAdherence: calculateAverageAdherence(adherenceIndexes ?? []),
-    activePatients: calculateActivePatientCount(patients ?? []),
-    consultationsThisMonth: calculateConsultationsThisMonth(consultations ?? []),
-    pendingPayments: calculatePendingPayments(consultations ?? []),
-  }), [consultations, adherenceIndexes, patients]);
-
-  const pathologyDistribution = React.useMemo(() => {
-    if (!patients || patients.length === 0) return undefined;
-    const dist = calculatePathologyDistribution((patients ?? []) as Parameters<typeof calculatePathologyDistribution>[0]);
-    return Object.entries(dist).map(([name, value]) => ({ name, value }));
-  }, [patients]);
-
-  const consultationTrends = React.useMemo(() => {
-    if (!consultations || consultations.length === 0) return undefined;
-    const byMonth = new Map<string, { consultations: number; payments: number }>();
-    for (const c of consultations) {
-      const d = new Date(c.consultation_date as string);
-      const key = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-      const entry = byMonth.get(key) ?? { consultations: 0, payments: 0 };
-      entry.consultations++;
-      if ((c as { paid?: boolean }).paid) entry.payments++;
-      byMonth.set(key, entry);
-    }
-    return Array.from(byMonth.entries()).sort().map(([month, data]) => ({ month, ...data }));
-  }, [consultations]);
+  const kpis = React.useMemo(() => buildReportKpis(dashboardMetrics), [dashboardMetrics]);
+  const pathologyDistribution = React.useMemo(() => buildPathologyDistribution(dashboardMetrics), [dashboardMetrics]);
 
   const indicatorValues = React.useMemo(() => new Map(), []);
 
-  const loading = indicatorsLoading || !consultations || !adherenceIndexes || !patients;
+  const loading = indicatorsLoading || metricsLoading;
+
+  const handleRefresh = React.useCallback(() => {
+    refresh();
+    setReloadToken((value) => value + 1);
+  }, [refresh]);
 
   return (
     <ReportsView
@@ -54,9 +63,9 @@ export function ReportsPage() {
       indicators={indicators}
       indicatorValues={indicatorValues}
       pathologyDistribution={pathologyDistribution}
-      consultationTrends={consultationTrends}
+      consultationTrends={undefined}
       loading={loading}
-      onRefresh={refresh}
+      onRefresh={handleRefresh}
     />
   );
 }

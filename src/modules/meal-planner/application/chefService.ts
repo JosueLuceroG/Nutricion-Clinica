@@ -1,6 +1,7 @@
 import type { MealSlot } from "@modules/mealplan/domain/MealSlot";
 import { smaeService } from "@services/smaeService";
 import type { Food } from "@modules/smae/domain";
+import { aiClient } from "@services/ai/AIClient";
 
 const SLOT_NAMES: Record<MealSlot, string> = {
   breakfast: "Desayuno",
@@ -150,107 +151,25 @@ async function enrichWithSmaeFoodIds(result: ChefResult): Promise<ChefResult> {
 }
 
 export async function generateMealPlan(input: ChefInput, onProgress?: ProgressCallback): Promise<ChefResult> {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
-  if (!apiKey) {
-    return { days: [], error: "VITE_OPENAI_API_KEY no configurada en .env" };
-  }
-
   const prompt = buildPrompt(input);
-
-  const result = onProgress
-    ? await generateStreaming(prompt, apiKey, onProgress)
-    : await generateNonStreaming(prompt, apiKey);
+  const result = await generateWithBackendAi(prompt, onProgress);
 
   return enrichWithSmaeFoodIds(result);
 }
 
-async function generateNonStreaming(prompt: string, apiKey: string): Promise<ChefResult> {
+async function generateWithBackendAi(prompt: string, onProgress?: ProgressCallback): Promise<ChefResult> {
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 4000,
-      }),
+    const response = await aiClient.complete({
+      model: "gpt-4o-mini",
+      systemPrompt: "Eres un nutriólogo experto. Responde solo con JSON válido para generar planes de alimentación.",
+      userPrompt: prompt,
+      temperature: 0.7,
+      maxTokens: 4000,
     });
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      return { days: [], error: `OpenAI API error ${response.status}: ${errBody}` };
-    }
-
-    const data = (await response.json()) as { choices: Array<{ message: { content: string } }> };
-    const text = data.choices?.[0]?.message?.content ?? "";
-    return parseJsonResponse(text);
+    onProgress?.(response.content);
+    return parseJsonResponse(response.content);
   } catch (err) {
     return { days: [], error: err instanceof Error ? err.message : "Error desconocido" };
   }
 }
-
-async function generateStreaming(prompt: string, apiKey: string, onProgress: ProgressCallback): Promise<ChefResult> {
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.7,
-        max_tokens: 4000,
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => "");
-      return { days: [], error: `OpenAI API error ${response.status}: ${errBody}` };
-    }
-
-    const reader = response.body?.getReader();
-    if (!reader) {
-      return { days: [], error: "No se pudo iniciar streaming" };
-    }
-
-    const decoder = new TextDecoder();
-    let fullText = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith("data: ")) continue;
-        const data = trimmed.slice(6);
-        if (data === "[DONE]") continue;
-
-        try {
-          const parsed = JSON.parse(data) as { choices: Array<{ delta: { content?: string } }> };
-          const content = parsed.choices?.[0]?.delta?.content ?? "";
-          fullText += content;
-          onProgress(fullText);
-        } catch {
-          // skip malformed JSON lines
-        }
-      }
-    }
-
-    return parseJsonResponse(fullText);
-  } catch (err) {
-    return { days: [], error: err instanceof Error ? err.message : "Error desconocido" };
-  }
-}
-
 

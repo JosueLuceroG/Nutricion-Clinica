@@ -7,13 +7,14 @@
 
 ```bash
 pnpm install
-cp apps/api/.env.example apps/api/.env  # editar credenciales SQL Server
+cp .env.example .env.local
+cp apps/api/.env.example apps/api/.env  # editar DB_*, JWT_SECRET y llaves server-side
 pnpm --filter @nutriclinica/api migrate
 pnpm --filter @nutriclinica/api seed
-pnpm dev              # frontend :1420
 pnpm --filter @nutriclinica/api dev  # API :3000
-pnpm test             # 985 frontend + 126 API + 10 E2E
-pnpm run typecheck && pnpm run lint && pnpm run build  # quality gate
+pnpm dev              # frontend :1420
+pnpm typecheck && pnpm --filter @nutriclinica/api test && pnpm test
+pnpm run lint && pnpm run build  # quality gate adicional
 pnpm run e2e          # requiere servidores arriba
 ```
 
@@ -28,7 +29,15 @@ pnpm run e2e          # requiere servidores arriba
 | Auth | JWT + Argon2 + 2FA TOTP |
 | Telemedicina | WebRTC + WebSocket signaling + AES-GCM grabaciones |
 | Tests | Vitest 3 + Playwright + Testing Library |
-| CI | GitHub Actions (typecheck + lint + build + test ~1107) |
+| CI | GitHub Actions (typecheck + lint + build + test) |
+
+## Operación Segura
+
+- El backend restringe CORS con `CORS_ORIGIN`, deshabilita `x-powered-by`, agrega headers de seguridad y aplica rate limit en login/IA.
+- `POST /auth/register` no es público: requiere JWT válido y rol `admin`.
+- Los secretos TOTP se cifran server-side. Configura `TOTP_ENCRYPTION_KEY` o `FIELD_ENCRYPTION_KEY` y aplica `apps/api/migrations/019-totp-secret-length.sql`.
+- Las llaves de IA viven solo en `apps/api/.env` (`OPENAI_API_KEY`); el frontend llama `POST /ai/complete` autenticado.
+- Sync anuncia solo entidades soportadas actualmente: `pacientes`, `consultas`, `antropometrias`, `lab_panels`, `planes_alimenticios`, `adherence_records`.
 
 ## Fases completadas
 

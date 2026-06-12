@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { checksumOf, listMigrations } from './migrate.js';
+import { checksumOf, listMigrations, splitSqlBatches } from './migrate.js';
 
 vi.mock('node:fs/promises', () => ({
   readdir: vi.fn(),
@@ -44,6 +44,26 @@ describe('migrate — utilidades', () => {
     expect(checksumOf('CREATE TABLE a;\nSELECT 1;\n')).toBe(
       checksumOf('CREATE TABLE a;\r\nSELECT 1;\r\n'),
     );
+  });
+
+  it('splitSqlBatches conserva bloques IF/BEGIN/END con punto y coma', () => {
+    const batches = splitSqlBatches(`IF EXISTS (SELECT 1)\nBEGIN\n  ALTER TABLE dbo.t ALTER COLUMN name NVARCHAR(400) NULL;\nEND;`);
+
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toContain('ALTER TABLE dbo.t');
+    expect(batches[0]).toContain('END;');
+  });
+
+  it('splitSqlBatches separa solo por GO en linea independiente', () => {
+    const batches = splitSqlBatches(`CREATE TABLE a (id INT);\nGO\nCREATE TABLE b (id INT);`);
+
+    expect(batches).toEqual(['CREATE TABLE a (id INT);', 'CREATE TABLE b (id INT);']);
+  });
+
+  it('splitSqlBatches ignora batches solo con comentarios', () => {
+    const batches = splitSqlBatches(`-- comment\nGO\n/* comment */\nGO\nSELECT 1;`);
+
+    expect(batches).toEqual(['SELECT 1;']);
   });
 });
 

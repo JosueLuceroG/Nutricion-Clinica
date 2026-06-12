@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach } from "vitest";
 import "fake-indexeddb/auto";
 import { DexieAgendaRepository } from "../infrastructure/DexieAgendaRepository";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
-import { createAppointmentUC, listAppointmentsByDateUC, cancelAppointmentUC } from "./agendaUseCases";
+import { createAppointmentUC, listAppointmentsByDateUC, cancelAppointmentUC, getAvailableSlotsUC } from "./agendaUseCases";
 import { createAppointmentId } from "../domain";
+import { Schedule } from "../domain/Schedule";
+import { createScheduleId } from "../domain/ScheduleId";
 import type { NewAppointmentFormInput } from "./agendaFormSchema";
 
 describe("agendaUseCases", () => {
@@ -51,6 +53,22 @@ describe("agendaUseCases", () => {
     expect(results).toHaveLength(2);
   });
 
+  it("createAppointmentUC rechaza solapamientos para el mismo profesional", async () => {
+    await createAppointmentUC(repo, baseInput, professionalId);
+
+    await expect(
+      createAppointmentUC(repo, { ...baseInput, startTime: "09:15", endTime: "09:45" }, professionalId),
+    ).rejects.toThrow("se solapa");
+  });
+
+  it("createAppointmentUC permite el mismo horario para otro profesional", async () => {
+    await createAppointmentUC(repo, baseInput, professionalId);
+
+    const appointment = await createAppointmentUC(repo, baseInput, crypto.randomUUID());
+
+    expect(appointment.startTime).toBe("09:00");
+  });
+
   it("listAppointmentsByDateUC retorna vacío si no hay citas", async () => {
     const results = await listAppointmentsByDateUC(repo, "2026-06-08");
     expect(results).toHaveLength(0);
@@ -77,5 +95,24 @@ describe("agendaUseCases", () => {
 
   it("cancelAppointmentUC lanza si la cita no existe", async () => {
     await expect(cancelAppointmentUC(repo, createAppointmentId(), "Motivo")).rejects.toThrow();
+  });
+
+  it("getAvailableSlotsUC solo bloquea citas del profesional consultado", async () => {
+    await repo.saveSchedule(Schedule.create({
+      id: createScheduleId(),
+      professionalId,
+      dayOfWeek: 1,
+      startTime: "09:00",
+      endTime: "10:00",
+      active: true,
+    }));
+    await createAppointmentUC(repo, baseInput, crypto.randomUUID());
+
+    const slots = await getAvailableSlotsUC(repo, "2026-06-08", professionalId, 30);
+
+    expect(slots).toEqual([
+      { startTime: "09:00", endTime: "09:30", available: true },
+      { startTime: "09:30", endTime: "10:00", available: true },
+    ]);
   });
 });
