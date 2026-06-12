@@ -61,6 +61,19 @@ describe("AuditEvent (domain)", () => {
     expect(event.justification).toBe("justified");
   });
 
+  it("accepts document as auditable resource type", () => {
+    const event = AuditEvent.create({
+      ...baseCreate,
+      module: "documents",
+      action: "sign",
+      resourceType: "document",
+      resourceId: "document-1",
+    });
+
+    expect(event.resourceType).toBe("document");
+    expect(event.action).toBe("sign");
+  });
+
   it("reconstitutes an event from props", () => {
     const props: AuditEventProps = {
       id: "550e8400-e29b-41d4-a716-446655440000",

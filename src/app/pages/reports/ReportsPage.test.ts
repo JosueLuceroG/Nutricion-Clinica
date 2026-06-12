@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DashboardMetrics } from "@services/api/dashboardApi";
-import { buildPathologyDistribution, buildReportKpis } from "./ReportsPage";
+import { buildLocalReportDashboardData, buildPathologyDistribution, buildReportKpis, type LocalReportSource } from "./ReportsPage";
 
 const metrics: DashboardMetrics = {
   pacientes: {
@@ -55,6 +55,46 @@ describe("ReportsPage metric builders", () => {
     expect(buildPathologyDistribution(metrics)).toEqual([
       { name: "Diabetes", value: 6 },
       { name: "Hipertension", value: 4 },
+    ]);
+  });
+
+  it("buildLocalReportDashboardData aggregates offline fallback data", () => {
+    const local = buildLocalReportDashboardData({
+      now: new Date("2026-06-12T12:00:00.000Z"),
+      patients: [
+        { status: "active", deleted_at: null, created_at: "2026-06-02T00:00:00.000Z", clinical_tags: JSON.stringify(["Diabetes", "Hipertension"]) },
+        { status: "active", deleted_at: null, created_at: "2026-05-15T00:00:00.000Z", clinical_tags: JSON.stringify(["Diabetes"]) },
+        { status: "inactive", deleted_at: null, created_at: "2026-06-03T00:00:00.000Z", clinical_tags: JSON.stringify(["No cuenta"]) },
+        { status: "active", deleted_at: "2026-06-04T00:00:00.000Z", created_at: "2026-06-01T00:00:00.000Z", clinical_tags: "[invalid" },
+      ],
+      totalConsultations: 12,
+      monthConsultations: [
+        { consultation_date: "2026-06-01T10:00:00.000Z", paid: true, deleted_at: null },
+        { consultation_date: "2026-06-02T10:00:00.000Z", paid: false, deleted_at: null },
+        { consultation_date: "2026-06-03T10:00:00.000Z", paid: false, deleted_at: "2026-06-04T00:00:00.000Z" },
+      ],
+      pendingPayments: 3,
+      adherenceIndexes: [{ score_global: 80 }, { score_global: 90 }],
+      trendConsultations: [
+        { consultation_date: "2026-05-20T10:00:00.000Z", paid: true, deleted_at: null },
+        { consultation_date: "2026-06-02T10:00:00.000Z", paid: false, deleted_at: null },
+      ],
+    } satisfies LocalReportSource);
+
+    expect(buildReportKpis(local.metrics)).toEqual({
+      consultationsPerWeek: 12,
+      averageAdherence: 85,
+      activePatients: 2,
+      consultationsThisMonth: 2,
+      pendingPayments: 3,
+    });
+    expect(local.metrics.patologias).toEqual([
+      { tag: "Diabetes", count: 2 },
+      { tag: "Hipertension", count: 1 },
+    ]);
+    expect(local.consultationTrends).toEqual([
+      { month: "May 2026", consultations: 1, payments: 1 },
+      { month: "Jun 2026", consultations: 1, payments: 0 },
     ]);
   });
 });

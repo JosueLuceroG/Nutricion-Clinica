@@ -5,7 +5,7 @@ export type AuditResourceType =
   | "patient" | "consultation" | "allergy" | "medication" | "clinical_event"
   | "family_history" | "personal_history" | "habit" | "physical_activity"
   | "diet_history" | "intolerance" | "surgery" | "hospitalization"
-  | "supplement" | "food_frequency" | "gi_symptom" | "snapshot"
+  | "supplement" | "food_frequency" | "gi_symptom" | "snapshot" | "document"
   | "anthropometry" | "lab_panel" | "meal_plan";
 
 export interface AuditEventProps {

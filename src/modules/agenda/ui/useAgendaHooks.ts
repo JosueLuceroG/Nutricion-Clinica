@@ -65,6 +65,14 @@ export function useCreateAppointment() {
   return { create, loading };
 }
 
+export function useAvailableSlots() {
+  const load = useCallback((date: string, slotDurationMin?: number, professionalId?: string) => {
+    return agendaService.getAvailableSlots(date, professionalId, slotDurationMin);
+  }, []);
+
+  return { load };
+}
+
 export function useCancelAppointment() {
   const cancel = async (id: AppointmentId, reason: string) => {
     return agendaService.cancel(id, reason);

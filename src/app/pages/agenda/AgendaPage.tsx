@@ -19,7 +19,7 @@ import {
 } from "@components/ui/dialog";
 import { AppointmentDialog } from "@modules/agenda/ui/AppointmentDialog";
 import { AppointmentCard } from "@modules/agenda/ui/AppointmentCard";
-import { useAppointmentsByRange, useCreateAppointment, useCancelAppointment, useMarkNoShow } from "@modules/agenda/ui/useAgendaHooks";
+import { useAppointmentsByRange, useCreateAppointment, useAvailableSlots, useCancelAppointment, useMarkNoShow } from "@modules/agenda/ui/useAgendaHooks";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@services/db";
@@ -56,6 +56,7 @@ export function AgendaPage() {
 
   const { appointments, loading, refresh } = useAppointmentsByRange(monthStart, monthEnd);
   const { create } = useCreateAppointment();
+  const { load: loadAvailableSlots } = useAvailableSlots();
   const { cancel } = useCancelAppointment();
   const { markNoShow } = useMarkNoShow();
 
@@ -87,8 +88,16 @@ export function AgendaPage() {
   }, [appointments]);
 
   const handleCreate = async (data: Parameters<typeof create>[0]) => {
-    await create(data);
-    refresh();
+    try {
+      await create(data);
+      toast.success(t("agenda.created_success"));
+      await refresh();
+    } catch (err) {
+      toast.error(t("common.error_occurred"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
   };
 
   const handleAppointmentClick = (appt: Appointment) => {
@@ -238,6 +247,7 @@ export function AgendaPage() {
         onOpenChange={setDialogOpen}
         selectedDate={selectedDayStr}
         patients={patients}
+        loadAvailableSlots={loadAvailableSlots}
         onSubmit={handleCreate}
       />
 

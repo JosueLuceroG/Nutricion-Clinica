@@ -9,6 +9,7 @@ import { Label } from "@components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select";
 import { APPOINTMENT_TYPES, AppointmentTypeLabel, type AppointmentType } from "../domain/AppointmentType";
 import { NewAppointmentFormSchema, type NewAppointmentFormInput } from "../application/agendaFormSchema";
+import type { TimeSlot } from "../application";
 
 interface AppointmentDialogProps {
   open: boolean;
@@ -16,11 +17,15 @@ interface AppointmentDialogProps {
   selectedDate: string;
   patients: Array<{ id: string; name: string }>;
   onSubmit: (data: NewAppointmentFormInput) => Promise<void>;
+  loadAvailableSlots?: (date: string, slotDurationMin?: number) => Promise<TimeSlot[]>;
 }
 
-export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, onSubmit }: AppointmentDialogProps) {
+export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, onSubmit, loadAvailableSlots }: AppointmentDialogProps) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
+  const [slots, setSlots] = React.useState<TimeSlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = React.useState(false);
+  const [slotsError, setSlotsError] = React.useState<string | null>(null);
   const form = useForm<NewAppointmentFormInput>({
     resolver: zodResolver(NewAppointmentFormSchema),
     defaultValues: {
@@ -50,13 +55,49 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
     }
   }, [open, selectedDate, form]);
 
+  React.useEffect(() => {
+    if (!open || !loadAvailableSlots) {
+      setSlots([]);
+      setSlotsError(null);
+      setSlotsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSlotsLoading(true);
+    setSlotsError(null);
+    loadAvailableSlots(selectedDate, 30)
+      .then((result) => {
+        if (!cancelled) setSlots(result);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSlots([]);
+          setSlotsError(err instanceof Error ? err.message : String(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, selectedDate, loadAvailableSlots]);
+
+  const handleSlotSelect = (slot: TimeSlot) => {
+    if (!slot.available) return;
+    form.setValue("startTime", slot.startTime, { shouldDirty: true, shouldValidate: true });
+    form.setValue("endTime", slot.endTime, { shouldDirty: true, shouldValidate: true });
+  };
+
   const handleSubmit = async (data: NewAppointmentFormInput) => {
     setSubmitting(true);
     try {
       await onSubmit(data);
       onOpenChange(false);
     } catch {
-      // error handled by parent
+      // error handled by parent; keep the dialog open so the user can adjust the form.
     } finally {
       setSubmitting(false);
     }
@@ -91,6 +132,41 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
               <p className="text-xs text-destructive">{form.formState.errors.patientId.message}</p>
             )}
           </div>
+
+          {loadAvailableSlots && (
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>{t("agenda.available_slots")}</Label>
+                <span className="text-xs text-muted-foreground">{t("agenda.slot_duration", { minutes: 30 })}</span>
+              </div>
+              {slotsLoading ? (
+                <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{t("agenda.loading_slots")}</p>
+              ) : slotsError ? (
+                <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{slotsError}</p>
+              ) : slots.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {slots.map((slot) => {
+                    const selected = form.watch("startTime") === slot.startTime && form.watch("endTime") === slot.endTime;
+                    return (
+                      <Button
+                        key={`${slot.startTime}-${slot.endTime}`}
+                        type="button"
+                        variant={selected ? "default" : "outline"}
+                        className="justify-center"
+                        disabled={!slot.available}
+                        aria-label={slot.available ? t("agenda.select_slot", { start: slot.startTime, end: slot.endTime }) : t("agenda.slot_unavailable", { start: slot.startTime, end: slot.endTime })}
+                        onClick={() => handleSlotSelect(slot)}
+                      >
+                        {slot.startTime} - {slot.endTime}
+                      </Button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">{t("agenda.no_slots_configured")}</p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
