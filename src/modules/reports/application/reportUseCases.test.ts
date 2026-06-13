@@ -14,7 +14,7 @@ import type { ReportsRepository } from "../domain/ReportsRepository";
 import { Indicator } from "../domain/Indicator";
 import { createIndicatorId, indicatorIdFrom, type IndicatorId } from "../domain/IndicatorId";
 import { IndicatorValue } from "../domain/IndicatorValue";
-import { GeneratedReport } from "../domain/GeneratedReport";
+import type { GeneratedReport } from "../domain/GeneratedReport";
 import { DashboardConfig } from "../domain/DashboardConfig";
 
 const validUUID = "550e8400-e29b-41d4-a716-446655440000";

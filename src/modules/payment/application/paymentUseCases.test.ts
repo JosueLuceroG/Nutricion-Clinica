@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Payment } from "../domain/Payment";
+import type { Payment } from "../domain/Payment";
 import { PaymentId } from "../domain/PaymentId";
 import type { PaymentRepository, PaymentQuery } from "../domain/PaymentRepository";
 import {

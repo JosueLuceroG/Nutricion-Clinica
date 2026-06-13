@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Expense } from "../domain/Expense";
+import type { Expense } from "../domain/Expense";
 import { ExpenseId } from "../domain/ExpenseId";
 import type { ExpenseRepository, ExpenseQuery } from "../domain/ExpenseRepository";
 import {

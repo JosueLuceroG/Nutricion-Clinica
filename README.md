@@ -20,16 +20,16 @@ pnpm run e2e          # requiere servidores arriba
 
 ## Stack
 
-| Capa | Tecnología |
-|------|-----------|
-| Frontend | React 19 + TypeScript 5 + Vite 6 |
-| Desktop | Tauri 2 (Rust) |
-| Persistencia local | IndexedDB (Dexie 4) |
-| Backend | Express + SQL Server (apps/api) |
-| Auth | JWT + Argon2 + 2FA TOTP |
-| Telemedicina | WebRTC + WebSocket signaling + AES-GCM grabaciones |
-| Tests | Vitest 3 + Playwright + Testing Library |
-| CI | GitHub Actions (typecheck + lint + build + test) |
+| Capa               | Tecnología                                         |
+| ------------------ | -------------------------------------------------- |
+| Frontend           | React 19 + TypeScript 5 + Vite 6                   |
+| Desktop            | Tauri 2 (Rust)                                     |
+| Persistencia local | IndexedDB (Dexie 4)                                |
+| Backend            | Express + SQL Server (apps/api)                    |
+| Auth               | JWT + Argon2 + 2FA TOTP                            |
+| Telemedicina       | WebRTC + WebSocket signaling + AES-GCM grabaciones |
+| Tests              | Vitest 3 + Playwright + Testing Library            |
+| CI                 | GitHub Actions (typecheck + lint + build + test)   |
 
 ## Operación Segura
 
@@ -51,6 +51,7 @@ pnpm run e2e          # requiere servidores arriba
 
 - [`spec.md`](spec.md) — especificación completa del producto y arquitectura (~5400 líneas)
 - [`docs/decisions/`](docs/decisions/) — ADRs formales (Michael Nygard)
+- [`docs/operations/pre-production-checklist.md`](docs/operations/pre-production-checklist.md) — validación final local y checklist staging/producción
 - [`apps/api/.env.example`](apps/api/.env.example) — variables de entorno del backend
 
 ## Licencia
