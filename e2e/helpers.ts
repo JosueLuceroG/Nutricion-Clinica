@@ -7,8 +7,8 @@
 
 import { expect, type Page } from "@playwright/test";
 
-export const ADMIN_EMAIL = "admin@nutriclinica.local";
-export const ADMIN_PASSWORD = "Admin123!Nutri";
+export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@nutriclinica.local";
+export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin123!";
 
 /**
  * Fake login: inyecta un estado de auth en localStorage ANTES de que
@@ -16,7 +16,7 @@ export const ADMIN_PASSWORD = "Admin123!Nutri";
  * Útil para tests que necesitan navegar páginas protegidas sin API server.
  */
 export async function fakeLogin(page: Page): Promise<void> {
-  await page.addInitScript(() => {
+  await page.addInitScript((email) => {
     localStorage.setItem(
       "auth-store",
       JSON.stringify({
@@ -24,7 +24,7 @@ export async function fakeLogin(page: Page): Promise<void> {
           token: "e2e-test-token",
           user: {
             id: "e2e-test-user",
-            email: "admin@nutriclinica.local",
+            email,
             nombre: "Admin",
             apellido: "Test",
             nombreCompleto: "Admin Test",
@@ -37,7 +37,7 @@ export async function fakeLogin(page: Page): Promise<void> {
         version: 0,
       }),
     );
-  });
+  }, ADMIN_EMAIL);
 }
 
 /** URL base + hash. El router es `createHashRouter`. */

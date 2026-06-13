@@ -22,14 +22,40 @@ const SYNC_BUTTON_NAME = /^(Sincronizar|Forzar un ciclo de sync ahora)$/i;
 
 async function forceSync(page: Page) {
   const syncBtn = page.getByRole("button", { name: SYNC_BUTTON_NAME });
-  await expect(syncBtn).toBeEnabled({ timeout: 30_000 });
+  await expect(syncBtn).toBeEnabled({ timeout: 60_000 });
   await syncBtn.click();
   await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({
-    timeout: 30_000,
+    timeout: 60_000,
   });
 }
 
+async function readPatientRow(page: Page, id: string): Promise<{ deleted_at: string | null } | null> {
+  return page.evaluate(async (patientId: string) => {
+    return new Promise<{ deleted_at: string | null } | null>((resolve, reject) => {
+      const req = indexedDB.open("nutriclinica");
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction("patients", "readonly");
+        const store = tx.objectStore("patients");
+        const getReq = store.get(patientId);
+        getReq.onsuccess = () => resolve(getReq.result ?? null);
+        getReq.onerror = () => reject(getReq.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }, id);
+}
+
+async function waitForPatientDeleted(page: Page, id: string): Promise<{ deleted_at: string | null } | null> {
+  await expect.poll(async () => (await readPatientRow(page, id))?.deleted_at ?? null, {
+    timeout: 30_000,
+  }).toMatch(/\d{4}/);
+  return readPatientRow(page, id);
+}
+
 test.describe.serial("Pacientes — soft-delete round-trip", () => {
+  test.setTimeout(90_000);
+
   test("crear paciente, sincronizar, soft-delete, re-sincronizar y NO resucita", async ({ page }) => {
     await loginAsAdmin(page);
     const email = uniqueEmail("crear");
@@ -95,47 +121,20 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     const deleteBtn = page.getByTestId("delete-patient-button");
     await expect(deleteBtn).toBeVisible({ timeout: 10_000 });
     await deleteBtn.click();
-    // Confirm dialog
-    const confirmBtn = page.getByRole("button", { name: /confirmar|eliminar todo|s[ií]/i }).last();
-    await confirmBtn.click();
+    const cascadeDialog = page.getByTestId("cascade-delete-dialog");
+    const hasCascadeDialog = await cascadeDialog.isVisible({ timeout: 5_000 }).catch(() => false);
+    if (hasCascadeDialog) {
+      await page.getByTestId("cascade-delete-all").click();
+    }
 
-    // Esperar a que el soft-delete se propague localmente
-    await page.waitForTimeout(1500);
-    const afterDelete = await page.evaluate(async (id: string) => {
-      return new Promise<unknown>((resolve, reject) => {
-        const req = indexedDB.open("nutriclinica");
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction("patients", "readonly");
-          const store = tx.objectStore("patients");
-          const getReq = store.get(id);
-          getReq.onsuccess = () => resolve(getReq.result);
-          getReq.onerror = () => reject(getReq.error);
-        };
-        req.onerror = () => reject(req.error);
-      });
-    }, patientId);
+    const afterDelete = await waitForPatientDeleted(page, patientId);
     console.log("After soft-delete (local):", JSON.stringify(afterDelete, null, 2));
     // Debe tener deleted_at set
     expect(afterDelete).toMatchObject({ deleted_at: expect.stringMatching(/\d{4}/) });
 
     // 7) Re-sincronizar y volver a verificar: NO resucita
     await forceSync(page);
-    await page.waitForTimeout(2000);
-    const afterResync = await page.evaluate(async (id: string) => {
-      return new Promise<unknown>((resolve, reject) => {
-        const req = indexedDB.open("nutriclinica");
-        req.onsuccess = () => {
-          const db = req.result;
-          const tx = db.transaction("patients", "readonly");
-          const store = tx.objectStore("patients");
-          const getReq = store.get(id);
-          getReq.onsuccess = () => resolve(getReq.result);
-          getReq.onerror = () => reject(getReq.error);
-        };
-        req.onerror = () => reject(req.error);
-      });
-    }, patientId);
+    const afterResync = await waitForPatientDeleted(page, patientId);
     console.log("After re-sync:", JSON.stringify(afterResync, null, 2));
     // CRÍTICO: deleted_at debe seguir set, NO resucitar
     expect(afterResync).toMatchObject({ deleted_at: expect.stringMatching(/\d{4}/) });

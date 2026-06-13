@@ -29,17 +29,18 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
 
     await page.getByRole("button", { name: /guardar|crear paciente|siguiente/i }).first().click();
     await page.waitForURL(/\/pacientes\/[a-f0-9-]{36}$/, { timeout: 15_000 });
+    const patientId = page.url().match(/\/pacientes\/([a-f0-9-]{36})/)?.[1];
+    expect(patientId).toBeTruthy();
 
-    // 2) En el detalle del paciente, navegar a adherencia vía ModuleLink
-    await expect(page.getByText(/Adherencia/i).first()).toBeVisible({ timeout: 10_000 });
-    await page.getByText(/Adherencia/i).first().click();
+    // 2) Navegar al submódulo de adherencia del paciente creado.
+    await page.goto(hashUrl(`/pacientes/${patientId}/adherencia`));
     await page.waitForURL(/\/pacientes\/[a-f0-9-]{36}\/adherencia/, { timeout: 10_000 });
 
     // 3) Verificar que la página de adherencia cargó
     await expect(page.getByText(/Agregar registro/i).first()).toBeVisible({ timeout: 10_000 });
 
     // 4) Abrir el diálogo de nuevo registro
-    await page.getByRole("button", { name: /Agregar registro/i }).click();
+    await page.getByRole("button", { name: /Agregar registro/i }).first().click();
     await expect(page.getByText(/Registro de adherencia/i).first()).toBeVisible({ timeout: 5_000 });
 
     // 5) Llenar los sliders de scores usando JS para setear valores

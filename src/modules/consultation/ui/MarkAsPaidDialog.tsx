@@ -63,7 +63,7 @@ const toIsoDateInput = (d: Date | null | undefined): string => {
 
 const defaultForm = (c: Consultation | null): FormState => ({
   cost: c && c.cost > 0 ? String(c.cost) : "",
-  paymentStatus: c?.paymentStatus ?? "pending",
+  paymentStatus: c?.isPaid ? c.paymentStatus : "paid",
   paymentConcept: c?.paymentConcept ?? "consulta",
   amountPaid: c && c.amountPaid > 0 ? String(c.amountPaid) : (c?.cost && c.cost > 0 ? String(c.cost) : ""),
   paymentMethod: c?.paymentMethod ?? "cash",

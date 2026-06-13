@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, hashUrl } from "./helpers";
+import { ADMIN_EMAIL, ADMIN_PASSWORD, loginAsAdmin, hashUrl } from "./helpers";
 
 test.describe("Telemedicina", () => {
   test("navega a la página de telemedicina y muestra el título", async ({ page }) => {
@@ -18,7 +18,7 @@ test.describe("Telemedicina", () => {
 
   test("TURN config endpoint responde con ICE servers", async ({ request }) => {
     const loginResp = await request.post("http://localhost:3000/auth/login", {
-      data: { email: "admin@nutriclinica.local", password: "Admin123!Nutri" },
+      data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
     });
     expect(loginResp.ok()).toBeTruthy();
     const body = (await loginResp.json()) as { token: string };
