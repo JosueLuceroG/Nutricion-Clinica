@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { httpRequest } from "./httpClient.js";
+import { recordClinicalAudit } from "@services/audit/clinicalAudit";
 
 const SubstitutionSchema = z.object({
   id: z.number(),
@@ -42,7 +43,9 @@ export async function createPatientSubstitution(
     body: SubstitutionInputSchema.parse(input),
     signal,
   });
-  return SubstitutionSchema.parse(response);
+  const substitution = SubstitutionSchema.parse(response);
+  await recordClinicalAudit({ module: "patient_substitutions", action: "create", resourceType: "patient_substitution", resourceId: String(substitution.id), patientId: pacienteId });
+  return substitution;
 }
 
 export async function updatePatientSubstitution(
@@ -56,6 +59,7 @@ export async function updatePatientSubstitution(
     body: input,
     signal,
   });
+  await recordClinicalAudit({ module: "patient_substitutions", action: "update", resourceType: "patient_substitution", resourceId: String(subId), patientId: pacienteId });
 }
 
 export async function deletePatientSubstitution(
@@ -67,6 +71,7 @@ export async function deletePatientSubstitution(
     method: "DELETE",
     signal,
   });
+  await recordClinicalAudit({ module: "patient_substitutions", action: "remove", resourceType: "patient_substitution", resourceId: String(subId), patientId: pacienteId });
 }
 
 export async function batchSavePatientSubstitutions(
@@ -79,5 +84,7 @@ export async function batchSavePatientSubstitutions(
     body: { substitutions },
     signal,
   });
-  return z.object({ inserted: z.number() }).parse(response);
+  const result = z.object({ inserted: z.number() }).parse(response);
+  await recordClinicalAudit({ module: "patient_substitutions", action: "create", resourceType: "patient_substitution", resourceId: pacienteId, patientId: pacienteId, justification: `batch:${result.inserted}` });
+  return result;
 }

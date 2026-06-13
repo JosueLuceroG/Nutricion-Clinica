@@ -1,5 +1,6 @@
 import { db } from "@services/db/dexieSchema";
 import type { Table } from "dexie";
+import { recordClinicalAudit } from "@services/audit/clinicalAudit";
 
 export interface PatientConsent {
   id: string;
@@ -18,12 +19,29 @@ export const ConsentService = {
 
   async recordConsent(consent: PatientConsent): Promise<string> {
     await this.table.put(consent);
+    await recordClinicalAudit({
+      module: "patient_consents",
+      action: "create",
+      resourceType: "patient_consent",
+      resourceId: consent.id,
+      patientId: consent.patient_id,
+      justification: `type:${consent.type}`,
+    });
     return consent.id;
   },
 
   async revokeConsent(id: string): Promise<void> {
+    const existing = await this.table.get(id);
     await this.table.update(id, {
       revoked_at: new Date().toISOString(),
+    });
+    await recordClinicalAudit({
+      module: "patient_consents",
+      action: "update",
+      resourceType: "patient_consent",
+      resourceId: id,
+      patientId: existing?.patient_id ?? null,
+      justification: "revoke",
     });
   },
 

@@ -6,7 +6,9 @@ export type AuditResourceType =
   | "family_history" | "personal_history" | "habit" | "physical_activity"
   | "diet_history" | "intolerance" | "surgery" | "hospitalization"
   | "supplement" | "food_frequency" | "gi_symptom" | "snapshot" | "document"
-  | "anthropometry" | "lab_panel" | "meal_plan";
+  | "anthropometry" | "lab_panel" | "meal_plan" | "goal" | "recipe"
+  | "medication_catalog" | "nutrient_interaction" | "adherence_record"
+  | "adherence_index" | "barrier_event" | "patient_consent" | "patient_substitution";
 
 export interface AuditEventProps {
   id: string;

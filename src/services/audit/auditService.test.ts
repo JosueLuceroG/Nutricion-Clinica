@@ -74,6 +74,31 @@ describe("AuditEvent (domain)", () => {
     expect(event.action).toBe("sign");
   });
 
+  it("accepts clinical workflow extension resource types", () => {
+    const resourceTypes = [
+      "goal",
+      "recipe",
+      "medication_catalog",
+      "nutrient_interaction",
+      "adherence_record",
+      "adherence_index",
+      "barrier_event",
+      "patient_consent",
+      "patient_substitution",
+    ] as const;
+
+    for (const resourceType of resourceTypes) {
+      const event = AuditEvent.create({
+        ...baseCreate,
+        module: "clinical_extensions",
+        resourceType,
+        resourceId: `${resourceType}-1`,
+      });
+
+      expect(event.resourceType).toBe(resourceType);
+    }
+  });
+
   it("reconstitutes an event from props", () => {
     const props: AuditEventProps = {
       id: "550e8400-e29b-41d4-a716-446655440000",

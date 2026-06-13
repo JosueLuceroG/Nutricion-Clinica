@@ -4,6 +4,7 @@ import { createRecipeUC, updateRecipeUC, publishRecipeUC, archiveRecipeUC, listR
 import type { RecipeId } from "@modules/recipes/domain/RecipeId";
 import { type Recipe, type RecipeIngredient, calculateNutrition, deriveAllergensFromFoods, type FoodNutrition } from "@modules/recipes/domain/Recipe";
 import type { RecipeFormInput } from "@modules/recipes/application/recipeFormSchema";
+import { recordClinicalAudit } from "@services/audit/clinicalAudit";
 
 interface FoodCacheEntry {
   nutrition: FoodNutrition;
@@ -43,15 +44,38 @@ function withNutrition(recipe: Recipe, foodMap: Map<string, FoodCacheEntry>): Re
 }
 
 export const recipeService = {
-  create: (input: RecipeFormInput): Promise<Recipe> => createRecipeUC(repository, input),
-  update: (id: RecipeId, input: Partial<RecipeFormInput>): Promise<Recipe> => updateRecipeUC(repository, id, input),
-  publish: (id: RecipeId): Promise<Recipe> => publishRecipeUC(repository, id),
-  archive: (id: RecipeId): Promise<Recipe> => archiveRecipeUC(repository, id),
+  create: async (input: RecipeFormInput): Promise<Recipe> => {
+    const recipe = await createRecipeUC(repository, input);
+    await recordClinicalAudit({ module: "recipes", action: "create", resourceType: "recipe", resourceId: recipe.id });
+    return recipe;
+  },
+  update: async (id: RecipeId, input: Partial<RecipeFormInput>): Promise<Recipe> => {
+    const recipe = await updateRecipeUC(repository, id, input);
+    await recordClinicalAudit({ module: "recipes", action: "update", resourceType: "recipe", resourceId: recipe.id });
+    return recipe;
+  },
+  publish: async (id: RecipeId): Promise<Recipe> => {
+    const recipe = await publishRecipeUC(repository, id);
+    await recordClinicalAudit({ module: "recipes", action: "update", resourceType: "recipe", resourceId: recipe.id, justification: "status:active" });
+    return recipe;
+  },
+  archive: async (id: RecipeId): Promise<Recipe> => {
+    const recipe = await archiveRecipeUC(repository, id);
+    await recordClinicalAudit({ module: "recipes", action: "soft_delete", resourceType: "recipe", resourceId: recipe.id, justification: "archive" });
+    return recipe;
+  },
   list: (): Promise<Recipe[]> => listRecipesUC(repository),
   getById: (id: RecipeId): Promise<Recipe | null> => getRecipeByIdUC(repository, id),
-  delete: (id: RecipeId): Promise<void> => deleteRecipeUC(repository, id),
+  delete: async (id: RecipeId): Promise<void> => {
+    await deleteRecipeUC(repository, id);
+    await recordClinicalAudit({ module: "recipes", action: "remove", resourceType: "recipe", resourceId: id });
+  },
   search: (query: string): Promise<Recipe[]> => searchRecipesUC(repository, query),
-  scale: (id: RecipeId, targetServings: number): Promise<Recipe> => scaleRecipeUC(repository, id, targetServings),
+  scale: async (id: RecipeId, targetServings: number): Promise<Recipe> => {
+    const recipe = await scaleRecipeUC(repository, id, targetServings);
+    await recordClinicalAudit({ module: "recipes", action: "update", resourceType: "recipe", resourceId: recipe.id, justification: "scale" });
+    return recipe;
+  },
 
   async listWithNutrition(): Promise<Array<Recipe & { kcal: number; proteinG: number; carbsG: number; fatG: number; derivedAllergens: string[] }>> {
     const [all, foodMap] = await Promise.all([listRecipesUC(repository), ensureFoodCache()]);

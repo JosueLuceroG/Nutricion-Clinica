@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "@services/db/dexieSchema";
+import { auditService } from "@services/audit/auditService";
 import { ConsentService, type PatientConsent } from "./PatientConsentService";
 
 const makeConsent = (overrides: Partial<PatientConsent> = {}): PatientConsent => ({
@@ -14,6 +15,7 @@ const makeConsent = (overrides: Partial<PatientConsent> = {}): PatientConsent =>
 beforeEach(async () => {
   await db.open();
   await db.patient_consents.clear();
+  await db.audit_events.clear();
 });
 
 describe("ConsentService", () => {
@@ -28,6 +30,18 @@ describe("ConsentService", () => {
       expect(stored!.patient_id).toBe("patient-1");
       expect(stored!.type).toBe("treatment");
     });
+
+    it("records a consent creation audit event", async () => {
+      const consent = makeConsent({ id: "consent-audit-1", patient_id: "patient-audit-1", type: "ai_opt_in" });
+
+      await ConsentService.recordConsent(consent);
+
+      const events = await auditService.findByResource("patient_consent", consent.id);
+      expect(events).toHaveLength(1);
+      expect(events[0].action).toBe("create");
+      expect(events[0].patientId).toBe("patient-audit-1");
+      expect(events[0].justification).toBe("type:ai_opt_in");
+    });
   });
 
   describe("revokeConsent", () => {
@@ -41,6 +55,20 @@ describe("ConsentService", () => {
       expect(stored!.revoked_at).toBeTruthy();
       const diff = Math.abs(new Date(stored!.revoked_at!).getTime() - Date.now());
       expect(diff).toBeLessThan(5000);
+    });
+
+    it("records a consent revocation audit event", async () => {
+      const consent = makeConsent({ id: "consent-audit-2", patient_id: "patient-audit-2", revoked_at: null });
+      await ConsentService.recordConsent(consent);
+      await db.audit_events.clear();
+
+      await ConsentService.revokeConsent(consent.id);
+
+      const events = await auditService.findByResource("patient_consent", consent.id);
+      expect(events).toHaveLength(1);
+      expect(events[0].action).toBe("update");
+      expect(events[0].patientId).toBe("patient-audit-2");
+      expect(events[0].justification).toBe("revoke");
     });
   });
 

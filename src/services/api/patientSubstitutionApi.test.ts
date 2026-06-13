@@ -7,6 +7,10 @@ import {
   updatePatientSubstitution,
 } from "./patientSubstitutionApi";
 
+const { mockRecordClinicalAudit } = vi.hoisted(() => ({
+  mockRecordClinicalAudit: vi.fn(),
+}));
+
 const mockFetch = vi.fn();
 const mockGetAuthState = vi.fn();
 
@@ -21,6 +25,10 @@ vi.mock("@store/syncStore", () => ({
 }));
 
 vi.mock("@nutriclinica/shared", () => ({}));
+
+vi.mock("@services/audit/clinicalAudit", () => ({
+  recordClinicalAudit: mockRecordClinicalAudit,
+}));
 
 const substitution = {
   id: 1,
@@ -68,6 +76,13 @@ describe("patientSubstitutionApi", () => {
     expect(call[0]).toBe("http://test.local/pacientes/p1/substitutions");
     expect(call[1].method).toBe("POST");
     expect(call[1].body).toBe('{"originalFoodId":null,"substituteFoodId":"fruta-manzana","mealSlot":"breakfast"}');
+    expect(mockRecordClinicalAudit).toHaveBeenCalledWith({
+      module: "patient_substitutions",
+      action: "create",
+      resourceType: "patient_substitution",
+      resourceId: "1",
+      patientId: "p1",
+    });
   });
 
   it("updatePatientSubstitution llama PUT con patch JSON", async () => {
@@ -79,6 +94,13 @@ describe("patientSubstitutionApi", () => {
     expect(call[0]).toBe("http://test.local/pacientes/p1/substitutions/7");
     expect(call[1].method).toBe("PUT");
     expect(call[1].body).toBe('{"mealSlot":"lunch"}');
+    expect(mockRecordClinicalAudit).toHaveBeenCalledWith({
+      module: "patient_substitutions",
+      action: "update",
+      resourceType: "patient_substitution",
+      resourceId: "7",
+      patientId: "p1",
+    });
   });
 
   it("deletePatientSubstitution llama DELETE", async () => {
@@ -90,6 +112,13 @@ describe("patientSubstitutionApi", () => {
       "http://test.local/pacientes/p1/substitutions/7",
       expect.objectContaining({ method: "DELETE" }),
     );
+    expect(mockRecordClinicalAudit).toHaveBeenCalledWith({
+      module: "patient_substitutions",
+      action: "remove",
+      resourceType: "patient_substitution",
+      resourceId: "7",
+      patientId: "p1",
+    });
   });
 
   it("batchSavePatientSubstitutions retorna inserted y serializa array", async () => {
@@ -105,5 +134,13 @@ describe("patientSubstitutionApi", () => {
     expect(call[0]).toBe("http://test.local/pacientes/p1/substitutions/batch");
     expect(call[1].body).toContain('"substitutions"');
     expect(call[1].body).not.toContain('\\"substitutions\\"');
+    expect(mockRecordClinicalAudit).toHaveBeenCalledWith({
+      module: "patient_substitutions",
+      action: "create",
+      resourceType: "patient_substitution",
+      resourceId: "p1",
+      patientId: "p1",
+      justification: "batch:2",
+    });
   });
 });
