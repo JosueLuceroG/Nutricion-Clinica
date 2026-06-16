@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { usePreferencesStore } from "@store/preferencesStore";
 import {
   ArrowLeft,
   Trash2,
@@ -17,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
-import { Badge } from "@components/ui/badge";
+import { Badge, type BadgeProps } from "@components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState, EmptyState } from "@components/layout/EmptyState";
@@ -65,6 +66,9 @@ export function MealPlanDetailPage() {
   const id = planId ? MealPlanId.fromUnsafe(planId) : null;
   const { data: plan, loading, error, reload } = useMealPlan(id);
   const [busy, setBusy] = React.useState(false);
+  const subscriptionPlan = usePreferencesStore((s) => s.subscriptionPlan);
+  const pdfBrandingEnabled = usePreferencesStore((s) => s.pdfBrandingEnabled);
+  const clinicDisplayName = usePreferencesStore((s) => s.clinicDisplayName);
 
   const onTransition = async (to: MealPlanStatus) => {
     if (!id) return;
@@ -125,8 +129,12 @@ export function MealPlanDetailPage() {
         keywords: [],
         custom: false,
       });
+      const branding: { clinicDisplayName: string; showPlatformBranding: boolean } = {
+        clinicDisplayName,
+        showPlatformBranding: subscriptionPlan === "free" || pdfBrandingEnabled,
+      };
       const data = pdfService.generateMealPlanPdf(plan, patient, lookupFn);
-      pdfService.download(data, `plan-alimentacion-${patient.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf`);
+      pdfService.download(data, `plan-alimentacion-${patient.fullName.replace(/\s+/g, "-").toLowerCase()}.pdf`, branding);
       toast.success(t("consultation.pdf_downloaded"));
     } catch (err) {
       toast.error(t("mealplan.pdf_error"), {
@@ -381,7 +389,7 @@ export function MealPlanDetailPage() {
                 <CardTitle className="text-base">{t("common.status")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Badge variant={MealPlanStatusColor[plan.status] as never}>
+                <Badge variant={MealPlanStatusColor[plan.status] as BadgeProps["variant"]}>
                   {mealPlanStatusLabel(t, plan.status)}
                 </Badge>
                 {plan.description && (
@@ -470,7 +478,7 @@ function ComplianceStat({
           {t("mealplan.in_target")}
         </Badge>
       ) : (
-        <Badge variant={tone as never} className="mt-1">
+        <Badge variant={tone as BadgeProps["variant"]} className="mt-1">
           {diff > 0 ? "+" : ""}
           {diff.toFixed(decimals)} {unit}
         </Badge>

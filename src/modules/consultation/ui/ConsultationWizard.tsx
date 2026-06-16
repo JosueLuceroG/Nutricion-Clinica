@@ -45,9 +45,14 @@ import { Badge } from "@components/ui/badge";
 import { cn } from "@utils/cn";
 import { useAI } from "@services/ai/useAI";
 import { AIAssistButton } from "@components/ai/AIAssistButton";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
+import { useAutoSave } from "@hooks/useAutoSave";
+import { SaveIndicator } from "@components/ui/SaveIndicator";
+import { usePreferencesStore } from "@store/preferencesStore";
 
 interface ConsultationWizardProps {
   patientId: PatientId;
+  initialValues?: Partial<ConsultationFormValues>;
   onComplete?: (consultationId: string) => void;
 }
 
@@ -60,16 +65,33 @@ const STEP_ICONS: Record<WizardStepKey, React.ComponentType<{ className?: string
   review: FileText,
 };
 
-export function ConsultationWizard({ patientId, onComplete }: ConsultationWizardProps) {
+export function ConsultationWizard({ patientId, initialValues, onComplete }: ConsultationWizardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [step, setStep] = React.useState(1);
   const [submitting, setSubmitting] = React.useState(false);
+  const isBeginnerMode = usePreferencesStore((s) => s.usageMode === "beginner");
 
   const methods = useForm<ConsultationFormValues>({
     resolver: zodResolver(ConsultationFormSchema),
     defaultValues: consultationFormDefaultValues,
     mode: "onChange",
+  });
+
+  React.useEffect(() => {
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      methods.reset({ ...consultationFormDefaultValues, ...initialValues });
+    }
+  }, []);
+
+  useUnsavedChangesGuard(methods.formState.isDirty && !submitting, t("common.unsaved_changes_warning"));
+
+  const allFormValues = methods.watch();
+  const draftKey = `consultation:${patientId.toString()}`;
+  const { status: saveStatus, clearDraft } = useAutoSave({
+    key: draftKey,
+    data: allFormValues as Record<string, unknown>,
+    enabled: methods.formState.isDirty && !submitting,
   });
 
   const goNext = async () => {
@@ -115,6 +137,8 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
           nextVisitDate,
         });
 
+        clearDraft();
+
         toast.success(t("consultation.wizard.toast_registered"), {
           description: t("consultation.wizard.toast_scheduled", { number: consultation.consultationNumber }),
         });
@@ -153,36 +177,38 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
       <form onSubmit={onSubmit} noValidate>
         <div className="space-y-6">
           <Stepper current={step} onSelect={goToStep} />
+          {isBeginnerMode && <BeginnerConsultationGuide step={step} />}
 
           {step === 1 && <StepBasics errors={errors} />}
           {step === 2 && <StepSubjective errors={errors} />}
           {step === 3 && <StepObjective patientId={patientId} errors={errors} />}
           {step === 4 && <StepLab patientId={patientId} errors={errors} />}
-          {step === 5 && <StepPlan patientId={patientId} errors={errors} />}
-          {step === 6 && <StepReview />}
+          {step === 5 && <StepPlan patientId={patientId} errors={errors} isBeginnerMode={isBeginnerMode} />}
+          {step === 6 && <StepReview patientId={patientId.toString()} />}
 
-          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
-            <div>
+          <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="w-full sm:w-auto">
               {step > 1 && (
-                <Button type="button" variant="outline" onClick={goBack} disabled={submitting}>
+                <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={goBack} disabled={submitting}>
                   <ChevronLeft className="mr-2 h-4 w-4" />
                   {t("common.back")}
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="ghost" onClick={() => navigate(-1)} disabled={submitting}>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => navigate(-1)} disabled={submitting}>
                 <X className="mr-2 h-4 w-4" />
                 {t("common.cancel")}
               </Button>
               {step < WIZARD_STEPS.length ? (
-                <Button type="button" onClick={goNext}>
+                <Button type="button" className="w-full sm:w-auto" onClick={goNext}>
                   {t("common.next")}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
                 <Button
                   type="button"
+                  className="w-full sm:w-auto"
                   onClick={() => void onSubmit()}
                   disabled={submitting}
                 >
@@ -192,14 +218,42 @@ export function ConsultationWizard({ patientId, onComplete }: ConsultationWizard
               )}
             </div>
           </div>
-          {currentStepDef && step < WIZARD_STEPS.length && (
-            <p className="text-center text-xs text-muted-foreground">
-              {t("consultation.wizard.step_of", { step, total: WIZARD_STEPS.length })} · {currentStepDef.title}
-            </p>
-          )}
+          <div className="flex items-center justify-center gap-3">
+            {currentStepDef && step < WIZARD_STEPS.length && (
+              <p className="text-center text-xs text-muted-foreground">
+                {t("consultation.wizard.step_of", { step, total: WIZARD_STEPS.length })} · {currentStepDef.title}
+              </p>
+            )}
+            <SaveIndicator status={saveStatus} />
+          </div>
         </div>
       </form>
     </FormProvider>
+  );
+}
+
+function BeginnerConsultationGuide({ step }: { step: number }) {
+  const { t } = useTranslation();
+  const key = WIZARD_STEPS[step - 1]?.key ?? "basics";
+  const hintKey: Record<WizardStepKey, string> = {
+    basics: "consultation.wizard.beginner_hint_basics",
+    subjective: "consultation.wizard.beginner_hint_subjective",
+    objective: "consultation.wizard.beginner_hint_objective",
+    lab: "consultation.wizard.beginner_hint_lab",
+    plan: "consultation.wizard.beginner_hint_plan",
+    review: "consultation.wizard.beginner_hint_review",
+  };
+
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ClipboardList className="h-4 w-4" />
+          {t("consultation.wizard.beginner_title")}
+        </CardTitle>
+        <CardDescription>{t(hintKey[key])}</CardDescription>
+      </CardHeader>
+    </Card>
   );
 }
 
@@ -218,7 +272,7 @@ function Stepper({
         const isDone = num < current;
         const Icon = STEP_ICONS[s.key];
         return (
-          <li key={s.key} className="flex flex-1 items-center gap-1">
+          <li key={s.key} className="flex min-w-fit flex-1 items-center gap-1">
             <button
               type="button"
               onClick={() => onSelect(num)}
@@ -259,7 +313,7 @@ function Stepper({
   );
 }
 
-function StepBasics({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
+const StepBasics = React.memo(function StepBasics({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
   const { register } = useFormContextSafe();
   const { t } = useTranslation();
   return (
@@ -288,9 +342,9 @@ function StepBasics({ errors }: { errors: FieldErrors<ConsultationFormValues> })
       </CardContent>
     </Card>
   );
-}
+});
 
-function StepSubjective({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
+const StepSubjective = React.memo(function StepSubjective({ errors }: { errors: FieldErrors<ConsultationFormValues> }) {
   const { register } = useFormContextSafe();
   const { t } = useTranslation();
   return (
@@ -315,9 +369,9 @@ function StepSubjective({ errors }: { errors: FieldErrors<ConsultationFormValues
       </CardContent>
     </Card>
   );
-}
+});
 
-function StepObjective({
+const StepObjective = React.memo(function StepObjective({
   patientId,
   errors,
 }: {
@@ -476,9 +530,9 @@ function StepObjective({
       </Card>
     </div>
   );
-}
+});
 
-function StepLab({
+const StepLab = React.memo(function StepLab({
   patientId,
   errors,
 }: {
@@ -569,14 +623,16 @@ function StepLab({
       </CardContent>
     </Card>
   );
-}
+});
 
-function StepPlan({
+const StepPlan = React.memo(function StepPlan({
   patientId,
   errors,
+  isBeginnerMode,
 }: {
   patientId: PatientId;
   errors: FieldErrors<ConsultationFormValues>;
+  isBeginnerMode: boolean;
 }) {
   const { register, watch, setValue } = useFormContextSafe();
   const { t } = useTranslation();
@@ -641,11 +697,14 @@ function StepPlan({
           <CardDescription>{t("consultation.wizard.assessment_and_plan_description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">{t("consultation.wizard.ai_draft_hint")}</p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">
+              {isBeginnerMode ? t("consultation.wizard.ai_draft_hint_beginner") : t("consultation.wizard.ai_draft_hint")}
+            </p>
             <AIAssistButton
               capability="draftClinicalNotes"
               busy={ai.busy}
+              patientId={patientId.toString()}
               onClick={handleAIDraft}
             />
           </div>
@@ -682,9 +741,9 @@ function StepPlan({
       </Card>
     </div>
   );
-}
+});
 
-function StepReview() {
+const StepReview = React.memo(function StepReview({ patientId }: { patientId: string }) {
   const { watch } = useFormContextSafe();
   const { t } = useTranslation();
   const v = watch();
@@ -725,8 +784,8 @@ function StepReview() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               {t("consultation.wizard.review")}
@@ -734,10 +793,11 @@ function StepReview() {
             <CardDescription>{t("consultation.wizard.review_description")}</CardDescription>
           </div>
           <AIAssistButton
-            capability="summarizeConsultation"
-            busy={ai.busy}
-            onClick={handleAISummarize}
-          />
+              capability="summarizeConsultation"
+              busy={ai.busy}
+              patientId={patientId.toString()}
+              onClick={handleAISummarize}
+            />
         </div>
       </CardHeader>
       {summary && (
@@ -812,7 +872,7 @@ function StepReview() {
       </CardContent>
     </Card>
   );
-}
+});
 
 function ReviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -825,9 +885,9 @@ function ReviewSection({ title, children }: { title: string; children: React.Rea
 
 function ReviewRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b pb-1.5 last:border-0">
+    <div className="flex flex-col gap-1 border-b pb-1.5 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <span className="text-xs text-muted-foreground">{label}</span>
-      <span className="text-right text-sm">{value}</span>
+      <span className="break-words text-sm sm:text-right">{value}</span>
     </div>
   );
 }
@@ -854,9 +914,9 @@ function MeasurementPicker({
             {...register(name)}
             className="size-4 accent-primary"
           />
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">{m.measuredAt}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="break-words text-xs text-muted-foreground">
               {t("consultation.wizard.weight")} {m.weightKg.toFixed(1)} kg · {t("consultation.wizard.height")} {m.heightCm.toFixed(0)} cm · BMI {m.bmi.toFixed(1)}
             </p>
           </div>
@@ -997,18 +1057,18 @@ function ClinicalSuggestionCard({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" onClick={onSuggest} disabled={busy || !canCompute}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onSuggest} disabled={busy || !canCompute}>
             <Sparkles className="mr-2 h-4 w-4" />
             {busy ? t("consultation.wizard.analyzing") : t("consultation.wizard.suggest_diagnostic_plan")}
           </Button>
           {diagnostics !== null && diagnostics.length > 0 && (
-            <Button type="button" variant="outline" size="sm" onClick={onApplyDiagnostics}>
+            <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={onApplyDiagnostics}>
               {t("consultation.wizard.insert_diagnostic")}
             </Button>
           )}
           {plan !== null && (
-            <Button type="button" variant="outline" size="sm" onClick={onApplyPlanTargets}>
+            <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={onApplyPlanTargets}>
               {t("consultation.wizard.insert_plan")}
             </Button>
           )}
@@ -1026,7 +1086,7 @@ function ClinicalSuggestionCard({
                 <Badge variant={CONFIDENCE_BADGE[d.confidence]} className="shrink-0 text-xs">
                   {ConfidenceLabel[d.confidence]}
                 </Badge>
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <p className="font-medium">{d.label}</p>
                   <p className="text-xs text-muted-foreground">{d.rationale}</p>
                 </div>

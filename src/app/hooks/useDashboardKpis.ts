@@ -8,6 +8,7 @@ import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
+import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
 import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
 
 export interface DashboardKpis {
@@ -146,16 +147,16 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
             (c) => activePatientIds.has(c.patientId.toString()),
           );
 
-          const pendingPaymentsAmount = (pendingRows as any[]).reduce(
-            (sum: number, r: any) => {
+          const pendingPaymentsAmount = (pendingRows as ConsultationRow[]).reduce(
+            (sum: number, r: ConsultationRow) => {
               const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
               const ap = r.amount_paid ?? 0;
               return ps === "partial" ? sum + Math.max(0, r.cost - ap) : sum + r.cost;
             },
             0,
           );
-          const incomeThisMonth = (incomeRows as any[]).reduce(
-            (sum: number, r: any) => sum + r.cost,
+          const incomeThisMonth = (incomeRows as ConsultationRow[]).reduce(
+            (sum: number, r: ConsultationRow) => sum + r.cost,
             0,
           );
 

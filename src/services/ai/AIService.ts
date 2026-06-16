@@ -1,9 +1,16 @@
-import { aiClient } from "./AIClient";
+import { aiClient, isAIEnvironmentEnabled } from "./AIClient";
 import { buildSystemPrompt, buildUserPrompt, type CapabilityId, type PromptContext } from "./AIPrompts";
 import { parseResponse, type ParsedResponse } from "./AIResponseParser";
 import { getCapabilityDef } from "./AICapabilities";
 import { auditService } from "@services/audit/auditService";
 import { useAuthStore } from "@store/authStore";
+import { usePreferencesStore } from "@store/preferencesStore";
+import { ConsentService } from "@modules/auth/PatientConsentService";
+import { db } from "@services/db/dexieSchema";
+
+function getPatientId(context: Record<string, unknown>): string | undefined {
+  return context.patientId as string | undefined;
+}
 
 export interface AIExecuteOptions {
   signal?: AbortSignal;
@@ -27,8 +34,38 @@ class AIService {
   private cache = new Map<string, CacheEntry>();
   private usageLog: UsageEntry[] = [];
 
-  isEnabled(): boolean {
-    return import.meta.env.VITE_AI_ENABLED === "true";
+  isEnvironmentEnabled(): boolean {
+    return isAIEnvironmentEnabled();
+  }
+
+  isUserEnabled(): boolean {
+    return usePreferencesStore.getState().aiEnabled;
+  }
+
+  isEnabled(context?: Record<string, unknown>): boolean {
+    if (!this.isEnvironmentEnabled()) return false;
+    if (!this.isUserEnabled()) return false;
+    if (context) {
+      const patientId = getPatientId(context);
+      if (patientId) {
+        const active = ConsentService.isConsentActive(patientId, "ai_opt_in");
+        if (!active) return false;
+      }
+    }
+    return true;
+  }
+
+  getDisabledReason(context?: Record<string, unknown>): "environment" | "user" | "consent" | null {
+    if (!this.isEnvironmentEnabled()) return "environment";
+    if (!this.isUserEnabled()) return "user";
+    if (context) {
+      const patientId = getPatientId(context);
+      if (patientId) {
+        const active = ConsentService.isConsentActive(patientId, "ai_opt_in");
+        if (!active) return "consent";
+      }
+    }
+    return null;
   }
 
   getMonthlyUsage(): { capability: CapabilityId; totalCalls: number; totalTokens: number }[] {
@@ -60,6 +97,21 @@ class AIService {
       return { success: false, data: null, raw: "", confidence: 0, error: `Unknown capability: ${capability}` };
     }
 
+    const disabledReason = this.getDisabledReason(context);
+    if (disabledReason) {
+      return {
+        success: false,
+        data: null,
+        raw: "",
+        confidence: 0,
+        error: disabledReason === "environment"
+          ? "AI is disabled for this environment. Set VITE_AI_ENABLED=true and configure the AI provider (OpenAI or Ollama)."
+          : disabledReason === "user"
+            ? "AI is disabled in user settings."
+            : "Patient has not granted AI consent.",
+      };
+    }
+
     const cacheKey = `${capability}::${JSON.stringify(context)}`;
 
     if (!options?.skipCache && def.cacheable) {
@@ -72,6 +124,10 @@ class AIService {
     const systemPrompt = buildSystemPrompt(capability, context.language ?? "es-MX");
     const userPrompt = buildUserPrompt(capability, context);
 
+    const store = usePreferencesStore.getState();
+    const provider = store.aiProvider;
+    const apiKey = provider === "openai" ? store.openAiApiKey : undefined;
+
     try {
       const response = await aiClient.complete(
         {
@@ -80,6 +136,8 @@ class AIService {
           userPrompt,
           temperature: def.temperature,
           maxTokens: def.maxTokens,
+          provider,
+          apiKey,
         },
         { signal: options?.signal },
       );
@@ -104,7 +162,17 @@ class AIService {
         timestamp: new Date(),
       });
 
-      const patientId = (context as Record<string, unknown>).patientId as string | undefined;
+      const patientId = getPatientId(context);
+
+      await db.ai_usage_logs.add({
+        id: crypto.randomUUID(),
+        capability,
+        prompt_tokens: promptTokens,
+        completion_tokens: completionTokens,
+        model: response.model,
+        success: true,
+        created_at: new Date().toISOString(),
+      });
 
       await auditService.record({
         module: "ai",
@@ -128,7 +196,17 @@ class AIService {
         timestamp: new Date(),
       });
 
-      const patientId = (context as Record<string, unknown>).patientId as string | undefined;
+      const patientId = getPatientId(context);
+
+      await db.ai_usage_logs.add({
+        id: crypto.randomUUID(),
+        capability,
+        prompt_tokens: 0,
+        completion_tokens: 0,
+        model: def.model,
+        success: false,
+        created_at: new Date().toISOString(),
+      });
 
       await auditService.record({
         module: "ai",

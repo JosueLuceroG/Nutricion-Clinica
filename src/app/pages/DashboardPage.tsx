@@ -7,30 +7,33 @@ import {
   Calendar,
   UtensilsCrossed,
   ClipboardList,
-  Activity,
   FlaskConical,
   ArrowRight,
   RefreshCw,
-  DollarSign,
-  AlertCircle,
+  Activity,
 } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
-import { Badge } from "@components/ui/badge";
+import { Badge, type BadgeProps } from "@components/ui/badge";
 import { Skeleton } from "@components/ui/skeleton";
 import { EmptyState } from "@components/layout/EmptyState";
 import { useDashboardKpis } from "@app/hooks/useDashboardKpis";
+import { usePreferencesStore, DEFAULT_DASHBOARD_WIDGET_IDS } from "@store/preferencesStore";
+import { WIDGET_MAP } from "@app/hooks/dashboardWidgetConfig";
 import { ConsultationStatusColor } from "@modules/consultation/domain/ConsultationStatus";
 import { ClinicMetricsCards } from "./DashboardPageClinicMetrics";
 import { formatCurrency } from "@utils/formatCurrency";
-import i18n from "../../i18n/config";
+import i18n from "@i18n/config";
 const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
 export function DashboardPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data, loading, error, reload } = useDashboardKpis();
+  const isBeginnerMode = usePreferencesStore((s) => s.usageMode === "beginner");
+  const widgetIds = usePreferencesStore((s) => s.dashboardWidgetIds);
+  const activeWidgetIds = widgetIds.length > 0 ? widgetIds : DEFAULT_DASHBOARD_WIDGET_IDS;
 
   return (
     <>
@@ -42,11 +45,11 @@ export function DashboardPage() {
             <Button variant="ghost" size="icon-sm" onClick={reload} aria-label={t("common.refresh")}>
               <RefreshCw className="h-4 w-4" />
             </Button>
-            <Button variant="outline" onClick={() => navigate("/pacientes")}>
+            <Button variant="outline" className="flex-1 sm:flex-none" onClick={() => navigate("/pacientes")}>
               <UsersIcon className="mr-2 h-4 w-4" />
               {t("patient.title")}
             </Button>
-            <Button onClick={() => navigate("/pacientes/nuevo")}>
+            <Button className="flex-1 sm:flex-none" onClick={() => navigate("/pacientes/nuevo")}>
               <Plus className="mr-2 h-4 w-4" />
               {t("patient.new")}
             </Button>
@@ -56,59 +59,26 @@ export function DashboardPage() {
 
       <PageContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard
-            label={t("billing.active_patients")}
-            value={data?.totalActivePatients ?? null}
-            total={data?.totalPatients ?? null}
-            icon={UsersIcon}
-            to="/pacientes"
-            hint={t("dashboard.total_registered")}
-          />
-          <KpiCard
-            label={t("dashboard.consultations_this_month")}
-            value={data?.consultationsThisMonth ?? null}
-            icon={Calendar}
-            to="/consultas"
-            hint={t("dashboard.current_month_agenda")}
-          />
-          <KpiCard
-            label={t("dashboard.active_plans")}
-            value={data?.activePlans ?? null}
-            icon={UtensilsCrossed}
-            to="/planes"
-            hint={t("dashboard.in_follow_up")}
-          />
-          <KpiCard
-            label={t("dashboard.pending_sync")}
-            value={data?.pendingSync ?? 0}
-            icon={Activity}
-            to="/configuracion"
-            hint={t("dashboard.unsent_changes")}
-          />
-        </div>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <KpiCard
-            label={t("billing.pending_collection")}
-            value={data?.pendingPaymentsAmount ?? 0}
-            icon={AlertCircle}
-            to="/billing"
-            hint={data?.pendingPaymentsAmount ? MXN(data.pendingPaymentsAmount) : t("billing.no_pending")}
-          />
-          <KpiCard
-            label={t("billing.income_this_month")}
-            value={data?.incomeThisMonth ?? 0}
-            icon={DollarSign}
-            to="/billing/report"
-            hint={data?.incomeThisMonth ? MXN(data.incomeThisMonth) : "$0"}
-          />
-          <KpiCard
-            label={t("billing.pending")}
-            value={(data?.pendingPayments ?? 0) > 0 ? data!.pendingPayments : 0}
-            icon={Calendar}
-            to="/billing"
-            hint={t("billing.pending_consultations")}
-          />
+          {activeWidgetIds.map((id) => {
+            const def = WIDGET_MAP[id];
+            if (!def) return null;
+            const val = data ? def.value(data) : null;
+            const tot = data && def.total ? def.total(data) : null;
+            const hint = data && def.formatHint
+              ? def.formatHint(data, t, MXN)
+              : t(def.hintKey);
+            return (
+              <KpiCard
+                key={def.id}
+                label={t(def.labelKey)}
+                value={val}
+                total={tot}
+                icon={def.icon}
+                to={def.to}
+                hint={hint}
+              />
+            );
+          })}
         </div>
 
         {error && (
@@ -119,6 +89,8 @@ export function DashboardPage() {
           </Card>
         )}
 
+        {isBeginnerMode && <BeginnerDashboardCard />}
+
         <ClinicMetricsCards />
 
         <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -126,7 +98,7 @@ export function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {t("dashboard.upcoming_consultations")}
-                <Badge variant="secondary">{data?.upcomingConsultations.length ?? 0}</Badge>
+                <Badge variant="secondary" className="shrink-0">{data?.upcomingConsultations.length ?? 0}</Badge>
               </CardTitle>
               <CardDescription>
                 {t("dashboard.upcoming_consultations_desc")}
@@ -155,7 +127,7 @@ export function DashboardPage() {
                     <li key={c.id.toString()}>
                       <Link
                         to={`/consultas/${c.id.toString()}`}
-                        className="flex items-center justify-between gap-2 rounded-md px-2 py-2.5 hover:bg-accent"
+                        className="flex items-start justify-between gap-2 rounded-md px-2 py-2.5 hover:bg-accent sm:items-center"
                       >
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium">
@@ -168,8 +140,8 @@ export function DashboardPage() {
                             {t("dashboard.patient_short", { id: c.patientId.toString().slice(0, 8), number: c.consultationNumber })}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant={ConsultationStatusColor[c.status] as never}>
+                        <div className="flex shrink-0 items-center gap-2">
+                          <Badge variant={ConsultationStatusColor[c.status] as BadgeProps["variant"]} className="max-w-28 truncate sm:max-w-none">
                             {t(`consultation.status_${c.status.replace("-", "_")}`)}
                           </Badge>
                           <ArrowRight className="h-3 w-3 text-muted-foreground" />
@@ -186,7 +158,7 @@ export function DashboardPage() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 {t("dashboard.expiring_plans")}
-                <Badge variant="secondary">{data?.expiringPlans.length ?? 0}</Badge>
+                <Badge variant="secondary" className="shrink-0">{data?.expiringPlans.length ?? 0}</Badge>
               </CardTitle>
               <CardDescription>
                 {t("dashboard.expiring_plans_desc")}
@@ -289,7 +261,7 @@ export function DashboardPage() {
                 to="/consultas"
                 icon={ClipboardList}
                 label={t("consultation.title")}
-                hint="Wizard SOAP"
+                hint={isBeginnerMode ? t("dashboard.quick_consultation_beginner") : "Wizard SOAP"}
               />
               <QuickLink
                 to="/laboratorio"
@@ -307,7 +279,7 @@ export function DashboardPage() {
                 to="/planes"
                 icon={UtensilsCrossed}
                 label={t("mealplan.title")}
-                hint={t("dashboard.smae_edition")}
+                hint={isBeginnerMode ? t("dashboard.quick_mealplan_beginner") : t("dashboard.smae_edition")}
               />
             </CardContent>
           </Card>
@@ -317,7 +289,69 @@ export function DashboardPage() {
   );
 }
 
-function KpiCard({
+function BeginnerDashboardCard() {
+  const { t } = useTranslation();
+  return (
+    <Card className="mt-4 border-primary/30 bg-primary/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ClipboardList className="h-4 w-4" />
+          {t("dashboard.beginner_title")}
+        </CardTitle>
+        <CardDescription>{t("dashboard.beginner_desc")}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-2 sm:grid-cols-3">
+        <BeginnerStepLink
+          to="/pacientes/nuevo"
+          step="1"
+          label={t("dashboard.beginner_step_patient")}
+          hint={t("dashboard.beginner_step_patient_desc")}
+        />
+        <BeginnerStepLink
+          to="/pacientes"
+          step="2"
+          label={t("dashboard.beginner_step_consultation")}
+          hint={t("dashboard.beginner_step_consultation_desc")}
+        />
+        <BeginnerStepLink
+          to="/planes"
+          step="3"
+          label={t("dashboard.beginner_step_plan")}
+          hint={t("dashboard.beginner_step_plan_desc")}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+const BeginnerStepLink = React.memo(function BeginnerStepLink({
+  to,
+  step,
+  label,
+  hint,
+}: {
+  to: string;
+  step: string;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className="rounded-md border bg-card p-3 transition-colors hover:border-primary hover:bg-accent"
+    >
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          {step}
+        </span>
+        <p className="text-sm font-medium">{label}</p>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+    </Link>
+  );
+});
+
+const KpiCard = React.memo(function KpiCard({
   label,
   value,
   total,
@@ -347,9 +381,9 @@ function KpiCard({
       }}
     >
       <CardHeader className="pb-2">
-        <CardDescription className="flex items-center justify-between text-xs uppercase tracking-wider">
-          {label}
-          <Icon className="h-3 w-3" />
+        <CardDescription className="flex min-w-0 items-start justify-between gap-2 text-xs uppercase tracking-wider">
+          <span className="min-w-0 break-words">{label}</span>
+          <Icon className="h-3 w-3 shrink-0" />
         </CardDescription>
         {value === null ? (
           <Skeleton className="h-8 w-20" />
@@ -363,13 +397,13 @@ function KpiCard({
         )}
       </CardHeader>
       <CardContent>
-        <p className="text-xs text-muted-foreground">{hint}</p>
+        <p className="break-words text-xs text-muted-foreground">{hint}</p>
       </CardContent>
     </Card>
   );
-}
+});
 
-function QuickLink({
+const QuickLink = React.memo(function QuickLink({
   to,
   icon: Icon,
   label,
@@ -385,12 +419,12 @@ function QuickLink({
       to={to}
       className="flex items-center gap-2 rounded-md border bg-card p-2 transition-colors hover:border-primary hover:bg-accent"
     >
-      <Icon className="h-4 w-4 text-primary" />
+      <Icon className="h-4 w-4 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{label}</p>
         <p className="truncate text-[10px] text-muted-foreground">{hint}</p>
       </div>
-      <ArrowRight className="h-3 w-3 text-muted-foreground" />
+      <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
     </Link>
   );
-}
+});

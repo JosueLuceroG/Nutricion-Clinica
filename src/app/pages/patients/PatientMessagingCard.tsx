@@ -1,44 +1,71 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { MessageCircle, Send } from "lucide-react";
+import { MessageCircle, Send, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { Textarea } from "@components/ui/textarea";
+import { Badge } from "@components/ui/badge";
 import {
   listProfessionalMessages,
   sendProfessionalMessage,
   markMessageAsRead,
-  type PortalMessage,
 } from "@services/api/patientPortalApi";
+import { useRealtimeChat } from "@hooks/useRealtimeChat";
+
+function getChatWsUrl(): string {
+  const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
+  const base = apiUrl.replace(/^http/, "ws");
+  return `${base}/ws/chat`;
+}
+
+function getAuthToken(): string | null {
+  try {
+    const raw = localStorage.getItem("auth-store");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { state?: { token?: string } };
+    return parsed.state?.token ?? null;
+  } catch {
+    return null;
+  }
+}
 
 export function PatientMessagingCard({ patientId }: { patientId: string }) {
   const { t, i18n } = useTranslation();
-  const [messages, setMessages] = React.useState<PortalMessage[]>([]);
   const [input, setInput] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
+  const token = getAuthToken();
 
-  const loadMessages = React.useCallback(async () => {
-    try {
-      const msgs = await listProfessionalMessages(patientId);
-      setMessages(msgs);
-      const unreadIds = msgs
-        .filter((m) => m.direction === "patient_to_professional" && !m.readAt)
-        .map((m) => m.id);
-      for (const id of unreadIds) {
-        markMessageAsRead(id).catch(() => {});
-      }
-    } catch { /* ignore */ }
-  }, [patientId]);
+  const buildWsUrl = React.useCallback(() => {
+    if (!token) return "";
+    return `${getChatWsUrl()}?token=${encodeURIComponent(token)}&pacienteId=${encodeURIComponent(patientId)}`;
+  }, [patientId, token]);
+
+  const { messages, send, markAsRead, loading, isRealtime } = useRealtimeChat({
+    wsUrl: buildWsUrl(),
+    fetchMessages: React.useCallback(
+      (signal) => listProfessionalMessages(patientId, signal),
+      [patientId],
+    ),
+    sendMessage: React.useCallback(
+      async (content: string) => { await sendProfessionalMessage(patientId, content); },
+      [patientId],
+    ),
+    markAsRead: React.useCallback(
+      async (messageId: string) => { await markMessageAsRead(messageId); },
+      [],
+    ),
+  });
 
   React.useEffect(() => {
-    setLoading(true);
-    loadMessages().finally(() => setLoading(false));
-    const interval = setInterval(() => void loadMessages(), 30_000);
-    return () => clearInterval(interval);
-  }, [loadMessages]);
+    const unreadIds = messages
+      .filter((m) => m.direction === "patient_to_professional" && !m.readAt)
+      .map((m) => m.id);
+    for (const id of unreadIds) {
+      markAsRead(id).catch((err) => { console.error("[PatientMessagingCard] Failed to mark message as read", err); });
+    }
+  }, [messages, markAsRead]);
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -49,11 +76,10 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
     if (!text || sending) return;
     setSending(true);
     try {
-      const msg = await sendProfessionalMessage(patientId, text);
-      setMessages((prev) => [...prev, msg]);
+      await send(text);
       setInput("");
-    } catch {
-      // Error toast could be added
+    } catch (err) {
+      console.error("[PatientMessagingCard] Failed to send message", err);
     } finally {
       setSending(false);
     }
@@ -84,6 +110,17 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
         <CardTitle className="flex items-center gap-2 text-sm">
           <MessageCircle className="h-4 w-4 text-primary" />
           {t("patient_portal.messages_pro_title")}
+          {isRealtime ? (
+            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+              <Wifi className="h-3 w-3 text-success" />
+              {t("sync.connected")}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+              <WifiOff className="h-3 w-3 text-warning" />
+              {t("sync.disconnected")}
+            </Badge>
+          )}
         </CardTitle>
         <CardDescription>{t("patient_portal.messages_pro_desc")}</CardDescription>
       </CardHeader>

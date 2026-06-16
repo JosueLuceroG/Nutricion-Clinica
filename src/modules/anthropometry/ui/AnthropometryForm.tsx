@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@comp
 import { Skeleton } from "@components/ui/skeleton";
 import { Alert, AlertDescription } from "@components/ui/alert";
 import { Info } from "lucide-react";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
 
 interface AnthropometryFormProps {
   patientId: PatientId;
@@ -45,7 +46,7 @@ export function AnthropometryForm({
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isDirty },
     setValue,
   } = useForm<AnthropometryFormValues>({
     resolver: zodResolver(AnthropometryFormSchema),
@@ -56,6 +57,8 @@ export function AnthropometryForm({
       sex: defaultSex ?? "undisclosed",
     },
   });
+
+  useUnsavedChangesGuard(isDirty && !submitting, t("common.unsaved_changes_warning"));
 
   React.useEffect(() => {
     if (defaultAge) {
@@ -298,12 +301,12 @@ export function AnthropometryForm({
         </Alert>
       )}
 
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-        <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
+      <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
           {t("common.cancel")}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
           <Save className="mr-2 h-4 w-4" />
           {submitting ? t("common.saving") : t("anthropometry.save")}
         </Button>

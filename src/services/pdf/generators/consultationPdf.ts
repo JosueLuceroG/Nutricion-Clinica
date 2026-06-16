@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { ConsultationStatusLabel } from "@modules/consultation/domain/ConsultationStatus";
-import type { PdfConsultationData } from "../types";
+import type { PdfConsultationData, PdfBrandingOptions } from "../types";
 
 const COLORS = {
   primary: [41, 112, 207] as [number, number, number],
@@ -13,11 +13,12 @@ const COLORS = {
   black: [0, 0, 0] as [number, number, number],
 };
 
-function addHeader(doc: jsPDF): void {
+function addHeader(doc: jsPDF, branding?: PdfBrandingOptions): void {
+  const clinicName = branding?.clinicDisplayName ?? "NutriClinica";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(...COLORS.primary);
-  doc.text("NutriClinica", 14, 20);
+  doc.text(clinicName, 14, 20);
 
   doc.setFontSize(16);
   doc.setTextColor(...COLORS.black);
@@ -197,7 +198,9 @@ function addReason(doc: jsPDF, data: PdfConsultationData, startY: number): numbe
   return y;
 }
 
-function addFooter(doc: jsPDF): void {
+function addFooter(doc: jsPDF, branding?: PdfBrandingOptions): void {
+  const clinicName = branding?.clinicDisplayName ?? "NutriClinica";
+  const showBranding = branding?.showPlatformBranding ?? true;
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -206,14 +209,18 @@ function addFooter(doc: jsPDF): void {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.secondary);
-    doc.text("NutriClinica \u2014 Nota de consulta", 14, 293);
-    doc.text(`P\u00e1gina ${i} de ${pageCount}`, 196, 293, { align: "right" as const });
+    if (showBranding) {
+      doc.text(`${clinicName} — Nota de consulta`, 14, 293);
+    } else {
+      doc.text("Nota de consulta", 14, 293);
+    }
+    doc.text(`Página ${i} de ${pageCount}`, 196, 293, { align: "right" as const });
   }
 }
 
-export function generateConsultationPdf(data: PdfConsultationData): jsPDF {
+export function generateConsultationPdf(data: PdfConsultationData, branding?: PdfBrandingOptions): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  addHeader(doc);
+  addHeader(doc, branding);
   addPatientInfo(doc, data);
 
   let y = 84;
@@ -226,7 +233,7 @@ export function generateConsultationPdf(data: PdfConsultationData): jsPDF {
   y = addSoapSection(doc, "A — Diagn\u00f3stico nutricional", data.assessment, y);
   addSoapSection(doc, "P — Plan", data.plan, y);
 
-  addFooter(doc);
+  addFooter(doc, branding);
   return doc;
 }
 

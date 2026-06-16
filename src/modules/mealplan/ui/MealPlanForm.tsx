@@ -41,7 +41,7 @@ import {
   DEFAULT_KCAL_DISTRIBUTION,
   type MealSlot,
 } from "@modules/mealplan/domain/MealSlot";
-import { getSystemFoodById, type FoodId } from "@modules/smae/domain";
+import { getSystemFoodById, getSystemFoodsByGroup, FoodGroupLabel, type FoodId } from "@modules/smae/domain";
 import { foodExchangeNutrition } from "@modules/mealplan/application/planCalculations";
 import { mealPlanService } from "@services/mealPlanService";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
@@ -52,9 +52,15 @@ import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
-import { Badge } from "@components/ui/badge";
+import { Badge, type BadgeProps } from "@components/ui/badge";
 import { FoodPicker } from "./FoodPicker";
 import { createPatientSubstitution, getPatientSubstitutions } from "@services/api/patientSubstitutionApi";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
+import { useAutoSave } from "@hooks/useAutoSave";
+import { SaveIndicator } from "@components/ui/SaveIndicator";
+import { usePreferencesStore } from "@store/preferencesStore";
+import { useAI } from "@services/ai/useAI";
+import { AIAssistButton } from "@components/ai/AIAssistButton";
 
 interface MealPlanFormProps {
   patientId: PatientId;
@@ -66,14 +72,25 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
+  const isBeginnerMode = usePreferencesStore((s) => s.usageMode === "beginner");
 
-  const { control, register, handleSubmit, watch, setValue, formState: { errors } } =
+  const { control, register, handleSubmit, watch, setValue, formState: { errors, isDirty } } =
     useForm<MealPlanFormValues>({
       resolver: zodResolver(MealPlanFormSchema),
       defaultValues: mealPlanFormDefaultValues,
       mode: "onSubmit",
       reValidateMode: "onChange",
     });
+
+  useUnsavedChangesGuard(isDirty && !submitting, t("common.unsaved_changes_warning"));
+
+  const allFormValues = watch();
+  const draftKey = `mealplan:${patientId.toString()}`;
+  const { status: saveStatus, clearDraft } = useAutoSave({
+    key: draftKey,
+    data: allFormValues as Record<string, unknown>,
+    enabled: isDirty && !submitting,
+  });
 
   const meals = watch("meals");
   const kcalTarget = watch("kcalTarget");
@@ -84,6 +101,63 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
   const patientIdString = typeof patientId === "string" ? patientId : patientId.toString();
 
   const [applyingPrefs, setApplyingPrefs] = React.useState(false);
+  const { execute: executeAI, busy: aiBusy } = useAI();
+
+  const handleGenerateWithAI = React.useCallback(async () => {
+    const response = await executeAI<{
+      meals: Array<{
+        slot: string;
+        exchanges: Array<{
+          group: string;
+          quantity: number;
+          examples: string[];
+        }>;
+      }>;
+      totalKcal: number;
+      notes?: string;
+    }>("generateMealPlanInitial", {
+      kcalTarget: kcalTarget ?? 1800,
+      diagnosis: t("mealplan.title_single"),
+      patientId: patientIdString,
+    });
+
+    if (!response?.success || !response.data) {
+      toast.error(t("mealplan.form.toast.ai_menu_error"));
+      return;
+    }
+
+    const labelToGroup = new Map<string, string>();
+    for (const [groupKey, label] of Object.entries(FoodGroupLabel)) {
+      labelToGroup.set(label.toLowerCase(), groupKey);
+    }
+    const foodsByGroup = getSystemFoodsByGroup();
+
+    for (const meal of response.data.meals) {
+      const slotIdx = MEAL_SLOT_ORDER.indexOf(meal.slot as MealSlot);
+      if (slotIdx < 0) continue;
+
+      const exchanges: Array<{ foodId: string; count: number }> = [];
+
+      for (const ex of meal.exchanges) {
+        const groupKey = labelToGroup.get(ex.group.toLowerCase());
+        if (!groupKey) continue;
+
+        const groupFoods = foodsByGroup.get(groupKey);
+        if (!groupFoods || groupFoods.length === 0) continue;
+
+        exchanges.push({
+          foodId: groupFoods[0].id,
+          count: Math.max(1, Math.round(ex.quantity)),
+        });
+      }
+
+      if (exchanges.length > 0) {
+        setValue(`meals.${slotIdx}.exchanges`, exchanges, { shouldDirty: true });
+      }
+    }
+
+    toast.success(t("mealplan.form.toast.ai_menu_generated"));
+  }, [executeAI, kcalTarget, setValue, t]);
 
   const handleSavePreference = React.useCallback(async (foodId: string) => {
     if (!foodId) return;
@@ -241,6 +315,8 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
         (acc, m) => acc + m.exchanges.length,
         0,
       );
+      clearDraft();
+
       toast.success(t("mealplan.form.toast.plan_created"), {
         description: t("mealplan.form.toast.plan_created_desc", {
           count: totalExchanges,
@@ -264,6 +340,8 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {isBeginnerMode && <BeginnerMealPlanGuide />}
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -331,15 +409,21 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
               <Input id="field-plan-fat" type="number" step="1" {...register("fatTargetG", { valueAsNumber: true })} aria-describedby={errors.fatTargetG ? "field-plan-fat-error" : undefined} />
             </Field>
           </div>
-          <div className="flex items-center justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={handleApplyPreferences} disabled={applyingPrefs}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleApplyPreferences} disabled={applyingPrefs}>
               <Sparkles className="mr-2 h-4 w-4" />
               {applyingPrefs ? t("common.sending") : t("mealplan.form.btn.apply_preferences")}
             </Button>
-            <Button type="button" variant="outline" size="sm" onClick={suggestDistribution}>
+            <Button type="button" variant="outline" size="sm" className="w-full sm:w-auto" onClick={suggestDistribution}>
               <Target className="mr-2 h-4 w-4" />
               {t("mealplan.form.btn.suggest_distribution")}
             </Button>
+            <AIAssistButton
+              capability="generateMealPlanInitial"
+              busy={aiBusy}
+              patientId={patientIdString}
+              onClick={handleGenerateWithAI}
+            />
           </div>
         </CardContent>
       </Card>
@@ -362,6 +446,7 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
             watch={watch}
             slotKcalTarget={Math.round((kcalTarget ?? 0) * DEFAULT_KCAL_DISTRIBUTION[slot])}
             onSavePreference={handleSavePreference}
+            isBeginnerMode={isBeginnerMode}
           />
         ))}
       </DndContext>
@@ -384,17 +469,62 @@ export function MealPlanForm({ patientId, consultationId, onSaved }: MealPlanFor
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-        <Button type="button" variant="ghost" onClick={() => navigate(-1)} disabled={submitting}>
+      <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <div className="flex-1">
+          <SaveIndicator status={saveStatus} />
+        </div>
+        <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
           {t("mealplan.form.btn.cancel")}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
           <Save className="mr-2 h-4 w-4" />
           {submitting ? t("mealplan.form.btn.saving") : t("mealplan.form.btn.create")}
         </Button>
       </div>
     </form>
+  );
+}
+
+function BeginnerMealPlanGuide() {
+  const { t } = useTranslation();
+  return (
+    <Card className="border-primary/30 bg-primary/5">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Target className="h-4 w-4" />
+          {t("mealplan.form.beginner_title")}
+        </CardTitle>
+        <CardDescription>{t("mealplan.form.beginner_desc")}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-2 sm:grid-cols-3">
+        <GuidedStep step="1" title={t("mealplan.form.beginner_step_targets")} description={t("mealplan.form.beginner_step_targets_desc")} />
+        <GuidedStep step="2" title={t("mealplan.form.beginner_step_foods")} description={t("mealplan.form.beginner_step_foods_desc")} />
+        <GuidedStep step="3" title={t("mealplan.form.beginner_step_review")} description={t("mealplan.form.beginner_step_review_desc")} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function GuidedStep({
+  step,
+  title,
+  description,
+}: {
+  step: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-md border bg-card p-3">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+          {step}
+        </span>
+        <p className="text-sm font-medium">{title}</p>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{description}</p>
+    </div>
   );
 }
 
@@ -491,7 +621,7 @@ function MacroStat({
       </p>
       <p className="text-[10px] text-muted-foreground">{t("mealplan.form.macro.target")}: {target}{unit}</p>
       {show ? (
-        <Badge variant={tone as never} className="mt-1">
+        <Badge variant={tone as BadgeProps["variant"]} className="mt-1">
           {diff > 0 ? "+" : ""}
           {diff.toFixed(decimals)} {unit}
         </Badge>
@@ -511,6 +641,7 @@ function MealSection({
   watch,
   slotKcalTarget,
   onSavePreference,
+  isBeginnerMode,
 }: {
   slot: MealSlot;
   control: ReturnType<typeof useForm<MealPlanFormValues>>["control"];
@@ -518,6 +649,7 @@ function MealSection({
   watch: ReturnType<typeof useForm<MealPlanFormValues>>["watch"];
   slotKcalTarget: number;
   onSavePreference: (foodId: string) => void;
+  isBeginnerMode: boolean;
 }) {
   const { t } = useTranslation();
   const idx = MEAL_SLOT_ORDER.indexOf(slot);
@@ -593,6 +725,11 @@ function MealSection({
           </Button>
         </div>
         <SlotProgress actualKcal={totals.kcal} targetKcal={slotKcalTarget} />
+        {isBeginnerMode && fields.length === 0 && !collapsed && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            {t("mealplan.form.beginner_slot_hint")}
+          </p>
+        )}
       </CardHeader>
       {!collapsed && (
         <CardContent className="space-y-2">
@@ -676,7 +813,7 @@ function DraggableFoodRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`grid grid-cols-12 items-end gap-2 rounded-md border bg-muted/10 p-2 ${isDragging ? "opacity-40" : ""}`}
+      className={`grid grid-cols-6 items-end gap-2 rounded-md border bg-muted/10 p-2 sm:grid-cols-12 ${isDragging ? "opacity-40" : ""}`}
     >
       <div className="col-span-1 flex items-end pb-1">
         <button
@@ -689,12 +826,12 @@ function DraggableFoodRow({
           <GripVertical className="h-4 w-4" />
         </button>
       </div>
-      <div className="col-span-5">
+      <div className="col-span-5 min-w-0">
         <Label className="text-xs">{t("mealplan.form.field.food")}</Label>
         <Button
           type="button"
           variant="outline"
-          className="w-full justify-start font-normal"
+          className="min-w-0 w-full justify-start font-normal"
           onClick={onClickFood}
         >
           <Apple className="mr-2 h-3 w-3" />
@@ -705,11 +842,11 @@ function DraggableFoodRow({
           )}
         </Button>
       </div>
-      <div className="col-span-3">
+      <div className="col-span-3 sm:col-span-3">
         <Label className="text-xs" htmlFor={`servings-${slot}-${rowIdx}`}>{t("mealplan.form.field.servings")}</Label>
         <Input type="number" step="0.5" min="0" {...countProps} id={`servings-${slot}-${rowIdx}`} />
       </div>
-      <div className="col-span-2 flex items-end justify-end gap-1">
+      <div className="col-span-3 flex items-end justify-end gap-1 sm:col-span-2">
         {foodId && (
           <Button type="button" variant="ghost" size="icon-sm" aria-label={t("mealplan.form.aria.save_preference")} onClick={() => onSavePreference(foodId)}>
             <Star className="h-4 w-4" />

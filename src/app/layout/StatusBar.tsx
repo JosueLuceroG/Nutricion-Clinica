@@ -10,11 +10,13 @@ import {
   CheckCircle2,
   AlertCircle,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { useSyncStore, type SyncStatus } from "@store/syncStore";
 import { useSyncActions } from "@services/sync/useSyncActions";
 import { ConflictResolutionModal } from "@modules/sync/ui/ConflictResolutionModal";
 import { SyncQueueDiagnosticModal } from "@modules/sync/ui/SyncQueueDiagnosticModal";
+import { usePWAInstall } from "@hooks/usePWAInstall";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
@@ -41,6 +43,7 @@ export function StatusBar() {
   const [isOnline, setIsOnline] = React.useState(
     typeof navigator !== "undefined" ? navigator.onLine : true,
   );
+  const { canInstall, promptInstall } = usePWAInstall();
 
   React.useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -114,6 +117,18 @@ export function StatusBar() {
         </span>
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          {canInstall && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="min-h-7 px-2 text-[10px]"
+              onClick={promptInstall}
+              title={t("pwa.install_desc")}
+            >
+              <Download className="h-3.5 w-3.5" aria-hidden />
+              <span className="hidden sm:inline ml-1">{t("pwa.install")}</span>
+            </Button>
+          )}
           <span className="hidden sm:flex items-center gap-1">
             {isOnline ? (
               <Wifi className="h-3.5 w-3.5 text-success" aria-hidden />

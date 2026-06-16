@@ -14,6 +14,7 @@ import type {
   PdfVitals,
   PdfAnthropometrySummary,
   PdfLabSummary,
+  PdfBrandingOptions,
 } from "./types";
 
 type FoodLookupFn = (foodId: FoodId) => Food;
@@ -80,12 +81,12 @@ export const pdfService = {
     };
   },
 
-  createPdfDocument(data: PdfMealPlanData) {
-    return generateMealPlanPdf(data);
+  createPdfDocument(data: PdfMealPlanData, branding?: PdfBrandingOptions) {
+    return generateMealPlanPdf(data, branding);
   },
 
-  download(data: PdfMealPlanData, fileName?: string) {
-    const doc = generateMealPlanPdf(data);
+  download(data: PdfMealPlanData, fileName?: string, branding?: PdfBrandingOptions) {
+    const doc = generateMealPlanPdf(data, branding);
     downloadPdf(doc, fileName ?? `plan-alimentacion-${data.patientName.replace(/\s+/g, "-").toLowerCase()}.pdf`);
   },
 
@@ -128,12 +129,12 @@ export const pdfService = {
     };
   },
 
-  createConsultationPdfDocument(data: PdfConsultationData) {
-    return generateConsultationPdf(data);
+  createConsultationPdfDocument(data: PdfConsultationData, branding?: PdfBrandingOptions) {
+    return generateConsultationPdf(data, branding);
   },
 
-  downloadConsultation(data: PdfConsultationData, fileName?: string) {
-    const doc = generateConsultationPdf(data);
+  downloadConsultation(data: PdfConsultationData, fileName?: string, branding?: PdfBrandingOptions) {
+    const doc = generateConsultationPdf(data, branding);
     const safeName = patientSafeName(data.patientName);
     downloadPdf(doc, fileName ?? `consulta-${data.consultationNumber}-${safeName}.pdf`);
   },

@@ -1,7 +1,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { MealSlotLabel, DEFAULT_KCAL_DISTRIBUTION } from "@modules/mealplan/domain/MealSlot";
-import type { PdfMealPlanData, PdfMeal } from "../types";
+import type { PdfMealPlanData, PdfMeal, PdfBrandingOptions } from "../types";
 
 const COLORS = {
   primary: [41, 112, 207] as [number, number, number],
@@ -15,15 +15,16 @@ const COLORS = {
   black: [0, 0, 0] as [number, number, number],
 };
 
-function addHeader(doc: jsPDF): void {
+function addHeader(doc: jsPDF, branding?: PdfBrandingOptions): void {
+  const clinicName = branding?.clinicDisplayName ?? "NutriClinica";
   doc.setFont("helvetica", "bold");
   doc.setFontSize(20);
   doc.setTextColor(...COLORS.primary);
-  doc.text("NutriClinica", 14, 20);
+  doc.text(clinicName, 14, 20);
 
   doc.setFontSize(16);
   doc.setTextColor(...COLORS.black);
-  doc.text("Plan de Alimentaci\u00f3n", 14, 30);
+  doc.text("Plan de Alimentación", 14, 30);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
@@ -232,7 +233,9 @@ function addNotes(doc: jsPDF, data: PdfMealPlanData, startY: number): void {
   doc.text(split, 14, y);
 }
 
-function addFooter(doc: jsPDF): void {
+function addFooter(doc: jsPDF, branding?: PdfBrandingOptions): void {
+  const clinicName = branding?.clinicDisplayName ?? "NutriClinica";
+  const showBranding = branding?.showPlatformBranding ?? true;
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
@@ -241,15 +244,19 @@ function addFooter(doc: jsPDF): void {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...COLORS.secondary);
-    doc.text("NutriClinica \u2014 Plan de Alimentaci\u00f3n", 14, 293);
-    doc.text(`P\u00e1gina ${i} de ${pageCount}`, 196, 293, { align: "right" as const });
+    if (showBranding) {
+      doc.text(`${clinicName} — Plan de Alimentación`, 14, 293);
+    } else {
+      doc.text("Plan de Alimentación", 14, 293);
+    }
+    doc.text(`Página ${i} de ${pageCount}`, 196, 293, { align: "right" as const });
   }
 }
 
-export function generateMealPlanPdf(data: PdfMealPlanData): jsPDF {
+export function generateMealPlanPdf(data: PdfMealPlanData, branding?: PdfBrandingOptions): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  addHeader(doc);
+  addHeader(doc, branding);
   addPatientInfo(doc, data);
 
   let y = 96;
@@ -259,7 +266,7 @@ export function generateMealPlanPdf(data: PdfMealPlanData): jsPDF {
 
   y = addSummaryTable(doc, data, y);
   addNotes(doc, data, y);
-  addFooter(doc);
+  addFooter(doc, branding);
 
   return doc;
 }

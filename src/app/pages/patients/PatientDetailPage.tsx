@@ -19,6 +19,8 @@ import {
   Tags,
   FileText,
   DollarSign,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ClinicalRecordCards } from "@modules/clinical-record/ui/ClinicalRecordCards";
 import { PatientMealPhotosCard } from "./PatientMealPhotosCard";
@@ -43,6 +45,7 @@ import type { RecordStatus } from "@modules/patient/domain/RecordStatus";
 import type { PatientStatus } from "@modules/patient/domain/PatientStatus";
 import { patientService } from "@services/patientService";
 import { formatCurrency } from "@utils/formatCurrency";
+import { usePreferencesStore } from "@store/preferencesStore";
 
 function patientStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: PatientStatus) {
   if (status === "deceased") return t("patient.status_deceased");
@@ -67,6 +70,12 @@ export function PatientDetailPage() {
   const paymentSummary = usePatientPaymentSummary(patientId ?? null);
   const [busy, setBusy] = React.useState(false);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
+  const isBeginnerMode = usePreferencesStore((s) => s.usageMode === "beginner");
+  const [advancedOpen, setAdvancedOpen] = React.useState(!isBeginnerMode);
+
+  React.useEffect(() => {
+    setAdvancedOpen(!isBeginnerMode);
+  }, [isBeginnerMode, patientId]);
 
   // Flujo de eliminación: si el paciente tiene entidades vinculadas
   // (consultas, planes, labs, antropometrias) abre el modal de cascada
@@ -296,15 +305,26 @@ export function PatientDetailPage() {
               </Card>
             )}
 
-            <PatientPortalLinksCard patientId={patient.id.toString()} />
-
-            <PatientPortalAdherenceCard patientId={patient.id.toString()} />
-
-            <PatientMealPhotosCard patientId={patient.id.toString()} />
-
-            <PatientMessagingCard patientId={patient.id.toString()} />
-
-            <PatientSubstitutionsCard patientId={patient.id.toString()} />
+            {isBeginnerMode ? (
+              <AdvancedPatientToolsToggle
+                open={advancedOpen}
+                onOpenChange={setAdvancedOpen}
+              >
+                <PatientPortalLinksCard patientId={patient.id.toString()} />
+                <PatientPortalAdherenceCard patientId={patient.id.toString()} />
+                <PatientMealPhotosCard patientId={patient.id.toString()} />
+                <PatientMessagingCard patientId={patient.id.toString()} />
+                <PatientSubstitutionsCard patientId={patient.id.toString()} />
+              </AdvancedPatientToolsToggle>
+            ) : (
+              <>
+                <PatientPortalLinksCard patientId={patient.id.toString()} />
+                <PatientPortalAdherenceCard patientId={patient.id.toString()} />
+                <PatientMealPhotosCard patientId={patient.id.toString()} />
+                <PatientMessagingCard patientId={patient.id.toString()} />
+                <PatientSubstitutionsCard patientId={patient.id.toString()} />
+              </>
+            )}
 
             {(patient.emergencyContactName || patient.emergencyContactPhone) && (
               <Card>
@@ -432,6 +452,41 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-medium">{value}</span>
     </div>
+  );
+}
+
+function AdvancedPatientToolsToggle({
+  open,
+  onOpenChange,
+  children,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">{t("patient.beginner_advanced_tools")}</CardTitle>
+          <CardDescription>{t("patient.beginner_advanced_tools_desc")}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full"
+            onClick={() => onOpenChange(!open)}
+          >
+            {open ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+            {open ? t("patient.beginner_hide_advanced") : t("patient.beginner_show_advanced")}
+          </Button>
+        </CardContent>
+      </Card>
+      {open && children}
+    </>
   );
 }
 

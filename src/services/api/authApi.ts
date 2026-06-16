@@ -21,7 +21,6 @@ export const authApi = {
     return httpRequest<AuthResponse>('/auth/register', {
       method: 'POST',
       body: input,
-      skipAuth: true,
     });
   },
 

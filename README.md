@@ -50,6 +50,7 @@ pnpm run e2e          # requiere servidores arriba
 ## Documentación
 
 - [`spec.md`](spec.md) — especificación completa del producto y arquitectura (~5400 líneas)
+- [`docs/roadmap/saas-ux-clinical-sprints.md`](docs/roadmap/saas-ux-clinical-sprints.md) — roadmap operativo SaaS/UX/clínico por sprints
 - [`docs/decisions/`](docs/decisions/) — ADRs formales (Michael Nygard)
 - [`docs/operations/pre-production-checklist.md`](docs/operations/pre-production-checklist.md) — validación final local y checklist staging/producción
 - [`apps/api/.env.example`](apps/api/.env.example) — variables de entorno del backend

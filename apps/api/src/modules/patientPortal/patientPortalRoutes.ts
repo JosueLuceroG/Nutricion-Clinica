@@ -7,6 +7,7 @@ import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
 import { sendEmail, logEmailSent, renderTemplate } from '../../services/email/emailService.js';
+import { broadcastMessageNew, broadcastMessageRead } from './chatServer.js';
 
 const router: Router = ExpressRouter();
 
@@ -809,7 +810,10 @@ router.post('/messages', requireAuth, requireSucursalAccess, async (req: Request
       auditOperation: 'create',
     });
 
-    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
+    const createdMessage = created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id };
+    broadcastMessageNew(body.pacienteId, createdMessage);
+
+    res.status(201).json({ message: createdMessage });
   } catch (err) {
     next(err);
   }
@@ -853,7 +857,10 @@ router.patch('/messages/:id/read', requireAuth, requireSucursalAccess, async (re
       return;
     }
 
-    res.json({ message: rowToPortalMessage(row) });
+    const updatedMessage = rowToPortalMessage(row);
+    broadcastMessageRead(row.paciente_id, row.id, updatedMessage.readAt as string | null);
+
+    res.json({ message: updatedMessage });
   } catch (err) {
     next(err);
   }
@@ -1800,6 +1807,9 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
       auditOperation: 'create',
     });
 
+    const createdMessage = created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id };
+    broadcastMessageNew(access.paciente_id, createdMessage);
+
     // Notify professional by email
     try {
       const profResult = await pool
@@ -1835,7 +1845,7 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
       // Email notification failure should not block the message
     }
 
-    res.status(201).json({ message: created.recordset[0] ? rowToPortalMessage(created.recordset[0]) : { id } });
+    res.status(201).json({ message: createdMessage });
   } catch (err) {
     next(err);
   }

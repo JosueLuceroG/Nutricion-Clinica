@@ -26,7 +26,7 @@ export function AppLayout() {
   const contextOpen = useUIStore((s) => s.contextPanelOpen);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:ring-2 focus:ring-ring focus:rounded-md"
@@ -36,13 +36,13 @@ export function AppLayout() {
 
       <Sidebar />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header />
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex min-w-0 flex-1 overflow-hidden">
           <main
             id="main-content"
-            className="flex-1 overflow-y-auto"
+            className="min-w-0 flex-1 overflow-y-auto"
             tabIndex={-1}
             aria-label={t("layout.main_content")}
           >
@@ -78,21 +78,21 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-1 border-b bg-background px-6 py-4 sm:flex-row sm:items-center sm:justify-between",
+        "flex min-w-0 flex-col gap-3 border-b bg-background px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6",
         className,
       )}
     >
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
+      <div className="min-w-0">
+        <h1 className="break-words text-xl font-semibold tracking-tight">{title}</h1>
         {description && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="break-words text-sm text-muted-foreground">{description}</p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">{actions}</div>}
     </div>
   );
 }
 
 export function PageContent({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("p-4 sm:p-6", className)}>{children}</div>;
+  return <div className={cn("min-w-0 p-4 sm:p-6", className)}>{children}</div>;
 }

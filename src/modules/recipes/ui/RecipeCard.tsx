@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import type { RecipeCategory } from "../domain/RecipeTypes";
 import { Badge } from "@components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
-import { Clock, Users, ChefHat, AlertCircle, Flame, Beef, Wheat, Droplets } from "lucide-react";
+import { Clock, Users, ChefHat, AlertCircle, Flame, Beef, Wheat, Droplets, DollarSign } from "lucide-react";
 
 interface RecipeCardProps {
   id: string;
@@ -17,6 +17,8 @@ interface RecipeCardProps {
   proteinG?: number;
   carbsG?: number;
   fatG?: number;
+  costTotal?: number;
+  currency?: string;
   onClick?: () => void;
 }
 
@@ -38,7 +40,7 @@ const difficultyLabelKey: Record<string, string> = {
   dificil: "recipes.difficulty_hard",
 };
 
-export function RecipeCard({ name, category, difficulty, servings, totalTimeMin, status, ingredientCount, kcal, proteinG, carbsG, fatG, onClick }: RecipeCardProps) {
+export function RecipeCard({ name, category, difficulty, servings, totalTimeMin, status, ingredientCount, kcal, proteinG, carbsG, fatG, costTotal, currency, onClick }: RecipeCardProps) {
   const { t } = useTranslation();
   return (
     <button type="button" onClick={onClick} className="w-full text-left">
@@ -93,6 +95,12 @@ export function RecipeCard({ name, category, difficulty, servings, totalTimeMin,
                 <Droplets className="h-3 w-3 text-blue-500" />
                 {Math.round(fatG ?? 0)}g
               </span>
+            </div>
+          )}
+          {costTotal !== undefined && costTotal > 0 && (
+            <div className="mt-2 flex items-center gap-1 border-t pt-2 text-xs text-muted-foreground">
+              <DollarSign className="h-3 w-3 text-emerald-500" />
+              <span>{t("pricing.total_cost")}: {costTotal.toFixed(2)} {currency ?? "MXN"}</span>
             </div>
           )}
         </CardContent>

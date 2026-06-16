@@ -7,6 +7,7 @@ import { RecipeCard } from "@modules/recipes/ui/RecipeCard";
 import { RecipeDialog } from "@modules/recipes/ui/RecipeDialog";
 import { useRecipes, useCreateRecipe } from "@modules/recipes/ui/useRecipeHooks";
 import { recipeService } from "@services/recipeService";
+import { calculateRecipeCost } from "@modules/pricing/application/recipeCostCalculator";
 import type { RecipeFormInput } from "@modules/recipes/application/recipeFormSchema";
 
 export function RecipesPage() {
@@ -16,6 +17,7 @@ export function RecipesPage() {
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [recipesWithNutrition, setRecipesWithNutrition] = React.useState<Record<string, { kcal: number; proteinG: number; carbsG: number; fatG: number }>>({});
+  const [recipesWithCosts, setRecipesWithCosts] = React.useState<Record<string, { costTotal: number; currency: string }>>({});
 
   React.useEffect(() => {
     if (recipes.length === 0) return;
@@ -27,7 +29,20 @@ export function RecipesPage() {
         map[r.id] = { kcal: (r as typeof enriched[0]).kcal, proteinG: (r as typeof enriched[0]).proteinG, carbsG: (r as typeof enriched[0]).carbsG, fatG: (r as typeof enriched[0]).fatG };
       }
       setRecipesWithNutrition(map);
-    }).catch(() => {});
+    }).catch((err) => { console.error("[RecipesPage] Failed to load nutrition data", err); });
+
+    Promise.all(
+      recipes.map(async (r) => {
+        const cost = await calculateRecipeCost(r.ingredients ?? [], r.servings);
+        return { id: r.id, costTotal: cost.costTotal, currency: cost.currency };
+      }),
+    ).then((costs) => {
+      if (cancelled) return;
+      const map: Record<string, { costTotal: number; currency: string }> = {};
+      for (const c of costs) map[c.id] = { costTotal: c.costTotal, currency: c.currency };
+      setRecipesWithCosts(map);
+    }).catch((err) => { console.error("[RecipesPage] Failed to calculate recipe costs", err); });
+
     return () => { cancelled = true; };
   }, [recipes]);
 
@@ -90,6 +105,7 @@ export function RecipesPage() {
                 status={r.status}
                 ingredientCount={r.ingredients.length}
                 {...(recipesWithNutrition[r.id] ?? {})}
+                {...(recipesWithCosts[r.id] ?? {})}
               />
             ))}
           </div>

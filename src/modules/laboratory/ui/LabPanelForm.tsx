@@ -2,6 +2,7 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Save, X, FlaskConical, Info, Stethoscope } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -24,6 +25,7 @@ import { Textarea } from "@components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Badge } from "@components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@components/ui/tooltip";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
 
 interface LabPanelFormProps {
   patientId: PatientId;
@@ -36,6 +38,7 @@ const grouped = getLabTestsByCategory();
 
 export function LabPanelForm({ patientId, patientAge, patientSex, initialResults }: LabPanelFormProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
 
   const form = useForm<LabPanelFormValues>({
@@ -43,8 +46,10 @@ export function LabPanelForm({ patientId, patientAge, patientSex, initialResults
     defaultValues: labPanelFormDefaultValues,
   });
 
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = form;
+  const { register, handleSubmit, formState: { errors, isDirty }, watch, setValue } = form;
   const values = watch();
+
+  useUnsavedChangesGuard(isDirty && !submitting, t("common.unsaved_changes_warning"));
 
   React.useEffect(() => {
     if (initialResults && initialResults.length > 0) {
@@ -174,12 +179,12 @@ export function LabPanelForm({ patientId, patientAge, patientSex, initialResults
         </Card>
       )}
 
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t pt-4">
-        <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
+      <div className="flex flex-col gap-2 border-t pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+        <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => navigate(-1)} disabled={submitting}>
           <X className="mr-2 h-4 w-4" />
           Cancelar
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
           <Save className="mr-2 h-4 w-4" />
           {submitting ? "Guardando…" : "Registrar panel"}
         </Button>
@@ -226,8 +231,9 @@ function LabCategorySection({
               label={`${test.name} (${test.unit})`}
               error={errors[test.code]?.message}
             >
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <Input
+                  className="min-w-0"
                   type="number"
                   step={test.decimals > 0 ? `0.${"0".repeat(test.decimals)}1` : "1"}
                   {...register(test.code)}
@@ -238,6 +244,7 @@ function LabCategorySection({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Badge
+                        className="shrink-0"
                         variant={flag === "critical-low" || flag === "critical-high" ? "destructive" : "warning"}
                         aria-label={labFlagMessage(flag, test.name, value as number, range)}
                       >

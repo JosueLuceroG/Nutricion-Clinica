@@ -1,4 +1,4 @@
-export { aiClient } from "./AIClient";
+export { aiClient, isAIEnvironmentEnabled } from "./AIClient";
 export { aiService } from "./AIService";
 export type { AIExecuteOptions } from "./AIService";
 export { AI_CAPABILITIES, getCapabilityDef } from "./AICapabilities";

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { usePreferencesStore } from "@store/preferencesStore";
 import i18n from "../../../i18n/config";
 import {
   ArrowLeft,
@@ -52,6 +53,9 @@ export function ConsultationDetailPage() {
   const [paidTarget, setPaidTarget] = React.useState<Consultation | null>(null);
   const userRole = useCurrentRole();
   const canManagePayment = isBillingRole(userRole);
+  const subscriptionPlan = usePreferencesStore((s) => s.subscriptionPlan);
+  const pdfBrandingEnabled = usePreferencesStore((s) => s.pdfBrandingEnabled);
+  const clinicDisplayName = usePreferencesStore((s) => s.clinicDisplayName);
 
   const onTransition = async (to: "in-progress" | "completed" | "cancelled" | "scheduled") => {
     if (!id) return;
@@ -116,8 +120,14 @@ export function ConsultationDetailPage() {
             takenAt: labPanel.takenAt,
           }
         : null;
+      const branding: { clinicDisplayName: string; showPlatformBranding: boolean } = {
+        clinicDisplayName,
+        showPlatformBranding: subscriptionPlan === "free" || pdfBrandingEnabled,
+      };
       pdfService.downloadConsultation(
         pdfService.generateConsultationPdf(consultation, patient, pdfAnthropometry, pdfLab),
+        undefined,
+        branding,
       );
       toast.success(t("consultation.pdf_downloaded"));
     } catch (err) {

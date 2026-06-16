@@ -139,3 +139,17 @@ export function useMarkNoShow() {
   };
   return { markNoShow };
 }
+
+export function useConfirmAppointment() {
+  const confirm = async (id: AppointmentId) => {
+    return agendaService.confirm(id);
+  };
+  return { confirm };
+}
+
+export function useCompleteAppointment() {
+  const complete = async (id: AppointmentId, consultationId?: string) => {
+    return agendaService.complete(id, consultationId);
+  };
+  return { complete };
+}

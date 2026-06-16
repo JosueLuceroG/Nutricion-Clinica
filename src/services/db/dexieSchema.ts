@@ -41,6 +41,21 @@ export interface AIUsageLogRow {
   created_at: string;
 }
 
+export interface FoodPriceRow {
+  id: string;
+  food_id: string;
+  food_name: string;
+  price: number;
+  currency: string;
+  quantity_base: number;
+  unit: string;
+  sucursal_id: string | null;
+  effective_date: string | null;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TelemedicinaRecordingRow {
   id: string;
   sala_id: string;
@@ -216,6 +231,7 @@ const EVOLUTION_RECORDS_STORES = "id, patient_id, consultation_id, professional_
 const EVOLUTION_INDICATORS_STORES = "id, patient_id, variable, status, calculated_at";
 const TEMPORAL_COMPARISONS_STORES = "id, patient_id, current_consultation_id, compared_consultation_id";
 const STAGNATION_ALERTS_STORES = "id, patient_id, variable, severity, generated_at";
+const FOOD_PRICES_STORES = "id, food_id, sucursal_id, created_at";
 
 export interface SyncMetaRow {
   key: string;
@@ -275,6 +291,7 @@ export class NutriClinicaDB extends Dexie {
   stagnation_alerts!: Table<StagnationAlertRow, string>;
   payments!: Table<PaymentRow, string>;
   expenses!: Table<ExpenseRow, string>;
+  food_prices!: Table<FoodPriceRow, string>;
 
   constructor(name = "nutriclinica") {
     super(name);
@@ -440,6 +457,10 @@ export class NutriClinicaDB extends Dexie {
       meal_plans: MEAL_PLANS_STORES,
       adherence_records: ADHERENCE_RECORDS_STORES,
       adherence_indexes: ADHERENCE_INDEXES_STORES,
+    });
+
+    this.version(31).stores({
+      food_prices: FOOD_PRICES_STORES,
     });
   }
 }

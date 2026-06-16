@@ -56,6 +56,11 @@ export interface PdfLabSummary {
   takenAt: string;
 }
 
+export interface PdfBrandingOptions {
+  clinicDisplayName: string;
+  showPlatformBranding: boolean;
+}
+
 export interface PdfConsultationData {
   patientName: string;
   consultationNumber: number;

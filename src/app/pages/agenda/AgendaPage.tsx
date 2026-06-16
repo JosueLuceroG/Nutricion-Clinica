@@ -2,8 +2,12 @@ import * as React from "react";
 import { DayPicker } from "react-day-picker";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
-import { ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle, CalendarX, User, FileText, Clock, Settings } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Plus, RefreshCw, XCircle, CalendarX,
+  User, FileText, Clock, Settings, CheckCircle2, RotateCcw, Stethoscope,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
@@ -20,13 +24,23 @@ import {
 import { AppointmentDialog } from "@modules/agenda/ui/AppointmentDialog";
 import { AppointmentCard } from "@modules/agenda/ui/AppointmentCard";
 import { AvailabilityDialog } from "@modules/agenda/ui/AvailabilityDialog";
-import { useAppointmentsByRange, useCreateAppointment, useAvailableSlots, useCancelAppointment, useMarkNoShow } from "@modules/agenda/ui/useAgendaHooks";
+import { WeekView } from "@modules/agenda/ui/WeekView";
+import { ListView } from "@modules/agenda/ui/ListView";
+import { RescheduleDialog } from "@modules/agenda/ui/RescheduleDialog";
+import {
+  useAppointmentsByRange, useCreateAppointment, useAvailableSlots,
+  useCancelAppointment, useMarkNoShow, useConfirmAppointment,
+  useCompleteAppointment, useRescheduleAppointment,
+} from "@modules/agenda/ui/useAgendaHooks";
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@services/db";
 import type { Appointment } from "@modules/agenda/domain/Appointment";
 import type { AppointmentStatus } from "@modules/agenda/domain/AppointmentStatus";
+import { appointmentIdFromUnsafe } from "@modules/agenda/domain/AppointmentId";
 import "react-day-picker/style.css";
+
+type AgendaView = "day" | "week" | "list";
 
 function toDateStr(d: Date): string {
   return format(d, "yyyy-MM-dd");
@@ -44,6 +58,7 @@ const statusLabelKey: Record<string, string> = {
 
 export function AgendaPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const today = new Date();
   const [currentMonth, setCurrentMonth] = React.useState(today);
   const [selectedDate, setSelectedDate] = React.useState(today);
@@ -51,6 +66,9 @@ export function AgendaPage() {
   const [availabilityOpen, setAvailabilityOpen] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<Appointment | null>(null);
   const [detailBusy, setDetailBusy] = React.useState(false);
+  const [view, setView] = React.useState<AgendaView>("day");
+  const [statusFilter, setStatusFilter] = React.useState<AppointmentStatus | "">("");
+  const [rescheduleTarget, setRescheduleTarget] = React.useState<Appointment | null>(null);
 
   const monthStart = toDateStr(startOfMonth(currentMonth));
   const monthEnd = toDateStr(endOfMonth(currentMonth));
@@ -61,6 +79,9 @@ export function AgendaPage() {
   const { load: loadAvailableSlots } = useAvailableSlots();
   const { cancel } = useCancelAppointment();
   const { markNoShow } = useMarkNoShow();
+  const { confirm } = useConfirmAppointment();
+  const { complete } = useCompleteAppointment();
+  const { reschedule } = useRescheduleAppointment();
 
   const patients = useLiveQuery(
     () => db.patients
@@ -106,6 +127,40 @@ export function AgendaPage() {
     setDetailTarget(appt);
   };
 
+  const handleConfirm = async () => {
+    if (!detailTarget) return;
+    setDetailBusy(true);
+    try {
+      await confirm(detailTarget.id);
+      toast.success(t("agenda.confirm_success"));
+      setDetailTarget(null);
+      refresh();
+    } catch (err) {
+      toast.error(t("common.error_occurred"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!detailTarget) return;
+    setDetailBusy(true);
+    try {
+      await complete(detailTarget.id);
+      toast.success(t("agenda.complete_success"));
+      setDetailTarget(null);
+      refresh();
+    } catch (err) {
+      toast.error(t("common.error_occurred"), {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setDetailBusy(false);
+    }
+  };
+
   const handleCancelAppointment = async () => {
     if (!detailTarget) return;
     setDetailBusy(true);
@@ -140,6 +195,24 @@ export function AgendaPage() {
     }
   };
 
+  const handleStartConsultation = () => {
+    if (!detailTarget) return;
+    const params = new URLSearchParams({
+      appointmentId: detailTarget.id,
+      reason: detailTarget.reason,
+      appointmentDate: detailTarget.date,
+    });
+    navigate(`/pacientes/${detailTarget.patientId}/consultas/nueva?${params.toString()}`);
+  };
+
+  const handleReschedule = async (id: string, date: string, startTime: string, endTime: string) => {
+    await reschedule(appointmentIdFromUnsafe(id), { date, startTime, endTime });
+    toast.success(t("agenda.reschedule_success"));
+    setDetailTarget(null);
+    setRescheduleTarget(null);
+    refresh();
+  };
+
   const modifiers = {
     hasAppointments: (date: Date) => {
       const str = toDateStr(date);
@@ -154,6 +227,9 @@ export function AgendaPage() {
     },
   };
 
+  const canModify = (status: string) =>
+    status !== "cancelled" && status !== "completed" && status !== "no_show";
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-col gap-3 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
@@ -163,7 +239,23 @@ export function AgendaPage() {
             {format(currentMonth, "MMMM yyyy", { locale: es })}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          <div className="flex items-center rounded-md border p-0.5">
+            {(["day", "week", "list"] as const).map((v) => (
+              <Button
+                key={v}
+                variant={view === v ? "default" : "ghost"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => setView(v)}
+              >
+                {t(v === "list" ? "agenda.view_list" : `agenda.${v}`)}
+              </Button>
+            ))}
+          </div>
+
+          <Separator orientation="vertical" className="hidden h-6 sm:block" />
+
           <Button variant="outline" size="icon" aria-label={t("common.previous_month")} onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -173,24 +265,24 @@ export function AgendaPage() {
           <Button variant="outline" size="icon" aria-label={t("common.next_month")} onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Separator orientation="vertical" className="h-6" />
+          <Separator orientation="vertical" className="hidden h-6 sm:block" />
           <Button variant="outline" size="icon" aria-label={t("common.refresh")} onClick={refresh} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="outline" onClick={() => setAvailabilityOpen(true)}>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => setAvailabilityOpen(true)}>
             <Settings className="mr-1 h-4 w-4" />
             {t("agenda.availability")}
           </Button>
-          <Button onClick={() => setDialogOpen(true)}>
+          <Button className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
             <Plus className="mr-1 h-4 w-4" />
             {t("agenda.new_appointment")}
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col gap-4 overflow-hidden p-4 sm:p-6 lg:flex-row">
+      <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-6 lg:flex-row lg:overflow-hidden">
         <Card className="w-full lg:w-[400px] lg:shrink-0">
-          <CardContent className="p-3">
+          <CardContent className="overflow-x-auto p-3">
             <DayPicker
               mode="single"
               selected={selectedDate}
@@ -200,7 +292,7 @@ export function AgendaPage() {
               locale={es}
               modifiers={modifiers}
               modifiersStyles={modifiersStyles}
-              className="!m-0"
+              className="!m-0 min-w-max sm:min-w-0"
             />
           </CardContent>
         </Card>
@@ -208,12 +300,33 @@ export function AgendaPage() {
         <Card className="flex-1">
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              {format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
+              {view === "week" && (
+                <span>
+                  {format(startOfMonth(currentMonth), "MMMM yyyy", { locale: es })}
+                </span>
+              )}
+              {view === "list" && t("agenda.view_list")}
+              {view === "day" && format(selectedDate, "EEEE d 'de' MMMM", { locale: es })}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <p className="py-8 text-center text-sm text-muted-foreground">{t("agenda.loading")}</p>
+            ) : view === "week" ? (
+              <WeekView
+                selectedDate={selectedDate}
+                appointments={appointments}
+                patients={patients}
+                onAppointmentClick={handleAppointmentClick}
+              />
+            ) : view === "list" ? (
+              <ListView
+                appointments={appointments}
+                patients={patients}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                onAppointmentClick={handleAppointmentClick}
+              />
             ) : dayAppointments.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">{t("agenda.no_appointments")}</p>
@@ -222,7 +335,7 @@ export function AgendaPage() {
                 </Button>
               </div>
             ) : (
-              <ScrollArea className="h-[500px] pr-4">
+              <ScrollArea className="h-[min(60dvh,500px)] pr-4">
                 <div className="space-y-2">
                   {dayAppointments
                     .sort((a, b) => a.startTime.localeCompare(b.startTime))
@@ -266,7 +379,7 @@ export function AgendaPage() {
         onChanged={refresh}
       />
 
-      <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) setDetailTarget(null); }}>
+      <Dialog open={!!detailTarget} onOpenChange={(o) => { if (!o) { setDetailTarget(null); } }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>{t("agenda.appointment_detail")}</DialogTitle>
@@ -298,9 +411,29 @@ export function AgendaPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {detailTarget.status !== "cancelled" && detailTarget.status !== "completed" && detailTarget.status !== "no_show" && (
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button variant="default" size="sm" onClick={handleStartConsultation}>
+                  <Stethoscope className="mr-1 h-4 w-4" />
+                  {t("agenda.start_consultation")}
+                </Button>
+                {canModify(detailTarget.status) && (
                   <>
+                    {detailTarget.status === "scheduled" && (
+                      <Button variant="default" size="sm" onClick={handleConfirm} disabled={detailBusy}>
+                        <CheckCircle2 className="mr-1 h-4 w-4" />
+                        {t("agenda.confirm_appointment")}
+                      </Button>
+                    )}
+                    {(detailTarget.status === "scheduled" || detailTarget.status === "confirmed" || detailTarget.status === "in_progress") && (
+                      <Button variant="default" size="sm" onClick={handleComplete} disabled={detailBusy}>
+                        <CheckCircle2 className="mr-1 h-4 w-4" />
+                        {t("agenda.complete_appointment")}
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => setRescheduleTarget(detailTarget)} disabled={detailBusy}>
+                      <RotateCcw className="mr-1 h-4 w-4" />
+                      {t("agenda.reschedule")}
+                    </Button>
                     <Button variant="destructive" size="sm" onClick={handleCancelAppointment} disabled={detailBusy}>
                       <XCircle className="mr-1 h-4 w-4" />
                       {t("agenda.cancel_appointment")}
@@ -316,6 +449,19 @@ export function AgendaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <RescheduleDialog
+        open={!!rescheduleTarget}
+        onOpenChange={(o) => { if (!o) setRescheduleTarget(null); }}
+        appointmentId={rescheduleTarget?.id ?? ""}
+        patientName={
+          rescheduleTarget
+            ? patients.find((p) => p.id === rescheduleTarget.patientId)?.name ?? t("common.patient")
+            : ""
+        }
+        onSubmit={handleReschedule}
+        loadAvailableSlots={loadAvailableSlots}
+      />
     </div>
   );
 }

@@ -9,7 +9,7 @@ const languages = [
 ] as const;
 
 export function LanguageSwitcher({ collapsed }: { collapsed?: boolean }) {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
 
   const currentLang = languages.find((l) => l.code === i18n.language) ?? languages[0];
 
@@ -23,7 +23,7 @@ export function LanguageSwitcher({ collapsed }: { collapsed?: boolean }) {
           void i18n.changeLanguage(next);
         }}
         className="w-full justify-center"
-        aria-label="Cambiar idioma"
+        aria-label={t("layout.change_language")}
       >
         <Globe className="h-4 w-4" />
       </Button>

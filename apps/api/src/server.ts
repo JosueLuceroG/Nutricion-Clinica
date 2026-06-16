@@ -19,6 +19,7 @@ import syncRouter from "./modules/sync/syncRoutes.js";
 import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
 import aiRouter from "./modules/ai/aiRoutes.js";
 import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
+import { createChatServer } from "./modules/patientPortal/chatServer.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { runRetentionCleanup, RETENTION_CONFIG } from "./services/retention/index.js";
 
@@ -72,6 +73,7 @@ const port = Number(process.env.PORT ?? 3000);
 const httpServer = createServer(app);
 
 createSignalingServer(httpServer);
+createChatServer(httpServer);
 
 httpServer.listen(port, () => {
   console.log(`[nutriclinica-api] listening on http://localhost:${port}`);

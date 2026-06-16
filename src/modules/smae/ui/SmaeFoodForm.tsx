@@ -21,6 +21,13 @@ import { Button } from "@components/ui/button";
 import { Input } from "@components/ui/input";
 import { Label } from "@components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -52,6 +59,8 @@ export function SmaeFoodForm({
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SmaeCustomFoodFormInput>({
     resolver: zodResolver(SmaeCustomFoodFormSchema),
@@ -160,17 +169,14 @@ export function SmaeFoodForm({
 
           <div className="space-y-1">
             <Label htmlFor="group">Grupo SMAE</Label>
-            <select
-              id="group"
-              className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-              {...register("group")}
-            >
-              {FOOD_GROUPS.map((g) => (
-                <option key={g} value={g}>
-                  {FoodGroupLabel[g]}
-                </option>
-              ))}
-            </select>
+            <Select value={watch("group")} onValueChange={(v) => setValue("group", v as never)}>
+              <SelectTrigger id="group"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {FOOD_GROUPS.map((g) => (
+                  <SelectItem key={g} value={g}>{FoodGroupLabel[g]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.group && <p className="text-xs text-destructive">{errors.group.message}</p>}
           </div>
 

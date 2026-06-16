@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   ShieldCheck,
   UtensilsCrossed,
+  Wifi,
 } from "lucide-react";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
@@ -40,6 +41,7 @@ import {
 } from "@components/ui/tooltip";
 import { getSystemFoodById } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "@modules/mealplan/domain/MealSlot";
+import { useRealtimeChat } from "@hooks/useRealtimeChat";
 import {
   flushPendingPortalAdherenceSubmissions,
   getDocumentDownloadUrl,
@@ -57,7 +59,6 @@ import {
   type PatientPortalPayload,
   type PatientPortalPlan,
   type PortalMealPhoto,
-  type PortalMessage,
   type PortalNotification,
   type SubmitPortalAdherenceInput,
   submitPatientPortalAdherenceWithQueue,
@@ -228,7 +229,7 @@ function PortalContent({
             <CardDescription className="text-primary-foreground/80">
               {t("patient_portal.patient_summary")}
             </CardDescription>
-            <CardTitle className="text-3xl sm:text-4xl">
+        <CardTitle className="break-words text-3xl sm:text-4xl">
               {t("patient_portal.hello", { name: patientFirstName })}
             </CardTitle>
           </CardHeader>
@@ -660,9 +661,9 @@ function ActivePlanCard({
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0">
             <CardDescription>{t("patient_portal.plan_title")}</CardDescription>
-            <CardTitle className="mt-1 text-2xl">{plan.name}</CardTitle>
+            <CardTitle className="mt-1 break-words text-2xl">{plan.name}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(plan.startDate, locale)}
               {plan.endDate ? ` - ${formatDate(plan.endDate, locale)}` : ""}
@@ -744,11 +745,11 @@ function MealsList({ meals }: { meals: PatientPortalMeal[] }) {
                 const food = getSystemFoodById(exchange.foodId);
                 return (
                   <li key={`${exchange.foodId}-${index}`} className="text-sm">
-                    <span className="font-medium">
+                    <span className="break-words font-medium">
                       {exchange.count}x {food?.shortName ?? exchange.foodId}
                     </span>
                     {food && (
-                      <span className="text-muted-foreground">
+                      <span className="break-words text-muted-foreground">
                         {" "}
                         - {food.serving}
                       </span>
@@ -865,7 +866,7 @@ function NotificationsCard({ token }: { token: string }) {
         setNotifications(result.notifications);
         setCacheState({ source: result.source, cachedAt: result.cachedAt });
       })
-      .catch(() => {})
+      .catch((err) => { console.error("[PatientPortalPage] Failed to load notifications", err); })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
@@ -900,7 +901,7 @@ function NotificationsCard({ token }: { token: string }) {
               {notifications.map((n) => (
                 <li
                   key={n.id}
-                  className="flex items-center justify-between rounded-lg border p-2 text-xs"
+                  className="flex flex-col gap-2 rounded-lg border p-2 text-xs sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{n.subject}</p>
@@ -957,7 +958,7 @@ function DocumentsCard({
           <ul className="space-y-3">
             {documents.map((document) => (
               <li key={document.id} className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="break-words text-sm font-medium">
                       {document.fileName}
@@ -992,7 +993,7 @@ function DocumentsCard({
                           </TooltipTrigger>
                           <TooltipContent
                             side="bottom"
-                            className="max-w-[300px] break-all text-xs"
+                            className="max-w-[calc(100vw-4rem)] break-all text-xs sm:max-w-[300px]"
                           >
                             <p className="font-medium">
                               {t("patient_portal.document_sha_title")}
@@ -1005,8 +1006,8 @@ function DocumentsCard({
                       </TooltipProvider>
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-1.5">
-                    <Button asChild variant="outline" size="sm">
+                  <div className="flex w-full shrink-0 flex-col gap-1.5 sm:w-auto">
+                    <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
                       <a
                         href={getDocumentPreviewUrl(token, document.id)}
                         target="_blank"
@@ -1016,7 +1017,7 @@ function DocumentsCard({
                         {t("patient_portal.document_preview")}
                       </a>
                     </Button>
-                    <Button asChild variant="default" size="sm">
+                    <Button asChild variant="default" size="sm" className="w-full sm:w-auto">
                       <a
                         href={getDocumentDownloadUrl(token, document.id)}
                         download={document.fileName}
@@ -1155,7 +1156,7 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
                 id="portal-meal-photo-slot"
                 value={mealSlot}
                 onChange={(event) => setMealSlot(event.target.value)}
-                className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {MEAL_SLOT_ORDER.map((slot) => (
                   <option key={slot} value={slot}>
@@ -1234,7 +1235,7 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
                     loading="lazy"
                   />
                   <div className="space-y-1 p-3 text-sm">
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <p className="font-medium">{mealSlotLabel(t, photo.mealSlot)}</p>
                       {photo.reviewedAt && (
                         <Badge variant="success" className="shrink-0">
@@ -1259,25 +1260,27 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
 
 function MessagingCard({ token }: { token: string }) {
   const { t, i18n } = useTranslation();
-  const [messages, setMessages] = React.useState<PortalMessage[]>([]);
   const [input, setInput] = React.useState("");
-  const [loading, setLoading] = React.useState(true);
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
-  const loadMessages = React.useCallback(async () => {
-    try {
-      const msgs = await listPatientPortalMessages(token);
-      setMessages(msgs);
-    } catch { /* ignore polling errors */ }
+  const getChatWsUrl = React.useCallback(() => {
+    const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
+    return `${apiUrl.replace(/^http/, "ws")}/ws/chat?portalToken=${encodeURIComponent(token)}`;
   }, [token]);
 
-  React.useEffect(() => {
-    setLoading(true);
-    loadMessages().finally(() => setLoading(false));
-    const interval = setInterval(() => void loadMessages(), 30_000);
-    return () => clearInterval(interval);
-  }, [loadMessages]);
+  const { messages, send, loading, isRealtime } = useRealtimeChat({
+    wsUrl: getChatWsUrl(),
+    fetchMessages: React.useCallback(
+      (signal) => listPatientPortalMessages(token, signal),
+      [token],
+    ),
+    sendMessage: React.useCallback(
+      async (content: string) => { await sendPatientPortalMessage(token, content); },
+      [token],
+    ),
+    markAsRead: React.useCallback(async () => {}, []),
+  });
 
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -1288,8 +1291,7 @@ function MessagingCard({ token }: { token: string }) {
     if (!text || sending) return;
     setSending(true);
     try {
-      const msg = await sendPatientPortalMessage(token, text);
-      setMessages((prev) => [...prev, msg]);
+      await send(text);
       setInput("");
     } catch {
       // Could add error toast
@@ -1311,6 +1313,12 @@ function MessagingCard({ token }: { token: string }) {
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageCircle className="h-4 w-4 text-primary" aria-hidden />
           {t("patient_portal.messages_title")}
+          {isRealtime ? (
+            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+              <Wifi className="h-3 w-3 text-success" />
+              {t("sync.online")}
+            </Badge>
+          ) : null}
         </CardTitle>
         <CardDescription>{t("patient_portal.messages_desc")}</CardDescription>
       </CardHeader>
@@ -1354,7 +1362,7 @@ function MessagingCard({ token }: { token: string }) {
             <div ref={bottomRef} />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -1366,7 +1374,7 @@ function MessagingCard({ token }: { token: string }) {
             <Button
               onClick={() => void handleSend()}
               disabled={!input.trim() || sending}
-              className="self-end"
+              className="w-full self-end sm:w-auto"
               size="sm"
             >
               {sending

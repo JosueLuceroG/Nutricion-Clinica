@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import { ArrowLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -7,12 +7,25 @@ import { Button } from "@components/ui/button";
 import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState } from "@components/layout/EmptyState";
 import { ConsultationWizard } from "@modules/consultation/ui/ConsultationWizard";
+import type { ConsultationFormValues } from "@modules/consultation/application/consultationFormSchema";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 
 export function NewConsultationPage() {
   const { t } = useTranslation();
   const { patientId } = useParams();
+  const [searchParams] = useSearchParams();
+  const appointmentId = searchParams.get("appointmentId");
+  const prefillReason = searchParams.get("reason") || "";
+  const prefillDate = searchParams.get("appointmentDate") || "";
+
+  const initialValues = React.useMemo<Partial<ConsultationFormValues> | undefined>(() => {
+    const vals: Partial<ConsultationFormValues> = {};
+    if (prefillReason) vals.reason = prefillReason;
+    if (prefillDate) vals.consultationDate = prefillDate;
+    return Object.keys(vals).length > 0 ? vals : undefined;
+  }, [prefillReason, prefillDate]);
+
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
@@ -68,9 +81,14 @@ export function NewConsultationPage() {
         <div className="mx-auto max-w-3xl">
           <ConsultationWizard
             patientId={id}
-            onComplete={(consultationId) =>
-              window.location.assign(`#/consultas/${consultationId}`)
-            }
+            initialValues={initialValues}
+            onComplete={(consultationId) => {
+              if (appointmentId) {
+                window.location.assign(`#/agenda`);
+              } else {
+                window.location.assign(`#/consultas/${consultationId}`);
+              }
+            }}
           />
         </div>
       </PageContent>

@@ -195,8 +195,8 @@ export function Sidebar() {
           />
           <aside
             className={cn(
-              "fixed inset-y-0 left-0 z-50 flex h-full flex-col border-r bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200",
-              collapsed ? "w-16" : "w-72",
+               "fixed inset-y-0 left-0 z-50 flex h-full max-w-[calc(100vw-2rem)] flex-col border-r bg-sidebar text-sidebar-foreground shadow-xl transition-transform duration-200",
+               collapsed ? "w-16" : "w-72",
             )}
             aria-label={t("nav.main_menu")}
           >

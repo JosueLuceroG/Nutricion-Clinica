@@ -2025,6 +2025,7 @@ import { chromium } from "../node_modules/.pnpm/playwright@1.60.0/node_modules/p
 - ⏳ Integración con básculas/baumanómetros/wearables (BLE)
 - ⏳ Importación OCR de resultados de laboratorio
 - ⏳ Sincronización en la nube (opcional, cifrada E2E)
+- Roadmap operativo aprobado para mejoras SaaS/UX/clínicas: `docs/roadmap/saas-ux-clinical-sprints.md`
 
 ---
 

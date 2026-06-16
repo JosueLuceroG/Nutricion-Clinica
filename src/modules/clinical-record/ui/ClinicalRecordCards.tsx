@@ -26,27 +26,38 @@ import { SupplementCategoryLabel } from "../domain/Supplement";
 import { useBlockedFoods, useFoodWarnings } from "./useClinicalRuleHooks";
 import { AddAllergyDialog, AddMedicationDialog, AddClinicalEventDialog, AddFamilyHistoryDialog, AddPersonalHistoryDialog, AddHabitDialog, AddPhysicalActivityDialog, AddDietHistoryDialog, AddIntoleranceDialog, AddSurgeryDialog, AddHospitalizationDialog, AddSupplementDialog, AddFoodFrequencyDialog, AddGiSymptomDialog } from "./ClinicalRecordDialogs";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import { usePreferencesStore, DEFAULT_CLINICAL_SECTION_IDS, type ClinicalSectionId } from "@store/preferencesStore";
 import type { AllergyFormData, MedicationFormData, ClinicalEventFormData, FamilyHistoryFormData, PersonalHistoryFormData, HabitFormData, PhysicalActivityFormData, DietHistoryFormData, IntoleranceFormData, SurgeryFormData, HospitalizationFormData, SupplementFormData, FoodFrequencyFormData, GiSymptomFormData } from "../application/clinicalRecordSchemas";
+
+const SECTION_COMPONENT: Record<ClinicalSectionId, React.ComponentType<{ patientId: string }>> = {
+  allergies: AllergyCard,
+  medications: MedicationCard,
+  clinicalEvents: ClinicalEventCard,
+  familyHistory: FamilyHistoryCard,
+  personalHistory: PersonalHistoryCard,
+  habits: HabitCard,
+  physicalActivity: PhysicalActivityCard,
+  dietHistory: DietHistoryCard,
+  intolerances: IntoleranceCard,
+  surgeries: SurgeryCard,
+  hospitalizations: HospitalizationCard,
+  supplements: SupplementCard,
+  foodFrequency: FoodFrequencyCard,
+  giSymptoms: GiSymptomCard,
+  aiConsent: AiConsentCard,
+};
 
 export function ClinicalRecordCards({ patientId }: { patientId: string }) {
   useTranslation();
+  const sectionIds = usePreferencesStore((s) => s.clinicalSectionIds);
+  const activeIds = sectionIds.length > 0 ? sectionIds : DEFAULT_CLINICAL_SECTION_IDS;
+
   return (
     <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      <AllergyCard patientId={patientId} />
-      <MedicationCard patientId={patientId} />
-      <ClinicalEventCard patientId={patientId} />
-      <FamilyHistoryCard patientId={patientId} />
-      <PersonalHistoryCard patientId={patientId} />
-      <HabitCard patientId={patientId} />
-      <PhysicalActivityCard patientId={patientId} />
-      <DietHistoryCard patientId={patientId} />
-      <IntoleranceCard patientId={patientId} />
-      <SurgeryCard patientId={patientId} />
-      <HospitalizationCard patientId={patientId} />
-      <SupplementCard patientId={patientId} />
-      <FoodFrequencyCard patientId={patientId} />
-      <GiSymptomCard patientId={patientId} />
-      <AiConsentCard patientId={patientId} />
+      {activeIds.map((id) => {
+        const CardComponent = SECTION_COMPONENT[id];
+        return CardComponent ? <CardComponent key={id} patientId={patientId} /> : null;
+      })}
     </div>
   );
 }
@@ -155,7 +166,7 @@ function MedicationCard({ patientId }: { patientId: string }) {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {m.dose} · {i18n.t("clinical_record.medication_frequency_" + m.frequency, { defaultValue: MedicationFreqLabel[m.frequency] })} · {m.route}
+                  {m.dose} · {i18n.t("clinical_record.options.medication_frequency." + m.frequency, { defaultValue: MedicationFreqLabel[m.frequency] })} · {m.route}
                 </p>
               </div>
             ))
@@ -223,11 +234,11 @@ function SeverityBadge({ severity }: { severity: Severity }) {
     severa: "destructive",
     anafilaxia: "destructive",
   };
-  return <Badge variant={map[severity]}>{i18n.t("clinical_record.severity_" + severity, { defaultValue: SeverityLabel[severity] })}</Badge>;
+  return <Badge variant={map[severity]}>{i18n.t("clinical_record.options.severity." + severity, { defaultValue: SeverityLabel[severity] })}</Badge>;
 }
 
 function EventTypeBadge({ type }: { type: EventType }) {
-  return <Badge variant="outline">{i18n.t("clinical_record.event_type_" + type, { defaultValue: EventTypeLabel[type] })}</Badge>;
+  return <Badge variant="outline">{i18n.t("clinical_record.options.event_type." + type, { defaultValue: EventTypeLabel[type] })}</Badge>;
 }
 
 function FamilyHistoryCard({ patientId }: { patientId: string }) {
@@ -260,9 +271,9 @@ function FamilyHistoryCard({ patientId }: { patientId: string }) {
             data.map((f) => (
               <div key={f.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.family_relationship_" + f.relationship, { defaultValue: FamilyRelationshipLabel[f.relationship] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.family_relationship." + f.relationship, { defaultValue: FamilyRelationshipLabel[f.relationship] })}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{i18n.t("clinical_record.family_condition_" + f.condition, { defaultValue: ConditionLabel[f.condition] })}</Badge>
+                    <Badge variant="outline">{i18n.t("clinical_record.options.family_condition." + f.condition, { defaultValue: ConditionLabel[f.condition] })}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(f.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
@@ -310,7 +321,7 @@ function PersonalHistoryCard({ patientId }: { patientId: string }) {
             data.map((p) => (
               <div key={p.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.personal_condition_" + p.condition, { defaultValue: PersonalConditionLabel[p.condition] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.personal_condition." + p.condition, { defaultValue: PersonalConditionLabel[p.condition] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant={p.status === "activo" ? "default" : "secondary"}>{p.status}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(p.id.toString()); }}>
@@ -359,7 +370,7 @@ function HabitCard({ patientId }: { patientId: string }) {
             data.map((h) => (
               <div key={h.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.habit_category_" + h.category, { defaultValue: HabitCategoryLabel[h.category] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.habit_category." + h.category, { defaultValue: HabitCategoryLabel[h.category] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant="outline">{h.status}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(h.id.toString()); }}>
@@ -409,7 +420,7 @@ function PhysicalActivityCard({ patientId }: { patientId: string }) {
             data.map((a) => (
               <div key={a.id.toString()} className={`rounded-md border p-2 text-sm ${!a.isActive ? "opacity-60" : ""}`}>
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.activity_type_" + a.type, { defaultValue: ActivityTypeLabel[a.type] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.activity_type." + a.type, { defaultValue: ActivityTypeLabel[a.type] })}</span>
                   <div className="flex items-center gap-1">
                     {!a.isActive && <Badge variant="outline">{i18n.t("common.inactive")}</Badge>}
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(a.id.toString()); }}>
@@ -418,7 +429,7 @@ function PhysicalActivityCard({ patientId }: { patientId: string }) {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {a.frequencyPerWeek}x/sem · {a.durationMinutes} min · {i18n.t("clinical_record.borg_intensity_" + a.intensity, { defaultValue: BorgIntensityLabel[a.intensity] })}
+                  {a.frequencyPerWeek}x/sem · {a.durationMinutes} min · {i18n.t("clinical_record.options.borg_intensity." + a.intensity, { defaultValue: BorgIntensityLabel[a.intensity] })}
                 </p>
               </div>
             ))
@@ -456,10 +467,10 @@ function DietHistoryCard({ patientId }: { patientId: string }) {
             <p className="text-sm text-muted-foreground">{i18n.t("clinical_record.no_diet_history")}</p>
           ) : (
             <div className="space-y-1 text-sm">
-              <p><span className="font-medium">{i18n.t("clinical_record.diet_type")}:</span> {i18n.t("clinical_record.diet_type_" + data.dietType, { defaultValue: DietTypeLabel[data.dietType] })}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.diet_type")}:</span> {i18n.t("clinical_record.options.diet_type." + data.dietType, { defaultValue: DietTypeLabel[data.dietType] })}</p>
               <p><span className="font-medium">{i18n.t("clinical_record.meals_per_day")}:</span> {data.mealsPerDay}</p>
               <p><span className="font-medium">{i18n.t("clinical_record.meal_schedule")}:</span> {data.mealSchedule || "—"}</p>
-              <p><span className="font-medium">{i18n.t("clinical_record.meal_place")}:</span> {i18n.t("clinical_record.meal_place_" + data.mealPlace, { defaultValue: MealPlaceLabel[data.mealPlace] })}</p>
+              <p><span className="font-medium">{i18n.t("clinical_record.meal_place")}:</span> {i18n.t("clinical_record.options.meal_place." + data.mealPlace, { defaultValue: MealPlaceLabel[data.mealPlace] })}</p>
               <p><span className="font-medium">{i18n.t("clinical_record.meal_preparer")}:</span> {data.mealPreparer || "—"}</p>
               <p><span className="font-medium">{i18n.t("clinical_record.budget")}:</span> {data.budget || "—"}</p>
               <p><span className="font-medium">{i18n.t("clinical_record.household_people")}:</span> {data.householdPeople}</p>
@@ -519,7 +530,7 @@ function IntoleranceCard({ patientId }: { patientId: string }) {
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">{i.symptom}</p>
                   <p className="text-xs text-muted-foreground">
-                    {i18n.t("clinical_record.mechanism_" + i.mechanism, { defaultValue: MechanismLabel[i.mechanism] })}
+                    {i18n.t("clinical_record.options.mechanism." + i.mechanism, { defaultValue: MechanismLabel[i.mechanism] })}
                     {i.thresholdDose ? ` · ${i18n.t("clinical_record.threshold_dose")}: ${i.thresholdDose}` : ""}
                   </p>
                 </div>
@@ -548,7 +559,7 @@ function IntoleranceSeverityBadge({ severity }: { severity: IntoleranceSeverity 
   const map: Record<IntoleranceSeverity, "default" | "secondary" | "destructive"> = {
     leve: "secondary", moderada: "default", severa: "destructive",
   };
-  return <Badge variant={map[severity]}>{i18n.t("clinical_record.intolerance_severity_" + severity, { defaultValue: IntoleranceSeverityLabel[severity] })}</Badge>;
+  return <Badge variant={map[severity]}>{i18n.t("clinical_record.options.intolerance_severity." + severity, { defaultValue: IntoleranceSeverityLabel[severity] })}</Badge>;
 }
 
 function SurgeryCard({ patientId }: { patientId: string }) {
@@ -577,7 +588,7 @@ function SurgeryCard({ patientId }: { patientId: string }) {
             data.map((s) => (
               <div key={s.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.surgery_type_" + s.type, { defaultValue: SurgeryTypeLabel[s.type] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.surgery_type." + s.type, { defaultValue: SurgeryTypeLabel[s.type] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant="outline">{new Date(s.date).toLocaleDateString("es-MX")}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>
@@ -670,7 +681,7 @@ function SupplementCard({ patientId }: { patientId: string }) {
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{s.name}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{i18n.t("clinical_record.supplement_category_" + s.category, { defaultValue: SupplementCategoryLabel[s.category] })}</Badge>
+                    <Badge variant="outline">{i18n.t("clinical_record.options.supplement_category." + s.category, { defaultValue: SupplementCategoryLabel[s.category] })}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
@@ -716,7 +727,7 @@ function FoodFrequencyCard({ patientId }: { patientId: string }) {
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{f.foodGroupName || f.foodGroupId}</span>
                   <div className="flex items-center gap-1">
-                    <Badge variant="outline">{i18n.t("clinical_record.food_frequency_" + f.frequency, { defaultValue: FrequencyValueLabel[f.frequency] })}</Badge>
+                    <Badge variant="outline">{i18n.t("clinical_record.options.food_frequency." + f.frequency, { defaultValue: FrequencyValueLabel[f.frequency] })}</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(f.id.toString()); }}>
                       <X className="h-3 w-3" />
                     </Button>
@@ -762,7 +773,7 @@ function GiSymptomCard({ patientId }: { patientId: string }) {
             data.map((s) => (
               <div key={s.id.toString()} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">{i18n.t("clinical_record.gi_symptom_type_" + s.symptomType, { defaultValue: GiSymptomTypeLabel[s.symptomType] })}</span>
+                  <span className="font-medium">{i18n.t("clinical_record.options.gi_symptom_type." + s.symptomType, { defaultValue: GiSymptomTypeLabel[s.symptomType] })}</span>
                   <div className="flex items-center gap-1">
                     <Badge variant={s.severity >= 7 ? "destructive" : s.severity >= 4 ? "default" : "secondary"}>{s.severity}/10</Badge>
                     <Button variant="ghost" size="icon" className="h-5 w-5" aria-label={i18n.t("common.delete")} onClick={async () => { await remove(s.id.toString()); }}>

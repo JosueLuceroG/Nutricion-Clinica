@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { Patient } from "./Patient";
 import { Email } from "./Contact";
 
@@ -10,6 +10,10 @@ const baseProps = {
   sex: "female" as const,
   email: Email.from("maria.garcia@example.com"),
 };
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("Patient.create", () => {
   it("crea paciente con datos válidos", () => {
@@ -85,13 +89,14 @@ describe("Patient.create", () => {
   });
 
   it("calcula edad correcta", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2024-06-16T12:00:00Z"));
+
     const patient = Patient.create({
       ...baseProps,
       birthDate: new Date("1990-06-15"),
     });
-    const age = patient.age;
-    expect(age).toBeGreaterThanOrEqual(33);
-    expect(age).toBeLessThanOrEqual(35);
+    expect(patient.age).toBe(34);
   });
 
   it("rechaza nombre muy corto", () => {

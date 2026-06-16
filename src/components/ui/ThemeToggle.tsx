@@ -1,9 +1,11 @@
+import { useTranslation } from "react-i18next";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "@app/providers/ThemeProvider";
 import { Button } from "@components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@components/ui/dropdown-menu";
 
 export function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
+  const { t } = useTranslation();
   const { theme, setTheme, resolvedTheme } = useTheme();
 
   if (collapsed) {
@@ -13,7 +15,7 @@ export function ThemeToggle({ collapsed }: { collapsed?: boolean }) {
         size="sm"
         onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
         className="w-full justify-center"
-        aria-label="Cambiar tema"
+        aria-label={t("theme.change_theme")}
       >
         {resolvedTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </Button>

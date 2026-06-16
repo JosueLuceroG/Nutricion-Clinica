@@ -22,6 +22,8 @@ const CompleteSchema = z.object({
   userPrompt: z.string().min(1).max(20_000),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().int().min(1).max(4_000).optional(),
+  provider: z.enum(["ollama", "openai"]).optional(),
+  apiKey: z.string().max(500).optional(),
 });
 
 export type AICompleteRequest = z.infer<typeof CompleteSchema>;
@@ -36,6 +38,14 @@ export interface AICompleteResponse {
 
 export function resolveOpenAiApiKey(env: NodeJS.ProcessEnv = process.env): string {
   return env.OPENAI_API_KEY ?? env.AI_API_KEY ?? '';
+}
+
+function getAIProvider(env: NodeJS.ProcessEnv = process.env): 'openai' | 'ollama' {
+  return (env.AI_PROVIDER ?? env.VITE_AI_PROVIDER ?? 'openai') as 'openai' | 'ollama';
+}
+
+function getModel(env: NodeJS.ProcessEnv = process.env): string {
+  return env.AI_MODEL ?? 'llama3.2';
 }
 
 export function mapOpenAiResponse(data: OpenAiResponse, fallbackModel: string): AICompleteResponse {
@@ -59,15 +69,26 @@ export function mapOpenAiResponse(data: OpenAiResponse, fallbackModel: string): 
   };
 }
 
-async function callOpenAi(req: AICompleteRequest, apiKey: string, signal?: AbortSignal): Promise<AICompleteResponse> {
-  const model = req.model ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini';
-  const baseUrl = (process.env.OPENAI_BASE_URL ?? 'https://api.openai.com/v1').replace(/\/$/, '');
+async function callAIProvider(req: AICompleteRequest, signal?: AbortSignal): Promise<AICompleteResponse> {
+  const provider = req.provider ?? getAIProvider();
+  const model = provider === 'ollama' ? getModel() : (req.model ?? process.env.OPENAI_MODEL ?? 'gpt-4o-mini');
+  const baseUrl = (process.env.OPENAI_BASE_URL ?? (provider === 'ollama' ? 'http://localhost:11434/v1' : 'https://api.openai.com/v1')).replace(/\/$/, '');
+  const apiKey = provider !== 'ollama' ? (req.apiKey || resolveOpenAiApiKey()) : null;
+
+  if (provider !== 'ollama' && !apiKey) {
+    throw new HttpError(503, 'IA no configurada en el servidor');
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model,
       messages: [
@@ -76,6 +97,7 @@ async function callOpenAi(req: AICompleteRequest, apiKey: string, signal?: Abort
       ],
       temperature: req.temperature ?? 0.3,
       max_tokens: req.maxTokens ?? 1024,
+      stream: false,
     }),
     signal,
   });
@@ -124,14 +146,8 @@ router.post('/complete', async (req: Request, res: Response, next: NextFunction)
     return;
   }
 
-  const apiKey = resolveOpenAiApiKey();
-  if (!apiKey) {
-    res.status(503).json({ error: 'IA no configurada en el servidor' });
-    return;
-  }
-
   try {
-    const result = await callOpenAi(parsed.data, apiKey);
+    const result = await callAIProvider(parsed.data);
     await auditAiRequest(req, { status: 'success', model: result.model, usage: result.usage });
     res.json(result);
   } catch (err) {

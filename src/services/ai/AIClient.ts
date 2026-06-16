@@ -8,6 +8,8 @@ export interface AIRequest {
   userPrompt: string;
   temperature?: number;
   maxTokens?: number;
+  provider?: AIProviderId;
+  apiKey?: string;
 }
 
 export interface AIResponse {
@@ -29,14 +31,14 @@ export interface AIProvider {
   stream?(req: AIRequest, opts?: { signal?: AbortSignal }): AsyncIterable<AIChunk>;
 }
 
-const DEFAULT_TIMEOUT = 30_000;
-const MAX_RETRIES = 3;
+const DEFAULT_TIMEOUT = 120_000;
+const MAX_RETRIES = 1;
 
 async function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function isEnabled(): boolean {
+export function isAIEnvironmentEnabled(): boolean {
   try {
     return import.meta.env.VITE_AI_ENABLED === "true";
   } catch {
@@ -49,7 +51,7 @@ class BackendAIProvider implements AIProvider {
 
   async complete(req: AIRequest, opts?: { signal?: AbortSignal }): Promise<AIResponse> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(new DOMException("AI request timed out")), DEFAULT_TIMEOUT);
     const signal = opts?.signal ? anySignal(opts.signal, controller.signal) : controller.signal;
 
     try {
@@ -113,11 +115,11 @@ export function createProvider(): AIProvider {
 }
 
 export const aiClient = {
-  isEnabled,
+  isEnabled: isAIEnvironmentEnabled,
   getProvider: createProvider,
   async complete(req: AIRequest, opts?: { signal?: AbortSignal }): Promise<AIResponse> {
-    if (!isEnabled()) {
-      throw new Error("AI is not enabled. Set VITE_AI_ENABLED=true and configure OPENAI_API_KEY on the API server.");
+    if (!isAIEnvironmentEnabled()) {
+      throw new Error("AI is not enabled. Set VITE_AI_ENABLED=true and configure the AI provider on the API server.");
     }
     return createProvider().complete(req, opts);
   },
