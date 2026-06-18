@@ -1,17 +1,23 @@
-import * as React from "react";
+import { useState, type FormEvent } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Eye, EyeOff, LogIn, AlertCircle, Shield } from "lucide-react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Lock,
+  LogIn,
+  Mail,
+  ShieldCheck,
+  AlertCircle,
+  Shield,
+} from "lucide-react";
 import { toast } from "sonner";
 import { authApi } from "@services/api/authApi";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
-import { Button } from "@components/ui/button";
-import { Input } from "@components/ui/input";
-import { Label } from "@components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { RoleLabel, type AuthSucursalDTO } from "@nutriclinica/shared";
-import { cn } from "@utils/cn";
+import "./LoginPage.css";
 
 export function LoginPage() {
   const { t } = useTranslation();
@@ -20,25 +26,26 @@ export function LoginPage() {
   const setSession = useAuthStore((s) => s.setSession);
   const setSucursalId = useSyncStore((s) => s.setSucursalId);
 
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [sucursales, setSucursales] = React.useState<AuthSucursalDTO[] | null>(null);
-  const [pendingSession, setPendingSession] = React.useState<{
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sucursales, setSucursales] = useState<AuthSucursalDTO[] | null>(null);
+  const [pendingSession, setPendingSession] = useState<{
     token: string;
     user: { id: string; email: string; nombreCompleto: string; rol: "admin" | "nutriologa" | "asistente" | "soporte_tecnico" | "auditor" | "facturacion" };
   } | null>(null);
-  const [requires2fa, setRequires2fa] = React.useState(false);
-  const [pending2faToken, setPending2faToken] = React.useState<string | null>(null);
-  const [totpCode, setTotpCode] = React.useState("");
+  const [requires2fa, setRequires2fa] = useState(false);
+  const [pending2faToken, setPending2faToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState("");
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
@@ -72,7 +79,7 @@ export function LoginPage() {
     }
   };
 
-  const handleTotpSubmit = async (e: React.FormEvent) => {
+  const handleTotpSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!pending2faToken) return;
     setError(null);
@@ -109,161 +116,244 @@ export function LoginPage() {
     navigate("/", { replace: true });
   };
 
-  if (sucursales && sucursales.length > 1) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>{t("auth.select_branch")}</CardTitle>
-            <CardDescription>
-              Tienes acceso a m&uacute;ltiples sucursales. Selecciona con cu&aacute;l quieres iniciar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {sucursales.map((s) => (
-              <Button
-                key={s.id}
-                variant="outline"
-                className="w-full justify-between"
-                onClick={() => handleSucursalPick(s.id)}
-              >
-                <span>{s.nombre}</span>
-                {s.esTitular && <span className="text-xs text-muted-foreground">Titular</span>}
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const rolesList = Object.values(RoleLabel).slice(0, 3).join(" \u00b7 ");
 
-  if (requires2fa) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" aria-hidden />
-              {t("auth.2fa_title")}
-            </CardTitle>
-            <CardDescription>
-              {t("auth.2fa_description")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleTotpSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="totp">{t("auth.2fa_code")}</Label>
-                <Input
-                  id="totp"
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  required
-                  autoFocus
-                  className="text-center text-lg tracking-widest"
-                  placeholder="000000"
-                />
-              </div>
-
-              {error && (
-                <div
-                  role="alert"
-                  className={cn(
-                    "flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive",
-                  )}
-                >
-                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={loading || totpCode.length !== 6}>
-                {loading ? t("auth.verifying") : t("auth.verify")}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const renderError = (msg: string) => (
+    <div className="nc-error" role="alert">
+      <AlertCircle size={16} aria-hidden />
+      <span>{msg}</span>
+    </div>
+  );
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LogIn className="h-5 w-5" aria-hidden />
-              {t("auth.login_title")}
-            </CardTitle>
-          <CardDescription>
-            NutriClinica \u2014 expediente cl&iacute;nico nutricional
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="email">{t("auth.email")}</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoFocus
-              />
+    <main className="nc-login-page">
+      <section className="nc-login-shell">
+
+        <div className="nc-shell-art" aria-hidden="true">
+          <img src="/assets/login-hero.png" alt="" className="nc-shell-art-image" />
+          <div className="nc-shell-art-overlay" />
+        </div>
+
+        {/* ===== LEFT ===== */}
+        <section className="nc-brand-panel">
+          <div className="nc-brand-circle" />
+          <div className="nc-brand-dots" />
+
+          <div className="nc-brand-content">
+            <img
+              className="nc-logo"
+              src="/assets/nutriclinica-logo.png"
+              alt="NutriClinica"
+            />
+
+            <div className="nc-brand-copy">
+              <h1>
+                <span className="nc-title-main">Gesti&oacute;n cl&iacute;nica nutricional</span>
+                <span className="nc-title-line">
+                  m&aacute;s <span className="nc-title-gradient">simple, segura y eficiente</span>
+                </span>
+              </h1>
+
+              <p>{t("auth.hero_description")}</p>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="password">{t("auth.password")}</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="pr-9"
-                />
+          </div>
+        </section>
+
+        {/* ===== RIGHT ===== */}
+        <section className="nc-form-panel">
+
+          {requires2fa ? (
+            /* ---------- 2FA ---------- */
+            <div className="nc-login-card nc-card-2fa">
+              <header className="nc-login-header">
+                <div className="nc-login-icon">
+                  <Shield size={31} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h2>{t("auth.2fa_title")}</h2>
+                  <p>{t("auth.2fa_description")}</p>
+                </div>
+              </header>
+
+              <form onSubmit={handleTotpSubmit}>
+                <div className="nc-field">
+                  <label htmlFor="totp">{t("auth.2fa_code")}</label>
+                  <div className="nc-input">
+                    <input
+                      id="totp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      required
+                      autoFocus
+                      placeholder="000000"
+                    />
+                  </div>
+                </div>
+
+                {error && renderError(error)}
+
                 <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground"
-                  aria-label={showPassword ? t("auth.hide_password") : t("auth.show_password")}
+                  type="submit"
+                  className="nc-submit"
+                  disabled={loading || totpCode.length !== 6}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {loading ? (
+                    <>
+                      <div className="nc-spinner" />
+                      <span>{t("auth.verifying")}</span>
+                    </>
+                  ) : (
+                    <span>{t("auth.verify")}</span>
+                  )}
                 </button>
+              </form>
+            </div>
+
+          ) : sucursales && sucursales.length > 1 ? (
+            /* ---------- Branch selection ---------- */
+            <div className="nc-login-card">
+              <header className="nc-login-header">
+                <div className="nc-login-icon">
+                  <LogIn size={31} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h2>{t("auth.select_branch")}</h2>
+                  <p>Tienes acceso a m&uacute;ltiples sucursales. Selecciona con cu&aacute;l quieres iniciar.</p>
+                </div>
+              </header>
+
+              <div className="nc-branch-list">
+                {sucursales.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    className="nc-branch-btn"
+                    onClick={() => handleSucursalPick(s.id)}
+                  >
+                    <span>{s.nombre}</span>
+                    {s.esTitular && <span className="nc-branch-titular">Titular</span>}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className={cn(
-                  "flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive",
-                )}
-              >
-                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-                <span>{error}</span>
+          ) : (
+            /* ---------- Normal login ---------- */
+            <form className="nc-login-card" onSubmit={handleLogin}>
+              <header className="nc-login-header">
+                <div className="nc-login-icon">
+                  <LogIn size={31} strokeWidth={2.2} />
+                </div>
+                <div>
+                  <h2>{t("auth.login_title")}</h2>
+                  <p>{t("auth.tagline")}</p>
+                </div>
+              </header>
+
+              <div className="nc-divider" />
+
+              <div className="nc-field">
+                <label htmlFor="email">{t("auth.email")}</label>
+                <div className="nc-input">
+                  <Mail size={20} strokeWidth={2} />
+                  <input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                    placeholder="correo@ejemplo.com"
+                  />
+                </div>
               </div>
-            )}
 
-            <Button type="submit" className="w-full" disabled={loading || !email || !password}>
-              {loading ? t("auth.logging_in") : t("auth.login_button")}
-            </Button>
+              <div className="nc-field">
+                <label htmlFor="password">{t("auth.password")}</label>
+                <div className="nc-input">
+                  <Lock size={20} strokeWidth={2} />
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                  />
+                  <button
+                    type="button"
+                    className="nc-eye-button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t("auth.hide_password") : t("auth.show_password")}
+                  >
+                    {showPassword ? <EyeOff size={20} strokeWidth={2} /> : <Eye size={20} strokeWidth={2} />}
+                  </button>
+                </div>
+              </div>
 
-            <p className="text-center text-xs text-muted-foreground">
-              Las credenciales las gestiona tu administradora de sucursal.
-              <br />
-              <span className="opacity-70">Rol disponible: {Object.values(RoleLabel).slice(0, 3).join(" \u00b7 ")}</span>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+              <div className="nc-options">
+                <label className="nc-remember">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                  />
+                  <span>{t("auth.remember_me")}</span>
+                </label>
+
+                <a
+                  href="#"
+                  onClick={(e) => e.preventDefault()}
+                >
+                  {t("auth.forgot_password")}
+                </a>
+              </div>
+
+              {error && renderError(error)}
+
+              <button
+                type="submit"
+                className="nc-submit"
+                disabled={loading || !email || !password}
+              >
+                {loading ? (
+                  <>
+                    <div className="nc-spinner" />
+                    <span>{t("auth.logging_in")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t("auth.login_button")}</span>
+                    <ArrowRight size={23} strokeWidth={2.2} />
+                  </>
+                )}
+              </button>
+
+              <div className="nc-secure-box">
+                <div className="nc-secure-icon">
+                  <ShieldCheck size={22} strokeWidth={2.1} />
+                </div>
+                <div>
+                  <strong>{t("auth.secure_access")}</strong>
+                  <p>{t("auth.secure_access_desc")}</p>
+                </div>
+              </div>
+
+              <footer className="nc-login-footer">
+                <strong>{t("auth.credentials_note")}</strong>
+                <span>{t("auth.roles_available", { roles: rolesList })}</span>
+              </footer>
+            </form>
+          )}
+
+        </section>
+      </section>
+    </main>
   );
 }

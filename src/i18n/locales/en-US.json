@@ -256,7 +256,17 @@
     "2fa_disabled": "2FA disabled successfully",
     "verifying": "Verifying...",
     "verify": "Verify",
-    "disabling": "Disabling..."
+    "disabling": "Disabling...",
+    "tagline": "Clinical nutrition record",
+    "hero_title_prefix": "Clinical nutrition management made ",
+    "hero_title_highlight": "simpler, safer and more efficient",
+    "hero_description": "A platform designed for nutritionists and their team, improving care and follow-up for every patient.",
+    "remember_me": "Remember me",
+    "forgot_password": "Forgot your password?",
+    "secure_access": "Secure and protected access",
+    "secure_access_desc": "Your data is protected with enterprise-grade encryption.",
+    "credentials_note": "Credentials are managed by your branch administrator.",
+    "roles_available": "Available roles: {{roles}}"
   },
   "patient": {
     "title": "Patients",

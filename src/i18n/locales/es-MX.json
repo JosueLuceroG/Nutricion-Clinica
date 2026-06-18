@@ -256,7 +256,17 @@
     "2fa_disabled": "2FA desactivado correctamente",
     "verifying": "Verificando...",
     "verify": "Verificar",
-    "disabling": "Desactivando..."
+    "disabling": "Desactivando...",
+    "tagline": "Expediente clínico nutricional",
+    "hero_title_prefix": "Gestión clínica nutricional más ",
+    "hero_title_highlight": "simple, segura y eficiente",
+    "hero_description": "Una plataforma diseñada para nutriólogas y su equipo, que mejora la atención y el seguimiento de cada paciente.",
+    "remember_me": "Recordarme",
+    "forgot_password": "¿Olvidaste tu contraseña?",
+    "secure_access": "Acceso seguro y protegido",
+    "secure_access_desc": "Tus datos están protegidos con cifrado de nivel empresarial.",
+    "credentials_note": "Las credenciales las gestiona tu administradora de sucursal.",
+    "roles_available": "Roles disponibles: {{roles}}"
   },
   "patient": {
     "title": "Pacientes",
