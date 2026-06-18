@@ -460,12 +460,7 @@
 /* AJUSTE FINAL CONTROLADO - SOLO LADO IZQUIERDO */
 /* ================================================= */
 
-/* Evita fondos duplicados que rompen el panel */
-.nc-brand-panel::before,
-.nc-brand-panel::after {
-  content: none !important;
-  display: none !important;
-}
+/* Se permite before/after para capas de fondo sutiles */
 
 /* Mantener estructura general sin mover card derecha */
 .nc-login-shell {
@@ -1062,4 +1057,85 @@
 .auth-divider {
   margin-top: 0 !important;
   margin-bottom: 18px !important;
+}
+
+/* =========================================================
+   SOLO RELLENAR LA PARTE SUPERIOR IZQUIERDA DEL FONDO
+   SIN MOVER EL RESTO DEL LAYOUT
+   ========================================================= */
+
+.nc-brand-panel {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Capa suave SOLO para la parte superior */
+.nc-brand-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 360px;
+  pointer-events: none;
+  z-index: 0;
+  border-top-left-radius: inherit;
+
+  background:
+    radial-gradient(
+      circle at 10% 34%,
+      rgba(205, 236, 250, 0.52) 0%,
+      rgba(205, 236, 250, 0.30) 18%,
+      rgba(205, 236, 250, 0.12) 34%,
+      rgba(205, 236, 250, 0.00) 56%
+    ),
+    radial-gradient(
+      circle at 74% 6%,
+      rgba(221, 233, 247, 0.80) 0%,
+      rgba(221, 233, 247, 0.52) 24%,
+      rgba(221, 233, 247, 0.22) 46%,
+      rgba(221, 233, 247, 0.00) 70%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(246, 251, 255, 0.96) 0%,
+      rgba(241, 248, 253, 0.92) 38%,
+      rgba(241, 248, 253, 0.58) 72%,
+      rgba(241, 248, 253, 0.00) 100%
+    );
+}
+
+/* asegurar que el contenido quede arriba de la capa */
+.nc-brand-content,
+.nc-brand-top,
+.nc-brand-copy,
+.nc-brand-logo-wrap,
+.nc-brand-dots,
+.nc-brand-circle {
+  position: relative;
+  z-index: 2;
+}
+
+/* si existe una figura circular decorativa, suavizarla un poco */
+.nc-brand-circle {
+  opacity: 0.75;
+}
+
+/* si quieres todavía menos blanco arriba, usa esto */
+.nc-brand-panel::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 22%;
+  width: 58%;
+  height: 330px;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(224, 234, 247, 0.34) 0%,
+    rgba(224, 234, 247, 0.16) 48%,
+    rgba(224, 234, 247, 0.00) 100%
+  );
 }
