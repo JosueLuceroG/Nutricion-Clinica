@@ -1063,3 +1063,65 @@
   margin-top: 0 !important;
   margin-bottom: 18px !important;
 }
+
+/* =========================================================
+   FIX ESQUINA SUPERIOR IZQUIERDA
+   Quitar borde redondo visible sin mover layout
+   ========================================================= */
+
+.nc-login-page {
+  background:
+    radial-gradient(circle at 10% 8%, rgba(32, 199, 181, 0.045), transparent 32%),
+    radial-gradient(circle at 92% 12%, rgba(23, 105, 255, 0.045), transparent 36%),
+    linear-gradient(135deg, #f4fbff 0%, #eef7fc 100%) !important;
+}
+
+.nc-login-shell {
+  border-color: transparent !important;
+  box-shadow:
+    0 34px 90px rgba(16, 42, 86, 0.10) !important;
+}
+
+/* Relleno suave justo en la esquina para que no se marque la curva */
+.nc-login-shell::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 360px;
+  height: 260px;
+  pointer-events: none;
+  z-index: 0;
+  border-top-left-radius: inherit;
+
+  background: radial-gradient(
+    ellipse at top left,
+    rgba(222, 243, 252, 0.72) 0%,
+    rgba(222, 243, 252, 0.38) 38%,
+    rgba(222, 243, 252, 0.12) 68%,
+    rgba(222, 243, 252, 0) 100%
+  );
+}
+
+/* Mantener todas las capas reales arriba */
+.nc-shell-art,
+.nc-brand-panel,
+.nc-form-panel {
+  position: relative;
+}
+
+.nc-shell-art {
+  z-index: 1;
+}
+
+.nc-brand-panel {
+  z-index: 3;
+}
+
+.nc-form-panel {
+  z-index: 4;
+}
+
+.nc-shell-art-image {
+  left: 0% !important;
+}
