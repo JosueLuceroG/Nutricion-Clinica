@@ -73,7 +73,7 @@ export function LoginPage() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No fue posible iniciar sesi\u00f3n");
+      setError(err instanceof Error ? err.message : "No fue posible iniciar sesión");
     } finally {
       setLoading(false);
     }
@@ -97,7 +97,7 @@ export function LoginPage() {
       toast.success(`Bienvenido/a, ${response.profesional.nombreCompleto}`);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "C\u00f3digo inv\u00e1lido o expirado");
+      setError(err instanceof Error ? err.message : "Código invalido o expirado");
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,13 @@ export function LoginPage() {
                 </span>
               </h1>
 
-              <p>{t("auth.hero_description")}</p>
+              <p className="nc-hero-description">
+  Una plataforma diseñada para nutriólogas
+  <br />
+  y su equipo, que mejora la atención y el
+  <br />
+  seguimiento de cada paciente.
+</p>
             </div>
           </div>
         </section>
@@ -284,7 +290,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"
+                    placeholder="Contraseña"
                   />
                   <button
                     type="button"

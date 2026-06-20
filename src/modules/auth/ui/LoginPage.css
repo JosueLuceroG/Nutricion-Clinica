@@ -2124,3 +2124,185 @@
     width: 85% !important;
   }
 }
+
+/* =========================================================
+   AJUSTE TEXTO IZQUIERDO COMO REFERENCIA
+   Solo acomoda título y párrafo del lado izquierdo.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-brand-copy {
+    max-width: 520px !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 520px !important;
+    margin: 0 !important;
+
+    font-size: 31px !important;
+    line-height: 1.24 !important;
+    font-weight: 640 !important;
+    letter-spacing: 0.001em !important;
+
+    color: #0b1f4d !important;
+  }
+
+  .nc-title-main {
+    display: block !important;
+    white-space: nowrap !important;
+    color: #0b1f4d !important;
+  }
+
+  .nc-title-line {
+    display: block !important;
+    white-space: nowrap !important;
+    color: #0b1f4d !important;
+  }
+
+  .nc-brand-copy h1 span {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    color: #0b1f4d !important;
+  }
+
+  .nc-brand-copy h1 .nc-title-gradient {
+    background: linear-gradient(
+      90deg,
+      #1f6cff 0%,
+      #169ceb 54%,
+      #25c8b8 100%
+    ) !important;
+
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    color: transparent !important;
+  }
+
+  .nc-brand-copy p {
+    max-width: 390px !important;
+    margin-top: 24px !important;
+
+    font-size: 16px !important;
+    line-height: 1.62 !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+
+    color: #566987 !important;
+  }
+}
+
+/* =========================================================
+   MODO COMPACTO / LAPTOP
+   Este es el que afecta tu captura actual.
+   ========================================================= */
+
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-brand-copy {
+    max-width: 500px !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 500px !important;
+
+    font-size: 28px !important;
+    line-height: 1.25 !important;
+    font-weight: 640 !important;
+    letter-spacing: 0.001em !important;
+  }
+
+  .nc-title-main,
+  .nc-title-line {
+    display: block !important;
+    white-space: nowrap !important;
+    color: #0b1f4d !important;
+  }
+
+  .nc-brand-copy h1 span {
+    background: none !important;
+    -webkit-background-clip: initial !important;
+    background-clip: initial !important;
+    color: #0b1f4d !important;
+  }
+
+  .nc-brand-copy h1 .nc-title-gradient {
+    background: linear-gradient(
+      90deg,
+      #1f6cff 0%,
+      #169ceb 54%,
+      #25c8b8 100%
+    ) !important;
+
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    color: transparent !important;
+  }
+
+  .nc-brand-copy p {
+    max-width: 360px !important;
+    margin-top: 22px !important;
+
+    font-size: 14.8px !important;
+    line-height: 1.62 !important;
+    font-weight: 400 !important;
+    letter-spacing: 0 !important;
+  }
+}
+
+/* Subir un poco el texto izquierdo */
+@media (min-width: 1051px) {
+  .nc-brand-copy {
+    transform: translateY(-18px) !important;
+  }
+}
+
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-brand-copy {
+    transform: translateY(-16px) !important;
+  }
+}
+
+/* =========================================================
+   SUBIR SOLO EL PÁRRAFO IZQUIERDO
+   "Una plataforma diseñada para nutriólogas..."
+   No mueve título ni logo.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-brand-copy p {
+    transform: translateY(-18px) !important;
+  }
+}
+
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-brand-copy p {
+    transform: translateY(-15px) !important;
+  }
+}
+
+/* =========================================================
+   PÁRRAFO IZQUIERDO EN 3 LÍNEAS EXACTAS
+   Solo toca el texto: "Una plataforma diseñada..."
+   ========================================================= */
+
+.nc-hero-description {
+  max-width: none !important;
+  width: max-content !important;
+
+  margin-top: 18px !important;
+
+  font-size: 15.8px !important;
+  line-height: 1.55 !important;
+  font-weight: 400 !important;
+  letter-spacing: 0 !important;
+
+  color: #566987 !important;
+}
+
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-hero-description {
+    margin-top: 16px !important;
+    font-size: 14.8px !important;
+    line-height: 1.55 !important;
+  }
+}
