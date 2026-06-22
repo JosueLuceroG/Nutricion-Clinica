@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -9,10 +9,16 @@ import {
   LogIn,
   Mail,
   ShieldCheck,
-  AlertCircle,
   Shield,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@components/ui/dialog";
 import { authApi } from "@services/api/authApi";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
@@ -31,7 +37,21 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("nc_remembered_email");
+    if (saved) {
+      setEmail(saved);
+      setRememberMe(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!rememberMe) {
+      localStorage.removeItem("nc_remembered_email");
+    }
+  }, [rememberMe]);
+
   const [sucursales, setSucursales] = useState<AuthSucursalDTO[] | null>(null);
   const [pendingSession, setPendingSession] = useState<{
     token: string;
@@ -40,6 +60,7 @@ export function LoginPage() {
   const [requires2fa, setRequires2fa] = useState(false);
   const [pending2faToken, setPending2faToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState("");
+  const [forgotOpen, setForgotOpen] = useState(false);
 
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
@@ -47,7 +68,6 @@ export function LoginPage() {
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
     try {
       const response = await authApi.login({ email, password });
@@ -56,6 +76,12 @@ export function LoginPage() {
         setPending2faToken(response.pending2faToken);
         setLoading(false);
         return;
+      }
+      if (rememberMe) {
+        localStorage.setItem("nc_remembered_email", email);
+      }
+      if (rememberMe) {
+        localStorage.setItem("nc_remembered_email", email);
       }
       if (response.sucursales.length > 1) {
         setPendingSession({ token: response.token, user: response.profesional });
@@ -73,7 +99,17 @@ export function LoginPage() {
         navigate("/", { replace: true });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No fue posible iniciar sesión");
+      const raw = err instanceof Error ? err.message : "No fue posible iniciar sesión";
+      if (
+        raw.includes("Failed to fetch") ||
+        raw.includes("NetworkError") ||
+        raw.includes("TypeError") ||
+        raw.includes("NetworkError")
+      ) {
+        toast.error("No se pudo conectar con el servidor. Intenta nuevamente.", { duration: 5000 });
+      } else {
+        toast.error(raw, { duration: 5000 });
+      }
     } finally {
       setLoading(false);
     }
@@ -82,7 +118,6 @@ export function LoginPage() {
   const handleTotpSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!pending2faToken) return;
-    setError(null);
     setLoading(true);
     try {
       const response = await authApi.login({ email, password, totpCode, pending2faToken });
@@ -97,7 +132,16 @@ export function LoginPage() {
       toast.success(`Bienvenido/a, ${response.profesional.nombreCompleto}`);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Código invalido o expirado");
+      const raw2 = err instanceof Error ? err.message : "Código invalido o expirado";
+      if (
+        raw2.includes("Failed to fetch") ||
+        raw2.includes("NetworkError") ||
+        raw2.includes("TypeError")
+      ) {
+        toast.error("No se pudo conectar con el servidor. Intenta nuevamente.", { duration: 5000 });
+      } else {
+        toast.error(raw2, { duration: 5000 });
+      }
     } finally {
       setLoading(false);
     }
@@ -117,13 +161,6 @@ export function LoginPage() {
   };
 
   const rolesList = Object.values(RoleLabel).slice(0, 3).join(" \u00b7 ");
-
-  const renderError = (msg: string) => (
-    <div className="nc-error" role="alert">
-      <AlertCircle size={16} aria-hidden />
-      <span>{msg}</span>
-    </div>
-  );
 
   return (
     <main className="nc-login-page">
@@ -199,8 +236,6 @@ export function LoginPage() {
                     />
                   </div>
                 </div>
-
-                {error && renderError(error)}
 
                 <button
                   type="submit"
@@ -315,13 +350,14 @@ export function LoginPage() {
 
                 <a
                   href="#"
-                  onClick={(e) => e.preventDefault()}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setForgotOpen(true);
+                  }}
                 >
                   {t("auth.forgot_password")}
                 </a>
               </div>
-
-              {error && renderError(error)}
 
               <button
                 type="submit"
@@ -360,6 +396,16 @@ export function LoginPage() {
 
         </section>
       </section>
+      <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("auth.forgot_password")}</DialogTitle>
+            <DialogDescription>
+              Contacta al administrador del sistema para restablecer tu contrase&ntilde;a.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

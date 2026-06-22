@@ -616,7 +616,7 @@
 }
 
 .nc-submit:disabled {
-  cursor: not-allowed;
+  cursor: pointer;
 }
 
 .nc-submit:hover:not(:disabled) {
@@ -639,24 +639,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-.nc-error {
-  margin: 0 0 18px;
-  min-height: 46px;
-  padding: 0 14px;
-
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  background: rgba(254, 242, 242, 0.92);
-
-  color: #b42318;
-  font-size: 14px;
-  font-weight: 600;
 }
 
 /* =========================================================
