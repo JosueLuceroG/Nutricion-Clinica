@@ -49,12 +49,6 @@ export function NutriLogoLoader({
 
         <p className="nutri-loader__text">{text}</p>
 
-        <div className="nutri-loader__dots" aria-hidden="true">
-          <span />
-          <span />
-          <span />
-        </div>
-
         {showProgress && (
           <div className="nutri-loader__progress" aria-hidden="true">
             <span />
