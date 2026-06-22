@@ -2306,3 +2306,116 @@
     line-height: 1.55 !important;
   }
 }
+
+/* =========================================================
+   MOVER CARD LOGIN UN POCO A LA IZQUIERDA
+   Solo toca la tarjeta derecha.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-form-panel {
+    justify-content: flex-end !important;
+  }
+
+  .nc-login-card {
+    transform: translateX(-88px) !important;
+  }
+}
+
+/* Modo compacto/laptop */
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-login-card {
+    transform: translateX(-90px) !important;
+  }
+}
+
+/* =========================================================
+   HACER CARD MÁS ANCHA Y ACOMODARLA
+   Solo toca la card derecha.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-form-panel {
+    justify-content: flex-end !important;
+    padding-right: 52px !important;
+  }
+
+  .nc-login-card {
+    width: 610px !important;
+    max-width: 610px !important;
+    transform: translateX(-18px) !important;
+  }
+}
+
+/* Modo compacto / laptop */
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-form-panel {
+    padding-right: 42px !important;
+  }
+
+  .nc-login-card {
+    width: 580px !important;
+    max-width: 580px !important;
+    transform: translateX(-30px) !important;
+  }
+}
+
+//////
+
+/* =========================================================
+   REDUCIR BLOQUE DERECHO COMPLETO
+   Card + espacio blanco derecho juntos
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  :root {
+    /* Hace un poco más pequeño el cuadro general */
+    --nc-shell-width: 1235px;
+
+    /* Da más espacio al lado izquierdo y reduce lado derecho */
+    --nc-left-panel: 52.5%;
+    --nc-right-panel: 47.5%;
+
+    /* Reduce el espacio blanco entre card y borde derecho */
+    --nc-card-right: 30px;
+  }
+
+  .nc-login-shell {
+    width: min(var(--nc-shell-width), calc(100vw - 80px)) !important;
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+  }
+
+  .nc-form-panel {
+    padding-right: var(--nc-card-right) !important;
+    justify-content: flex-end !important;
+  }
+
+  .nc-login-card {
+    transform: none !important;
+  }
+}
+
+/* Modo compacto/laptop */
+@media (max-height: 850px), (max-width: 1500px) {
+  :root {
+    --nc-shell-width: 1260px;
+
+    --nc-left-panel: 49.8%;
+    --nc-right-panel: 48.7%;
+
+    --nc-card-right: 25px;
+  }
+
+  .nc-login-shell {
+    width: min(var(--nc-shell-width), calc(100vw - 80px)) !important;
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+  }
+
+  .nc-form-panel {
+    padding-right: var(--nc-card-right) !important;
+  }
+
+  .nc-login-card {
+    transform: none !important;
+  }
+}
