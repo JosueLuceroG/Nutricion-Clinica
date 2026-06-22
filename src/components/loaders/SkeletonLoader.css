@@ -1,0 +1,89 @@
+.skeleton-loader {
+  width: 100%;
+}
+
+.skeleton-loader__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  padding: 14px 0;
+}
+
+.skeleton-loader__avatar,
+.skeleton-loader__line {
+  display: block;
+  overflow: hidden;
+  position: relative;
+
+  background: rgba(148, 163, 184, 0.16);
+  border-radius: 999px;
+}
+
+.skeleton-loader__avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+}
+
+.skeleton-loader__content {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.skeleton-loader__line {
+  height: 11px;
+}
+
+.skeleton-loader__line--wide {
+  width: min(72%, 460px);
+}
+
+.skeleton-loader__line--short {
+  width: min(42%, 280px);
+}
+
+.skeleton-loader--card {
+  padding: 18px;
+  border-radius: 22px;
+
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(203, 222, 235, 0.75);
+}
+
+.skeleton-loader--table .skeleton-loader__row {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
+}
+
+.skeleton-loader__avatar::after,
+.skeleton-loader__line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+
+  transform: translateX(-100%);
+
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.68),
+    transparent
+  );
+
+  animation: skeletonShimmer 1.35s ease-in-out infinite;
+}
+
+@keyframes skeletonShimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-loader__avatar::after,
+  .skeleton-loader__line::after {
+    animation: none;
+  }
+}

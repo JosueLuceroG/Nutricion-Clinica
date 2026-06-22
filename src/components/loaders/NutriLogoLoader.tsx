@@ -6,12 +6,14 @@ type NutriLogoLoaderProps = {
   text?: string;
   fullscreen?: boolean;
   className?: string;
+  showProgress?: boolean;
 };
 
 export function NutriLogoLoader({
   text = "Cargando sistema...",
   fullscreen = true,
   className = "",
+  showProgress = true,
 }: NutriLogoLoaderProps) {
   return (
     <div
@@ -52,6 +54,12 @@ export function NutriLogoLoader({
           <span />
           <span />
         </div>
+
+        {showProgress && (
+          <div className="nutri-loader__progress" aria-hidden="true">
+            <span />
+          </div>
+        )}
       </div>
     </div>
   );

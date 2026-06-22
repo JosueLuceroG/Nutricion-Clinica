@@ -219,7 +219,7 @@
     "show_password": "Mostrar contraseña",
     "hide_password": "Ocultar contraseña",
     "login_button": "Iniciar sesión",
-    "logging_in": "Iniciando sesión...",
+    "logging_in": "Ingresando...",
     "invalid_credentials": "Credenciales inválidas",
     "connection_error": "Error de conexión",
     "select_branch": "Selecciona una sucursal",

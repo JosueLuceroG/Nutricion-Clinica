@@ -219,7 +219,7 @@
     "show_password": "Show password",
     "hide_password": "Hide password",
     "login_button": "Log in",
-    "logging_in": "Logging in...",
+    "logging_in": "Signing in...",
     "invalid_credentials": "Invalid credentials",
     "connection_error": "Connection error",
     "select_branch": "Select a branch",
