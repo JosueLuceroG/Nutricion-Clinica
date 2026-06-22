@@ -90,13 +90,26 @@ export async function listSucursalesForProfesional(profesionalId: string): Promi
   return result.recordset;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const prof = await findProfesionalByEmail(email);
-  if (!prof) throw new InvalidCredentialsError();
-  if (!prof.activo) throw new InactiveAccountError();
+  if (!prof) {
+    await delay(500 + Math.random() * 1000);
+    throw new InvalidCredentialsError();
+  }
+  if (!prof.activo) {
+    await delay(500 + Math.random() * 1000);
+    throw new InactiveAccountError();
+  }
 
   const ok = await verifyPassword(prof.password_hash, password);
-  if (!ok) throw new InvalidCredentialsError();
+  if (!ok) {
+    await delay(500 + Math.random() * 1000);
+    throw new InvalidCredentialsError();
+  }
 
   const sucursales = await listSucursalesForProfesional(prof.id);
   const token = await signToken({
@@ -107,6 +120,8 @@ export async function login(email: string, password: string): Promise<AuthRespon
   });
 
   await markLastLogin(prof.id);
+
+  await delay(1000 + Math.random() * 2000);
 
   return {
     token,
