@@ -2419,3 +2419,149 @@
     transform: none !important;
   }
 }
+
+
+/* =========================================================
+   FIX PANTALLAS GRANDES
+   Solo aplica en resoluciones grandes.
+   No rompe laptop ni modo compacto.
+   ========================================================= */
+
+@media (min-width: 1600px) and (min-height: 900px) {
+  :root {
+    --nc-shell-width: 1575px;
+    --nc-shell-height: 870px;
+    --nc-shell-radius: 30px;
+
+    --nc-left-panel: 49.25%;
+    --nc-right-panel: 50.75%;
+
+    --nc-card-width: 730px;
+    --nc-card-height: 807px;
+    --nc-card-radius: 22px;
+
+    --nc-card-top: 30px;
+    --nc-card-right: 70px;
+    --nc-card-bottom: 30px;
+
+    --nc-card-padding-left: 57px;
+    --nc-card-padding-right: 58px;
+
+    --nc-input-height: 68px;
+    --nc-button-height: 64px;
+  }
+
+  .nc-login-page {
+    padding: 38px 48px !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .nc-login-shell {
+    width: min(var(--nc-shell-width), calc(100vw - 96px)) !important;
+    height: min(var(--nc-shell-height), calc(100vh - 76px)) !important;
+
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+    border-radius: var(--nc-shell-radius) !important;
+  }
+
+  .nc-form-panel {
+    align-items: flex-start !important;
+    justify-content: flex-end !important;
+    padding: var(--nc-card-top) var(--nc-card-right) var(--nc-card-bottom) 0 !important;
+  }
+
+  .nc-login-card {
+    width: var(--nc-card-width) !important;
+    max-width: var(--nc-card-width) !important;
+    min-height: var(--nc-card-height) !important;
+    height: auto !important;
+
+    padding:
+      57px
+      var(--nc-card-padding-right)
+      24px
+      var(--nc-card-padding-left) !important;
+
+    border-radius: var(--nc-card-radius) !important;
+    transform: none !important;
+  }
+
+  /* Lado izquierdo en pantalla grande */
+  .nc-brand-panel {
+    padding-top: 86px !important;
+    padding-left: 90px !important;
+    padding-right: 42px !important;
+    padding-bottom: 40px !important;
+  }
+
+  .nc-brand-content {
+    max-width: 650px !important;
+  }
+
+  .nc-logo {
+    width: 405px !important;
+    max-width: 88% !important;
+    margin: 0 0 58px 0 !important;
+  }
+
+  .nc-brand-copy {
+    max-width: 650px !important;
+    transform: none !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 660px !important;
+    font-size: 34px !important;
+    line-height: 1.24 !important;
+    font-weight: 680 !important;
+    letter-spacing: 0.002em !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    max-width: 470px !important;
+    width: auto !important;
+    margin-top: 24px !important;
+    font-size: 16.5px !important;
+    line-height: 1.62 !important;
+    transform: none !important;
+  }
+
+  .nc-brand-dots {
+    top: 50px !important;
+    right: 44px !important;
+    width: 168px !important;
+    height: 132px !important;
+    opacity: 0.55 !important;
+  }
+
+  .nc-shell-art-image {
+    left: 0% !important;
+    bottom: -5.1% !important;
+    width: 101.5% !important;
+  }
+}
+
+/* =========================================================
+   AJUSTE SOLO PARTE INFERIOR DE LA CARD
+   Acceso seguro + credenciales
+   No toca inputs, botón, header ni card completa.
+   ========================================================= */
+
+.nc-secure-box {
+  /* baja o sube el bloque de acceso seguro */
+  margin-top: 28.5px !important;
+
+  /* mueve el contenido un poco a la derecha */
+  padding-left: 18px !important;
+  padding-right: 18px !important;
+}
+
+.nc-login-footer {
+  /* separación entre acceso seguro y credenciales */
+  margin-top: 20px !important;
+
+  /* mueve credenciales a la derecha */
+  padding-left: 42px !important;
+}
