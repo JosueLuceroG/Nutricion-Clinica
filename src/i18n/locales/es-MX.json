@@ -265,7 +265,7 @@
     "forgot_password": "¿Olvidaste tu contraseña?",
     "secure_access": "Acceso seguro y protegido",
     "secure_access_desc": "Tus datos están protegidos con cifrado de nivel empresarial.",
-    "credentials_note": "Las credenciales las gestiona tu administradora de sucursal.",
+    "credentials_note": "Tu administradora de sucursal gestiona las credenciales de acceso.",
     "roles_available": "Roles disponibles: {{roles}}"
   },
   "patient": {

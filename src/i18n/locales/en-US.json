@@ -265,7 +265,7 @@
     "forgot_password": "Forgot your password?",
     "secure_access": "Secure and protected access",
     "secure_access_desc": "Your data is protected with enterprise-grade encryption.",
-    "credentials_note": "Credentials are managed by your branch administrator.",
+    "credentials_note": "Your branch administrator manages access credentials.",
     "roles_available": "Available roles: {{roles}}"
   },
   "patient": {

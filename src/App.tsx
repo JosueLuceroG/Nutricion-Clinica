@@ -45,7 +45,7 @@ export function App() {
       <NotificationProvider>
         <TooltipProvider delayDuration={300}>
           <AppRouter />
-          <Toaster position="bottom-right" richColors closeButton />
+          <Toaster position="top-right" richColors={false} closeButton />
         </TooltipProvider>
       </NotificationProvider>
     </ThemeProvider>

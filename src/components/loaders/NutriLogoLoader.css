@@ -279,10 +279,96 @@
 }
 
 @media (max-width: 768px) {
+  .nutri-loader--fullscreen {
+    padding: 20px;
+  }
+
   .nutri-loader__card {
-    min-width: 230px;
-    padding: 26px 30px;
+    width: min(78vw, 320px);
+    min-width: 280px;
+
+    padding: 30px 32px;
+    border-radius: 26px;
+  }
+
+  .nutri-loader__logoWrap {
+    width: 150px;
+    height: 122px;
+  }
+
+  .nutri-loader__leaf--left,
+  .nutri-loader__leaf--right {
+    width: 88px;
+  }
+
+  .nutri-loader__leaf--left {
+    left: 9px;
+    bottom: 0;
+  }
+
+  .nutri-loader__leaf--right {
+    right: 9px;
+    bottom: 0;
+  }
+
+  .nutri-loader__text {
+    margin-top: 12px;
+    font-size: 15px;
+    line-height: 1.25;
+  }
+
+  .nutri-loader__progress {
+    width: 96px;
+    height: 3px;
+    margin-top: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .nutri-loader__card {
+    width: min(82vw, 310px);
+    min-width: 270px;
+
+    padding: 28px 30px;
     border-radius: 24px;
+  }
+
+  .nutri-loader__logoWrap {
+    width: 142px;
+    height: 116px;
+  }
+
+  .nutri-loader__leaf--left,
+  .nutri-loader__leaf--right {
+    width: 84px;
+  }
+
+  .nutri-loader__leaf--left {
+    left: 8px;
+    bottom: 0;
+  }
+
+  .nutri-loader__leaf--right {
+    right: 8px;
+    bottom: 0;
+  }
+
+  .nutri-loader__text {
+    font-size: 14.5px;
+  }
+
+  .nutri-loader__progress {
+    width: 92px;
+  }
+}
+
+@media (max-width: 380px) {
+  .nutri-loader__card {
+    width: min(86vw, 286px);
+    min-width: 250px;
+
+    padding: 26px 26px;
+    border-radius: 22px;
   }
 
   .nutri-loader__logoWrap {
@@ -297,42 +383,19 @@
 
   .nutri-loader__leaf--left {
     left: 8px;
+    bottom: 0;
   }
 
   .nutri-loader__leaf--right {
     right: 8px;
+    bottom: 0;
   }
 
   .nutri-loader__text {
     font-size: 14px;
   }
-}
 
-@media (max-width: 420px) {
-  .nutri-loader__card {
-    min-width: 210px;
-    padding: 24px 26px;
-  }
-
-  .nutri-loader__logoWrap {
-    width: 118px;
-    height: 96px;
-  }
-
-  .nutri-loader__leaf--left,
-  .nutri-loader__leaf--right {
-    width: 69px;
-  }
-
-  .nutri-loader__leaf--left {
-    left: 7px;
-  }
-
-  .nutri-loader__leaf--right {
-    right: 7px;
-  }
-
-  .nutri-loader__text {
-    font-size: 13.5px;
+  .nutri-loader__progress {
+    width: 86px;
   }
 }

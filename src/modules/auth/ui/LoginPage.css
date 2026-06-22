@@ -3575,10 +3575,12 @@
 
 .nc-login-card {
   box-sizing: border-box;
+  border-color: rgba(203, 222, 235, 0.78);
   box-shadow:
-    0 18px 44px rgba(15, 23, 42, 0.070),
+    0 20px 50px rgba(15, 23, 42, 0.080),
     0 8px 22px rgba(16, 42, 86, 0.035),
-    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.42);
 }
 
 @media (min-width: 1051px) {
@@ -3602,8 +3604,66 @@
     0 10px 22px rgba(37, 99, 235, 0.075);
 }
 
-.nc-input:focus-within svg {
+.nc-input > svg,
+.nc-eye-button,
+.nc-eye-button svg {
+  transition:
+    color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.nc-input:focus-within > svg,
+.nc-input:focus-within .nc-eye-button {
   color: var(--nc-blue);
+  opacity: 0.95;
+}
+
+.nc-eye-button:hover {
+  transform: scale(1.06);
+  opacity: 0.85;
+}
+
+.nc-eye-button:active {
+  transform: scale(0.97);
+}
+
+.nc-remember input {
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.nc-remember input:checked {
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+}
+
+.nc-remember input:active {
+  transform: scale(0.94);
+}
+
+:where([data-sonner-toast][data-type="error"]) {
+  border-radius: 16px !important;
+  border: 1px solid rgba(239, 68, 68, 0.22) !important;
+  background: rgba(254, 242, 242, 0.96) !important;
+  color: #991b1b !important;
+  box-shadow:
+    0 18px 45px rgba(15, 23, 42, 0.14),
+    0 6px 18px rgba(239, 68, 68, 0.10) !important;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+:where([data-sonner-toast][data-type="error"]) :where(svg) {
+  color: #dc2626;
+}
+
+:where([data-sonner-toast][data-type="error"]) :where([data-title], [data-description]) {
+  color: inherit;
 }
 
 .nc-submit {
@@ -3733,6 +3793,10 @@
   }
 
   .nc-input,
+  .nc-input > svg,
+  .nc-eye-button,
+  .nc-eye-button svg,
+  .nc-remember input,
   .nc-submit,
   .nc-submit::after,
   .nc-secure-box {

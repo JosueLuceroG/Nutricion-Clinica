@@ -8,8 +8,8 @@ export function NotificationProvider({ children, ...props }: ToasterProps) {
     <>
       {children}
       <Sonner
-        position="bottom-right"
-        richColors
+        position="top-right"
+        richColors={false}
         closeButton
         toastOptions={{
           classNames: {
