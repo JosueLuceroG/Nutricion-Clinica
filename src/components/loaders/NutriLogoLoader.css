@@ -1,0 +1,324 @@
+.nutri-loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nutri-loader--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  width: 100vw;
+  height: 100dvh;
+  min-height: 100dvh;
+
+  display: grid;
+  place-items: center;
+
+  padding: 24px;
+  box-sizing: border-box;
+
+  background:
+    radial-gradient(circle at center, rgba(14, 165, 233, 0.1), transparent 38%),
+    linear-gradient(
+      135deg,
+      rgba(248, 252, 255, 0.96),
+      rgba(239, 248, 252, 0.96)
+    );
+
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+}
+
+.nutri-loader--inline {
+  width: 100%;
+  min-height: 220px;
+}
+
+.nutri-loader__card {
+  margin: 0;
+  position: relative;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 260px;
+  padding: 30px 38px;
+
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(203, 222, 235, 0.8);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
+}
+
+.nutri-loader__logoWrap {
+  position: relative;
+
+  width: 181px;
+  height: 150px;
+
+  display: block;
+}
+
+.nutri-loader__glow {
+  position: absolute;
+  left: 50%;
+  bottom: 100px;
+
+  width: 112px;
+  height: 90px;
+
+  border-radius: 999px;
+
+  background: linear-gradient(
+    135deg,
+    rgba(37, 99, 235, 0.14),
+    rgba(20, 184, 166, 0.14)
+  );
+
+  filter: blur(16px);
+  transform: translateX(-50%);
+  animation: nutriGlowPulse 2s ease-in-out infinite;
+}
+
+/*
+  IMPORTANTE:
+  Los SVG están separados y parecen estar recortados por hoja.
+  Por eso NO usar inset: 0 en cada hoja.
+  Se deben posicionar como el logo real:
+  izquierda a la izquierda, derecha a la derecha,
+  juntándose en la punta inferior central.
+*/
+.nutri-loader__leaf {
+  position: absolute;
+  z-index: 2;
+
+  height: auto;
+
+  user-select: none;
+  pointer-events: none;
+
+  will-change: transform, opacity;
+}
+
+/* Hoja izquierda del logo real */
+.nutri-loader__leaf--left {
+  width: 88px;
+  left: 9px;
+  bottom: 0;
+
+  transform-origin: 88% 96%;
+  animation: nutriLeafLeft 2.4s ease-in-out infinite;
+}
+
+/* Hoja derecha del logo real */
+.nutri-loader__leaf--right {
+  width: 88px;
+  right: 9px;
+  bottom: 0;
+
+  transform-origin: 12% 96%;
+  animation: nutriLeafRight 2.4s ease-in-out infinite;
+}
+
+.nutri-loader__text {
+  margin: 12px 0 0;
+
+  color: #0b1f4d;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+
+.nutri-loader__dots {
+  display: flex;
+  gap: 7px;
+
+  margin-top: 12px;
+}
+
+.nutri-loader__dots span {
+  width: 7px;
+  height: 7px;
+
+  border-radius: 999px;
+  background: #0ea5e9;
+
+  opacity: 0.35;
+  animation: nutriDotBounce 1.1s ease-in-out infinite;
+}
+
+.nutri-loader__dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.nutri-loader__dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/*
+  La animación debe construir el logo:
+  primero aparece la hoja izquierda,
+  luego aparece la derecha,
+  después ambas respiran suavemente.
+*/
+@keyframes nutriLeafLeft {
+  0% {
+    opacity: 0;
+    transform: translate(10px, 10px) scale(0.78) rotate(-7deg);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  58% {
+    opacity: 1;
+    transform: translate(0, -3px) scale(1.025) rotate(0deg);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(6px, 6px) scale(0.92) rotate(-3deg);
+  }
+}
+
+@keyframes nutriLeafRight {
+  0% {
+    opacity: 0;
+    transform: translate(-10px, 10px) scale(0.78) rotate(7deg);
+  }
+
+  18% {
+    opacity: 0;
+    transform: translate(-10px, 10px) scale(0.78) rotate(7deg);
+  }
+
+  36% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  58% {
+    opacity: 1;
+    transform: translate(0, -3px) scale(1.025) rotate(0deg);
+  }
+
+  82% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(-6px, 6px) scale(0.92) rotate(3deg);
+  }
+}
+
+@keyframes nutriGlowPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateX(-50%) scale(0.95);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.08);
+  }
+}
+
+@keyframes nutriDotBounce {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nutri-loader__glow,
+  .nutri-loader__leaf,
+  .nutri-loader__dots span {
+    animation: none;
+  }
+
+  .nutri-loader__leaf {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .nutri-loader__card {
+    min-width: 230px;
+    padding: 26px 30px;
+    border-radius: 24px;
+  }
+
+  .nutri-loader__logoWrap {
+    width: 130px;
+    height: 106px;
+  }
+
+  .nutri-loader__leaf--left,
+  .nutri-loader__leaf--right {
+    width: 76px;
+  }
+
+  .nutri-loader__leaf--left {
+    left: 8px;
+  }
+
+  .nutri-loader__leaf--right {
+    right: 8px;
+  }
+
+  .nutri-loader__text {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .nutri-loader__card {
+    min-width: 210px;
+    padding: 24px 26px;
+  }
+
+  .nutri-loader__logoWrap {
+    width: 118px;
+    height: 96px;
+  }
+
+  .nutri-loader__leaf--left,
+  .nutri-loader__leaf--right {
+    width: 69px;
+  }
+
+  .nutri-loader__leaf--left {
+    left: 7px;
+  }
+
+  .nutri-loader__leaf--right {
+    right: 7px;
+  }
+
+  .nutri-loader__text {
+    font-size: 13.5px;
+  }
+}

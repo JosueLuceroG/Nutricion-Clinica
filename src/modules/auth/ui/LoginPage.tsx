@@ -19,6 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@components/ui/dialog";
+import { NutriLogoLoader } from "@components/loaders/NutriLogoLoader";
 import { authApi } from "@services/api/authApi";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
@@ -164,6 +165,8 @@ export function LoginPage() {
 
   return (
     <main className="nc-login-page">
+      {loading && <NutriLogoLoader text="Iniciando sesión..." fullscreen />}
+
       <section className="nc-login-shell">
 
         <div className="nc-shell-art" aria-hidden="true">

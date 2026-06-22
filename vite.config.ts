@@ -5,6 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const isDependency = (id: string, dependency: string) => {
+  const normalizedId = id.replace(/\\/g, "/");
+  return normalizedId.includes(`/node_modules/${dependency}/`);
+};
+
+const isScopedDependency = (id: string, scope: string) => {
+  const normalizedId = id.replace(/\\/g, "/");
+  return normalizedId.includes(`/node_modules/${scope}/`);
+};
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -46,19 +56,89 @@ export default defineConfig({
     sourcemap: process.env.CI ? false : true,
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          ui: [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tooltip",
-            "@radix-ui/react-toast",
-          ],
-          forms: ["react-hook-form", "@hookform/resolvers", "zod"],
-          table: ["@tanstack/react-table"],
-          charts: ["recharts"],
-          dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
+        manualChunks(id) {
+          if (
+            isDependency(id, "react") ||
+            isDependency(id, "react-dom") ||
+            isDependency(id, "react-router-dom")
+          ) {
+            return "react";
+          }
+
+          if (
+            isScopedDependency(id, "@radix-ui") ||
+            isDependency(id, "cmdk") ||
+            isDependency(id, "class-variance-authority") ||
+            isDependency(id, "clsx") ||
+            isDependency(id, "tailwind-merge") ||
+            isDependency(id, "tailwindcss-animate")
+          ) {
+            return "ui";
+          }
+
+          if (
+            isDependency(id, "react-hook-form") ||
+            isScopedDependency(id, "@hookform") ||
+            isDependency(id, "zod")
+          ) {
+            return "forms";
+          }
+
+          if (isScopedDependency(id, "@tanstack")) {
+            return "table";
+          }
+
+          if (isDependency(id, "recharts")) {
+            return "charts";
+          }
+
+          if (isScopedDependency(id, "@dnd-kit")) {
+            return "dnd";
+          }
+
+          if (isDependency(id, "jspdf") || isDependency(id, "jspdf-autotable")) {
+            return "pdf";
+          }
+
+          if (isDependency(id, "html2canvas")) {
+            return "canvas";
+          }
+
+          if (isDependency(id, "tesseract.js")) {
+            return "ocr";
+          }
+
+          if (isDependency(id, "i18next") || isDependency(id, "react-i18next")) {
+            return "i18n";
+          }
+
+          if (
+            isDependency(id, "dexie") ||
+            isDependency(id, "dexie-react-hooks") ||
+            isDependency(id, "zustand")
+          ) {
+            return "state";
+          }
+
+          if (isScopedDependency(id, "@tauri-apps")) {
+            return "tauri";
+          }
+
+          if (isDependency(id, "date-fns") || isDependency(id, "uuid")) {
+            return "utils";
+          }
+
+          if (isDependency(id, "lucide-react")) {
+            return "icons";
+          }
+
+          if (isDependency(id, "react-day-picker")) {
+            return "calendar";
+          }
+
+          if (isDependency(id, "sonner")) {
+            return "notifications";
+          }
         },
       },
     },
