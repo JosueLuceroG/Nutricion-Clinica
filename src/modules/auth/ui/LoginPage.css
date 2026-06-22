@@ -2360,7 +2360,9 @@
   }
 }
 
-//////
+/* =========================================================
+   SEPARADOR
+   ========================================================= */
 
 /* =========================================================
    REDUCIR BLOQUE DERECHO COMPLETO
@@ -2564,4 +2566,231 @@
 
   /* mueve credenciales a la derecha */
   padding-left: 42px !important;
+}
+
+/* =========================================================
+   RAYAS AZULES FINALES - FUERTES, CURVEADAS Y DIFUMINADAS
+   Solo usa .nc-form-panel::before / ::after.
+   No toca card, inputs, textos, logo ni fondo.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-form-panel {
+    position: relative !important;
+    overflow: visible !important;
+    isolation: isolate !important;
+  }
+
+  .nc-form-panel::before,
+  .nc-form-panel::after {
+    content: "" !important;
+    position: absolute !important;
+    pointer-events: none !important;
+    z-index: 1 !important;
+
+    /* Esto suaviza las puntas para que no se vean cortadas */
+    -webkit-mask-image: radial-gradient(
+      ellipse 100% 78% at 55% 54%,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.78) 18%,
+      rgba(0, 0, 0, 1) 43%,
+      rgba(0, 0, 0, 0.72) 72%,
+      rgba(0, 0, 0, 0) 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 100% 78% at 55% 54%,
+      rgba(0, 0, 0, 0) 0%,
+      rgba(0, 0, 0, 0.78) 18%,
+      rgba(0, 0, 0, 1) 43%,
+      rgba(0, 0, 0, 0.72) 72%,
+      rgba(0, 0, 0, 0) 100%
+    );
+
+    transform-origin: left center !important;
+  }
+
+  /* Raya principal */
+  .nc-form-panel::before {
+    left: -222px !important;
+    bottom: 78px !important;
+
+    width: 478px !important;
+    height: 174px !important;
+
+    background:
+      radial-gradient(
+        ellipse 72% 80% at 58% 52%,
+        rgba(22, 156, 235, 0.30) 0%,
+        rgba(22, 156, 235, 0.24) 40%,
+        rgba(37, 200, 184, 0.17) 68%,
+        rgba(37, 200, 184, 0) 100%
+      ),
+      linear-gradient(
+        105deg,
+        rgba(23, 105, 255, 0) 0%,
+        rgba(23, 105, 255, 0.14) 18%,
+        rgba(22, 156, 235, 0.34) 48%,
+        rgba(37, 200, 184, 0.24) 73%,
+        rgba(37, 200, 184, 0) 100%
+      ) !important;
+
+    clip-path: polygon(
+      0% 82%,
+      10% 77%,
+      24% 68%,
+      42% 55%,
+      62% 41%,
+      82% 30%,
+      100% 23%,
+      100% 49%,
+      82% 56%,
+      62% 66%,
+      42% 78%,
+      24% 89%,
+      10% 98%,
+      0% 100%
+    ) !important;
+
+    border-radius: 0 100% 100% 0 / 0 92% 92% 0 !important;
+    transform: rotate(-7.5deg) skewX(-4deg) !important;
+    filter: blur(0.72px) !important;
+    opacity: 0.94 !important;
+  }
+
+  /* Raya secundaria */
+  .nc-form-panel::after {
+    left: -182px !important;
+    bottom: 44px !important;
+
+    width: 420px !important;
+    height: 126px !important;
+
+    background:
+      radial-gradient(
+        ellipse 75% 82% at 58% 52%,
+        rgba(23, 105, 255, 0.20) 0%,
+        rgba(22, 156, 235, 0.18) 43%,
+        rgba(37, 200, 184, 0.11) 70%,
+        rgba(37, 200, 184, 0) 100%
+      ),
+      linear-gradient(
+        105deg,
+        rgba(23, 105, 255, 0) 0%,
+        rgba(23, 105, 255, 0.10) 22%,
+        rgba(22, 156, 235, 0.24) 53%,
+        rgba(37, 200, 184, 0.16) 78%,
+        rgba(37, 200, 184, 0) 100%
+      ) !important;
+
+    clip-path: polygon(
+      0% 80%,
+      12% 74%,
+      29% 64%,
+      49% 52%,
+      70% 40%,
+      88% 31%,
+      100% 27%,
+      100% 47%,
+      88% 53%,
+      70% 62%,
+      49% 74%,
+      29% 86%,
+      12% 96%,
+      0% 99%
+    ) !important;
+
+    border-radius: 0 100% 100% 0 / 0 88% 88% 0 !important;
+    transform: rotate(-6.5deg) skewX(-3deg) !important;
+    filter: blur(0.82px) !important;
+    opacity: 0.72 !important;
+  }
+
+  .nc-login-card {
+    position: relative !important;
+    z-index: 5 !important;
+  }
+}
+
+/* Ajuste de posición de rayas para pantalla grande */
+@media (min-width: 1600px) and (min-height: 900px) {
+  .nc-form-panel::before {
+    left: -245px !important;
+    bottom: 100px !important;
+    width: 510px !important;
+    height: 188px !important;
+  }
+
+  .nc-form-panel::after {
+    left: -200px !important;
+    bottom: 66px !important;
+    width: 448px !important;
+    height: 136px !important;
+  }
+}
+
+/* Ajuste de posición de rayas para laptop / modo compacto */
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-form-panel::before {
+    left: -214px !important;
+    bottom: 72px !important;
+    width: 455px !important;
+    height: 162px !important;
+  }
+
+  .nc-form-panel::after {
+    left: -176px !important;
+    bottom: 40px !important;
+    width: 400px !important;
+    height: 118px !important;
+  }
+}
+
+/* =========================================================
+   AJUSTE RAYAS AZULES
+   Menos fuertes + más blur + más arriba
+   Pegar hasta el final del CSS.
+   ========================================================= */
+
+@media (min-width: 1051px) {
+  .nc-form-panel::before {
+    bottom: 94px !important;      /* antes 78px */
+    filter: blur(1.35px) !important;
+    opacity: 0.72 !important;     /* antes 0.94 */
+  }
+
+  .nc-form-panel::after {
+    bottom: 60px !important;      /* antes 44px */
+    filter: blur(1.45px) !important;
+    opacity: 0.50 !important;     /* antes 0.72 */
+  }
+}
+
+/* Pantalla grande */
+@media (min-width: 1600px) and (min-height: 900px) {
+  .nc-form-panel::before {
+    bottom: 118px !important;     /* antes 100px */
+    filter: blur(1.35px) !important;
+    opacity: 0.72 !important;
+  }
+
+  .nc-form-panel::after {
+    bottom: 84px !important;      /* antes 66px */
+    filter: blur(1.45px) !important;
+    opacity: 0.50 !important;
+  }
+}
+
+/* Laptop / compacto */
+@media (max-height: 850px), (max-width: 1500px) {
+  .nc-form-panel::before {
+    bottom: 88px !important;      /* antes 72px */
+    filter: blur(1.35px) !important;
+    opacity: 0.72 !important;
+  }
+
+  .nc-form-panel::after {
+    bottom: 56px !important;      /* antes 40px */
+    filter: blur(1.45px) !important;
+    opacity: 0.50 !important;
+  }
 }
