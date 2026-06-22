@@ -2746,51 +2746,834 @@
 }
 
 /* =========================================================
-   AJUSTE RAYAS AZULES
-   Menos fuertes + más blur + más arriba
-   Pegar hasta el final del CSS.
+   RESPONSIVE FINAL NUTRICLINICA
+   Este bloque debe ir AL FINAL del CSS.
+   Mantiene el diseño actual en escritorio y lo adapta a:
+   - pantallas grandes
+   - laptop
+   - iPad Air horizontal
+   - iPad/tablet vertical
+   - celulares
    ========================================================= */
 
-@media (min-width: 1051px) {
-  .nc-form-panel::before {
-    bottom: 94px !important;      /* antes 78px */
-    filter: blur(1.35px) !important;
-    opacity: 0.72 !important;     /* antes 0.94 */
-  }
-
-  .nc-form-panel::after {
-    bottom: 60px !important;      /* antes 44px */
-    filter: blur(1.45px) !important;
-    opacity: 0.50 !important;     /* antes 0.72 */
+/* Evita problemas con barras del navegador en móvil */
+@supports (height: 100dvh) {
+  .nc-login-page {
+    min-height: 100dvh !important;
   }
 }
 
-/* Pantalla grande */
+/* ---------------------------------------------------------
+   1) PANTALLAS GRANDES / MONITORES GRANDES
+   --------------------------------------------------------- */
 @media (min-width: 1600px) and (min-height: 900px) {
+  :root {
+    --nc-shell-width: 1575px;
+    --nc-shell-height: 870px;
+    --nc-shell-radius: 30px;
+
+    --nc-left-panel: 49.25%;
+    --nc-right-panel: 50.75%;
+
+    --nc-card-width: 730px;
+    --nc-card-height: 807px;
+    --nc-card-radius: 22px;
+
+    --nc-card-top: 30px;
+    --nc-card-right: 70px;
+    --nc-card-bottom: 30px;
+
+    --nc-card-padding-left: 57px;
+    --nc-card-padding-right: 58px;
+
+    --nc-input-height: 68px;
+    --nc-button-height: 64px;
+  }
+
+  .nc-login-page {
+    padding: 38px 48px !important;
+    overflow: hidden !important;
+  }
+
+  .nc-login-shell {
+    width: min(var(--nc-shell-width), calc(100vw - 96px)) !important;
+    height: min(var(--nc-shell-height), calc(100vh - 76px)) !important;
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+    border-radius: var(--nc-shell-radius) !important;
+  }
+
+  .nc-brand-panel {
+    padding: 86px 42px 40px 90px !important;
+  }
+
+  .nc-brand-content {
+    max-width: 650px !important;
+  }
+
+  .nc-logo {
+    width: 405px !important;
+    max-width: 88% !important;
+    margin: 0 0 58px 0 !important;
+  }
+
+  .nc-brand-copy {
+    max-width: 650px !important;
+    transform: none !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 660px !important;
+    font-size: 34px !important;
+    line-height: 1.24 !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    max-width: 470px !important;
+    width: auto !important;
+    margin-top: 24px !important;
+    font-size: 16.5px !important;
+    line-height: 1.62 !important;
+    transform: none !important;
+  }
+
+  .nc-form-panel {
+    align-items: flex-start !important;
+    justify-content: flex-end !important;
+    padding: var(--nc-card-top) var(--nc-card-right) var(--nc-card-bottom) 0 !important;
+  }
+
+  .nc-login-card {
+    width: var(--nc-card-width) !important;
+    max-width: var(--nc-card-width) !important;
+    min-height: var(--nc-card-height) !important;
+    padding: 57px var(--nc-card-padding-right) 24px var(--nc-card-padding-left) !important;
+    transform: none !important;
+  }
+
+  .nc-shell-art-image {
+    left: 0% !important;
+    bottom: -5.1% !important;
+    width: 101.5% !important;
+  }
+
   .nc-form-panel::before {
-    bottom: 118px !important;     /* antes 100px */
+    left: -245px !important;
+    bottom: 118px !important;
+    width: 510px !important;
+    height: 188px !important;
     filter: blur(1.35px) !important;
     opacity: 0.72 !important;
   }
 
   .nc-form-panel::after {
-    bottom: 84px !important;      /* antes 66px */
+    left: -200px !important;
+    bottom: 84px !important;
+    width: 448px !important;
+    height: 136px !important;
     filter: blur(1.45px) !important;
     opacity: 0.50 !important;
   }
 }
 
-/* Laptop / compacto */
-@media (max-height: 850px), (max-width: 1500px) {
+/* ---------------------------------------------------------
+   2) ESCRITORIO / LAPTOP NORMAL
+   Mantiene la vista que ya te gustó.
+   --------------------------------------------------------- */
+@media (min-width: 1200px) and (max-width: 1599px),
+       (min-width: 1200px) and (max-height: 850px) {
+  :root {
+    --nc-shell-width: 1260px;
+    --nc-shell-height: 646px;
+    --nc-shell-radius: 30px;
+
+    --nc-left-panel: 49.8%;
+    --nc-right-panel: 50.2%;
+
+    --nc-card-width: 580px;
+    --nc-card-height: 590px;
+    --nc-card-radius: 18px;
+
+    --nc-card-top: 28px;
+    --nc-card-right: 25px;
+    --nc-card-bottom: 28px;
+
+    --nc-card-padding-left: 31px;
+    --nc-card-padding-right: 31px;
+
+    --nc-input-height: 46px;
+    --nc-button-height: 47px;
+  }
+
+  .nc-login-page {
+    padding: 12px 24px !important;
+    overflow: hidden !important;
+  }
+
+  .nc-login-shell {
+    width: min(var(--nc-shell-width), calc(100vw - 80px)) !important;
+    height: min(var(--nc-shell-height), calc(100vh - 58px)) !important;
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+  }
+
+  .nc-form-panel {
+    padding: var(--nc-card-top) var(--nc-card-right) var(--nc-card-bottom) 0 !important;
+    justify-content: flex-end !important;
+  }
+
+  .nc-login-card {
+    width: var(--nc-card-width) !important;
+    max-width: var(--nc-card-width) !important;
+    min-height: var(--nc-card-height) !important;
+    transform: none !important;
+  }
+
+  .nc-shell-art-image {
+    left: 0% !important;
+    bottom: -5.1% !important;
+    width: 85% !important;
+  }
+
   .nc-form-panel::before {
-    bottom: 88px !important;      /* antes 72px */
+    left: -214px !important;
+    bottom: 88px !important;
+    width: 455px !important;
+    height: 162px !important;
     filter: blur(1.35px) !important;
     opacity: 0.72 !important;
   }
 
   .nc-form-panel::after {
-    bottom: 56px !important;      /* antes 40px */
+    left: -176px !important;
+    bottom: 56px !important;
+    width: 400px !important;
+    height: 118px !important;
     filter: blur(1.45px) !important;
     opacity: 0.50 !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   3) IPAD AIR / TABLET HORIZONTAL
+   1051px a 1199px mantiene dos columnas pero más compacto.
+   --------------------------------------------------------- */
+@media (min-width: 1051px) and (max-width: 1199px) {
+  :root {
+    --nc-shell-width: 100vw;
+    --nc-shell-height: 760px;
+    --nc-shell-radius: 28px;
+
+    --nc-left-panel: 47.5%;
+    --nc-right-panel: 52.5%;
+
+    --nc-card-width: 500px;
+    --nc-card-height: auto;
+    --nc-card-radius: 18px;
+
+    --nc-card-top: 24px;
+    --nc-card-right: 18px;
+    --nc-card-bottom: 24px;
+
+    --nc-card-padding-left: 28px;
+    --nc-card-padding-right: 28px;
+
+    --nc-input-height: 46px;
+    --nc-button-height: 48px;
+  }
+
+  .nc-login-page {
+    padding: 18px !important;
+    overflow: auto !important;
+    align-items: center !important;
+  }
+
+  .nc-login-shell {
+    width: calc(100vw - 36px) !important;
+    height: min(760px, calc(100vh - 36px)) !important;
+    grid-template-columns: var(--nc-left-panel) var(--nc-right-panel) !important;
+    border-radius: var(--nc-shell-radius) !important;
+  }
+
+  .nc-brand-panel {
+    padding: 50px 24px 30px 42px !important;
+  }
+
+  .nc-logo {
+    width: 255px !important;
+    max-width: 82% !important;
+    margin-bottom: 30px !important;
+  }
+
+  .nc-brand-copy {
+    max-width: 430px !important;
+    transform: none !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 430px !important;
+    font-size: 24px !important;
+    line-height: 1.25 !important;
+  }
+
+  .nc-title-main,
+  .nc-title-line {
+    white-space: normal !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    width: auto !important;
+    max-width: 330px !important;
+    margin-top: 18px !important;
+    font-size: 13.8px !important;
+    line-height: 1.52 !important;
+    transform: none !important;
+  }
+
+  .nc-form-panel {
+    padding: var(--nc-card-top) var(--nc-card-right) var(--nc-card-bottom) 0 !important;
+    justify-content: flex-end !important;
+  }
+
+  .nc-login-card {
+    width: min(var(--nc-card-width), calc(100% - 18px)) !important;
+    max-width: min(var(--nc-card-width), calc(100% - 18px)) !important;
+    min-height: auto !important;
+    padding: 26px var(--nc-card-padding-right) 20px var(--nc-card-padding-left) !important;
+    transform: none !important;
+  }
+
+  .nc-login-header {
+    gap: 14px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .nc-login-icon {
+    width: 48px !important;
+    height: 48px !important;
+    flex-basis: 48px !important;
+  }
+
+  .nc-login-header h2 {
+    font-size: 27px !important;
+  }
+
+  .nc-login-header p {
+    font-size: 12.8px !important;
+  }
+
+  .nc-divider {
+    margin-bottom: 16px !important;
+  }
+
+  .nc-field {
+    margin-bottom: 12px !important;
+  }
+
+  .nc-field label {
+    margin-bottom: 6px !important;
+    font-size: 13px !important;
+  }
+
+  .nc-input {
+    height: var(--nc-input-height) !important;
+  }
+
+  .nc-options {
+    margin: 4px 0 14px !important;
+  }
+
+  .nc-submit,
+  .nc-submit:disabled,
+  .nc-login-button {
+    height: var(--nc-button-height) !important;
+    font-size: 15px !important;
+  }
+
+  .nc-secure-box {
+    margin-top: 16px !important;
+    margin-bottom: 13px !important;
+    padding-top: 14px !important;
+    padding-bottom: 13px !important;
+  }
+
+  .nc-login-footer,
+  .nc-login-note {
+    margin-top: 12px !important;
+    padding-left: 22px !important;
+  }
+
+  .nc-shell-art-image {
+    left: -8% !important;
+    bottom: -4% !important;
+    width: 115% !important;
+  }
+
+  .nc-form-panel::before {
+    left: -166px !important;
+    bottom: 80px !important;
+    width: 340px !important;
+    height: 125px !important;
+    filter: blur(1.25px) !important;
+    opacity: 0.55 !important;
+  }
+
+  .nc-form-panel::after {
+    left: -132px !important;
+    bottom: 54px !important;
+    width: 298px !important;
+    height: 94px !important;
+    filter: blur(1.35px) !important;
+    opacity: 0.38 !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   4) TABLET VERTICAL / IPAD AIR VERTICAL
+   Se convierte en una sola columna para no apretar la card.
+   --------------------------------------------------------- */
+@media (max-width: 1050px) {
+  .nc-login-page {
+    min-height: 100vh !important;
+    height: auto !important;
+    padding: 18px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    align-items: flex-start !important;
+  }
+
+  .nc-login-shell {
+    width: min(860px, 100%) !important;
+    height: auto !important;
+    min-height: auto !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    border-radius: 30px !important;
+    overflow: hidden !important;
+  }
+
+  .nc-shell-art {
+    inset: 0 !important;
+  }
+
+  .nc-shell-art-image {
+    width: 142% !important;
+    left: -28% !important;
+    bottom: -7% !important;
+    opacity: 0.95 !important;
+  }
+
+  .nc-shell-art-overlay {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.18) 0%,
+        rgba(255, 255, 255, 0.74) 44%,
+        rgba(255, 255, 255, 0.98) 100%
+      ) !important;
+  }
+
+  .nc-brand-panel {
+    min-height: 360px !important;
+    padding: 44px 44px 32px !important;
+    overflow: hidden !important;
+  }
+
+  .nc-brand-dots {
+    top: 38px !important;
+    right: 38px !important;
+    width: 130px !important;
+    height: 104px !important;
+    opacity: 0.38 !important;
+  }
+
+  .nc-brand-content {
+    max-width: 620px !important;
+  }
+
+  .nc-logo {
+    width: 305px !important;
+    max-width: 78% !important;
+    margin: 0 0 28px 0 !important;
+  }
+
+  .nc-brand-copy {
+    max-width: 610px !important;
+    transform: none !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 620px !important;
+    font-size: 30px !important;
+    line-height: 1.22 !important;
+  }
+
+  .nc-title-main,
+  .nc-title-line,
+  .nc-title-gradient {
+    white-space: normal !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    width: auto !important;
+    max-width: 480px !important;
+    margin-top: 18px !important;
+    font-size: 15px !important;
+    line-height: 1.55 !important;
+    transform: none !important;
+  }
+
+  .nc-hero-description br {
+    display: none !important;
+  }
+
+  .nc-form-panel {
+    padding: 0 32px 32px !important;
+    justify-content: center !important;
+    align-items: stretch !important;
+    overflow: visible !important;
+  }
+
+  .nc-form-panel::before,
+  .nc-form-panel::after {
+    display: none !important;
+    content: none !important;
+  }
+
+  .nc-login-card {
+    width: min(620px, 100%) !important;
+    max-width: 620px !important;
+    min-height: auto !important;
+    height: auto !important;
+    padding: 34px 34px 28px !important;
+    border-radius: 22px !important;
+    transform: none !important;
+    margin: 0 auto !important;
+  }
+
+  .nc-login-header {
+    gap: 18px !important;
+    margin-bottom: 24px !important;
+  }
+
+  .nc-login-icon {
+    width: 58px !important;
+    height: 58px !important;
+    flex-basis: 58px !important;
+  }
+
+  .nc-login-header h2 {
+    font-size: 32px !important;
+  }
+
+  .nc-login-header p {
+    font-size: 14.5px !important;
+  }
+
+  .nc-input {
+    height: 52px !important;
+  }
+
+  .nc-submit,
+  .nc-submit:disabled,
+  .nc-login-button {
+    height: 54px !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   5) TABLET PEQUEÑA Y CELULARES GRANDES
+   --------------------------------------------------------- */
+@media (max-width: 768px) {
+  .nc-login-page {
+    padding: 14px !important;
+  }
+
+  .nc-login-shell {
+    border-radius: 26px !important;
+  }
+
+  .nc-brand-panel {
+    min-height: 315px !important;
+    padding: 34px 28px 26px !important;
+  }
+
+  .nc-brand-dots {
+    display: none !important;
+  }
+
+  .nc-logo {
+    width: 260px !important;
+    max-width: 84% !important;
+    margin-bottom: 24px !important;
+  }
+
+  .nc-brand-copy h1 {
+    font-size: 26px !important;
+    line-height: 1.24 !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    max-width: 430px !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+  }
+
+  .nc-form-panel {
+    padding: 0 22px 24px !important;
+  }
+
+  .nc-login-card {
+    width: 100% !important;
+    max-width: 560px !important;
+    padding: 30px 26px 24px !important;
+    border-radius: 22px !important;
+  }
+
+  .nc-login-header {
+    gap: 15px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .nc-login-icon {
+    width: 52px !important;
+    height: 52px !important;
+    flex-basis: 52px !important;
+  }
+
+  .nc-login-header h2 {
+    font-size: 29px !important;
+  }
+
+  .nc-options {
+    gap: 12px !important;
+  }
+
+  .nc-secure-box {
+    align-items: flex-start !important;
+    gap: 12px !important;
+  }
+
+  .nc-login-footer,
+  .nc-login-note {
+    padding-left: 18px !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   6) CELULARES
+   --------------------------------------------------------- */
+@media (max-width: 560px) {
+  .nc-login-page {
+    padding: 10px !important;
+  }
+
+  .nc-login-shell {
+    width: 100% !important;
+    border-radius: 22px !important;
+  }
+
+  .nc-shell-art-image {
+    width: 175% !important;
+    left: -52% !important;
+    bottom: -9% !important;
+  }
+
+  .nc-shell-art-overlay {
+    background:
+      linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.34) 0%,
+        rgba(255, 255, 255, 0.84) 44%,
+        rgba(255, 255, 255, 1) 100%
+      ) !important;
+  }
+
+  .nc-brand-panel {
+    min-height: 265px !important;
+    padding: 28px 20px 20px !important;
+  }
+
+  .nc-logo {
+    width: 218px !important;
+    max-width: 86% !important;
+    margin-bottom: 20px !important;
+  }
+
+  .nc-brand-copy h1 {
+    max-width: 100% !important;
+    font-size: 23px !important;
+    line-height: 1.23 !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    max-width: 100% !important;
+    margin-top: 14px !important;
+    font-size: 13.5px !important;
+    line-height: 1.45 !important;
+  }
+
+  .nc-form-panel {
+    padding: 0 12px 12px !important;
+  }
+
+  .nc-login-card {
+    width: 100% !important;
+    max-width: none !important;
+    padding: 24px 18px 20px !important;
+    border-radius: 20px !important;
+  }
+
+  .nc-login-header {
+    gap: 12px !important;
+    margin-bottom: 18px !important;
+  }
+
+  .nc-login-icon {
+    width: 46px !important;
+    height: 46px !important;
+    flex-basis: 46px !important;
+  }
+
+  .nc-login-icon svg {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  .nc-login-header h2 {
+    font-size: 25px !important;
+  }
+
+  .nc-login-header p {
+    margin-top: 3px !important;
+    font-size: 13px !important;
+  }
+
+  .nc-divider {
+    margin-bottom: 16px !important;
+  }
+
+  .nc-field {
+    margin-bottom: 13px !important;
+  }
+
+  .nc-field label {
+    margin-bottom: 7px !important;
+    font-size: 13px !important;
+  }
+
+  .nc-input {
+    height: 48px !important;
+    gap: 12px !important;
+    padding: 0 14px !important;
+  }
+
+  .nc-input input {
+    font-size: 14px !important;
+  }
+
+  .nc-options {
+    align-items: flex-start !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    margin: 4px 0 14px !important;
+  }
+
+  .nc-remember,
+  .nc-options a {
+    font-size: 13.5px !important;
+  }
+
+  .nc-submit,
+  .nc-submit:disabled,
+  .nc-login-button {
+    height: 50px !important;
+    font-size: 15px !important;
+  }
+
+  .nc-secure-box {
+    margin-top: 16px !important;
+    margin-bottom: 12px !important;
+    padding: 14px 0 12px !important;
+    gap: 11px !important;
+  }
+
+  .nc-secure-icon {
+    width: 42px !important;
+    height: 42px !important;
+    flex-basis: 42px !important;
+  }
+
+  .nc-secure-box strong,
+  .nc-secure-title {
+    font-size: 13.5px !important;
+  }
+
+  .nc-secure-box p,
+  .nc-secure-text {
+    font-size: 12.5px !important;
+  }
+
+  .nc-login-footer,
+  .nc-login-note {
+    margin-top: 12px !important;
+    padding-left: 0 !important;
+  }
+
+  .nc-login-footer strong,
+  .nc-login-note strong,
+  .nc-login-note-title {
+    font-size: 13px !important;
+  }
+
+  .nc-login-footer span,
+  .nc-login-note p,
+  .nc-login-roles {
+    font-size: 12.5px !important;
+  }
+}
+
+/* ---------------------------------------------------------
+   7) CELULARES MUY CHICOS
+   --------------------------------------------------------- */
+@media (max-width: 390px) {
+  .nc-brand-panel {
+    min-height: 238px !important;
+    padding: 24px 16px 18px !important;
+  }
+
+  .nc-logo {
+    width: 190px !important;
+    margin-bottom: 16px !important;
+  }
+
+  .nc-brand-copy h1 {
+    font-size: 21px !important;
+  }
+
+  .nc-brand-copy p,
+  .nc-hero-description {
+    font-size: 12.8px !important;
+  }
+
+  .nc-login-card {
+    padding: 22px 15px 18px !important;
+  }
+
+  .nc-login-header h2 {
+    font-size: 23px !important;
+  }
+
+  .nc-input {
+    height: 46px !important;
+  }
+
+  .nc-submit,
+  .nc-submit:disabled,
+  .nc-login-button {
+    height: 48px !important;
   }
 }
