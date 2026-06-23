@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
@@ -23,7 +23,9 @@ function PageFallback() {
 
 export function AppLayout() {
   const { t } = useTranslation();
+  const location = useLocation();
   const contextOpen = useUIStore((s) => s.contextPanelOpen);
+  const isDashboardRoute = location.pathname === "/";
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">
@@ -34,15 +36,15 @@ export function AppLayout() {
         {t("common.skip_to_content")}
       </a>
 
-      <Sidebar />
+      {!isDashboardRoute && <Sidebar />}
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Header />
+        {!isDashboardRoute && <Header />}
 
         <div className="flex min-w-0 flex-1 overflow-hidden">
           <main
             id="main-content"
-            className="min-w-0 flex-1 overflow-y-auto"
+            className={cn("min-w-0 flex-1 overflow-y-auto", isDashboardRoute && "bg-[#f7faff]")}
             tabIndex={-1}
             aria-label={t("layout.main_content")}
           >
@@ -53,10 +55,10 @@ export function AppLayout() {
 
           <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
 
-          {contextOpen && <ContextPanel />}
+          {!isDashboardRoute && contextOpen && <ContextPanel />}
         </div>
 
-        <StatusBar />
+        {!isDashboardRoute && <StatusBar />}
       </div>
 
       <CommandPalette />

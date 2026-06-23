@@ -31,7 +31,7 @@ function lazyPage(loader: () => Promise<unknown>, exportName: string) {
 const AppLayout = lazyPage(() => import("@app/layout/AppLayout"), "AppLayout");
 const LoginPage = lazyPage(() => import("@modules/auth/ui/LoginPage"), "LoginPage");
 const PatientPortalPage = lazyPage(() => import("@app/pages/patient-portal/PatientPortalPage"), "PatientPortalPage");
-const DashboardPage = lazyPage(() => import("@app/pages/DashboardPage"), "DashboardPage");
+const DashboardPage = lazyPage(() => import("@app/pages/dashboard/DashboardPage"), "DashboardPage");
 const PatientsListPage = lazyPage(() => import("@app/pages/patients/PatientsListPage"), "PatientsListPage");
 const NewPatientPage = lazyPage(() => import("@app/pages/patients/NewPatientPage"), "NewPatientPage");
 const PatientDetailPage = lazyPage(() => import("@app/pages/patients/PatientDetailPage"), "PatientDetailPage");

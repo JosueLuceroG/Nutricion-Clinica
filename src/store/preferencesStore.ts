@@ -22,6 +22,19 @@ export const DEFAULT_DASHBOARD_WIDGET_IDS: DashboardWidgetId[] = [
   "pendingPaymentsCount",
 ];
 
+export type DashboardPremiumKpiId =
+  | "activePatients"
+  | "consultationsToday"
+  | "incomeThisMonth"
+  | "pendingPayments";
+
+export const DEFAULT_DASHBOARD_PREMIUM_KPI_IDS: DashboardPremiumKpiId[] = [
+  "activePatients",
+  "consultationsToday",
+  "incomeThisMonth",
+  "pendingPayments",
+];
+
 export type ClinicalSectionId =
   | "allergies"
   | "medications"
@@ -73,6 +86,8 @@ export interface PreferencesState {
   pdfBrandingEnabled: boolean;
   clinicDisplayName: string;
   dashboardWidgetIds: DashboardWidgetId[];
+  dashboardPremiumKpiOrder: DashboardPremiumKpiId[];
+  dashboardPremiumKpiHiddenIds: DashboardPremiumKpiId[];
   clinicalSectionIds: ClinicalSectionId[];
   setLanguage: (lang: PreferencesState["language"]) => void;
   setDateFormat: (format: PreferencesState["dateFormat"]) => void;
@@ -88,6 +103,9 @@ export interface PreferencesState {
   setClinicDisplayName: (name: string) => void;
   setDashboardWidgetIds: (ids: DashboardWidgetId[]) => void;
   resetDashboardWidgets: () => void;
+  setDashboardPremiumKpiOrder: (ids: DashboardPremiumKpiId[]) => void;
+  setDashboardPremiumKpiHiddenIds: (ids: DashboardPremiumKpiId[]) => void;
+  resetDashboardPremiumKpis: () => void;
   setClinicalSectionIds: (ids: ClinicalSectionId[]) => void;
   resetClinicalSections: () => void;
 }
@@ -108,6 +126,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       pdfBrandingEnabled: true,
       clinicDisplayName: "NutriClinica",
       dashboardWidgetIds: [],
+      dashboardPremiumKpiOrder: DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
+      dashboardPremiumKpiHiddenIds: [],
       clinicalSectionIds: DEFAULT_CLINICAL_SECTION_IDS,
       setLanguage: (language) => set({ language }),
       setDateFormat: (dateFormat) => set({ dateFormat }),
@@ -123,6 +143,12 @@ export const usePreferencesStore = create<PreferencesState>()(
       setClinicDisplayName: (clinicDisplayName) => set({ clinicDisplayName }),
       setDashboardWidgetIds: (dashboardWidgetIds) => set({ dashboardWidgetIds }),
       resetDashboardWidgets: () => set({ dashboardWidgetIds: DEFAULT_DASHBOARD_WIDGET_IDS }),
+      setDashboardPremiumKpiOrder: (dashboardPremiumKpiOrder) => set({ dashboardPremiumKpiOrder }),
+      setDashboardPremiumKpiHiddenIds: (dashboardPremiumKpiHiddenIds) => set({ dashboardPremiumKpiHiddenIds }),
+      resetDashboardPremiumKpis: () => set({
+        dashboardPremiumKpiOrder: DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
+        dashboardPremiumKpiHiddenIds: [],
+      }),
       setClinicalSectionIds: (clinicalSectionIds) => set({ clinicalSectionIds }),
       resetClinicalSections: () => set({ clinicalSectionIds: DEFAULT_CLINICAL_SECTION_IDS }),
     }),
