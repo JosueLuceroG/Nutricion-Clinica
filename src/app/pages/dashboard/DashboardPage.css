@@ -1,15 +1,15 @@
 .nc-dashboard-shell {
-  --nc-sidebar-w: 270px;
-  --nc-sidebar-collapsed-w: 74px;
+  --nc-sidebar-w: 252px;
+  --nc-sidebar-collapsed-w: 70px;
   --nc-header-max-w: 1500px;
   --nc-container-max-w: 1500px;
   --nc-header-h: 104px;
   --nc-main-pad-x: 24px;
-  --nc-main-pad-y: 10px;
-  --nc-gap: 16px;
-  --nc-kpi-h: 108px;
-  --nc-section-h: 282px;
-  --nc-third-row-h: 314px;
+  --nc-main-pad-y: 12px;
+  --nc-gap: 18px;
+  --nc-kpi-h: 118px;
+  --nc-section-h: 320px;
+  --nc-third-row-h: 224px;
   --nc-card-pad: 14px;
   --nc-radius: 18px;
   --nc-font-scale: 1;
@@ -18,11 +18,11 @@
   --nc-sidebar-pad-x: 20px;
   --nc-sidebar-pad-top: 22px;
   --nc-sidebar-pad-bottom: 12px;
-  --nc-impact-h: 236px;
+  --nc-impact-h: 224px;
   --nc-impact-pad-x: 18px;
-  --nc-impact-pad-y: 22px;
-  --nc-impact-plant-w: 116px;
-  --nc-impact-plant-h: 174px;
+  --nc-impact-pad-y: 20px;
+  --nc-impact-plant-w: 102px;
+  --nc-impact-plant-h: 152px;
   --nc-dashboard-sidebar-w: var(--nc-sidebar-w);
   --nc-dashboard-sidebar-collapsed-w: var(--nc-sidebar-collapsed-w);
   --nc-dashboard-header-w: var(--nc-header-max-w);
@@ -93,7 +93,7 @@
 }
 
 .nc-dashboard-sidebar__logo {
-  width: clamp(164px, calc(176px * var(--nc-font-scale)), 198px);
+  width: clamp(154px, calc(168px * var(--nc-font-scale)), 190px);
   max-width: 100%;
   height: auto;
   flex: 0 0 auto;
@@ -194,7 +194,7 @@
     radial-gradient(circle at 8% 112%, rgba(35, 91, 214, 0.3), transparent 46%),
     radial-gradient(circle at 96% 94%, rgba(37, 220, 199, 0.36), transparent 38%),
     linear-gradient(150deg, #4d9af8 0%, #2f9be9 48%, #28c8ca 100%);
-  box-shadow: 0 20px 42px rgba(28, 112, 210, 0.16);
+  box-shadow: 0 18px 36px rgba(28, 112, 210, 0.14);
   color: #ffffff;
   padding: var(--nc-impact-pad-y) var(--nc-impact-pad-x) calc(var(--nc-impact-pad-y) + 2px);
   flex: 0 0 auto;
@@ -236,9 +236,9 @@
 .nc-dashboard-impact::before {
   position: absolute;
   z-index: -1;
-  inset: auto auto -78px -82px;
-  width: 238px;
-  height: 178px;
+  inset: auto auto -70px -78px;
+  width: 220px;
+  height: 164px;
   border-radius: 999px 999px 0 0;
   background: rgba(43, 102, 226, 0.16);
   content: "";
@@ -248,10 +248,10 @@
 .nc-dashboard-impact::after {
   position: absolute;
   z-index: -1;
-  right: -58px;
-  bottom: -68px;
-  width: 180px;
-  height: 162px;
+  right: -54px;
+  bottom: -62px;
+  width: 168px;
+  height: 150px;
   border-radius: 999px;
   background: rgba(215, 255, 249, 0.16);
   content: "";
@@ -301,7 +301,7 @@
   position: relative;
   z-index: 1;
   max-width: 164px;
-  margin: clamp(18px, calc(20px * var(--nc-font-scale)), 22px) 0 0;
+  margin: clamp(16px, calc(18px * var(--nc-font-scale)), 20px) 0 0;
   color: rgba(255, 255, 255, 0.96);
   font-size: clamp(13px, calc(13.5px * var(--nc-font-scale)), 14px);
   font-weight: 500;
@@ -311,8 +311,8 @@
 .nc-dashboard-impact__plant {
   position: absolute;
   z-index: 0;
-  right: -12px;
-  bottom: -8px;
+  right: -10px;
+  bottom: -10px;
   width: var(--nc-impact-plant-w);
   height: var(--nc-impact-plant-h);
   color: rgba(212, 255, 248, 0.78);
@@ -363,7 +363,7 @@
   position: absolute;
   z-index: 1;
   left: 50%;
-  bottom: 18px;
+  bottom: 16px;
   display: flex;
   gap: 7px;
   transform: translateX(-50%);
@@ -3285,7 +3285,7 @@
   }
 
   .nc-dashboard-sidebar__logo {
-    width: clamp(164px, calc(176px * var(--nc-sidebar-font-scale)), 198px);
+    width: clamp(154px, calc(168px * var(--nc-sidebar-font-scale)), 190px);
   }
 
   .nc-dashboard-sidebar__nav {
@@ -3315,8 +3315,8 @@
   .nc-dashboard-impact {
     min-height: var(--nc-impact-h);
     height: var(--nc-impact-h);
-    margin-right: clamp(8px, calc(10px * var(--nc-sidebar-font-scale)), 14px);
-    margin-left: clamp(8px, calc(10px * var(--nc-sidebar-font-scale)), 14px);
+    margin-right: clamp(7px, calc(9px * var(--nc-sidebar-font-scale)), 12px);
+    margin-left: clamp(7px, calc(9px * var(--nc-sidebar-font-scale)), 12px);
     padding: var(--nc-impact-pad-y) var(--nc-impact-pad-x) calc(var(--nc-impact-pad-y) + 2px);
   }
 
@@ -3333,7 +3333,7 @@
 
   .nc-dashboard-impact__text {
     max-width: clamp(148px, calc(164px * var(--nc-sidebar-font-scale)), 176px);
-    margin-top: clamp(17px, calc(20px * var(--nc-sidebar-font-scale)), 22px);
+    margin-top: clamp(16px, calc(18px * var(--nc-sidebar-font-scale)), 20px);
     font-size: clamp(13px, calc(13.5px * var(--nc-sidebar-font-scale)), 14px);
     font-weight: 500;
     line-height: 1.55;
@@ -3345,11 +3345,11 @@
   }
 
   .nc-dashboard-impact__dots {
-    bottom: 18px;
+    bottom: 16px;
   }
 
   .nc-dashboard-sidebar__collapse {
-    height: clamp(33px, calc(35px * var(--nc-sidebar-font-scale)), 38px);
+    height: clamp(32px, calc(34px * var(--nc-sidebar-font-scale)), 37px);
     font-size: 12px;
     font-weight: 500;
     padding-right: clamp(10px, calc(12px * var(--nc-sidebar-font-scale)), 14px);
@@ -3444,7 +3444,7 @@
   .nc-dashboard-container {
     width: min(100%, var(--nc-container-max-w));
     gap: var(--nc-gap);
-    padding: var(--nc-main-pad-y) 0;
+    padding: var(--nc-main-pad-y) 0 calc(var(--nc-main-pad-y) + 4px);
   }
 
   .nc-dashboard-kpi-grid,
@@ -3647,150 +3647,150 @@
 /* Fase R profile: web-laptop */
 @media (min-width: 1280px) and (max-width: 1535px) {
   .nc-dashboard-shell {
-    --nc-sidebar-w: 240px;
-    --nc-sidebar-collapsed-w: 70px;
-    --nc-header-max-w: 1248px;
-    --nc-container-max-w: 1248px;
+    --nc-sidebar-w: 236px;
+    --nc-sidebar-collapsed-w: 68px;
+    --nc-header-max-w: 1264px;
+    --nc-container-max-w: 1264px;
     --nc-header-h: 104px;
     --nc-main-pad-x: 18px;
-    --nc-main-pad-y: 8px;
-    --nc-gap: 14px;
+    --nc-main-pad-y: 10px;
+    --nc-gap: 16px;
     --nc-kpi-h: 112px;
-    --nc-section-h: 280px;
-    --nc-third-row-h: 240px;
+    --nc-section-h: 300px;
+    --nc-third-row-h: 204px;
     --nc-card-pad: 12px;
-    --nc-radius: 17px;
+    --nc-radius: 18px;
     --nc-font-scale: 0.94;
     --nc-header-font-scale: 0.94;
     --nc-sidebar-font-scale: 0.94;
-    --nc-sidebar-pad-x: 22px;
-    --nc-sidebar-pad-top: 26px;
-    --nc-sidebar-pad-bottom: 12px;
-    --nc-impact-h: 230px;
-    --nc-impact-pad-x: 18px;
-    --nc-impact-pad-y: 20px;
-    --nc-impact-plant-w: 94px;
-    --nc-impact-plant-h: 140px;
+    --nc-sidebar-pad-x: 20px;
+    --nc-sidebar-pad-top: 24px;
+    --nc-sidebar-pad-bottom: 10px;
+    --nc-impact-h: 210px;
+    --nc-impact-pad-x: 17px;
+    --nc-impact-pad-y: 18px;
+    --nc-impact-plant-w: 86px;
+    --nc-impact-plant-h: 128px;
   }
 }
 
 /* Fase R profile: tauri-laptop, using the reduced useful viewport height from the native title bar. */
 @media (min-width: 1280px) and (max-width: 1535px) and (max-height: 879px) {
   .nc-dashboard-shell {
-    --nc-sidebar-w: 240px;
-    --nc-sidebar-collapsed-w: 70px;
-    --nc-header-max-w: 1248px;
-    --nc-container-max-w: 1248px;
+    --nc-sidebar-w: 236px;
+    --nc-sidebar-collapsed-w: 68px;
+    --nc-header-max-w: 1264px;
+    --nc-container-max-w: 1264px;
     --nc-header-h: 100px;
     --nc-main-pad-x: 16px;
-    --nc-main-pad-y: 7px;
-    --nc-gap: 12px;
-    --nc-kpi-h: 106px;
-    --nc-section-h: 260px;
-    --nc-third-row-h: 238px;
+    --nc-main-pad-y: 8px;
+    --nc-gap: 14px;
+    --nc-kpi-h: 104px;
+    --nc-section-h: 286px;
+    --nc-third-row-h: 188px;
     --nc-card-pad: 11px;
     --nc-radius: 16px;
     --nc-font-scale: 0.92;
     --nc-header-font-scale: 0.92;
     --nc-sidebar-font-scale: 0.91;
-    --nc-sidebar-pad-x: 22px;
-    --nc-sidebar-pad-top: 24px;
+    --nc-sidebar-pad-x: 20px;
+    --nc-sidebar-pad-top: 22px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 224px;
-    --nc-impact-pad-x: 18px;
-    --nc-impact-pad-y: 19px;
-    --nc-impact-plant-w: 90px;
-    --nc-impact-plant-h: 134px;
+    --nc-impact-h: 202px;
+    --nc-impact-pad-x: 16px;
+    --nc-impact-pad-y: 17px;
+    --nc-impact-plant-w: 82px;
+    --nc-impact-plant-h: 122px;
   }
 }
 
 /* Fase R profile: web-monitor */
 @media (min-width: 1536px) and (max-width: 2199px) {
   .nc-dashboard-shell {
-    --nc-sidebar-w: 256px;
-    --nc-sidebar-collapsed-w: 72px;
+    --nc-sidebar-w: 252px;
+    --nc-sidebar-collapsed-w: 70px;
     --nc-header-max-w: 1500px;
     --nc-container-max-w: 1500px;
     --nc-header-h: 112px;
     --nc-main-pad-x: 24px;
-    --nc-main-pad-y: 10px;
-    --nc-gap: 16px;
-    --nc-kpi-h: 118px;
-    --nc-section-h: 294px;
-    --nc-third-row-h: 254px;
+    --nc-main-pad-y: 12px;
+    --nc-gap: 18px;
+    --nc-kpi-h: 124px;
+    --nc-section-h: 322px;
+    --nc-third-row-h: 224px;
     --nc-card-pad: 14px;
     --nc-radius: 18px;
     --nc-font-scale: 1;
     --nc-header-font-scale: 1;
     --nc-sidebar-font-scale: 1;
-    --nc-sidebar-pad-x: 22px;
-    --nc-sidebar-pad-top: 28px;
+    --nc-sidebar-pad-x: 21px;
+    --nc-sidebar-pad-top: 26px;
     --nc-sidebar-pad-bottom: 12px;
-    --nc-impact-h: 236px;
+    --nc-impact-h: 224px;
     --nc-impact-pad-x: 18px;
-    --nc-impact-pad-y: 22px;
-    --nc-impact-plant-w: 102px;
-    --nc-impact-plant-h: 152px;
+    --nc-impact-pad-y: 20px;
+    --nc-impact-plant-w: 96px;
+    --nc-impact-plant-h: 144px;
   }
 }
 
 /* Fase R profile: web-laptop-real, for physical 1536x816 CSS pixels. */
 @media (min-width: 1536px) and (max-width: 1599px) and (max-height: 899px) {
   .nc-dashboard-shell {
-    --nc-sidebar-w: 240px;
-    --nc-sidebar-collapsed-w: 70px;
-    --nc-header-max-w: 1248px;
-    --nc-container-max-w: 1248px;
+    --nc-sidebar-w: 236px;
+    --nc-sidebar-collapsed-w: 68px;
+    --nc-header-max-w: 1264px;
+    --nc-container-max-w: 1264px;
     --nc-header-h: 104px;
     --nc-main-pad-x: 18px;
-    --nc-main-pad-y: 8px;
-    --nc-gap: 14px;
+    --nc-main-pad-y: 10px;
+    --nc-gap: 16px;
     --nc-kpi-h: 112px;
-    --nc-section-h: 280px;
-    --nc-third-row-h: 240px;
+    --nc-section-h: 300px;
+    --nc-third-row-h: 204px;
     --nc-card-pad: 12px;
-    --nc-radius: 17px;
+    --nc-radius: 18px;
     --nc-font-scale: 0.94;
     --nc-header-font-scale: 0.94;
     --nc-sidebar-font-scale: 0.94;
-    --nc-sidebar-pad-x: 22px;
-    --nc-sidebar-pad-top: 26px;
-    --nc-sidebar-pad-bottom: 12px;
-    --nc-impact-h: 230px;
-    --nc-impact-pad-x: 18px;
-    --nc-impact-pad-y: 20px;
-    --nc-impact-plant-w: 94px;
-    --nc-impact-plant-h: 140px;
+    --nc-sidebar-pad-x: 20px;
+    --nc-sidebar-pad-top: 24px;
+    --nc-sidebar-pad-bottom: 10px;
+    --nc-impact-h: 210px;
+    --nc-impact-pad-x: 17px;
+    --nc-impact-pad-y: 18px;
+    --nc-impact-plant-w: 86px;
+    --nc-impact-plant-h: 128px;
   }
 }
 
 /* Fase R profile: tauri-laptop-real, same width with less useful native-window height. */
 @media (min-width: 1536px) and (max-width: 1599px) and (max-height: 799px) {
   .nc-dashboard-shell {
-    --nc-sidebar-w: 240px;
-    --nc-sidebar-collapsed-w: 70px;
-    --nc-header-max-w: 1248px;
-    --nc-container-max-w: 1248px;
+    --nc-sidebar-w: 236px;
+    --nc-sidebar-collapsed-w: 68px;
+    --nc-header-max-w: 1264px;
+    --nc-container-max-w: 1264px;
     --nc-header-h: 100px;
     --nc-main-pad-x: 16px;
-    --nc-main-pad-y: 7px;
-    --nc-gap: 12px;
-    --nc-kpi-h: 106px;
-    --nc-section-h: 260px;
-    --nc-third-row-h: 238px;
+    --nc-main-pad-y: 8px;
+    --nc-gap: 14px;
+    --nc-kpi-h: 104px;
+    --nc-section-h: 286px;
+    --nc-third-row-h: 188px;
     --nc-card-pad: 11px;
     --nc-radius: 16px;
     --nc-font-scale: 0.92;
     --nc-header-font-scale: 0.92;
     --nc-sidebar-font-scale: 0.91;
-    --nc-sidebar-pad-x: 22px;
-    --nc-sidebar-pad-top: 24px;
+    --nc-sidebar-pad-x: 20px;
+    --nc-sidebar-pad-top: 22px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 224px;
-    --nc-impact-pad-x: 18px;
-    --nc-impact-pad-y: 19px;
-    --nc-impact-plant-w: 90px;
-    --nc-impact-plant-h: 134px;
+    --nc-impact-h: 202px;
+    --nc-impact-pad-x: 16px;
+    --nc-impact-pad-y: 17px;
+    --nc-impact-plant-w: 82px;
+    --nc-impact-plant-h: 122px;
   }
 }
 

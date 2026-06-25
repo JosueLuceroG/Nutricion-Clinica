@@ -78,16 +78,6 @@ const impactSlides: ImpactSlide[] = [
   },
 ];
 
-function getDailyImpactIndex(date = new Date()) {
-  const day = Math.floor(new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86_400_000);
-  return day % impactSlides.length;
-}
-
-function msUntilNextDay(date = new Date()) {
-  const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
-  return Math.max(60_000, nextDay.getTime() - date.getTime());
-}
-
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
 
@@ -112,23 +102,6 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   const pointerStartXRef = React.useRef<number | null>(null);
   const activeImpact = impactSlides[activeImpactIndex] ?? impactSlides[0];
   const ImpactIcon = activeImpact.icon;
-
-  React.useEffect(() => {
-    let timeoutId: number | undefined;
-
-    const scheduleDailySlide = () => {
-      timeoutId = window.setTimeout(() => {
-        setActiveImpactIndex(getDailyImpactIndex());
-        scheduleDailySlide();
-      }, msUntilNextDay());
-    };
-
-    scheduleDailySlide();
-
-    return () => {
-      if (timeoutId) window.clearTimeout(timeoutId);
-    };
-  }, []);
 
   React.useEffect(() => {
     if (prefersReducedMotion) return;
