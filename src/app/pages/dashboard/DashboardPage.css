@@ -23,6 +23,7 @@
   --nc-impact-pad-y: 20px;
   --nc-impact-plant-w: 102px;
   --nc-impact-plant-h: 152px;
+  --nc-bottom-safe-gap: 0px;
   --nc-dashboard-sidebar-w: var(--nc-sidebar-w);
   --nc-dashboard-sidebar-collapsed-w: var(--nc-sidebar-collapsed-w);
   --nc-dashboard-header-w: var(--nc-header-max-w);
@@ -196,9 +197,16 @@
     linear-gradient(150deg, #4d9af8 0%, #2f9be9 48%, #28c8ca 100%);
   box-shadow: 0 18px 36px rgba(28, 112, 210, 0.14);
   color: #ffffff;
+  cursor: grab;
   padding: var(--nc-impact-pad-y) var(--nc-impact-pad-x) calc(var(--nc-impact-pad-y) + 2px);
   flex: 0 0 auto;
   touch-action: pan-y;
+  --nc-impact-drag-x: 0px;
+  --nc-impact-plant-drag-x: 0px;
+}
+
+.nc-dashboard-impact--dragging {
+  cursor: grabbing;
 }
 
 .nc-dashboard-impact--aqua {
@@ -279,6 +287,15 @@
   z-index: 1;
   max-width: 168px;
   animation: nc-dashboard-impact-enter 220ms ease both;
+  transform: translate3d(var(--nc-impact-drag-x), 0, 0);
+  transition:
+    opacity 160ms ease,
+    transform 180ms ease;
+}
+
+.nc-dashboard-impact--dragging .nc-dashboard-impact__content {
+  opacity: 0.94;
+  transition-duration: 0ms;
 }
 
 .nc-dashboard-impact__heading {
@@ -318,6 +335,8 @@
   color: rgba(212, 255, 248, 0.78);
   opacity: 0.62;
   pointer-events: none;
+  transform: translate3d(var(--nc-impact-plant-drag-x), 0, 0);
+  transition: transform 180ms ease;
 }
 
 .nc-dashboard-impact__plant svg {
@@ -382,6 +401,10 @@
     background-color 200ms ease,
     opacity 200ms ease,
     width 220ms ease;
+}
+
+.nc-dashboard-impact--dragging .nc-dashboard-impact__plant {
+  transition-duration: 0ms;
 }
 
 .nc-dashboard-impact__dot:hover {
@@ -564,7 +587,7 @@
   font-size: clamp(20px, calc(21px * var(--nc-font-scale)), 22px);
   font-weight: 650;
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1.24;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3262,7 +3285,7 @@
     --nc-dashboard-main-bottom: var(--nc-main-pad-y);
     --nc-dashboard-container-gap: var(--nc-gap);
     --nc-dashboard-container-top: var(--nc-main-pad-y);
-    --nc-dashboard-container-bottom: var(--nc-main-pad-y);
+    --nc-dashboard-container-bottom: calc(var(--nc-main-pad-y) + var(--nc-bottom-safe-gap));
     --nc-dashboard-kpi-h: var(--nc-kpi-h);
     --nc-dashboard-section-h: var(--nc-section-h);
     --nc-dashboard-third-row-h: var(--nc-third-row-h);
@@ -3397,12 +3420,12 @@
 
   .nc-dashboard-header__inner {
     width: min(100%, var(--nc-header-max-w));
-    grid-template-columns: minmax(260px, 0.74fr) minmax(320px, calc(500px * var(--nc-header-font-scale))) auto;
+    grid-template-columns: minmax(286px, 0.76fr) minmax(240px, calc(352px * var(--nc-header-font-scale))) auto;
     gap: var(--nc-gap);
   }
 
   .nc-dashboard-header__title {
-    font-size: clamp(20px, calc(21px * var(--nc-header-font-scale)), 22px);
+    font-size: clamp(19px, calc(21px * var(--nc-header-font-scale)), 22px);
   }
 
   .nc-dashboard-header__subtitle {
@@ -3444,7 +3467,7 @@
   .nc-dashboard-container {
     width: min(100%, var(--nc-container-max-w));
     gap: var(--nc-gap);
-    padding: var(--nc-main-pad-y) 0 calc(var(--nc-main-pad-y) + 4px);
+    padding: var(--nc-main-pad-y) 0 var(--nc-dashboard-container-bottom);
   }
 
   .nc-dashboard-kpi-grid,
@@ -3654,11 +3677,11 @@
     --nc-header-h: 104px;
     --nc-main-pad-x: 18px;
     --nc-main-pad-y: 10px;
-    --nc-gap: 16px;
-    --nc-kpi-h: 112px;
-    --nc-section-h: 300px;
-    --nc-third-row-h: 204px;
-    --nc-card-pad: 12px;
+    --nc-gap: 14px;
+    --nc-kpi-h: 108px;
+    --nc-section-h: 286px;
+    --nc-third-row-h: 236px;
+    --nc-card-pad: 11px;
     --nc-radius: 18px;
     --nc-font-scale: 0.94;
     --nc-header-font-scale: 0.94;
@@ -3666,11 +3689,12 @@
     --nc-sidebar-pad-x: 20px;
     --nc-sidebar-pad-top: 24px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 210px;
+    --nc-impact-h: 198px;
     --nc-impact-pad-x: 17px;
-    --nc-impact-pad-y: 18px;
-    --nc-impact-plant-w: 86px;
-    --nc-impact-plant-h: 128px;
+    --nc-impact-pad-y: 17px;
+    --nc-impact-plant-w: 78px;
+    --nc-impact-plant-h: 116px;
+    --nc-bottom-safe-gap: 18px;
   }
 }
 
@@ -3684,11 +3708,11 @@
     --nc-header-h: 100px;
     --nc-main-pad-x: 16px;
     --nc-main-pad-y: 8px;
-    --nc-gap: 14px;
-    --nc-kpi-h: 104px;
-    --nc-section-h: 286px;
-    --nc-third-row-h: 188px;
-    --nc-card-pad: 11px;
+    --nc-gap: 12px;
+    --nc-kpi-h: 102px;
+    --nc-section-h: 272px;
+    --nc-third-row-h: 220px;
+    --nc-card-pad: 9px;
     --nc-radius: 16px;
     --nc-font-scale: 0.92;
     --nc-header-font-scale: 0.92;
@@ -3696,11 +3720,12 @@
     --nc-sidebar-pad-x: 20px;
     --nc-sidebar-pad-top: 22px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 202px;
+    --nc-impact-h: 192px;
     --nc-impact-pad-x: 16px;
-    --nc-impact-pad-y: 17px;
-    --nc-impact-plant-w: 82px;
-    --nc-impact-plant-h: 122px;
+    --nc-impact-pad-y: 16px;
+    --nc-impact-plant-w: 76px;
+    --nc-impact-plant-h: 112px;
+    --nc-bottom-safe-gap: 24px;
   }
 }
 
@@ -3744,11 +3769,11 @@
     --nc-header-h: 104px;
     --nc-main-pad-x: 18px;
     --nc-main-pad-y: 10px;
-    --nc-gap: 16px;
-    --nc-kpi-h: 112px;
-    --nc-section-h: 300px;
-    --nc-third-row-h: 204px;
-    --nc-card-pad: 12px;
+    --nc-gap: 14px;
+    --nc-kpi-h: 108px;
+    --nc-section-h: 286px;
+    --nc-third-row-h: 236px;
+    --nc-card-pad: 11px;
     --nc-radius: 18px;
     --nc-font-scale: 0.94;
     --nc-header-font-scale: 0.94;
@@ -3756,11 +3781,12 @@
     --nc-sidebar-pad-x: 20px;
     --nc-sidebar-pad-top: 24px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 210px;
+    --nc-impact-h: 198px;
     --nc-impact-pad-x: 17px;
-    --nc-impact-pad-y: 18px;
-    --nc-impact-plant-w: 86px;
-    --nc-impact-plant-h: 128px;
+    --nc-impact-pad-y: 17px;
+    --nc-impact-plant-w: 78px;
+    --nc-impact-plant-h: 116px;
+    --nc-bottom-safe-gap: 18px;
   }
 }
 
@@ -3774,11 +3800,11 @@
     --nc-header-h: 100px;
     --nc-main-pad-x: 16px;
     --nc-main-pad-y: 8px;
-    --nc-gap: 14px;
-    --nc-kpi-h: 104px;
-    --nc-section-h: 286px;
-    --nc-third-row-h: 188px;
-    --nc-card-pad: 11px;
+    --nc-gap: 12px;
+    --nc-kpi-h: 102px;
+    --nc-section-h: 272px;
+    --nc-third-row-h: 220px;
+    --nc-card-pad: 9px;
     --nc-radius: 16px;
     --nc-font-scale: 0.92;
     --nc-header-font-scale: 0.92;
@@ -3786,11 +3812,135 @@
     --nc-sidebar-pad-x: 20px;
     --nc-sidebar-pad-top: 22px;
     --nc-sidebar-pad-bottom: 10px;
-    --nc-impact-h: 202px;
+    --nc-impact-h: 192px;
     --nc-impact-pad-x: 16px;
-    --nc-impact-pad-y: 17px;
-    --nc-impact-plant-w: 82px;
-    --nc-impact-plant-h: 122px;
+    --nc-impact-pad-y: 16px;
+    --nc-impact-plant-w: 76px;
+    --nc-impact-plant-h: 112px;
+    --nc-bottom-safe-gap: 24px;
+  }
+}
+
+@media (min-width: 1280px) and (max-width: 1599px) and (max-height: 899px) {
+  .nc-dashboard-header__inner {
+    grid-template-columns: minmax(290px, 0.76fr) minmax(240px, calc(348px * var(--nc-header-font-scale))) auto;
+  }
+
+  .nc-dashboard-search {
+    gap: 10px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .nc-dashboard-section-card--financial,
+  .nc-dashboard-section-card--payments,
+  .nc-dashboard-section-card--actions {
+    padding: max(9px, calc(var(--nc-card-pad) - 1px));
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-section-card__header,
+  .nc-dashboard-section-card--payments .nc-dashboard-section-card__header,
+  .nc-dashboard-section-card--actions .nc-dashboard-section-card__header {
+    margin-bottom: 5px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-card-action,
+  .nc-dashboard-section-card--payments .nc-dashboard-card-action {
+    min-height: 28px;
+    padding-right: 10px;
+    padding-left: 10px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-card-link,
+  .nc-dashboard-section-card--payments .nc-dashboard-card-link {
+    font-size: 12px;
+    line-height: 1.05;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero {
+    gap: 3px;
+    border-radius: 13px;
+    padding: 7px 8px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__label,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero small,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__detail {
+    font-size: 10.5px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__row strong {
+    font-size: 20px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__row span {
+    min-height: 20px;
+    height: 20px;
+    font-size: 10px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-meter {
+    height: 6px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list {
+    gap: 4px;
+    margin-top: 6px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__item {
+    grid-template-columns: 26px minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__body {
+    gap: 1px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__topline span,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__topline strong {
+    font-size: 11.5px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__track {
+    height: 3px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions {
+    gap: 3px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__item {
+    grid-template-columns: 26px minmax(0, 1fr) 16px;
+    min-height: 31px;
+    border-radius: 12px;
+    padding: 2px 8px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__icon {
+    width: 26px;
+    height: 26px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body {
+    gap: 1px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body strong {
+    font-size: 11.5px;
+    line-height: 1.02;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body small {
+    font-size: 10.5px;
+    line-height: 1.02;
   }
 }
 

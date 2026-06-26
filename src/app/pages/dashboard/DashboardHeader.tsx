@@ -17,8 +17,15 @@ interface DashboardHeaderProps {
 
 function getFirstName(fullName?: string | null): string {
   const trimmed = fullName?.trim();
-  if (!trimmed) return "Andrea";
-  return trimmed.split(/\s+/)[0] ?? "Andrea";
+  if (!trimmed) return "Admin";
+  return trimmed.split(/\s+/)[0] ?? "Admin";
+}
+
+function getGreetingForHour(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour >= 5 && hour < 12) return "Buenos días";
+  if (hour >= 12 && hour < 19) return "Buenas tardes";
+  return "Buenas noches";
 }
 
 function getInitials(fullName: string): string {
@@ -36,8 +43,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const openCommand = useCommandPaletteStore((state) => state.setOpen);
   const user = useAuthStore((state) => state.user);
   const unread = useNotificationStore((state) => state.unread);
-  const displayName = user?.nombreCompleto?.trim() || "Andrea";
+  const displayName = user?.nombreCompleto?.trim() || "Admin";
   const firstName = getFirstName(displayName);
+  const greeting = getGreetingForHour();
   const initials = getInitials(displayName);
   const notificationCount = unread > 0 ? unread : 3;
 
@@ -45,7 +53,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     <header className="nc-dashboard-header">
       <div className="nc-dashboard-header__inner">
         <div className="nc-dashboard-header__intro">
-          <h1 className="nc-dashboard-header__title">¡Hola, {firstName}! <span aria-hidden="true">👋</span></h1>
+          <h1 className="nc-dashboard-header__title">{greeting}, {firstName} <span aria-hidden="true">👋</span></h1>
           <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
           <button type="button" className="nc-dashboard-header__metricsAction" onClick={onCustomizeKpis}>
             <SlidersHorizontal size={17} strokeWidth={2} aria-hidden="true" />

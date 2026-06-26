@@ -43,6 +43,10 @@ interface ImpactSlide {
   decoration: "leaf" | "spark" | "wave" | "pulse";
 }
 
+const IMPACT_AUTOPLAY_DELAY_MS = 10_000;
+const IMPACT_AUTOPLAY_INTERVAL_MS = 10_000;
+const IMPACT_DRAG_THRESHOLD_PX = 42;
+
 const impactSlides: ImpactSlide[] = [
   {
     id: "impacto",
@@ -98,19 +102,32 @@ function usePrefersReducedMotion() {
 
 export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSidebarProps) {
   const [activeImpactIndex, setActiveImpactIndex] = React.useState(0);
+  const [impactDragOffset, setImpactDragOffset] = React.useState(0);
+  const [isImpactDragging, setIsImpactDragging] = React.useState(false);
   const prefersReducedMotion = usePrefersReducedMotion();
   const pointerStartXRef = React.useRef<number | null>(null);
   const activeImpact = impactSlides[activeImpactIndex] ?? impactSlides[0];
   const ImpactIcon = activeImpact.icon;
+  const impactDragStyle = {
+    "--nc-impact-drag-x": `${impactDragOffset}px`,
+    "--nc-impact-plant-drag-x": `${Math.round(impactDragOffset * 0.18)}px`,
+  } as React.CSSProperties;
 
   React.useEffect(() => {
     if (prefersReducedMotion) return;
 
-    const intervalId = window.setInterval(() => {
+    let intervalId: number | undefined;
+    const timeoutId = window.setTimeout(() => {
       setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
-    }, 10_000);
+      intervalId = window.setInterval(() => {
+        setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
+      }, IMPACT_AUTOPLAY_INTERVAL_MS);
+    }, IMPACT_AUTOPLAY_DELAY_MS);
 
-    return () => window.clearInterval(intervalId);
+    return () => {
+      window.clearTimeout(timeoutId);
+      if (intervalId) window.clearInterval(intervalId);
+    };
   }, [prefersReducedMotion]);
 
   const showImpactSlide = (index: number) => {
@@ -129,21 +146,43 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
     if (!event.isPrimary) return;
     if ((event.target as HTMLElement).closest("button")) return;
     pointerStartXRef.current = event.clientX;
+    setImpactDragOffset(0);
+    setIsImpactDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleImpactPointerMove = (event: React.PointerEvent<HTMLElement>) => {
+    const startX = pointerStartXRef.current;
+    if (startX === null) return;
+
+    const deltaX = event.clientX - startX;
+    const limitedOffset = Math.max(-54, Math.min(54, deltaX));
+    setImpactDragOffset(limitedOffset);
   };
 
   const handleImpactPointerUp = (event: React.PointerEvent<HTMLElement>) => {
     const startX = pointerStartXRef.current;
     pointerStartXRef.current = null;
+    setImpactDragOffset(0);
+    setIsImpactDragging(false);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (startX === null) return;
 
     const deltaX = event.clientX - startX;
-    if (Math.abs(deltaX) < 36) return;
+    if (Math.abs(deltaX) < IMPACT_DRAG_THRESHOLD_PX) return;
     if (deltaX > 0) showPreviousImpactSlide();
     else showNextImpactSlide();
+  };
+
+  const handleImpactPointerCancel = (event: React.PointerEvent<HTMLElement>) => {
+    pointerStartXRef.current = null;
+    setImpactDragOffset(0);
+    setIsImpactDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
 
   return (
@@ -184,13 +223,13 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
 
       {!collapsed && (
         <section
-          className={`nc-dashboard-impact nc-dashboard-impact--${activeImpact.theme} nc-dashboard-impact--decor-${activeImpact.decoration}`}
+          className={`nc-dashboard-impact nc-dashboard-impact--${activeImpact.theme} nc-dashboard-impact--decor-${activeImpact.decoration}${isImpactDragging ? " nc-dashboard-impact--dragging" : ""}`}
           aria-label="Galería motivacional"
+          style={impactDragStyle}
           onPointerDown={handleImpactPointerDown}
+          onPointerMove={handleImpactPointerMove}
           onPointerUp={handleImpactPointerUp}
-          onPointerCancel={() => {
-            pointerStartXRef.current = null;
-          }}
+          onPointerCancel={handleImpactPointerCancel}
         >
           <div key={activeImpact.id} className="nc-dashboard-impact__content" aria-live="polite">
             <div className="nc-dashboard-impact__heading">
