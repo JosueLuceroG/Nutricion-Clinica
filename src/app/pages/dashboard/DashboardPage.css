@@ -3282,10 +3282,10 @@
     --nc-dashboard-container-w: var(--nc-container-max-w);
     --nc-dashboard-header-gap: var(--nc-gap);
     --nc-dashboard-main-x: var(--nc-main-pad-x);
-    --nc-dashboard-main-bottom: var(--nc-main-pad-y);
+    --nc-dashboard-main-bottom: calc(var(--nc-main-pad-y) + var(--nc-bottom-safe-gap));
     --nc-dashboard-container-gap: var(--nc-gap);
     --nc-dashboard-container-top: var(--nc-main-pad-y);
-    --nc-dashboard-container-bottom: calc(var(--nc-main-pad-y) + var(--nc-bottom-safe-gap));
+    --nc-dashboard-container-bottom: var(--nc-main-pad-y);
     --nc-dashboard-kpi-h: var(--nc-kpi-h);
     --nc-dashboard-section-h: var(--nc-section-h);
     --nc-dashboard-third-row-h: var(--nc-third-row-h);
@@ -3461,7 +3461,8 @@
   }
 
   .nc-dashboard-main {
-    padding: 0 var(--nc-main-pad-x) 0;
+    padding: 0 var(--nc-main-pad-x) var(--nc-dashboard-main-bottom);
+    scroll-padding-bottom: var(--nc-dashboard-main-bottom);
   }
 
   .nc-dashboard-container {
@@ -3694,7 +3695,7 @@
     --nc-impact-pad-y: 17px;
     --nc-impact-plant-w: 78px;
     --nc-impact-plant-h: 116px;
-    --nc-bottom-safe-gap: 18px;
+    --nc-bottom-safe-gap: 28px;
   }
 }
 
@@ -3725,7 +3726,7 @@
     --nc-impact-pad-y: 16px;
     --nc-impact-plant-w: 76px;
     --nc-impact-plant-h: 112px;
-    --nc-bottom-safe-gap: 24px;
+    --nc-bottom-safe-gap: 28px;
   }
 }
 
@@ -3786,7 +3787,7 @@
     --nc-impact-pad-y: 17px;
     --nc-impact-plant-w: 78px;
     --nc-impact-plant-h: 116px;
-    --nc-bottom-safe-gap: 18px;
+    --nc-bottom-safe-gap: 28px;
   }
 }
 
@@ -3817,13 +3818,17 @@
     --nc-impact-pad-y: 16px;
     --nc-impact-plant-w: 76px;
     --nc-impact-plant-h: 112px;
-    --nc-bottom-safe-gap: 24px;
+    --nc-bottom-safe-gap: 28px;
   }
 }
 
 @media (min-width: 1280px) and (max-width: 1599px) and (max-height: 899px) {
   .nc-dashboard-header__inner {
     grid-template-columns: minmax(290px, 0.76fr) minmax(240px, calc(348px * var(--nc-header-font-scale))) auto;
+  }
+
+  .nc-dashboard-header__title {
+    line-height: 1.2;
   }
 
   .nc-dashboard-search {
@@ -3941,6 +3946,127 @@
   .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body small {
     font-size: 10.5px;
     line-height: 1.02;
+  }
+}
+
+@media (min-width: 1600px) and (max-width: 2199px) and (max-height: 949px) {
+  .nc-dashboard-shell {
+    --nc-third-row-h: 244px;
+    --nc-bottom-safe-gap: 24px;
+  }
+
+  .nc-dashboard-header__title {
+    line-height: 1.2;
+  }
+
+  .nc-dashboard-section-card--financial,
+  .nc-dashboard-section-card--payments,
+  .nc-dashboard-section-card--actions {
+    padding: max(10px, calc(var(--nc-card-pad) - 3px));
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-section-card__header,
+  .nc-dashboard-section-card--payments .nc-dashboard-section-card__header,
+  .nc-dashboard-section-card--actions .nc-dashboard-section-card__header {
+    margin-bottom: 6px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-card-action,
+  .nc-dashboard-section-card--payments .nc-dashboard-card-action {
+    min-height: 29px;
+    padding-right: 11px;
+    padding-left: 11px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-card-link,
+  .nc-dashboard-section-card--payments .nc-dashboard-card-link {
+    line-height: 1.05;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero {
+    gap: 4px;
+    border-radius: 14px;
+    padding: 8px 9px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__label,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero small,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__detail {
+    font-size: 11px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__row strong {
+    font-size: 21px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-hero__row span {
+    min-height: 21px;
+    height: 21px;
+    font-size: 10px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-meter {
+    height: 6px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list {
+    gap: 5px;
+    margin-top: 7px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__item {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__body {
+    gap: 1px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__topline span,
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__topline strong {
+    font-size: 12px;
+  }
+
+  .nc-dashboard-section-card--financial .nc-dashboard-financial-list__track {
+    height: 4px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions {
+    gap: 4px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__item {
+    grid-template-columns: 28px minmax(0, 1fr) 18px;
+    min-height: 32px;
+    border-radius: 12px;
+    padding: 2px 8px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body {
+    gap: 1px;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body strong {
+    font-size: 11.5px;
+    line-height: 1.03;
+  }
+
+  .nc-dashboard-section-card--actions .nc-dashboard-quick-actions__body small {
+    font-size: 10.5px;
+    line-height: 1.03;
   }
 }
 
