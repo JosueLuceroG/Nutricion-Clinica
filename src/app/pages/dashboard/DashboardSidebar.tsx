@@ -44,8 +44,9 @@ interface ImpactSlide {
 }
 
 const IMPACT_AUTOPLAY_DELAY_MS = 10_000;
-const IMPACT_AUTOPLAY_INTERVAL_MS = 10_000;
-const IMPACT_DRAG_THRESHOLD_PX = 42;
+const IMPACT_DRAG_THRESHOLD_PX = 40;
+const IMPACT_DRAG_MAX_OFFSET_PX = 96;
+const IMPACT_SNAP_DURATION_MS = 160;
 
 const impactSlides: ImpactSlide[] = [
   {
@@ -104,34 +105,45 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   const [activeImpactIndex, setActiveImpactIndex] = React.useState(0);
   const [impactDragOffset, setImpactDragOffset] = React.useState(0);
   const [isImpactDragging, setIsImpactDragging] = React.useState(false);
+  const [impactAutoplayNonce, setImpactAutoplayNonce] = React.useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
   const pointerStartXRef = React.useRef<number | null>(null);
+  const impactSnapTimeoutRef = React.useRef<number | null>(null);
   const activeImpact = impactSlides[activeImpactIndex] ?? impactSlides[0];
   const ImpactIcon = activeImpact.icon;
+  const impactDragProgress = Math.min(1, Math.abs(impactDragOffset) / IMPACT_DRAG_MAX_OFFSET_PX);
   const impactDragStyle = {
-    "--nc-impact-drag-x": `${impactDragOffset}px`,
-    "--nc-impact-plant-drag-x": `${Math.round(impactDragOffset * 0.18)}px`,
+    "--nc-impact-drag-x": `${Math.round(impactDragOffset * 0.84)}px`,
+    "--nc-impact-card-drag-x": `${Math.round(impactDragOffset * 0.18)}px`,
+    "--nc-impact-plant-drag-x": `${Math.round(impactDragOffset * 0.32)}px`,
+    "--nc-impact-drag-tilt": `${impactDragOffset * 0.018}deg`,
+    "--nc-impact-drag-progress": impactDragProgress,
   } as React.CSSProperties;
 
-  React.useEffect(() => {
-    if (prefersReducedMotion) return;
+  const clearImpactSnapTimeout = () => {
+    if (impactSnapTimeoutRef.current === null) return;
+    window.clearTimeout(impactSnapTimeoutRef.current);
+    impactSnapTimeoutRef.current = null;
+  };
 
-    let intervalId: number | undefined;
+  React.useEffect(() => clearImpactSnapTimeout, []);
+
+  React.useEffect(() => {
+    if (prefersReducedMotion || isImpactDragging) return;
+
     const timeoutId = window.setTimeout(() => {
       setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
-      intervalId = window.setInterval(() => {
-        setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
-      }, IMPACT_AUTOPLAY_INTERVAL_MS);
     }, IMPACT_AUTOPLAY_DELAY_MS);
 
-    return () => {
-      window.clearTimeout(timeoutId);
-      if (intervalId) window.clearInterval(intervalId);
-    };
-  }, [prefersReducedMotion]);
+    return () => window.clearTimeout(timeoutId);
+  }, [activeImpactIndex, impactAutoplayNonce, isImpactDragging, prefersReducedMotion]);
 
   const showImpactSlide = (index: number) => {
+    clearImpactSnapTimeout();
+    setImpactDragOffset(0);
+    setIsImpactDragging(false);
     setActiveImpactIndex((index + impactSlides.length) % impactSlides.length);
+    setImpactAutoplayNonce((nonce) => nonce + 1);
   };
 
   const showPreviousImpactSlide = () => {
@@ -145,6 +157,7 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   const handleImpactPointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (!event.isPrimary) return;
     if ((event.target as HTMLElement).closest("button")) return;
+    clearImpactSnapTimeout();
     pointerStartXRef.current = event.clientX;
     setImpactDragOffset(0);
     setIsImpactDragging(true);
@@ -156,30 +169,42 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
     if (startX === null) return;
 
     const deltaX = event.clientX - startX;
-    const limitedOffset = Math.max(-54, Math.min(54, deltaX));
+    const limitedOffset = Math.max(-IMPACT_DRAG_MAX_OFFSET_PX, Math.min(IMPACT_DRAG_MAX_OFFSET_PX, deltaX));
     setImpactDragOffset(limitedOffset);
   };
 
   const handleImpactPointerUp = (event: React.PointerEvent<HTMLElement>) => {
     const startX = pointerStartXRef.current;
     pointerStartXRef.current = null;
-    setImpactDragOffset(0);
     setIsImpactDragging(false);
+    setImpactAutoplayNonce((nonce) => nonce + 1);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
     if (startX === null) return;
 
     const deltaX = event.clientX - startX;
-    if (Math.abs(deltaX) < IMPACT_DRAG_THRESHOLD_PX) return;
-    if (deltaX > 0) showPreviousImpactSlide();
-    else showNextImpactSlide();
+    if (Math.abs(deltaX) < IMPACT_DRAG_THRESHOLD_PX) {
+      setImpactDragOffset(0);
+      return;
+    }
+
+    const movingToPrevious = deltaX > 0;
+    const snapOffset = movingToPrevious ? IMPACT_DRAG_MAX_OFFSET_PX : -IMPACT_DRAG_MAX_OFFSET_PX;
+    setImpactDragOffset(snapOffset);
+    impactSnapTimeoutRef.current = window.setTimeout(() => {
+      if (movingToPrevious) showPreviousImpactSlide();
+      else showNextImpactSlide();
+      setImpactDragOffset(0);
+      impactSnapTimeoutRef.current = null;
+    }, prefersReducedMotion ? 0 : IMPACT_SNAP_DURATION_MS);
   };
 
   const handleImpactPointerCancel = (event: React.PointerEvent<HTMLElement>) => {
     pointerStartXRef.current = null;
     setImpactDragOffset(0);
     setIsImpactDragging(false);
+    setImpactAutoplayNonce((nonce) => nonce + 1);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }

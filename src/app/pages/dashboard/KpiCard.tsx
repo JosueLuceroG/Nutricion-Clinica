@@ -15,7 +15,7 @@ export function KpiCard({ item }: KpiCardProps) {
       aria-label={`${item.label}: ${item.value}`}
     >
       <span className="nc-dashboard-kpi-card__icon" aria-hidden="true">
-        <Icon size={29} strokeWidth={1.9} />
+        <Icon size={27} strokeWidth={1.85} />
       </span>
 
       <span className="nc-dashboard-kpi-card__body">
