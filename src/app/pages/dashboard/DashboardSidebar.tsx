@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Heart,
   HeartPulse,
-  House,
   Leaf,
   ReceiptText,
   Settings,
@@ -16,6 +15,7 @@ import {
   UsersRound,
   WalletCards,
   type LucideIcon,
+  type LucideProps,
 } from "lucide-react";
 
 interface DashboardSidebarProps {
@@ -23,8 +23,40 @@ interface DashboardSidebarProps {
   onToggleCollapsed: () => void;
 }
 
+function DashboardHomeIcon({ size = 24, strokeWidth = 1.75, className, ...props }: LucideProps) {
+  const iconClassName = className ? `nc-dashboard-home-icon ${className}` : "nc-dashboard-home-icon";
+
+  return (
+    <svg
+      {...props}
+      className={iconClassName}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={strokeWidth}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+        className="nc-dashboard-home-icon__solid"
+        d="M4.42 10.9 11.18 5.2c.47-.4 1.16-.4 1.64 0l6.76 5.7a.72.72 0 0 1-.92 1.1l-.84-.7v6.98c0 .8-.64 1.44-1.44 1.44H7.62c-.8 0-1.44-.64-1.44-1.44V11.3l-.84.7a.72.72 0 0 1-.92-1.1Zm5.63 8.82h3.9v-4.6a.72.72 0 0 0-.72-.72h-2.46a.72.72 0 0 0-.72.72v4.6Z"
+        fill="currentColor"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        stroke="none"
+      />
+      <path className="nc-dashboard-home-icon__outline" d="M6.25 10.7v7.48c0 .82.67 1.49 1.49 1.49h8.52c.82 0 1.49-.67 1.49-1.49V10.7" />
+      <path className="nc-dashboard-home-icon__roof" d="m3.95 11.15 7.36-6.2a1.06 1.06 0 0 1 1.38 0l7.36 6.2" />
+      <path className="nc-dashboard-home-icon__door" d="M10.18 19.67v-4.56c0-.43.35-.78.78-.78h2.08c.43 0 .78.35.78.78v4.56" />
+    </svg>
+  );
+}
+
 export const dashboardNavItems = [
-  { to: "/", label: "Dashboard", icon: House, end: true },
+  { to: "/", label: "Dashboard", icon: DashboardHomeIcon, end: true },
   { to: "/pacientes", label: "Pacientes", icon: UsersRound },
   { to: "/consultas", label: "Consultas", icon: ClipboardList },
   { to: "/agenda", label: "Agenda", icon: CalendarDays },

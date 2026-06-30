@@ -2,7 +2,6 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell,
-  BellRing,
   CalendarPlus,
   ChevronRight,
   Inbox,
@@ -202,7 +201,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                   aria-label={`Notificaciones (${notificationCount})`}
                   aria-expanded={notificationsOpen}
                 >
-                  <BellRing size={18} strokeWidth={1.7} aria-hidden="true" />
+                  <Bell size={19} strokeWidth={1.55} aria-hidden="true" />
                   {notificationCount > 0 && <span className="nc-dashboard-header__badge">{notificationCount}</span>}
                 </button>
               </DropdownMenuTrigger>
