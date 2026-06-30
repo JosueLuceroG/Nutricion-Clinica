@@ -384,7 +384,7 @@
   position: relative;
   background: linear-gradient(135deg, #3277ff 0%, #1f5df2 100%);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: none;
   font-weight: 580;
   transform: translateX(0);
 }
@@ -840,7 +840,7 @@
 .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible {
   background: linear-gradient(135deg, #3277ff 0%, #1f5df2 100%);
   color: #ffffff;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  box-shadow: none;
   transform: translateY(0);
 }
 
@@ -1169,11 +1169,11 @@
 .nc-dashboard-button--primary {
   background: linear-gradient(135deg, #2f78ff 0%, #195de8 100%);
   color: #ffffff;
-  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .nc-dashboard-button--primary:hover {
-  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .nc-dashboard-button:active {
@@ -6006,13 +6006,47 @@
   background: rgba(255, 255, 255, 0.995);
 }
 
+.nc-dashboard-desktop-titlebar__brand {
+  gap: 5px;
+  padding-left: 13px;
+  font-size: 10.4px;
+}
+
+.nc-dashboard-desktop-titlebar__brand img {
+  width: 12px;
+  height: 12px;
+}
+
+.nc-dashboard-desktop-titlebar__name {
+  letter-spacing: -0.018em;
+}
+
+.nc-dashboard-desktop-titlebar__separator {
+  height: 9px;
+  margin: 0 3px;
+  background: rgba(191, 203, 224, 0.52);
+}
+
+.nc-dashboard-desktop-titlebar__subtitle {
+  color: #6b758b;
+  font-size: 9.2px;
+  font-weight: 590;
+}
+
+.nc-dashboard-desktop-titlebar__desktopIndicator {
+  width: 14px;
+  height: 14px;
+  border-color: rgba(205, 216, 234, 0.3);
+  background: transparent;
+}
+
 .nc-dashboard-desktop-titlebar__controls button {
-  width: 34px;
+  width: 33px;
   color: #52617c;
 }
 
 .nc-dashboard-desktop-titlebar__controls .nc-dashboard-desktop-titlebar__theme {
-  width: 32px;
+  width: 31px;
   margin-right: 2px;
   border-radius: 8px;
   color: #41577f;
@@ -6030,18 +6064,18 @@
 }
 
 .nc-dashboard-shell--tauri {
-  --nc-impact-h: 232px;
-  --nc-impact-pad-x: 18px;
-  --nc-impact-pad-y: 19px;
-  --nc-impact-plant-w: 96px;
-  --nc-impact-plant-h: 144px;
+  --nc-impact-h: 236px;
+  --nc-impact-pad-x: 17px;
+  --nc-impact-pad-y: 18px;
+  --nc-impact-plant-w: 94px;
+  --nc-impact-plant-h: 140px;
   background: #ffffff;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header {
   min-height: 102px;
   padding-top: 4px;
-  padding-bottom: 14px;
+  padding-bottom: 9px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__inner {
@@ -6053,7 +6087,8 @@
 .nc-dashboard-shell--tauri .nc-dashboard-header__intro,
 .nc-dashboard-shell--tauri .nc-dashboard-header__searchSlot,
 .nc-dashboard-shell--tauri .nc-dashboard-header__actions {
-  transform: translateY(-3px);
+  align-self: center;
+  transform: translateY(0);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__title {
@@ -6066,60 +6101,68 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__searchSlot {
-  max-width: 440px;
+  max-width: 436px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search {
   height: 39px;
   gap: 9px;
-  border-color: rgba(217, 226, 242, 0.84);
-  border-radius: 13px;
+  border-color: rgba(217, 226, 242, 0.76);
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 6px 18px rgba(31, 78, 150, 0.022);
+  box-shadow: 0 3px 12px rgba(31, 78, 150, 0.014);
   padding-right: 12px;
-  padding-left: 13px;
+  padding-left: 14px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
   border-color: rgba(37, 99, 235, 0.16);
   box-shadow: 0 8px 22px rgba(31, 78, 150, 0.04);
+  transform: none;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__icon {
-  width: 18px;
-  height: 18px;
-  color: #526384;
+  width: 17.5px;
+  height: 17.5px;
+  color: #53627f;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__placeholder {
   color: #69758e;
-  font-size: 12.7px;
+  font-size: 12.6px;
+  line-height: 1;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__kbd {
   height: 21px;
-  min-width: 39px;
+  min-width: 40px;
   border-color: rgba(219, 227, 241, 0.78);
   border-radius: 6px;
   background: #f6f8fc;
   color: #818da3;
-  font-size: 10.4px;
+  font-size: 10.2px;
+  line-height: 1;
+  padding: 0 7px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__actions,
 .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup,
 .nc-dashboard-shell--tauri .nc-dashboard-header__utilityGroup {
-  gap: 6px;
+  gap: 7px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button {
-  height: 38px;
+  height: 39px;
   gap: 6px;
   border-radius: 11px;
-  font-size: 12.45px;
+  font-size: 12.35px;
   line-height: 1;
-  padding-right: 10px;
-  padding-left: 10px;
+  padding-right: 11px;
+  padding-left: 11px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button:hover {
+  transform: none;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button svg {
@@ -6128,9 +6171,9 @@
 
 .nc-dashboard-shell--tauri .nc-dashboard-button--outline,
 .nc-dashboard-shell--tauri .nc-dashboard-button--soft {
-  border-color: rgba(222, 230, 244, 0.82);
+  border-color: rgba(222, 230, 244, 0.76);
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 5px 14px rgba(31, 78, 150, 0.022);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
@@ -6145,38 +6188,58 @@
 .nc-dashboard-shell--tauri .nc-dashboard-button--outline:hover,
 .nc-dashboard-shell--tauri .nc-dashboard-button--soft:hover {
   background: #fbfdff;
-  box-shadow: 0 7px 18px rgba(31, 78, 150, 0.038);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
   background: linear-gradient(135deg, #2f7bff 0%, #1e61ed 100%);
-  box-shadow: 0 9px 20px rgba(37, 99, 235, 0.12);
-  padding-right: 13px;
-  padding-left: 13px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  min-width: 146px;
+  padding-right: 17px;
+  padding-left: 17px;
+  white-space: nowrap;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button--primary span {
+  flex: 0 0 auto;
+  min-width: max-content;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover {
-  box-shadow: 0 11px 24px rgba(37, 99, 235, 0.15);
+  background: linear-gradient(135deg, #2e76fb 0%, #1d5ce5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification {
-  width: 38px;
-  height: 38px;
+  width: 39px;
+  height: 39px;
   border: 0;
   border-radius: 999px;
   background: transparent;
   box-shadow: none;
-  color: #253456;
+  color: #33405f;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__notification svg {
+  width: 18px;
+  height: 18px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification:hover,
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification[aria-expanded="true"] {
-  background: rgba(37, 99, 235, 0.055);
+  background: rgba(37, 99, 235, 0.045);
   color: #145fff;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification:active {
   background: rgba(37, 99, 235, 0.075);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__notification:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.18);
+  outline-offset: 2px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__avatar,
@@ -6192,12 +6255,20 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__avatarFallback {
-  box-shadow: 0 8px 16px rgba(20, 34, 74, 0.09);
+  box-shadow: none;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__avatarStatus {
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.08);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-container {
+  padding-top: 2px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-action-row {
-  margin: 8px 0 2px;
-  padding-left: 1px;
+  margin: -1px 0 -5px;
+  padding-left: 2px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-action {
@@ -6206,28 +6277,28 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-grid {
-  margin-top: 0;
+  margin-top: -3px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-card {
-  border-color: rgba(218, 230, 255, 0.9);
+  border-color: rgba(219, 231, 255, 0.86);
   box-shadow:
-    0 18px 42px rgba(37, 99, 235, 0.07),
-    0 6px 16px rgba(15, 23, 42, 0.03),
+    0 16px 38px rgba(37, 99, 235, 0.058),
+    0 6px 16px rgba(15, 23, 42, 0.034),
     inset 0 1px 0 rgba(255, 255, 255, 0.96);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover {
   box-shadow:
-    0 20px 46px rgba(37, 99, 235, 0.08),
-    0 7px 18px rgba(15, 23, 42, 0.034),
+    0 18px 42px rgba(37, 99, 235, 0.066),
+    0 7px 18px rgba(15, 23, 42, 0.036),
     inset 0 1px 0 rgba(255, 255, 255, 0.98);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact {
-  border-radius: 20px;
-  box-shadow: 0 16px 32px rgba(28, 112, 210, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  padding: var(--nc-impact-pad-y) var(--nc-impact-pad-x) calc(var(--nc-impact-pad-y) + 8px);
+  border-radius: 19px;
+  box-shadow: 0 15px 30px rgba(28, 112, 210, 0.115), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  padding: var(--nc-impact-pad-y) var(--nc-impact-pad-x) calc(var(--nc-impact-pad-y) + 7px);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__heading {
@@ -6235,27 +6306,27 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__icon {
-  width: 27px;
-  height: 27px;
-  flex-basis: 27px;
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__title {
-  font-size: clamp(13px, calc(13.5px * var(--nc-sidebar-font-scale, var(--nc-font-scale))), 14px);
+  font-size: clamp(13px, calc(13.35px * var(--nc-sidebar-font-scale, var(--nc-font-scale))), 13.9px);
   line-height: 1.12;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__text {
-  max-width: 156px;
-  margin-top: 14px;
-  font-size: 12.7px;
+  max-width: 152px;
+  margin-top: 13px;
+  font-size: 12.55px;
   line-height: 1.45;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__plant {
-  right: -8px;
-  bottom: -15px;
-  opacity: 0.64;
+  right: -7px;
+  bottom: -14px;
+  opacity: 0.62;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-impact__dots {
@@ -6263,16 +6334,16 @@
 }
 
 .nc-dashboard-sidebar__brandLink {
-  gap: 10px;
+  gap: 9px;
   min-height: 48px;
   padding-left: 4px;
 }
 
 .nc-dashboard-sidebar__logo {
-  width: 41px;
-  max-width: 41px;
-  height: 41px;
-  filter: drop-shadow(0 7px 13px rgba(37, 99, 235, 0.08));
+  width: 40px;
+  max-width: 40px;
+  height: 40px;
+  filter: drop-shadow(0 6px 12px rgba(37, 99, 235, 0.075));
 }
 
 .nc-dashboard-sidebar__brandText {
@@ -6282,7 +6353,7 @@
 
 .nc-dashboard-sidebar__brandText strong {
   color: #091746;
-  font-size: clamp(18.5px, calc(19.4px * var(--nc-sidebar-font-scale, var(--nc-font-scale))), 20.4px);
+  font-size: clamp(18.4px, calc(19.2px * var(--nc-sidebar-font-scale, var(--nc-font-scale))), 20.2px);
   font-weight: 780;
   letter-spacing: -0.045em;
 }
@@ -6296,7 +6367,75 @@
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: none;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active .nc-dashboard-sidebar__itemIcon,
+.nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover .nc-dashboard-sidebar__itemIcon,
+.nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible .nc-dashboard-sidebar__itemIcon {
+  color: #ffffff;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts {
+  margin-top: 3px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts__item {
+  grid-template-columns: 46px minmax(0, 1fr) 32px;
+  gap: 12px;
+  min-height: 72px;
+  border-bottom-color: rgba(237, 242, 250, 0.86);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts__icon {
+  width: 44px;
+  height: 44px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts__body {
+  gap: 4px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts__badge {
+  justify-self: end;
+  min-width: 30px;
+  height: 30px;
+  font-size: 11.5px;
+  line-height: 1;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-alerts__badge--arrow {
+  font-size: 21px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions {
+  gap: 7px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  grid-template-columns: 34px minmax(0, 1fr) 18px;
+  gap: 10px;
+  min-height: 42px;
+  border-color: rgba(237, 242, 250, 0.92);
+  padding: 5px 10px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item:hover {
+  box-shadow: 0 9px 20px rgba(31, 78, 150, 0.052);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions__icon {
+  width: 34px;
+  height: 34px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions__body {
+  gap: 3px;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item > svg {
+  justify-self: end;
+  color: #8b96ad;
 }
 
 .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__brandLink {
@@ -6325,8 +6464,9 @@
   }
 
   .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
-    padding-right: 11px;
-    padding-left: 11px;
+    min-width: 142px;
+    padding-right: 13px;
+    padding-left: 13px;
   }
 }
 
@@ -6352,8 +6492,9 @@
   }
 
   .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
-    padding-right: 10px;
-    padding-left: 10px;
+    min-width: 138px;
+    padding-right: 12px;
+    padding-left: 12px;
   }
 }
 

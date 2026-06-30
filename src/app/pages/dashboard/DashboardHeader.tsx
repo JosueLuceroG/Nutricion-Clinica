@@ -2,6 +2,7 @@ import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell,
+  BellRing,
   CalendarPlus,
   ChevronRight,
   Inbox,
@@ -55,9 +56,9 @@ function getGreetingEmoji(periodOfDay: PeriodOfDay, date = new Date()): string {
   const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
   const hourBucket = Math.floor(date.getHours() / 3);
   const emojiByPeriod: Record<PeriodOfDay, string[]> = {
-    morning: ["👋", "🌿", "🍎", "✨"],
+    morning: ["👋", "☀️", "🌱", "🍎"],
     afternoon: ["🥗", "🍎", "💙", "🌿"],
-    night: ["🩺", "💙", "✨", "👋"],
+    night: ["🩺", "🌿", "✨", "💙"],
   };
   const periodOffset: Record<PeriodOfDay, number> = {
     morning: 0,
@@ -201,7 +202,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                   aria-label={`Notificaciones (${notificationCount})`}
                   aria-expanded={notificationsOpen}
                 >
-                  <Bell size={21} strokeWidth={1.9} aria-hidden="true" />
+                  <BellRing size={18} strokeWidth={1.7} aria-hidden="true" />
                   {notificationCount > 0 && <span className="nc-dashboard-header__badge">{notificationCount}</span>}
                 </button>
               </DropdownMenuTrigger>
