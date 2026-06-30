@@ -25,6 +25,8 @@ import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
 import { useNotificationStore } from "@store/notificationStore";
 
+type PeriodOfDay = "morning" | "afternoon" | "night";
+
 interface DashboardHeaderProps {
   onCustomizeKpis?: () => void;
 }
@@ -35,11 +37,37 @@ function getFirstName(fullName?: string | null): string {
   return trimmed.split(/\s+/)[0] ?? "Administrador";
 }
 
-function getGreetingForHour(date = new Date()): string {
+function getPeriodOfDay(date = new Date()): PeriodOfDay {
   const hour = date.getHours();
-  if (hour >= 5 && hour < 12) return "Buenos días";
-  if (hour >= 12 && hour < 19) return "Buenas tardes";
+  if (hour >= 5 && hour < 12) return "morning";
+  if (hour >= 12 && hour < 19) return "afternoon";
+  return "night";
+}
+
+function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
+  if (periodOfDay === "morning") return "Buenos días";
+  if (periodOfDay === "afternoon") return "Buenas tardes";
   return "Buenas noches";
+}
+
+function getGreetingEmoji(periodOfDay: PeriodOfDay, date = new Date()): string {
+  const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
+  const hourBucket = Math.floor(date.getHours() / 3);
+  const emojiByPeriod: Record<PeriodOfDay, string[]> = {
+    morning: ["👋", "🌿", "🍎", "✨"],
+    afternoon: ["🥗", "🍎", "💙", "🌿"],
+    night: ["🩺", "💙", "✨", "👋"],
+  };
+  const periodOffset: Record<PeriodOfDay, number> = {
+    morning: 0,
+    afternoon: 1,
+    night: 2,
+  };
+  const emojis = emojiByPeriod[periodOfDay];
+  const index = (dayOfYear + hourBucket + periodOffset[periodOfDay]) % emojis.length;
+
+  return emojis[index] ?? "👋";
 }
 
 function getInitials(fullName: string): string {
@@ -62,12 +90,20 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const unread = useNotificationStore((state) => state.unread);
   const displayName = user?.nombreCompleto?.trim() || "Administrador";
   const firstName = getFirstName(displayName);
-  const greeting = getGreetingForHour();
+  const [headerDate, setHeaderDate] = React.useState(() => new Date());
+  const periodOfDay = getPeriodOfDay(headerDate);
+  const greeting = getGreetingForPeriod(periodOfDay);
+  const greetingEmoji = getGreetingEmoji(periodOfDay, headerDate);
   const initials = getInitials(displayName);
   const notificationCount = unread > 0 ? unread : 0;
   const hasUnreadNotifications = notificationCount > 0;
   const userRole = user?.rol ?? "admin";
   const userEmail = user?.email ?? "";
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => setHeaderDate(new Date()), 15 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   React.useEffect(() => {
     if (!notificationsOpen && !avatarMenuOpen) return;
@@ -114,15 +150,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
         <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
           <h1 className="nc-dashboard-header__title">
             <span className="nc-dashboard-header__greetingText">{greeting}, {firstName}</span>
-            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">👋</span>
+            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">{greetingEmoji}</span>
           </h1>
           <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
-          {onCustomizeKpis && (
-            <button type="button" className="nc-dashboard-header__metricsAction" onClick={onCustomizeKpis}>
-              <SlidersHorizontal size={14} strokeWidth={2} aria-hidden="true" />
-              <span>Reordenar / ocultar métricas</span>
-            </button>
-          )}
         </section>
 
         <div className="nc-dashboard-header__searchSlot">
@@ -141,7 +171,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
         <div className="nc-dashboard-header__actions">
           <div className="nc-dashboard-header__ctaGroup" aria-label="Acciones rápidas del dashboard">
             <button type="button" className="nc-dashboard-button nc-dashboard-button--outline" onClick={onCustomizeKpis}>
-              <SlidersHorizontal size={17} strokeWidth={2} aria-hidden="true" />
+              <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
               <span>Personalizar KPIs</span>
             </button>
             <button
@@ -255,6 +285,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             </DropdownMenu>
           </div>
         </div>
+
       </div>
     </header>
   );

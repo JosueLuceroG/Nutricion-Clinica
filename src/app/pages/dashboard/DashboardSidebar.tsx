@@ -46,7 +46,7 @@ interface ImpactSlide {
 const IMPACT_AUTOPLAY_DELAY_MS = 10_000;
 const IMPACT_DRAG_THRESHOLD_PX = 40;
 const IMPACT_DRAG_MAX_OFFSET_PX = 96;
-const IMPACT_SNAP_DURATION_MS = 160;
+const IMPACT_SNAP_DURATION_MS = 140;
 
 const impactSlides: ImpactSlide[] = [
   {
@@ -216,11 +216,15 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
         <NavLink to="/" className="nc-dashboard-sidebar__brandLink" aria-label="NutriClinica dashboard">
           <img
             className="nc-dashboard-sidebar__logo"
-            src="/assets/logo-system.png"
-            alt="NutriClinica"
-            width="188"
-            height="51"
+            src="/assets/icon.png"
+            alt=""
+            width="40"
+            height="40"
           />
+          <span className="nc-dashboard-sidebar__brandText" aria-hidden="true">
+            <strong>NutriClinica</strong>
+            <small>Tu clínica, su bienestar</small>
+          </span>
         </NavLink>
       </div>
 
@@ -235,63 +239,64 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
               className={({ isActive }) =>
                 `nc-dashboard-sidebar__item${isActive ? " nc-dashboard-sidebar__item--active" : ""}`
               }
+              aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
             >
               <span className="nc-dashboard-sidebar__itemIcon" aria-hidden="true">
                 <Icon size={19} strokeWidth={1.75} />
               </span>
-              {!collapsed && <span className="nc-dashboard-sidebar__itemLabel">{item.label}</span>}
+              <span className="nc-dashboard-sidebar__itemLabel" aria-hidden={collapsed ? "true" : undefined}>{item.label}</span>
             </NavLink>
           );
         })}
       </nav>
 
-      {!collapsed && (
-        <section
-          className={`nc-dashboard-impact nc-dashboard-impact--${activeImpact.theme} nc-dashboard-impact--decor-${activeImpact.decoration}${isImpactDragging ? " nc-dashboard-impact--dragging" : ""}`}
-          aria-label="Galería motivacional"
-          style={impactDragStyle}
-          onPointerDown={handleImpactPointerDown}
-          onPointerMove={handleImpactPointerMove}
-          onPointerUp={handleImpactPointerUp}
-          onPointerCancel={handleImpactPointerCancel}
-        >
-          <div key={activeImpact.id} className="nc-dashboard-impact__content" aria-live="polite">
-            <div className="nc-dashboard-impact__heading">
-              <div className="nc-dashboard-impact__icon" aria-hidden="true">
-                <ImpactIcon size={18} strokeWidth={1.8} />
-              </div>
-              <h2 className="nc-dashboard-impact__title">{activeImpact.title}</h2>
+      <section
+        className={`nc-dashboard-impact nc-dashboard-impact--${activeImpact.theme} nc-dashboard-impact--decor-${activeImpact.decoration}${isImpactDragging ? " nc-dashboard-impact--dragging" : ""}`}
+        aria-label="Galería motivacional"
+        aria-hidden={collapsed ? "true" : undefined}
+        style={impactDragStyle}
+        onPointerDown={handleImpactPointerDown}
+        onPointerMove={handleImpactPointerMove}
+        onPointerUp={handleImpactPointerUp}
+        onPointerCancel={handleImpactPointerCancel}
+      >
+        <div key={activeImpact.id} className="nc-dashboard-impact__content" aria-live={collapsed ? "off" : "polite"}>
+          <div className="nc-dashboard-impact__heading">
+            <div className="nc-dashboard-impact__icon" aria-hidden="true">
+              <ImpactIcon size={18} strokeWidth={1.8} />
             </div>
-            <p className="nc-dashboard-impact__text">{activeImpact.text}</p>
+            <h2 className="nc-dashboard-impact__title">{activeImpact.title}</h2>
           </div>
-          <div className="nc-dashboard-impact__plant" aria-hidden="true">
-            <svg viewBox="0 0 120 168" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path className="nc-dashboard-impact__stem" d="M82 166C84 133 93 91 112 50" />
-              <path className="nc-dashboard-impact__stem" d="M42 166C50 130 40 99 21 70" />
-              <path className="nc-dashboard-impact__stem nc-dashboard-impact__stem--thin" d="M63 166C65 130 58 105 43 78" />
-              <path className="nc-dashboard-impact__leaf" d="M86 97C103 89 116 100 114 119C96 126 83 115 86 97Z" />
-              <path className="nc-dashboard-impact__leaf" d="M99 48C114 45 123 57 116 72C100 75 92 63 99 48Z" />
-              <path className="nc-dashboard-impact__leaf" d="M53 95C70 95 80 109 75 126C58 127 48 112 53 95Z" />
-              <path className="nc-dashboard-impact__leaf" d="M22 69C38 68 48 81 43 97C27 99 18 84 22 69Z" />
-              <path className="nc-dashboard-impact__leaf" d="M63 124C79 125 88 139 82 154C66 154 57 139 63 124Z" />
-              <path className="nc-dashboard-impact__leaf" d="M42 116C55 113 65 122 64 136C50 140 40 130 42 116Z" />
-            </svg>
-          </div>
-          <div className="nc-dashboard-impact__dots" aria-label="Frases motivacionales">
-            {impactSlides.map((slide, index) => (
-              <button
-                key={slide.id}
-                type="button"
-                className={`nc-dashboard-impact__dot${index === activeImpactIndex ? " nc-dashboard-impact__dot--active" : ""}`}
-                onClick={() => showImpactSlide(index)}
-                aria-label={`Mostrar frase: ${slide.title}`}
-                aria-current={index === activeImpactIndex ? "true" : undefined}
-              />
-            ))}
-          </div>
-        </section>
-      )}
+          <p className="nc-dashboard-impact__text">{activeImpact.text}</p>
+        </div>
+        <div className="nc-dashboard-impact__plant" aria-hidden="true">
+          <svg viewBox="0 0 120 168" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path className="nc-dashboard-impact__stem" d="M82 166C84 133 93 91 112 50" />
+            <path className="nc-dashboard-impact__stem" d="M42 166C50 130 40 99 21 70" />
+            <path className="nc-dashboard-impact__stem nc-dashboard-impact__stem--thin" d="M63 166C65 130 58 105 43 78" />
+            <path className="nc-dashboard-impact__leaf" d="M86 97C103 89 116 100 114 119C96 126 83 115 86 97Z" />
+            <path className="nc-dashboard-impact__leaf" d="M99 48C114 45 123 57 116 72C100 75 92 63 99 48Z" />
+            <path className="nc-dashboard-impact__leaf" d="M53 95C70 95 80 109 75 126C58 127 48 112 53 95Z" />
+            <path className="nc-dashboard-impact__leaf" d="M22 69C38 68 48 81 43 97C27 99 18 84 22 69Z" />
+            <path className="nc-dashboard-impact__leaf" d="M63 124C79 125 88 139 82 154C66 154 57 139 63 124Z" />
+            <path className="nc-dashboard-impact__leaf" d="M42 116C55 113 65 122 64 136C50 140 40 130 42 116Z" />
+          </svg>
+        </div>
+        <div className="nc-dashboard-impact__dots" aria-label="Frases motivacionales">
+          {impactSlides.map((slide, index) => (
+            <button
+              key={slide.id}
+              type="button"
+              className={`nc-dashboard-impact__dot${index === activeImpactIndex ? " nc-dashboard-impact__dot--active" : ""}`}
+              onClick={() => showImpactSlide(index)}
+              aria-label={`Mostrar frase: ${slide.title}`}
+              aria-current={index === activeImpactIndex ? "true" : undefined}
+              tabIndex={collapsed ? -1 : undefined}
+            />
+          ))}
+        </div>
+      </section>
 
       <button
         type="button"
@@ -302,7 +307,7 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
         title={collapsed ? "Expandir sidebar" : undefined}
       >
         {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        {!collapsed && <span>Contraer</span>}
+        <span className="nc-dashboard-sidebar__collapseLabel" aria-hidden={collapsed ? "true" : undefined}>Contraer</span>
       </button>
     </aside>
   );

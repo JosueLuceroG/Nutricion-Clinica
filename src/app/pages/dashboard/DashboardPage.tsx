@@ -1,4 +1,5 @@
 import * as React from "react";
+import { SlidersHorizontal } from "lucide-react";
 import { useDashboardKpis, type DashboardKpis, type DashboardRecentPayment } from "@app/hooks/useDashboardKpis";
 import {
   DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
@@ -326,6 +327,13 @@ export function DashboardPage() {
             : "Actualizando métricas reales del consultorio..."}
         </div>
       )}
+
+      <div className="nc-dashboard-kpi-action-row">
+        <button type="button" className="nc-dashboard-kpi-action" onClick={() => setKpiCustomizerOpen(true)}>
+          <SlidersHorizontal size={14} strokeWidth={2} aria-hidden="true" />
+          <span>Reordenar / ocultar métricas</span>
+        </button>
+      </div>
 
       <section className="nc-dashboard-kpi-grid" aria-label="Métricas principales">
         {visibleKpis.map((item) => (
