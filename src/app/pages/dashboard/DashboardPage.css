@@ -411,6 +411,23 @@
 
 .nc-dashboard-home-icon__solid {
   display: none;
+  shape-rendering: geometricPrecision;
+}
+
+.nc-dashboard-home-icon {
+  display: block;
+}
+
+.nc-dashboard-home-icon__cutout {
+  display: none;
+}
+
+.nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #2869f2;
+}
+
+.nc-dashboard-sidebar__item--active[href="/"]:hover {
+  --nc-dashboard-home-cutout: #2867ed;
 }
 
 .nc-dashboard-sidebar__item--active[href="/"] .nc-dashboard-home-icon__solid,
@@ -418,6 +435,14 @@
 .nc-dashboard-sidebar__item--active[href="/"]:focus-visible .nc-dashboard-home-icon__solid {
   display: block;
   fill: currentColor;
+  stroke: none;
+}
+
+.nc-dashboard-sidebar__item--active[href="/"] .nc-dashboard-home-icon__cutout,
+.nc-dashboard-sidebar__item--active[href="/"]:hover .nc-dashboard-home-icon__cutout,
+.nc-dashboard-sidebar__item--active[href="/"]:focus-visible .nc-dashboard-home-icon__cutout {
+  display: block;
+  fill: var(--nc-dashboard-home-cutout);
   stroke: none;
 }
 
@@ -6072,14 +6097,17 @@
 
 .nc-dashboard-desktop-titlebar__controls button {
   width: 33px;
+  background: transparent;
+  box-shadow: none;
   color: #52617c;
 }
 
 .nc-dashboard-desktop-titlebar__controls .nc-dashboard-desktop-titlebar__theme {
-  width: 31px;
+  width: 32px;
   margin-right: 2px;
   border-radius: 8px;
-  color: #41577f;
+  background: transparent;
+  color: #52617c;
 }
 
 .nc-dashboard-desktop-titlebar__theme::after {
@@ -6091,6 +6119,24 @@
 .nc-dashboard-desktop-titlebar__controls button:hover {
   background: rgba(37, 99, 235, 0.04);
   color: #1767ff;
+}
+
+.nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"] {
+  background: transparent;
+  box-shadow: none;
+  color: #52617c;
+}
+
+.nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"]:hover,
+.nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"]:active,
+.nc-dashboard-desktop-titlebar__controls button:active {
+  background: rgba(37, 99, 235, 0.055);
+  color: #1767ff;
+}
+
+.nc-dashboard-desktop-titlebar__controls button:focus-visible {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  outline-offset: -2px;
 }
 
 .nc-dashboard-shell--tauri {
@@ -6110,8 +6156,12 @@
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__inner {
   grid-template-columns: minmax(280px, 350px) minmax(300px, 436px) max-content;
-  column-gap: clamp(10px, 0.78vw, 15px);
+  column-gap: clamp(12px, 0.82vw, 17px);
   align-items: center;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__intro {
+  gap: 3.5px;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__intro,
@@ -6126,13 +6176,13 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
-  margin-top: 1px;
+  margin-top: 0;
   color: #65718a;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__searchSlot {
-  max-width: 424px;
-  transform: translateX(-5px);
+  max-width: 428px;
+  transform: translateX(-3px);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search {
@@ -6144,24 +6194,67 @@
   box-shadow: 0 3px 12px rgba(31, 78, 150, 0.014);
   padding-right: 11px;
   padding-left: 13px;
+  transition:
+    background-color 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    color 170ms ease;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
-  border-color: rgba(37, 99, 235, 0.16);
-  box-shadow: 0 8px 22px rgba(31, 78, 150, 0.04);
+  border-color: rgba(33, 100, 239, 0.24);
+  background: #ffffff;
+  box-shadow:
+    0 6px 16px rgba(31, 78, 150, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.96);
   transform: none;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:hover .nc-dashboard-search__icon {
+  color: #2164ef;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:hover .nc-dashboard-search__placeholder {
+  color: #2f5fae;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:hover .nc-dashboard-search__kbd {
+  border-color: rgba(33, 100, 239, 0.18);
+  background: #f5f8ff;
+  color: #2164ef;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:active {
+  border-color: rgba(33, 100, 239, 0.34);
+  background: #f8fbff;
+  box-shadow:
+    0 4px 12px rgba(31, 78, 150, 0.026),
+    inset 0 0 0 1px rgba(33, 100, 239, 0.07);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:active .nc-dashboard-search__icon,
+.nc-dashboard-shell--tauri .nc-dashboard-search:active .nc-dashboard-search__placeholder {
+  color: #0f5bea;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-search:active .nc-dashboard-search__kbd {
+  border-color: rgba(33, 100, 239, 0.26);
+  background: #edf4ff;
+  color: #0f5bea;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__icon {
   width: 17px;
   height: 17px;
   color: #53627f;
+  transition: color 170ms ease;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__placeholder {
   color: #69758e;
   font-size: 12.6px;
   line-height: 1;
+  transition: color 170ms ease;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-search__kbd {
@@ -6174,9 +6267,16 @@
   font-size: 10.2px;
   line-height: 1;
   padding: 0 7px;
+  transition:
+    background-color 170ms ease,
+    border-color 170ms ease,
+    color 170ms ease;
 }
 
-.nc-dashboard-shell--tauri .nc-dashboard-header__actions,
+.nc-dashboard-shell--tauri .nc-dashboard-header__actions {
+  gap: 8px;
+}
+
 .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup,
 .nc-dashboard-shell--tauri .nc-dashboard-header__utilityGroup {
   gap: 7px;
@@ -6190,6 +6290,11 @@
   line-height: 1;
   padding-right: 10px;
   padding-left: 10px;
+  transition:
+    background-color 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    color 170ms ease;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-button:hover {
@@ -6222,13 +6327,37 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.94);
 }
 
+.nc-dashboard-shell--tauri .nc-dashboard-button--outline:hover {
+  border-color: rgba(33, 100, 239, 0.52);
+  color: #2164ef;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button--soft:hover {
+  border-color: rgba(33, 100, 239, 0.24);
+  color: #2164ef;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button--outline:active {
+  border-color: rgba(33, 100, 239, 0.6);
+  background: #f4f8ff;
+  box-shadow: inset 0 0 0 1px rgba(33, 100, 239, 0.07);
+  color: #0f5bea;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button--soft:active {
+  border-color: rgba(33, 100, 239, 0.34);
+  background: #f6f9ff;
+  box-shadow: inset 0 0 0 1px rgba(33, 100, 239, 0.055);
+  color: #0f5bea;
+}
+
 .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
   background: linear-gradient(135deg, #2f7bff 0%, #1e61ed 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: none;
   gap: 7px;
-  min-width: 150px;
-  padding-right: 17px;
-  padding-left: 17px;
+  min-width: 152px;
+  padding-right: 18px;
+  padding-left: 18px;
   white-space: nowrap;
 }
 
@@ -6241,7 +6370,12 @@
 
 .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover {
   background: linear-gradient(135deg, #2e76fb 0%, #1d5ce5 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  background: linear-gradient(135deg, #286df3 0%, #1857d8 100%);
+  box-shadow: inset 0 1px 1px rgba(11, 35, 85, 0.16);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification {
@@ -6277,7 +6411,8 @@
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification:active {
-  background: rgba(37, 99, 235, 0.075);
+  background: rgba(37, 99, 235, 0.095);
+  color: #0f5bea;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__notification:focus-visible {
@@ -6295,10 +6430,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  transition: filter 170ms ease;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__avatarFallback {
   box-shadow: none;
+  transition:
+    box-shadow 170ms ease,
+    filter 170ms ease,
+    transform 170ms ease;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.nc-dashboard-shell--tauri .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.055);
+  filter: none;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-header__avatar:active .nc-dashboard-header__avatarFallback,
+.nc-dashboard-shell--tauri .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  filter: saturate(1.02);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-header__avatarStatus {
@@ -6317,6 +6469,16 @@
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-action {
   color: #1767ff;
   font-weight: 620;
+  transform: translateY(6.5px);
+  transition: color 170ms ease;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-kpi-action:hover {
+  color: #0a4edc;
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-kpi-action:active {
+  color: #073fb3;
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-kpi-grid {
@@ -6411,7 +6573,12 @@
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover {
+  background: linear-gradient(135deg, #2e76fb 0%, #1d5ce5 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active .nc-dashboard-sidebar__itemIcon,
@@ -6435,6 +6602,7 @@
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:hover .nc-dashboard-sidebar__itemIcon svg,
 .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:focus-visible .nc-dashboard-sidebar__itemIcon svg {
   stroke-width: 1.75;
+  transform: translateY(-0.15px);
 }
 
 .nc-dashboard-shell--tauri .nc-dashboard-alerts {
@@ -6517,7 +6685,7 @@
 
   .nc-dashboard-shell--tauri .nc-dashboard-header__searchSlot {
     max-width: 282px;
-    transform: translateX(-4px);
+    transform: translateX(-2px);
   }
 
   .nc-dashboard-shell--tauri .nc-dashboard-button {
@@ -6526,9 +6694,9 @@
   }
 
   .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
-    min-width: 146px;
-    padding-right: 14px;
-    padding-left: 14px;
+    min-width: 148px;
+    padding-right: 15px;
+    padding-left: 15px;
   }
 }
 
@@ -6555,7 +6723,7 @@
   }
 
   .nc-dashboard-shell--tauri .nc-dashboard-button--primary {
-    min-width: 140px;
+    min-width: 142px;
     padding-right: 13px;
     padding-left: 13px;
   }
