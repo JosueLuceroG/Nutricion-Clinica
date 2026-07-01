@@ -17,6 +17,7 @@ import {
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
+import { motivationalMessages } from "./motivationalMessages";
 
 interface DashboardSidebarProps {
   collapsed: boolean;
@@ -100,22 +101,20 @@ interface ImpactSlide {
   id: string;
   icon: LucideIcon;
   title: string;
-  text: string;
   theme: "ocean" | "aqua" | "blue" | "teal" | "mint";
   decoration: "leaf" | "spark" | "wave" | "pulse";
 }
 
-const IMPACT_AUTOPLAY_DELAY_MS = 10_000;
 const IMPACT_DRAG_THRESHOLD_PX = 40;
 const IMPACT_DRAG_MAX_OFFSET_PX = 96;
 const IMPACT_SNAP_DURATION_MS = 140;
+const IMPACT_SESSION_STORAGE_KEY = "nutriclinica.dashboard.impactIndex";
 
 const impactSlides: ImpactSlide[] = [
   {
     id: "impacto",
     icon: Heart,
     title: "Tu impacto hoy",
-    text: "Cada consulta es un paso hacia una vida más saludable.",
     theme: "ocean",
     decoration: "leaf",
   },
@@ -123,7 +122,6 @@ const impactSlides: ImpactSlide[] = [
     id: "progreso",
     icon: Sparkles,
     title: "Progreso real",
-    text: "La constancia pesa más que la perfección.",
     theme: "blue",
     decoration: "spark",
   },
@@ -131,7 +129,6 @@ const impactSlides: ImpactSlide[] = [
     id: "nutricion",
     icon: Leaf,
     title: "Nutrir también es cuidar",
-    text: "Cada plan puede acercar a alguien a sentirse mejor.",
     theme: "teal",
     decoration: "wave",
   },
@@ -139,11 +136,58 @@ const impactSlides: ImpactSlide[] = [
     id: "bienestar",
     icon: HeartPulse,
     title: "Bienestar diario",
-    text: "Una mejor decisión al día también cuenta.",
     theme: "mint",
     decoration: "pulse",
   },
 ];
+
+const IMPACT_MESSAGE_COUNT = motivationalMessages.length;
+
+function normalizeImpactIndex(index: number) {
+  return (index + IMPACT_MESSAGE_COUNT) % IMPACT_MESSAGE_COUNT;
+}
+
+function getImpactStorageDate(date = new Date()) {
+  return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+function getDailyImpactIndex(date = new Date()) {
+  const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
+  const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
+
+  return normalizeImpactIndex(dayOfYear);
+}
+
+function getInitialImpactIndex() {
+  if (typeof window === "undefined") return getDailyImpactIndex();
+
+  try {
+    const storedValue = window.sessionStorage.getItem(IMPACT_SESSION_STORAGE_KEY);
+    if (storedValue) {
+      const stored = JSON.parse(storedValue) as { date?: string; index?: number };
+      if (stored.date === getImpactStorageDate() && Number.isInteger(stored.index)) {
+        return normalizeImpactIndex(stored.index ?? 0);
+      }
+    }
+  } catch {
+    // Ignore unavailable storage or legacy values and fall back to the daily index.
+  }
+
+  return getDailyImpactIndex();
+}
+
+function saveImpactIndex(index: number) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.sessionStorage.setItem(
+      IMPACT_SESSION_STORAGE_KEY,
+      JSON.stringify({ date: getImpactStorageDate(), index: normalizeImpactIndex(index) }),
+    );
+  } catch {
+    // Session storage can be unavailable in restricted environments.
+  }
+}
 
 function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
@@ -164,14 +208,15 @@ function usePrefersReducedMotion() {
 }
 
 export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSidebarProps) {
-  const [activeImpactIndex, setActiveImpactIndex] = React.useState(0);
+  const [activeImpactIndex, setActiveImpactIndex] = React.useState(getInitialImpactIndex);
   const [impactDragOffset, setImpactDragOffset] = React.useState(0);
   const [isImpactDragging, setIsImpactDragging] = React.useState(false);
-  const [impactAutoplayNonce, setImpactAutoplayNonce] = React.useState(0);
   const prefersReducedMotion = usePrefersReducedMotion();
   const pointerStartXRef = React.useRef<number | null>(null);
   const impactSnapTimeoutRef = React.useRef<number | null>(null);
-  const activeImpact = impactSlides[activeImpactIndex] ?? impactSlides[0];
+  const activeImpactDotIndex = activeImpactIndex % impactSlides.length;
+  const activeImpact = impactSlides[activeImpactDotIndex] ?? impactSlides[0];
+  const activeImpactText = motivationalMessages[activeImpactIndex] ?? motivationalMessages[0];
   const ImpactIcon = activeImpact.icon;
   const impactDragProgress = Math.min(1, Math.abs(impactDragOffset) / IMPACT_DRAG_MAX_OFFSET_PX);
   const impactDragStyle = {
@@ -191,29 +236,22 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   React.useEffect(() => clearImpactSnapTimeout, []);
 
   React.useEffect(() => {
-    if (prefersReducedMotion || isImpactDragging) return;
-
-    const timeoutId = window.setTimeout(() => {
-      setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
-    }, IMPACT_AUTOPLAY_DELAY_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [activeImpactIndex, impactAutoplayNonce, isImpactDragging, prefersReducedMotion]);
+    saveImpactIndex(activeImpactIndex);
+  }, [activeImpactIndex]);
 
   const showImpactSlide = (index: number) => {
     clearImpactSnapTimeout();
     setImpactDragOffset(0);
     setIsImpactDragging(false);
-    setActiveImpactIndex((index + impactSlides.length) % impactSlides.length);
-    setImpactAutoplayNonce((nonce) => nonce + 1);
+    setActiveImpactIndex(normalizeImpactIndex(activeImpactIndex - activeImpactDotIndex + index));
   };
 
   const showPreviousImpactSlide = () => {
-    setActiveImpactIndex((index) => (index - 1 + impactSlides.length) % impactSlides.length);
+    setActiveImpactIndex((index) => normalizeImpactIndex(index - 1));
   };
 
   const showNextImpactSlide = () => {
-    setActiveImpactIndex((index) => (index + 1) % impactSlides.length);
+    setActiveImpactIndex((index) => normalizeImpactIndex(index + 1));
   };
 
   const handleImpactPointerDown = (event: React.PointerEvent<HTMLElement>) => {
@@ -239,7 +277,6 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
     const startX = pointerStartXRef.current;
     pointerStartXRef.current = null;
     setIsImpactDragging(false);
-    setImpactAutoplayNonce((nonce) => nonce + 1);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -266,7 +303,6 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
     pointerStartXRef.current = null;
     setImpactDragOffset(0);
     setIsImpactDragging(false);
-    setImpactAutoplayNonce((nonce) => nonce + 1);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -331,14 +367,14 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
         onPointerUp={handleImpactPointerUp}
         onPointerCancel={handleImpactPointerCancel}
       >
-        <div key={activeImpact.id} className="nc-dashboard-impact__content" aria-live={collapsed ? "off" : "polite"}>
+        <div key={`${activeImpact.id}-${activeImpactIndex}`} className="nc-dashboard-impact__content" aria-live={collapsed ? "off" : "polite"}>
           <div className="nc-dashboard-impact__heading">
             <div className="nc-dashboard-impact__icon" aria-hidden="true">
               <ImpactIcon size={18} strokeWidth={1.8} />
             </div>
             <h2 className="nc-dashboard-impact__title">{activeImpact.title}</h2>
           </div>
-          <p className="nc-dashboard-impact__text">{activeImpact.text}</p>
+          <p className="nc-dashboard-impact__text">{activeImpactText}</p>
         </div>
         <div className="nc-dashboard-impact__plant" aria-hidden="true">
           <svg viewBox="0 0 120 168" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -358,10 +394,10 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
             <button
               key={slide.id}
               type="button"
-              className={`nc-dashboard-impact__dot${index === activeImpactIndex ? " nc-dashboard-impact__dot--active" : ""}`}
+              className={`nc-dashboard-impact__dot${index === activeImpactDotIndex ? " nc-dashboard-impact__dot--active" : ""}`}
               onClick={() => showImpactSlide(index)}
               aria-label={`Mostrar frase: ${slide.title}`}
-              aria-current={index === activeImpactIndex ? "true" : undefined}
+              aria-current={index === activeImpactDotIndex ? "true" : undefined}
               tabIndex={collapsed ? -1 : undefined}
             />
           ))}
