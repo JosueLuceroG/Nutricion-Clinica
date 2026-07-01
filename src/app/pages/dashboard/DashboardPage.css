@@ -423,11 +423,11 @@
 }
 
 .nc-dashboard-sidebar__item--active[href="/"] {
-  --nc-dashboard-home-cutout: #2869f2;
+  --nc-dashboard-home-cutout: #286af9;
 }
 
 .nc-dashboard-sidebar__item--active[href="/"]:hover {
-  --nc-dashboard-home-cutout: #2867ed;
+  --nc-dashboard-home-cutout: #286af9;
 }
 
 .nc-dashboard-sidebar__item--active[href="/"] .nc-dashboard-home-icon__solid,
@@ -506,6 +506,10 @@
   padding: calc(var(--nc-impact-pad-y) + 1px) calc(var(--nc-impact-pad-x) + 1px) calc(var(--nc-impact-pad-y) + 4px);
   flex: 0 0 auto;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
   --nc-impact-drag-x: 0px;
   --nc-impact-card-drag-x: 0px;
   --nc-impact-plant-drag-x: 0px;
@@ -525,6 +529,16 @@
     transform 210ms cubic-bezier(0.22, 1, 0.36, 1),
     width var(--nc-motion-duration) var(--nc-motion-ease);
   will-change: height, opacity, transform;
+}
+
+.nc-dashboard-impact__content,
+.nc-dashboard-impact__heading,
+.nc-dashboard-impact__title,
+.nc-dashboard-impact__text {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .nc-dashboard-impact--dragging {

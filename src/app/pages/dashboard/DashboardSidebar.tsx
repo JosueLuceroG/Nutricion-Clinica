@@ -42,13 +42,13 @@ function DashboardHomeIcon({ size = 24, strokeWidth = 1.75, className, ...props 
     >
       <path
         className="nc-dashboard-home-icon__solid"
-        d="M4.34 10.86 11.2 5.08c.46-.39 1.14-.39 1.6 0l6.86 5.78a.72.72 0 0 1-.93 1.1l-.8-.67v6.98c0 .8-.65 1.45-1.45 1.45H7.52c-.8 0-1.45-.65-1.45-1.45v-6.98l-.8.67a.72.72 0 1 1-.93-1.1ZM10.1 20v-4.86c0-.5.4-.9.9-.9h2c.5 0 .9.4.9.9V20h-3.8Z"
+        d="M4.34 10.86 11.2 5.08c.46-.39 1.14-.39 1.6 0l6.86 5.78a.72.72 0 0 1-.93 1.1l-.8-.67v6.98c0 .8-.65 1.45-1.45 1.45H7.52c-.8 0-1.45-.65-1.45-1.45v-6.98l-.8.67a.72.72 0 1 1-.93-1.1Z"
         fill="currentColor"
         fillRule="evenodd"
         clipRule="evenodd"
         stroke="none"
       />
-      <path className="nc-dashboard-home-icon__cutout" d="M10.1 19.72v-4.58c0-.5.4-.9.9-.9h2c.5 0 .9.4.9.9v4.58h-3.8Z" />
+      <path className="nc-dashboard-home-icon__cutout" d="M10.12 19.72v-4.58c0-.62.5-1.12 1.12-1.12h1.52c.62 0 1.12.5 1.12 1.12v4.58h-3.76Z" />
       <path className="nc-dashboard-home-icon__outline" d="M6.25 10.7v7.48c0 .82.67 1.49 1.49 1.49h8.52c.82 0 1.49-.67 1.49-1.49V10.7" />
       <path className="nc-dashboard-home-icon__roof" d="m3.95 11.15 7.36-6.2a1.06 1.06 0 0 1 1.38 0l7.36 6.2" />
       <path className="nc-dashboard-home-icon__door" d="M10.18 19.67v-4.56c0-.43.35-.78.78-.78h2.08c.43 0 .78.35.78.78v4.56" />
