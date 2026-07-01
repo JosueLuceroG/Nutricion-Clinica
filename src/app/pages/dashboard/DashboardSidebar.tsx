@@ -56,6 +56,35 @@ function DashboardHomeIcon({ size = 24, strokeWidth = 1.75, className, ...props 
   );
 }
 
+function DashboardActiveHomeIcon({ size = 24, className, ...props }: LucideProps) {
+  const iconClassName = className ? `nc-dashboard-home-active-icon ${className}` : "nc-dashboard-home-active-icon";
+  const maskId = `${React.useId().replace(/:/g, "")}-dashboard-home-mask`;
+
+  return (
+    <svg
+      {...props}
+      className={iconClassName}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24" style={{ maskType: "luminance" } as React.CSSProperties}>
+        <rect width="24" height="24" fill="#ffffff" stroke="none" />
+        <path d="M9.5 19.72V15.1c0-.78.63-1.41 1.41-1.41h2.18c.78 0 1.41.63 1.41 1.41v4.62h-5Z" fill="#000000" stroke="none" />
+      </mask>
+      <path
+        d="M4.34 10.86 11.2 5.08c.46-.39 1.14-.39 1.6 0l6.86 5.78a.72.72 0 0 1-.93 1.1l-.8-.67v6.98c0 .8-.65 1.45-1.45 1.45H7.52c-.8 0-1.45-.65-1.45-1.45v-6.98l-.8.67a.72.72 0 1 1-.93-1.1Z"
+        fill="currentColor"
+        mask={`url(#${maskId})`}
+        stroke="none"
+        shapeRendering="geometricPrecision"
+      />
+    </svg>
+  );
+}
+
 export const dashboardNavItems = [
   { to: "/", label: "Dashboard", icon: DashboardHomeIcon, end: true },
   { to: "/pacientes", label: "Pacientes", icon: UsersRound },
@@ -275,10 +304,18 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
               aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
             >
-              <span className="nc-dashboard-sidebar__itemIcon" aria-hidden="true">
-                <Icon size={19} strokeWidth={1.75} />
-              </span>
-              <span className="nc-dashboard-sidebar__itemLabel" aria-hidden={collapsed ? "true" : undefined}>{item.label}</span>
+              {({ isActive }) => {
+                const isActiveDashboard = item.to === "/" && isActive;
+
+                return (
+                  <>
+                    <span className="nc-dashboard-sidebar__itemIcon" aria-hidden="true">
+                      {isActiveDashboard ? <DashboardActiveHomeIcon size={19} /> : <Icon size={19} strokeWidth={1.75} />}
+                    </span>
+                    <span className="nc-dashboard-sidebar__itemLabel" aria-hidden={collapsed ? "true" : undefined}>{item.label}</span>
+                  </>
+                );
+              }}
             </NavLink>
           );
         })}

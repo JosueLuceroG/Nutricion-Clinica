@@ -45,19 +45,18 @@ function getPeriodOfDay(date = new Date()): PeriodOfDay {
 }
 
 function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
-  if (periodOfDay === "morning") return "Buenos días";
-  if (periodOfDay === "afternoon") return "Buenas tardes";
-  return "Buenas noches";
+  if (periodOfDay === "morning") return "Buen día";
+  if (periodOfDay === "afternoon") return "Buena tarde";
+  return "Buena noche";
 }
 
 function getGreetingEmoji(periodOfDay: PeriodOfDay, date = new Date()): string {
   const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
-  const hourBucket = Math.floor(date.getHours() / 3);
   const emojiByPeriod: Record<PeriodOfDay, string[]> = {
-    morning: ["👋", "☀️", "🌱", "🍎"],
-    afternoon: ["🥗", "🍎", "💙", "🌿"],
-    night: ["🩺", "🌿", "✨", "💙"],
+    morning: ["☀️", "🌿", "🍎", "🥗", "🩺", "🤝", "✨"],
+    afternoon: ["🌤️", "💙", "🥗", "🍊", "🩺", "🌱", "✨"],
+    night: ["🌙", "🍵", "💙", "🫶", "🩺", "🌿", "✨"],
   };
   const periodOffset: Record<PeriodOfDay, number> = {
     morning: 0,
@@ -65,7 +64,7 @@ function getGreetingEmoji(periodOfDay: PeriodOfDay, date = new Date()): string {
     night: 2,
   };
   const emojis = emojiByPeriod[periodOfDay];
-  const index = (dayOfYear + hourBucket + periodOffset[periodOfDay]) % emojis.length;
+  const index = (dayOfYear + periodOffset[periodOfDay]) % emojis.length;
 
   return emojis[index] ?? "👋";
 }
