@@ -1,13 +1,6 @@
 import * as React from "react";
 import { Maximize2, Minimize2, Minus, Monitor, Moon, Square, Sun, X } from "lucide-react";
 import { useTheme } from "@app/providers/ThemeProvider";
-import type { Theme } from "@store/uiStore";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@components/ui/dropdown-menu";
 import { BottomStatusBar } from "./BottomStatusBar";
 import { DashboardHeader } from "./DashboardHeader";
 import { DashboardMobileNav } from "./DashboardMobileNav";
@@ -42,14 +35,14 @@ async function getCurrentTauriWindow() {
 
 function DesktopWindowTitlebar() {
   const [isFullscreen, setIsFullscreen] = React.useState(false);
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const ThemeIcon = theme === "system" ? Monitor : resolvedTheme === "dark" ? Moon : Sun;
-  const themeLabel = theme === "light" ? "Claro" : theme === "dark" ? "Oscuro" : "Sistema";
-  const themeOptions: Array<{ value: Extract<Theme, "light" | "dark" | "system">; label: string; icon: typeof Sun }> = [
-    { value: "light", label: "Claro", icon: Sun },
-    { value: "dark", label: "Oscuro", icon: Moon },
-    { value: "system", label: "Sistema", icon: Monitor },
-  ];
+  const { setTheme, resolvedTheme } = useTheme();
+  const ThemeIcon = resolvedTheme === "dark" ? Moon : Sun;
+  const themeLabel = resolvedTheme === "dark" ? "Oscuro" : "Claro";
+  const nextThemeLabel = resolvedTheme === "dark" ? "claro" : "oscuro";
+
+  const toggleDashboardTheme = () => {
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
+  };
 
   React.useEffect(() => {
     let mounted = true;
@@ -149,34 +142,15 @@ function DesktopWindowTitlebar() {
         </span>
       </div>
       <div className="nc-dashboard-desktop-titlebar__controls" aria-label="Controles de ventana">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="nc-dashboard-desktop-titlebar__theme"
-              aria-label={`Cambiar tema. Actual: ${themeLabel}`}
-              title={`Tema: ${themeLabel}`}
-            >
-              <ThemeIcon size={13} strokeWidth={2} aria-hidden="true" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={7} className="nc-dashboard-theme-menu">
-            {themeOptions.map((option) => {
-              const OptionIcon = option.icon;
-              return (
-                <DropdownMenuItem
-                  key={option.value}
-                  className="nc-dashboard-theme-menu__item"
-                  data-active={theme === option.value ? "true" : undefined}
-                  onClick={() => setTheme(option.value)}
-                >
-                  <OptionIcon size={14} strokeWidth={2} aria-hidden="true" />
-                  <span>{option.label}</span>
-                </DropdownMenuItem>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <button
+          type="button"
+          className="nc-dashboard-desktop-titlebar__theme"
+          aria-label={`Cambiar a modo ${nextThemeLabel}. Actual: ${themeLabel}`}
+          title={`Cambiar a modo ${nextThemeLabel}`}
+          onClick={toggleDashboardTheme}
+        >
+          <ThemeIcon size={13} strokeWidth={2} aria-hidden="true" />
+        </button>
         <button type="button" onClick={minimizeWindow} aria-label="Minimizar ventana">
           <Minus size={14} strokeWidth={2} aria-hidden="true" />
         </button>

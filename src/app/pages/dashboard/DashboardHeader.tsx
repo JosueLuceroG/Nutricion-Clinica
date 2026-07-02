@@ -50,23 +50,56 @@ function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
   return "Buena noche";
 }
 
-function getGreetingEmoji(periodOfDay: PeriodOfDay, date = new Date()): string {
-  const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
-  const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
-  const emojiByPeriod: Record<PeriodOfDay, string[]> = {
-    morning: ["☀️", "🌿", "🍎", "🥗", "🩺", "🤝", "✨"],
-    afternoon: ["🌤️", "💙", "🥗", "🍊", "🩺", "🌱", "✨"],
-    night: ["🌙", "🍵", "💙", "🫶", "🩺", "🌿", "✨"],
-  };
-  const periodOffset: Record<PeriodOfDay, number> = {
-    morning: 0,
-    afternoon: 1,
-    night: 2,
-  };
-  const emojis = emojiByPeriod[periodOfDay];
-  const index = (dayOfYear + periodOffset[periodOfDay]) % emojis.length;
+const GREETING_EMOJI_STORAGE_KEY = "nutriclinica.dashboard.greetingEmoji";
 
-  return emojis[index] ?? "👋";
+const greetingEmojisByPeriod: Record<PeriodOfDay, string[]> = {
+  morning: ["🌿", "☀️", "🍎", "🩺"],
+  afternoon: ["💙", "🌿", "🍎", "✨"],
+  night: ["🌙", "✨", "💙", "🌿"],
+};
+
+function getRandomIndex(max: number): number {
+  if (max <= 1) return 0;
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    const values = new Uint32Array(1);
+    window.crypto.getRandomValues(values);
+    return (values[0] ?? 0) % max;
+  }
+
+  const performanceSeed = typeof performance !== "undefined" ? Math.round(performance.now() * 1000) : 0;
+  return Math.abs(Date.now() + performanceSeed) % max;
+}
+
+function getStoredGreetingEmoji(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const storedValue = window.localStorage.getItem(GREETING_EMOJI_STORAGE_KEY);
+    if (!storedValue) return undefined;
+    const stored = JSON.parse(storedValue) as { emoji?: string };
+    return stored.emoji;
+  } catch {
+    return undefined;
+  }
+}
+
+function saveGreetingEmoji(periodOfDay: PeriodOfDay, emoji: string) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(GREETING_EMOJI_STORAGE_KEY, JSON.stringify({ periodOfDay, emoji }));
+  } catch {
+    // Storage can be unavailable in restricted environments.
+  }
+}
+
+function getGreetingEmoji(periodOfDay: PeriodOfDay): string {
+  const emojis = greetingEmojisByPeriod[periodOfDay];
+  const previousEmoji = getStoredGreetingEmoji();
+  const candidates = emojis.filter((emoji) => emoji !== previousEmoji);
+  const availableEmojis = candidates.length > 0 ? candidates : emojis;
+
+  return availableEmojis[getRandomIndex(availableEmojis.length)] ?? emojis[0] ?? "👋";
 }
 
 function getInitials(fullName: string): string {
@@ -92,7 +125,11 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const [headerDate, setHeaderDate] = React.useState(() => new Date());
   const periodOfDay = getPeriodOfDay(headerDate);
   const greeting = getGreetingForPeriod(periodOfDay);
-  const greetingEmoji = getGreetingEmoji(periodOfDay, headerDate);
+  const [greetingEmojiState, setGreetingEmojiState] = React.useState(() => ({
+    periodOfDay,
+    emoji: getGreetingEmoji(periodOfDay),
+  }));
+  const greetingEmoji = greetingEmojiState.emoji;
   const initials = getInitials(displayName);
   const notificationCount = unread > 0 ? unread : 0;
   const hasUnreadNotifications = notificationCount > 0;
@@ -103,6 +140,17 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     const intervalId = window.setInterval(() => setHeaderDate(new Date()), 15 * 60 * 1000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  React.useEffect(() => {
+    setGreetingEmojiState((current) => {
+      if (current.periodOfDay === periodOfDay) return current;
+      return { periodOfDay, emoji: getGreetingEmoji(periodOfDay) };
+    });
+  }, [periodOfDay]);
+
+  React.useEffect(() => {
+    saveGreetingEmoji(greetingEmojiState.periodOfDay, greetingEmojiState.emoji);
+  }, [greetingEmojiState]);
 
   React.useEffect(() => {
     if (!notificationsOpen && !avatarMenuOpen) return;

@@ -14,25 +14,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setThemeStore = useUIStore((state) => state.setTheme);
   const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">("light");
 
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     const root = window.document.documentElement;
 
     const applyTheme = (newTheme: Theme) => {
+      let nextResolvedTheme: "light" | "dark" = "light";
+
       root.classList.remove("light", "dark", "high-contrast");
       if (newTheme === "high-contrast") {
         root.classList.add("high-contrast");
-        const isDark = root.classList.contains("dark");
-        setResolvedTheme(isDark ? "dark" : "light");
+        nextResolvedTheme = "light";
       } else if (newTheme === "system") {
-        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
+        nextResolvedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"
           : "light";
-        root.classList.add(systemTheme);
-        setResolvedTheme(systemTheme);
+        root.classList.add(nextResolvedTheme);
       } else {
         root.classList.add(newTheme);
-        setResolvedTheme(newTheme);
+        nextResolvedTheme = newTheme;
       }
+
+      root.dataset.theme = nextResolvedTheme;
+      root.style.colorScheme = nextResolvedTheme;
+      setResolvedTheme(nextResolvedTheme);
     };
 
     applyTheme(theme);

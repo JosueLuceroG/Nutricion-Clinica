@@ -41,6 +41,12 @@
   --nc-dashboard-third-row-h: var(--nc-third-row-h);
   --nc-dashboard-card-radius: var(--nc-radius);
   --nc-dashboard-card-pad: var(--nc-card-pad);
+  --nc-chart-grid: #e8eef8;
+  --nc-chart-text: #52617f;
+  --nc-chart-cursor: #c9d8f3;
+  --nc-chart-blue: #2563ff;
+  --nc-chart-cyan: #10b7c8;
+  --nc-chart-active-dot: #ffffff;
   color-scheme: light;
   display: grid;
   width: 100%;
@@ -6863,6 +6869,3475 @@
   }
 }
 
+.dark .nc-dashboard-shell {
+  --nc-app-bg: #020817;
+  --nc-page-bg: #020817;
+  --nc-content-bg: #020817;
+  --nc-dark-bg: #020817;
+  --nc-dark-bg-soft: #06111f;
+  --nc-dark-bg-elevated: rgba(8, 17, 31, 0.92);
+  --nc-dark-surface: rgba(8, 17, 31, 0.86);
+  --nc-dark-surface-strong: rgba(7, 20, 38, 0.92);
+  --nc-dark-surface-muted: rgba(2, 8, 23, 0.34);
+  --nc-dark-border: rgba(148, 163, 184, 0.14);
+  --nc-dark-border-strong: rgba(148, 163, 184, 0.22);
+  --nc-dark-text: #f8fafc;
+  --nc-dark-text-secondary: #cbd5e1;
+  --nc-dark-text-muted: #94a3b8;
+  --nc-dark-primary: #2563eb;
+  --nc-dark-primary-bright: #3b82f6;
+  --nc-dark-primary-soft: rgba(37, 99, 235, 0.18);
+  --nc-dark-success: #22c55e;
+  --nc-dark-warning: #f59e0b;
+  --nc-dark-danger: #f43f5e;
+  --nc-dark-orange: #fb923c;
+  --nc-dark-purple: #a855f7;
+  --nc-chart-grid: rgba(148, 163, 184, 0.14);
+  --nc-chart-text: #94a3b8;
+  --nc-chart-cursor: rgba(96, 165, 250, 0.32);
+  --nc-chart-blue: #3b82f6;
+  --nc-chart-cyan: #06b6d4;
+  --nc-chart-active-dot: #071426;
+  color-scheme: dark;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.13), transparent 30%),
+    radial-gradient(circle at 78% 12%, rgba(6, 182, 212, 0.055), transparent 28%),
+    radial-gradient(circle at 48% 100%, rgba(59, 130, 246, 0.06), transparent 34%),
+    linear-gradient(180deg, #06111f 0%, #020817 100%);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-shell--tauri {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.13), transparent 30%),
+    radial-gradient(circle at 80% 8%, rgba(6, 182, 212, 0.05), transparent 28%),
+    linear-gradient(180deg, #06111f 0%, #020817 100%);
+}
+
+.dark .nc-dashboard-desktop-titlebar {
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+  background: #050b14;
+  box-shadow: inset 0 -1px 0 rgba(15, 23, 42, 0.82);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-desktop-titlebar__subtitle {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-desktop-titlebar__separator,
+.dark .nc-dashboard-desktop-titlebar__theme::after {
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.dark .nc-dashboard-desktop-titlebar__desktopIndicator {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.45);
+  color: #8ea0bd;
+}
+
+.dark .nc-dashboard-desktop-titlebar__controls button,
+.dark .nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"] {
+  background: transparent;
+  color: #9caec9;
+}
+
+.dark .nc-dashboard-desktop-titlebar__controls button:hover,
+.dark .nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"]:hover,
+.dark .nc-dashboard-desktop-titlebar__controls button[aria-pressed="true"]:active {
+  background: rgba(37, 99, 235, 0.14);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-desktop-titlebar__controls .nc-dashboard-desktop-titlebar__theme {
+  color: #b8c8e3;
+}
+
+.dark .nc-dashboard-desktop-titlebar__controls .nc-dashboard-desktop-titlebar__close:hover {
+  background: rgba(244, 63, 94, 0.16);
+  color: #fb7185;
+}
+
+.dark .nc-dashboard-theme-menu,
+.dark .nc-dashboard-notification-menu,
+.dark .nc-dashboard-avatar-menu {
+  border-color: rgba(148, 163, 184, 0.16);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.12), transparent 34%),
+    rgba(8, 17, 31, 0.98);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-theme-menu__item,
+.dark .nc-dashboard-avatar-menu__item {
+  color: var(--nc-dark-text-secondary);
+}
+
+.dark .nc-dashboard-theme-menu__item svg,
+.dark .nc-dashboard-avatar-menu__item svg {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-theme-menu__item[data-active="true"],
+.dark .nc-dashboard-avatar-menu__item:focus,
+.dark .nc-dashboard-avatar-menu__item[data-highlighted],
+.dark .nc-dashboard-menu__action:focus,
+.dark .nc-dashboard-menu__action[data-highlighted] {
+  background: rgba(37, 99, 235, 0.16);
+  color: #93c5fd;
+}
+
+.dark .nc-dashboard-menu__label,
+.dark .nc-dashboard-notification-menu__item strong,
+.dark .nc-dashboard-notification-menu__empty strong,
+.dark .nc-dashboard-avatar-menu__identity strong {
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-notification-menu__item small,
+.dark .nc-dashboard-notification-menu__empty small,
+.dark .nc-dashboard-avatar-menu__identity small {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-menu__separator {
+  background: rgba(148, 163, 184, 0.13);
+}
+
+.dark .nc-dashboard-notification-menu__item {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(6, 182, 212, 0.08));
+}
+
+.dark .nc-dashboard-notification-menu__icon,
+.dark .nc-dashboard-notification-menu__emptyIcon {
+  background: rgba(15, 23, 42, 0.82);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.16);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-avatar-menu__initials {
+  border-color: #111827;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.12);
+  background:
+    radial-gradient(circle at 30% 0%, rgba(37, 99, 235, 0.075), transparent 34%),
+    linear-gradient(180deg, rgba(5, 13, 26, 0.99) 0%, rgba(3, 9, 20, 0.99) 100%);
+  box-shadow: 9px 0 28px rgba(0, 0, 0, 0.24);
+}
+
+.dark .nc-dashboard-sidebar__brandText strong,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__brandText strong {
+  color: #f8fafc;
+}
+
+.dark .nc-dashboard-sidebar__brandText small,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__brandText small {
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-sidebar__brandLink:hover,
+.dark .nc-dashboard-sidebar__brandLink:focus-visible {
+  background: rgba(37, 99, 235, 0.075);
+}
+
+.dark .nc-dashboard-sidebar__brandLink:hover .nc-dashboard-sidebar__brandText strong,
+.dark .nc-dashboard-sidebar__brandLink:focus-visible .nc-dashboard-sidebar__brandText strong {
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-sidebar__brandLink:hover .nc-dashboard-sidebar__brandText small,
+.dark .nc-dashboard-sidebar__brandLink:focus-visible .nc-dashboard-sidebar__brandText small {
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-sidebar__item {
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-sidebar__itemIcon {
+  color: #9fb2cf;
+}
+
+.dark .nc-dashboard-sidebar__item:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item:hover {
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(96, 165, 250, 0.12);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-sidebar__item:hover .nc-dashboard-sidebar__itemIcon {
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.32) 0%, rgba(29, 78, 216, 0.22) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 28px rgba(37, 99, 235, 0.16);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #153470;
+}
+
+.dark .nc-dashboard-sidebar__collapse,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__collapse {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.48);
+  box-shadow: none;
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-sidebar__collapse:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__collapse:hover {
+  border-color: rgba(59, 130, 246, 0.28);
+  background: rgba(37, 99, 235, 0.14);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(96, 165, 250, 0.28);
+  background:
+    radial-gradient(circle at 16% 12%, rgba(96, 165, 250, 0.28), transparent 34%),
+    radial-gradient(circle at 86% 86%, rgba(6, 182, 212, 0.2), transparent 40%),
+    linear-gradient(150deg, #08214c 0%, #0b2f67 48%, #053848 100%);
+  box-shadow: 0 20px 38px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.17);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(147, 197, 253, 0.18);
+  background: rgba(15, 23, 42, 0.34);
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(226, 232, 240, 0.96);
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(3, 10, 22, 0.74);
+  backdrop-filter: blur(22px);
+}
+
+.dark .nc-dashboard-header__title {
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-header__subtitle,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-kpi-action,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action,
+.dark .nc-dashboard-card-link {
+  color: #3b82f6;
+}
+
+.dark .nc-dashboard-kpi-action:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action:hover,
+.dark .nc-dashboard-card-link:hover {
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #e5e7eb;
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(59, 130, 246, 0.42);
+  background: rgba(15, 23, 42, 0.86);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .nc-dashboard-search__icon {
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-search__placeholder,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__placeholder {
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-search__kbd,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__kbd {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(30, 41, 59, 0.76);
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(15, 23, 42, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:active {
+  border-color: rgba(96, 165, 250, 0.62);
+  background: rgba(37, 99, 235, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.6);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #e2e8f0;
+}
+
+.dark .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft:active {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-header__notification,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #b6c3d8;
+}
+
+.dark .nc-dashboard-header__notification:hover,
+.dark .nc-dashboard-header__notification[aria-expanded="true"],
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification[aria-expanded="true"] {
+  background: rgba(37, 99, 235, 0.12);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-header__badge,
+.dark .nc-dashboard-header__avatarStatus {
+  border-color: #06111f;
+}
+
+.dark .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatarFallback {
+  border-color: #0b1220;
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.28);
+}
+
+.dark .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.dark .nc-dashboard-kpi-grid::before {
+  border-color: rgba(148, 163, 184, 0.08);
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.08), transparent 34%),
+    radial-gradient(circle at 86% 22%, rgba(6, 182, 212, 0.045), transparent 34%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.26) 0%, rgba(2, 8, 23, 0.08) 100%);
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-grid::before {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card {
+  border-color: rgba(148, 163, 184, 0.14);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(59, 130, 246, 0.08), transparent 34%),
+    radial-gradient(circle at 96% 12%, rgba(6, 182, 212, 0.045), transparent 36%),
+    rgba(15, 23, 42, 0.72);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-kpi-card::after,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card::after {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.035), transparent 42%);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover {
+  border-color: rgba(96, 165, 250, 0.28);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(37, 99, 235, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.dark .nc-dashboard-kpi-card__label,
+.dark .nc-dashboard-kpi-card__value {
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-kpi-card__hint {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-kpi-card--orange .nc-dashboard-kpi-card__value {
+  color: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-kpi-card--green .nc-dashboard-kpi-card__icon,
+.dark .nc-dashboard-kpi-customizer__metricIcon--green {
+  background: rgba(34, 197, 94, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+}
+
+.dark .nc-dashboard-kpi-card--blue .nc-dashboard-kpi-card__icon,
+.dark .nc-dashboard-kpi-customizer__metricIcon--blue {
+  background: rgba(37, 99, 235, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.28);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-kpi-card--purple .nc-dashboard-kpi-card__icon,
+.dark .nc-dashboard-kpi-customizer__metricIcon--purple {
+  background: rgba(168, 85, 247, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.28);
+  color: #c084fc;
+}
+
+.dark .nc-dashboard-kpi-card--orange .nc-dashboard-kpi-card__icon,
+.dark .nc-dashboard-kpi-customizer__metricIcon--orange {
+  background: rgba(251, 146, 60, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.28);
+  color: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-kpi-card__trend,
+.dark .nc-dashboard-financial-hero__row span,
+.dark .nc-dashboard-bottom-status--synced,
+.dark .nc-dashboard-payment-status--paid,
+.dark .nc-dashboard-status-pill--confirmed {
+  background: rgba(34, 197, 94, 0.13);
+  color: #4ade80;
+}
+
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.13);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.055), transparent 36%),
+    rgba(8, 17, 31, 0.82);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(59, 130, 246, 0.22), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-section-card__title,
+.dark .nc-dashboard-consultations__name,
+.dark .nc-dashboard-weekly-summary__item strong,
+.dark .nc-dashboard-alerts__title,
+.dark .nc-dashboard-financial-hero__row strong,
+.dark .nc-dashboard-financial-list__topline span,
+.dark .nc-dashboard-financial-list__topline strong,
+.dark .nc-dashboard-payments__patient,
+.dark .nc-dashboard-payments__meta strong,
+.dark .nc-dashboard-quick-actions__body strong,
+.dark .nc-dashboard-kpi-customizer__header h2,
+.dark .nc-dashboard-kpi-customizer__metricText strong {
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-section-card__titleIcon {
+  color: #3b82f6;
+}
+
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(15, 23, 42, 0.64);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #e2e8f0;
+}
+
+.dark .nc-dashboard-card-action:hover,
+.dark .nc-dashboard-period-button:hover {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: rgba(37, 99, 235, 0.14);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-consultations__item,
+.dark .nc-dashboard-alerts__item,
+.dark .nc-dashboard-payments__item,
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-weekly-summary__item {
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+.dark .nc-dashboard-consultations__type,
+.dark .nc-dashboard-empty-note,
+.dark .nc-dashboard-chart-legend__item,
+.dark .nc-dashboard-weekly-summary__item small,
+.dark .nc-dashboard-alerts__detail,
+.dark .nc-dashboard-financial-hero__label,
+.dark .nc-dashboard-financial-hero small,
+.dark .nc-dashboard-financial-list__detail,
+.dark .nc-dashboard-payments__concept,
+.dark .nc-dashboard-payments__method,
+.dark .nc-dashboard-quick-actions__body small,
+.dark .nc-dashboard-kpi-customizer__header p,
+.dark .nc-dashboard-kpi-customizer__metricText small {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(2, 8, 23, 0.26);
+}
+
+.dark .nc-dashboard-weekly-tooltip {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(8, 17, 31, 0.96);
+  box-shadow: 0 18px 38px rgba(0, 0, 0, 0.32);
+  color: var(--nc-dark-text);
+}
+
+.dark .nc-dashboard-weekly-tooltip span {
+  color: var(--nc-dark-text-secondary);
+}
+
+.dark .nc-dashboard-weekly-summary {
+  background: rgba(2, 8, 23, 0.18);
+}
+
+.dark .nc-dashboard-alerts__icon--pink {
+  background: rgba(244, 63, 94, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(244, 63, 94, 0.22);
+  color: #fb7185;
+}
+
+.dark .nc-dashboard-alerts__icon--orange {
+  background: rgba(251, 146, 60, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.22);
+  color: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-alerts__icon--amber {
+  background: rgba(245, 158, 11, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.24);
+  color: #fbbf24;
+}
+
+.dark .nc-dashboard-alerts__badge {
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.dark .nc-dashboard-alerts__badge--pink {
+  color: #fb7185;
+}
+
+.dark .nc-dashboard-alerts__badge--orange,
+.dark .nc-dashboard-payment-status--pending,
+.dark .nc-dashboard-status-pill--pending {
+  background: rgba(251, 146, 60, 0.13);
+  color: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-alerts__badge--amber,
+.dark .nc-dashboard-bottom-status--offline,
+.dark .nc-dashboard-bottom-chip--warning {
+  background: rgba(245, 158, 11, 0.13);
+  color: #fbbf24;
+}
+
+.dark .nc-dashboard-card-link--alerts {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.46);
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-financial-hero {
+  border-color: rgba(59, 130, 246, 0.18);
+  background:
+    radial-gradient(circle at 92% 20%, rgba(59, 130, 246, 0.16), transparent 32%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.82) 0%, rgba(8, 17, 31, 0.84) 100%);
+}
+
+.dark .nc-dashboard-financial-meter,
+.dark .nc-dashboard-financial-list__track {
+  background: rgba(30, 41, 59, 0.76);
+}
+
+.dark .nc-dashboard-financial-meter span {
+  background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
+}
+
+.dark .nc-dashboard-financial-list__fill--blue,
+.dark .nc-dashboard-payment-status--partial,
+.dark .nc-dashboard-bottom-status--syncing {
+  background: rgba(37, 99, 235, 0.16);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-financial-list__fill--green {
+  background: #22c55e;
+}
+
+.dark .nc-dashboard-financial-list__fill--orange {
+  background: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-financial-list__icon--blue,
+.dark .nc-dashboard-quick-actions__icon--blue {
+  background: rgba(37, 99, 235, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.24);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-financial-list__icon--green,
+.dark .nc-dashboard-quick-actions__icon--green {
+  background: rgba(34, 197, 94, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(34, 197, 94, 0.22);
+  color: #4ade80;
+}
+
+.dark .nc-dashboard-financial-list__icon--orange,
+.dark .nc-dashboard-quick-actions__icon--orange {
+  background: rgba(251, 146, 60, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(251, 146, 60, 0.24);
+  color: var(--nc-dark-orange);
+}
+
+.dark .nc-dashboard-quick-actions__icon--purple {
+  background: rgba(168, 85, 247, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(168, 85, 247, 0.24);
+  color: #c084fc;
+}
+
+.dark .nc-dashboard-payments__avatar,
+.dark .nc-dashboard-consultations__avatar {
+  border-color: #0b1220;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.24);
+}
+
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.5);
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-quick-actions__item:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(37, 99, 235, 0.12);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.2);
+}
+
+.dark .nc-dashboard-quick-actions__item > svg,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item > svg {
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-bottom-frame {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(3, 10, 22, 0.86);
+  backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .nc-dashboard-bottom-bar {
+  color: var(--nc-dark-text-muted);
+}
+
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.dark .nc-dashboard-bottom-chip {
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-bottom-chip--quiet {
+  color: #94a3b8;
+}
+
+.dark .nc-dashboard-bottom-chip--button:hover,
+.dark .nc-dashboard-bottom-sync-button:hover {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: rgba(37, 99, 235, 0.16);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-bottom-network {
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-bottom-network--online svg {
+  color: #22c55e;
+}
+
+.dark .nc-dashboard-bottom-network--offline svg {
+  color: #fbbf24;
+}
+
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(37, 99, 235, 0.18);
+  color: #60a5fa;
+}
+
+.dark .nc-dashboard-data-status {
+  border-color: rgba(59, 130, 246, 0.24);
+  background: rgba(37, 99, 235, 0.14);
+  color: #93c5fd;
+}
+
+.dark .nc-dashboard-data-status--error,
+.dark .nc-dashboard-bottom-status--error {
+  border-color: rgba(244, 63, 94, 0.3);
+  background: rgba(244, 63, 94, 0.13);
+  color: #fb7185;
+}
+
+/* Dark-mode final visual polish: color, contour and hierarchy only. */
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.085), transparent 30%),
+    radial-gradient(circle at 84% 10%, rgba(6, 182, 212, 0.038), transparent 30%),
+    linear-gradient(180deg, #050f1d 0%, #020817 48%, #020817 100%);
+}
+
+.dark .nc-dashboard-desktop-titlebar,
+.dark .nc-dashboard-bottom-frame {
+  background: rgba(2, 8, 23, 0.94);
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.095);
+  background: rgba(2, 8, 23, 0.68);
+}
+
+.dark .nc-dashboard-header__title {
+  color: #f8fafc;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
+}
+
+.dark .nc-dashboard-header__subtitle,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
+  color: #a8b5ca;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: rgba(10, 18, 33, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035), 0 10px 24px rgba(0, 0, 0, 0.12);
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(59, 130, 246, 0.34);
+  background: rgba(12, 23, 41, 0.84);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045), 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline,
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  background: rgba(10, 18, 33, 0.64);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  background: linear-gradient(135deg, #3478f6 0%, #1f5fd8 100%);
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.105);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(37, 99, 235, 0.07), transparent 34%),
+    linear-gradient(180deg, rgba(3, 10, 22, 0.995) 0%, rgba(2, 8, 18, 0.995) 100%);
+  box-shadow: 8px 0 26px rgba(0, 0, 0, 0.2);
+}
+
+.dark .nc-dashboard-sidebar__item {
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-sidebar__itemIcon {
+  color: #9aaecb;
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(59, 130, 246, 0.46);
+  background:
+    linear-gradient(135deg, rgba(51, 112, 246, 0.34) 0%, rgba(29, 78, 216, 0.28) 54%, rgba(20, 56, 133, 0.36) 100%);
+  box-shadow:
+    0 11px 26px rgba(37, 99, 235, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.105),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.08);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-sidebar__item--active .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:hover .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:focus-visible .nc-dashboard-sidebar__itemIcon {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(2, 8, 23, 0.28));
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #17366f;
+}
+
+.dark .nc-dashboard-shell--tauri .nc-dashboard-home-active-icon,
+.dark .nc-dashboard-home-active-icon {
+  transform: translateY(-0.1px);
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(96, 165, 250, 0.24);
+  background:
+    radial-gradient(circle at 16% 9%, rgba(147, 197, 253, 0.22), transparent 34%),
+    radial-gradient(circle at 92% 92%, rgba(6, 182, 212, 0.2), transparent 38%),
+    linear-gradient(150deg, #08235a 0%, #0a3475 48%, #063449 100%);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(191, 219, 254, 0.22);
+  background: rgba(15, 23, 42, 0.32);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 16px rgba(0, 0, 0, 0.16);
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-impact__title {
+  color: #ffffff;
+  font-weight: 650;
+  letter-spacing: -0.026em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.14);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(226, 232, 240, 0.94);
+  font-weight: 540;
+  letter-spacing: -0.012em;
+}
+
+.dark .nc-dashboard-impact__plant {
+  color: rgba(191, 219, 254, 0.74);
+  opacity: 0.58;
+}
+
+.dark .nc-dashboard-impact__dot {
+  background: rgba(191, 219, 254, 0.32);
+}
+
+.dark .nc-dashboard-impact__dot--active {
+  background: rgba(226, 232, 240, 0.95);
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card,
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.115);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.045), transparent 36%),
+    linear-gradient(180deg, rgba(8, 17, 31, 0.9), rgba(7, 20, 38, 0.84));
+  box-shadow: 0 13px 30px rgba(0, 0, 0, 0.205), inset 0 1px 0 rgba(255, 255, 255, 0.032);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(96, 165, 250, 0.14), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-section-card__title,
+.dark .nc-dashboard-kpi-card__label {
+  color: #f8fafc;
+}
+
+.dark .nc-dashboard-kpi-card__hint,
+.dark .nc-dashboard-consultations__type,
+.dark .nc-dashboard-alerts__detail,
+.dark .nc-dashboard-payments__concept,
+.dark .nc-dashboard-payments__method,
+.dark .nc-dashboard-quick-actions__body small {
+  color: #8ea0b8;
+}
+
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.14);
+  background:
+    radial-gradient(circle at 50% 18%, rgba(59, 130, 246, 0.045), transparent 34%),
+    rgba(2, 8, 23, 0.24);
+  color: #9aa9bd;
+}
+
+.dark .nc-dashboard-empty-note svg {
+  color: rgba(148, 163, 184, 0.5);
+  opacity: 0.82;
+}
+
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  border-color: rgba(148, 163, 184, 0.105);
+  background: rgba(2, 8, 23, 0.24);
+}
+
+.dark .nc-dashboard-quick-actions__item:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item:hover {
+  border-color: rgba(96, 165, 250, 0.24);
+  background: rgba(37, 99, 235, 0.105);
+}
+
+.dark .nc-dashboard-bottom-frame,
+.dark .nc-dashboard-bottom-bar {
+  background: rgba(2, 8, 23, 0.94);
+}
+
+/* Request-specific final dark tuning: cleaner reference-like finish. */
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.072), transparent 30%),
+    radial-gradient(circle at 84% 8%, rgba(6, 182, 212, 0.032), transparent 29%),
+    linear-gradient(180deg, #050e1c 0%, #020817 54%, #020817 100%);
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(96, 165, 250, 0.24);
+  background:
+    radial-gradient(circle at 15% 9%, rgba(147, 197, 253, 0.23), transparent 33%),
+    radial-gradient(circle at 86% 82%, rgba(6, 182, 212, 0.22), transparent 39%),
+    radial-gradient(circle at 32% 112%, rgba(37, 99, 235, 0.24), transparent 48%),
+    linear-gradient(152deg, #071d4b 0%, #0a2f70 47%, #053a4d 100%);
+  box-shadow:
+    0 16px 30px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 34px rgba(96, 165, 250, 0.065);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(6, 182, 212, 0.115);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(191, 219, 254, 0.2);
+  background: rgba(8, 17, 31, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dark .nc-dashboard-impact__plant {
+  color: rgba(191, 219, 254, 0.72);
+  opacity: 0.54;
+}
+
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.56;
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(59, 130, 246, 0.42);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.29) 0%, rgba(29, 78, 216, 0.24) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.095),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.06);
+}
+
+.dark .nc-dashboard-shell--tauri .nc-dashboard-home-active-icon,
+.dark .nc-dashboard-home-active-icon {
+  filter: none;
+}
+
+.dark .nc-dashboard-kpi-grid::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-grid::before {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card {
+  border-color: rgba(148, 163, 184, 0.115);
+  background: linear-gradient(180deg, rgba(8, 17, 31, 0.9), rgba(7, 20, 38, 0.84));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.032);
+}
+
+.dark .nc-dashboard-kpi-card::after,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card::after {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.026), transparent 44%);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover {
+  border-color: rgba(148, 163, 184, 0.16);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.036);
+}
+
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.108);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.195), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(96, 165, 250, 0.105), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-sidebar__collapse,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__collapse {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: #a8b5ca;
+}
+
+.dark .nc-dashboard-sidebar__collapse:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__collapse:hover {
+  border-color: transparent;
+  background: rgba(37, 99, 235, 0.075);
+  box-shadow: none;
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-mobile-nav {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(3, 10, 22, 0.82);
+}
+
+.dark .nc-dashboard-mobile-nav__item {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.56);
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-mobile-nav__item--active,
+.dark .nc-dashboard-mobile-nav__item--active:hover {
+  border-color: rgba(59, 130, 246, 0.48);
+  background: rgba(37, 99, 235, 0.22);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-kpi-customizer__backdrop {
+  background: rgba(2, 8, 23, 0.66);
+}
+
+.dark .nc-dashboard-kpi-customizer__panel {
+  border-color: rgba(148, 163, 184, 0.18);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(37, 99, 235, 0.12), transparent 34%),
+    rgba(8, 17, 31, 0.98);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.48);
+}
+
+.dark .nc-dashboard-kpi-customizer__header,
+.dark .nc-dashboard-kpi-customizer__footer {
+  border-color: rgba(148, 163, 184, 0.14);
+}
+
+.dark .nc-dashboard-kpi-customizer__icon,
+.dark .nc-dashboard-kpi-customizer__close,
+.dark .nc-dashboard-kpi-customizer__controls button,
+.dark .nc-dashboard-kpi-customizer__reset {
+  background: rgba(15, 23, 42, 0.72);
+  color: #cbd5e1;
+}
+
+.dark .nc-dashboard-kpi-customizer__item {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.62);
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-customizer__item--hidden {
+  background: rgba(15, 23, 42, 0.36);
+}
+
+[data-theme="dark"] {
+  --nc-app-bg: #020817;
+  --nc-page-bg: #020817;
+  --nc-content-bg: #020817;
+  --nc-surface: rgba(8, 17, 31, 0.86);
+  --nc-surface-soft: rgba(15, 23, 42, 0.72);
+  --nc-surface-muted: rgba(2, 8, 23, 0.34);
+  --nc-border-dark: rgba(148, 163, 184, 0.14);
+  --nc-border-dark-strong: rgba(148, 163, 184, 0.22);
+  --nc-text-primary-dark: #f8fafc;
+  --nc-text-secondary-dark: #cbd5e1;
+  --nc-text-muted-dark: #94a3b8;
+  --nc-text-soft-dark: #64748b;
+  --nc-primary-dark: #2563eb;
+  --nc-primary-dark-hover: #1d4ed8;
+  --nc-primary-dark-soft: rgba(37, 99, 235, 0.18);
+  --nc-success-dark: #22c55e;
+  --nc-warning-dark: #f59e0b;
+  --nc-danger-dark: #f43f5e;
+  --nc-orange-dark: #fb923c;
+  --nc-purple-dark: #a855f7;
+  background-color: #020817;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #020817;
+}
+
+/* Reference dark polish: visual-only refinements, no layout changes. */
+[data-theme="dark"] {
+  --nc-app-bg: #020712;
+  --nc-page-bg: #020712;
+  --nc-content-bg: #020712;
+  background-color: #020712;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #020712;
+}
+
+.dark .nc-dashboard-shell {
+  --nc-dark-bg: #020712;
+  --nc-dark-bg-soft: #050c18;
+  --nc-dark-surface: rgba(9, 18, 32, 0.9);
+  --nc-dark-surface-strong: rgba(10, 22, 40, 0.92);
+  --nc-dark-border: rgba(148, 163, 184, 0.14);
+  --nc-dark-border-strong: rgba(148, 163, 184, 0.2);
+  --nc-chart-grid: rgba(148, 163, 184, 0.12);
+  --nc-chart-text: #8fa0b8;
+  --nc-chart-cursor: rgba(148, 163, 184, 0.2);
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.022), transparent 31%),
+    radial-gradient(circle at 86% 9%, rgba(6, 182, 212, 0.014), transparent 29%),
+    linear-gradient(180deg, #050b15 0%, #030915 44%, #020712 100%);
+}
+
+.dark .nc-dashboard-shell .nc-dashboard-container,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-container {
+  background: transparent;
+}
+
+.dark .nc-dashboard-main {
+  scrollbar-color: rgba(148, 163, 184, 0.25) transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.18);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.28);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-desktop-titlebar,
+.dark .nc-dashboard-bottom-frame,
+.dark .nc-dashboard-bottom-bar {
+  background: rgba(2, 7, 14, 0.94);
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.11);
+  background:
+    radial-gradient(circle at 28% 0%, rgba(59, 130, 246, 0.035), transparent 35%),
+    linear-gradient(180deg, rgba(3, 10, 21, 0.995) 0%, rgba(2, 7, 16, 0.995) 100%);
+  box-shadow: 6px 0 20px rgba(0, 0, 0, 0.18);
+}
+
+.dark .nc-dashboard-sidebar__item {
+  color: #c7d1df;
+}
+
+.dark .nc-dashboard-sidebar__itemIcon {
+  color: #8fa0b7;
+}
+
+.dark .nc-dashboard-sidebar__item:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item:hover {
+  background: rgba(37, 99, 235, 0.075);
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.08);
+  color: #eef5ff;
+}
+
+.dark .nc-dashboard-sidebar__item:hover .nc-dashboard-sidebar__itemIcon {
+  color: #adc4e5;
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.28);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(24, 57, 118, 0.38) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(96, 165, 250, 0.045);
+  color: #f8fbff;
+}
+
+.dark .nc-dashboard-sidebar__item--active .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:hover .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:focus-visible .nc-dashboard-sidebar__itemIcon {
+  color: #ffffff;
+  filter: none;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #102a5e;
+}
+
+.dark .nc-dashboard-shell--tauri .nc-dashboard-home-active-icon,
+.dark .nc-dashboard-home-active-icon {
+  filter: none;
+  transform: none;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.24);
+  background:
+    radial-gradient(circle at 16% 8%, rgba(191, 219, 254, 0.18), transparent 34%),
+    radial-gradient(circle at 91% 89%, rgba(34, 211, 238, 0.16), transparent 39%),
+    radial-gradient(circle at 25% 114%, rgba(37, 99, 235, 0.14), transparent 46%),
+    linear-gradient(150deg, #071f4f 0%, #0a3270 48%, #05364a 100%);
+  box-shadow:
+    0 14px 28px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 28px rgba(96, 165, 250, 0.05);
+}
+
+.dark .nc-dashboard-impact--dragging {
+  box-shadow:
+    0 16px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 30px rgba(96, 165, 250, 0.06);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.095);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.095);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.18);
+  background: rgba(8, 17, 31, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.085);
+  color: #e5f0ff;
+}
+
+.dark .nc-dashboard-impact__title {
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.16);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.93);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.58);
+  opacity: 0.56;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.52);
+  opacity: 0.44;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.68;
+}
+
+.dark .nc-dashboard-impact__stem--thin {
+  opacity: 0.52;
+}
+
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.54;
+}
+
+.dark .nc-dashboard-impact__dot {
+  background: rgba(219, 234, 254, 0.26);
+}
+
+.dark .nc-dashboard-impact__dot:hover {
+  background: rgba(219, 234, 254, 0.42);
+}
+
+.dark .nc-dashboard-impact__dot--active {
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.105);
+  background: rgba(3, 9, 19, 0.74);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.012);
+}
+
+.dark .nc-dashboard-header__title {
+  color: #f8fafc;
+  text-shadow: none;
+}
+
+.dark .nc-dashboard-header__subtitle,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
+  color: #98a7bb;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.155);
+  background: rgba(10, 18, 31, 0.82);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  color: #e5e7eb;
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(125, 166, 225, 0.26);
+  background: rgba(11, 21, 37, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+
+.dark .nc-dashboard-search__icon {
+  color: #8798b0;
+}
+
+.dark .nc-dashboard-search__placeholder,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__placeholder {
+  color: #93a3b8;
+}
+
+.dark .nc-dashboard-search__kbd,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__kbd {
+  border-color: rgba(148, 163, 184, 0.14);
+  background: rgba(2, 8, 23, 0.58);
+  color: #b6c2d2;
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline,
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  background: rgba(10, 18, 31, 0.66);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
+  border-color: rgba(96, 165, 250, 0.31);
+  color: #7fb2ff;
+}
+
+.dark .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:active {
+  border-color: rgba(125, 189, 248, 0.42);
+  background: rgba(37, 99, 235, 0.105);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  color: #bfdbfe;
+}
+
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  border-color: rgba(148, 163, 184, 0.145);
+  color: #d9e2ee;
+}
+
+.dark .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft:active,
+.dark .nc-dashboard-card-action:hover,
+.dark .nc-dashboard-period-button:hover {
+  border-color: rgba(148, 163, 184, 0.22);
+  background: rgba(15, 28, 48, 0.78);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.18);
+  background: linear-gradient(135deg, #2f6fe8 0%, #2058c3 100%);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-header__notification,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification {
+  background: rgba(10, 18, 31, 0.36);
+  color: #aebbd0;
+}
+
+.dark .nc-dashboard-header__notification:hover,
+.dark .nc-dashboard-header__notification[aria-expanded="true"],
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification[aria-expanded="true"] {
+  background: rgba(37, 99, 235, 0.09);
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatarFallback {
+  border-color: rgba(15, 23, 42, 0.9);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.24);
+}
+
+.dark .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback {
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.13);
+}
+
+.dark .nc-dashboard-kpi-grid::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-grid::before {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card {
+  border-color: rgba(148, 163, 184, 0.145);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.024), transparent 34%),
+    linear-gradient(180deg, rgba(10, 21, 38, 0.93), rgba(7, 18, 34, 0.88));
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.235), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .nc-dashboard-kpi-card::after,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card::after {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 44%);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover {
+  border-color: rgba(148, 163, 184, 0.21);
+  box-shadow: 0 14px 29px rgba(0, 0, 0, 0.255), inset 0 1px 0 rgba(255, 255, 255, 0.048);
+}
+
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.135);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.018), transparent 36%),
+    linear-gradient(180deg, rgba(9, 18, 32, 0.92), rgba(7, 18, 34, 0.86));
+  box-shadow: 0 13px 28px rgba(0, 0, 0, 0.225), inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.18);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(148, 163, 184, 0.09), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-section-card__title,
+.dark .nc-dashboard-kpi-card__label,
+.dark .nc-dashboard-kpi-card__value,
+.dark .nc-dashboard-consultations__name,
+.dark .nc-dashboard-payments__patient,
+.dark .nc-dashboard-quick-actions__body strong {
+  color: #f4f7fb;
+}
+
+.dark .nc-dashboard-kpi-card__hint,
+.dark .nc-dashboard-consultations__type,
+.dark .nc-dashboard-alerts__detail,
+.dark .nc-dashboard-payments__concept,
+.dark .nc-dashboard-payments__method,
+.dark .nc-dashboard-quick-actions__body small,
+.dark .nc-dashboard-chart-legend__item {
+  color: #8f9fb4;
+}
+
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.17);
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.34), rgba(2, 8, 23, 0.24));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  color: #8f9fb4;
+}
+
+.dark .nc-dashboard-empty-note svg {
+  color: rgba(148, 163, 184, 0.46);
+  opacity: 0.82;
+}
+
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  border-color: rgba(148, 163, 184, 0.135);
+  background: rgba(3, 10, 21, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+}
+
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  background: linear-gradient(180deg, rgba(12, 24, 42, 0.64), rgba(5, 13, 27, 0.5));
+  color: #8f9fb4;
+}
+
+.dark .nc-dashboard-quick-actions__item:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item:hover {
+  border-color: rgba(125, 166, 225, 0.24);
+  background: linear-gradient(180deg, rgba(18, 36, 62, 0.68), rgba(10, 22, 42, 0.55));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+}
+
+.dark .nc-dashboard-quick-actions__item > svg,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item > svg {
+  color: #7f8fa5;
+}
+
+.dark .nc-dashboard-financial-meter,
+.dark .nc-dashboard-financial-list__track {
+  background: rgba(2, 8, 23, 0.54);
+}
+
+.dark .nc-dashboard-bottom-frame {
+  border-top-color: rgba(148, 163, 184, 0.105);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.022);
+}
+
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(12, 23, 40, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  color: #bcc7d8;
+}
+
+.dark .nc-dashboard-bottom-chip--quiet {
+  color: #8d9bb0;
+}
+
+.dark .nc-dashboard-bottom-chip--button:hover,
+.dark .nc-dashboard-bottom-sync-button:hover {
+  border-color: rgba(125, 166, 225, 0.24);
+  background: rgba(21, 40, 67, 0.66);
+  color: #dbeafe;
+}
+
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(96, 165, 250, 0.22);
+  color: #8abaff;
+}
+
+.dark .nc-dashboard-bottom-status--synced {
+  border-color: rgba(34, 197, 94, 0.2);
+  background: rgba(34, 197, 94, 0.105);
+  color: #4ade80;
+}
+
+.dark .nc-dashboard-bottom-status--syncing {
+  border-color: rgba(96, 165, 250, 0.22);
+  background: rgba(37, 99, 235, 0.115);
+  color: #84b9ff;
+}
+
+.dark .nc-dashboard-bottom-status--offline,
+.dark .nc-dashboard-bottom-chip--warning {
+  border-color: rgba(245, 158, 11, 0.2);
+  background: rgba(245, 158, 11, 0.105);
+  color: #fbbf24;
+}
+
+.dark .nc-dashboard-bottom-status--error {
+  border-color: rgba(244, 63, 94, 0.24);
+  background: rgba(244, 63, 94, 0.105);
+  color: #fb7185;
+}
+
+/* Final premium dark pass: reduce noise while preserving the exact layout. */
+[data-theme="dark"] {
+  --nc-app-bg: #020610;
+  --nc-page-bg: #020610;
+  --nc-content-bg: #020610;
+  background-color: #020610;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #020610;
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.014), transparent 32%),
+    radial-gradient(circle at 86% 8%, rgba(6, 182, 212, 0.008), transparent 30%),
+    linear-gradient(180deg, #040913 0%, #030812 44%, #020610 100%);
+}
+
+.dark .nc-dashboard-main {
+  scrollbar-color: rgba(148, 163, 184, 0.16) transparent;
+  scrollbar-width: thin;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.14);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.22);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.095);
+  background:
+    radial-gradient(circle at 28% 0%, rgba(59, 130, 246, 0.025), transparent 36%),
+    linear-gradient(180deg, rgba(3, 9, 19, 0.998) 0%, rgba(2, 7, 15, 0.998) 100%);
+  box-shadow: 5px 0 18px rgba(0, 0, 0, 0.16);
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.23);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.145) 0%, rgba(18, 46, 99, 0.42) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.035);
+  color: #f8fbff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #0e2553;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.21);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(191, 219, 254, 0.15), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(34, 211, 238, 0.13), transparent 39%),
+    radial-gradient(circle at 24% 114%, rgba(37, 99, 235, 0.105), transparent 46%),
+    linear-gradient(150deg, #071b44 0%, #092d66 48%, #053448 100%);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.27),
+    inset 0 1px 0 rgba(255, 255, 255, 0.105),
+    inset 0 0 24px rgba(96, 165, 250, 0.035);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.075);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.075);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.16);
+  background: rgba(5, 12, 24, 0.34);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.075);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.91);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.5);
+  opacity: 0.52;
+}
+
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.48;
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.088);
+  background: rgba(3, 9, 18, 0.78);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.01);
+}
+
+.dark .nc-dashboard-header__subtitle,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
+  color: #91a0b5;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search,
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  background: rgba(8, 16, 29, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.135);
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(125, 166, 225, 0.21);
+  background: rgba(10, 20, 36, 0.8);
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  background: linear-gradient(135deg, #2d67d6 0%, #1f52b8 100%);
+  box-shadow: 0 8px 17px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.125);
+}
+
+.dark .nc-dashboard-kpi-action,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action {
+  color: #7da9ea;
+}
+
+.dark .nc-dashboard-kpi-action:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action:hover {
+  color: #a8c8f7;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card {
+  border-color: rgba(148, 163, 184, 0.13);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.018), transparent 34%),
+    linear-gradient(180deg, rgba(10, 20, 36, 0.92), rgba(7, 17, 31, 0.88));
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.036);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover {
+  border-color: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 12px 25px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.042);
+}
+
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.122);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.014), transparent 36%),
+    linear-gradient(180deg, rgba(9, 18, 31, 0.91), rgba(7, 17, 31, 0.86));
+  box-shadow: 0 11px 24px rgba(0, 0, 0, 0.21), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.165);
+}
+
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.125);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(148, 163, 184, 0.105);
+  background: rgba(10, 20, 36, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+/* Build-mode matte finish: final dark polish with no structural changes. */
+[data-theme="dark"] {
+  --nc-app-bg: #02050e;
+  --nc-page-bg: #02050e;
+  --nc-content-bg: #02050e;
+  --nc-chart-grid: rgba(148, 163, 184, 0.1);
+  --nc-chart-text: #8797ad;
+  --nc-chart-cursor: rgba(148, 163, 184, 0.16);
+  background-color: #02050e;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #02050e;
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.004), transparent 32%),
+    radial-gradient(circle at 86% 8%, rgba(6, 182, 212, 0.003), transparent 30%),
+    linear-gradient(180deg, #030811 0%, #02060f 48%, #02050e 100%);
+}
+
+.dark .nc-dashboard-main {
+  scrollbar-color: rgba(148, 163, 184, 0.13) transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: rgba(148, 163, 184, 0.11);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.18);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.085);
+  background:
+    radial-gradient(circle at 28% 0%, rgba(59, 130, 246, 0.018), transparent 36%),
+    linear-gradient(180deg, rgba(3, 9, 18, 0.998) 0%, rgba(2, 7, 15, 0.998) 100%);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.15);
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.2);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.125) 0%, rgba(18, 44, 94, 0.43) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.062),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.028);
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #0c224d;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.185);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(191, 219, 254, 0.125), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(34, 211, 238, 0.105), transparent 39%),
+    radial-gradient(circle at 24% 114%, rgba(37, 99, 235, 0.085), transparent 46%),
+    linear-gradient(150deg, #06193f 0%, #092a5f 48%, #053143 100%);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.092),
+    inset 0 0 20px rgba(96, 165, 250, 0.026);
+}
+
+.dark .nc-dashboard-impact--dragging {
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.27),
+    inset 0 1px 0 rgba(255, 255, 255, 0.105),
+    inset 0 0 22px rgba(96, 165, 250, 0.032);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.06);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.14);
+  background: rgba(5, 12, 24, 0.36);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.065);
+}
+
+.dark .nc-dashboard-impact__title {
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.9);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.46);
+  opacity: 0.49;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.42);
+  opacity: 0.4;
+}
+
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.44;
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.076);
+  background: rgba(2, 8, 17, 0.8);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.008);
+}
+
+.dark .nc-dashboard-header__subtitle,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__subtitle {
+  color: #8c9bb0;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: rgba(8, 16, 29, 0.68);
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(125, 166, 225, 0.18);
+  background: rgba(10, 19, 34, 0.76);
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
+  border-color: rgba(96, 165, 250, 0.25);
+  color: #77a3df;
+}
+
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  border-color: rgba(148, 163, 184, 0.12);
+  color: #cfd9e7;
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.14);
+  background: linear-gradient(135deg, #2a62cf 0%, #1e4fab 100%);
+  box-shadow: 0 7px 15px rgba(0, 0, 0, 0.19), inset 0 1px 0 rgba(255, 255, 255, 0.112);
+}
+
+.dark .nc-dashboard-kpi-action,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action {
+  color: #719bd6;
+}
+
+.dark .nc-dashboard-kpi-action:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action:hover {
+  color: #98bcee;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card,
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.108);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.012), transparent 36%),
+    linear-gradient(180deg, rgba(9, 18, 32, 0.9), rgba(7, 16, 30, 0.86));
+  box-shadow: 0 9px 20px rgba(0, 0, 0, 0.205), inset 0 1px 0 rgba(255, 255, 255, 0.028);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.152);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.225), inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(148, 163, 184, 0.065), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.11);
+  background: rgba(3, 10, 20, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.018);
+}
+
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  background: linear-gradient(180deg, rgba(10, 21, 37, 0.56), rgba(5, 12, 24, 0.48));
+}
+
+.dark .nc-dashboard-bottom-frame,
+.dark .nc-dashboard-bottom-bar {
+  background: rgba(2, 7, 14, 0.88);
+}
+
+.dark .nc-dashboard-bottom-frame {
+  border-top-color: rgba(148, 163, 184, 0.082);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.016);
+}
+
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(148, 163, 184, 0.092);
+  background: rgba(8, 17, 31, 0.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.016);
+  color: #b3bfce;
+}
+
+.dark .nc-dashboard-bottom-chip--quiet {
+  color: #8492a7;
+}
+
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(96, 165, 250, 0.17);
+  color: #7faee7;
+}
+
+/* Last-mile premium polish: sidebar active, impact card and secondary KPI action. */
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.145);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.088) 0%, rgba(15, 37, 81, 0.47) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.018);
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #0a1d42;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.155);
+  background:
+    radial-gradient(circle at 14% 8%, rgba(219, 234, 254, 0.095), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(34, 211, 238, 0.078), transparent 38%),
+    radial-gradient(circle at 25% 116%, rgba(37, 99, 235, 0.055), transparent 46%),
+    linear-gradient(150deg, #061635 0%, #08244f 48%, #052d3e 100%);
+  box-shadow:
+    0 9px 18px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.076),
+    inset 0 0 16px rgba(96, 165, 250, 0.014);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.045);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.045);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.13);
+  background: rgba(5, 12, 24, 0.38);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.895);
+  line-height: 1.52;
+  margin-top: clamp(15px, calc(16.5px * var(--nc-font-scale)), 18px);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.4);
+  opacity: 0.43;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.36);
+  opacity: 0.35;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.58;
+}
+
+.dark .nc-dashboard-impact__stem--thin,
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.38;
+}
+
+.dark .nc-dashboard-header__inner {
+  column-gap: calc(var(--nc-dashboard-header-gap) - 2px);
+}
+
+.dark .nc-dashboard-header__intro {
+  gap: 3px;
+}
+
+.dark .nc-dashboard-header__actions,
+.dark .nc-dashboard-header__ctaGroup {
+  gap: 7px;
+}
+
+.dark .nc-dashboard-kpi-action,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action {
+  color: #5f86bd;
+}
+
+.dark .nc-dashboard-kpi-action:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-action:hover {
+  color: #86aee0;
+}
+
+/* Ultimate premium dark finish: matte, cohesive and low-noise. */
+[data-theme="dark"] {
+  --nc-app-bg: #02050d;
+  --nc-page-bg: #02050d;
+  --nc-content-bg: #02050d;
+  --nc-chart-grid: rgba(148, 163, 184, 0.082);
+  --nc-chart-text: #7f8da1;
+  --nc-chart-cursor: rgba(148, 163, 184, 0.125);
+  background-color: #02050d;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #02050d;
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(59, 130, 246, 0.001), transparent 28%),
+    linear-gradient(180deg, #02050d 0%, #02050d 56%, #02050d 100%);
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.064);
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.072);
+  box-shadow: 3px 0 14px rgba(0, 0, 0, 0.135);
+}
+
+.dark .nc-dashboard-bottom-frame {
+  border-top-color: rgba(148, 163, 184, 0.066);
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.092);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.044) 0%, rgba(10, 27, 58, 0.46) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.006);
+  color: #edf4ff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #07162f;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.102);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(219, 234, 254, 0.044), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(34, 211, 238, 0.032), transparent 38%),
+    radial-gradient(circle at 25% 116%, rgba(37, 99, 235, 0.021), transparent 46%),
+    linear-gradient(150deg, #051129 0%, #071d41 48%, #052433 100%);
+  box-shadow:
+    0 7px 14px rgba(0, 0, 0, 0.228),
+    inset 0 1px 0 rgba(255, 255, 255, 0.046),
+    inset 0 0 8px rgba(96, 165, 250, 0.004);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.018);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.018);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.082);
+  background: rgba(4, 11, 22, 0.48);
+  color: rgba(230, 241, 255, 0.89);
+}
+
+.dark .nc-dashboard-impact__title {
+  color: rgba(255, 255, 255, 0.925);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.825);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.25);
+  opacity: 0.29;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.22);
+  opacity: 0.24;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.36;
+}
+
+.dark .nc-dashboard-impact__stem--thin,
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.24;
+}
+
+.dark .nc-dashboard-impact__dot {
+  background: rgba(219, 234, 254, 0.12);
+}
+
+.dark .nc-dashboard-impact__dot--active {
+  background: rgba(248, 250, 252, 0.62);
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card,
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.074);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.006), transparent 36%),
+    linear-gradient(180deg, rgba(8, 17, 30, 0.868), rgba(6, 15, 28, 0.84));
+  box-shadow: 0 7px 15px rgba(0, 0, 0, 0.178), inset 0 1px 0 rgba(255, 255, 255, 0.017);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.102);
+  box-shadow: 0 8px 17px rgba(0, 0, 0, 0.188), inset 0 1px 0 rgba(255, 255, 255, 0.022);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(148, 163, 184, 0.045), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-consultations__item,
+.dark .nc-dashboard-alerts__item,
+.dark .nc-dashboard-payments__item,
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-weekly-summary__item,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.07);
+}
+
+.dark .nc-dashboard-kpi-card__hint,
+.dark .nc-dashboard-consultations__type,
+.dark .nc-dashboard-empty-note,
+.dark .nc-dashboard-chart-legend__item,
+.dark .nc-dashboard-weekly-summary__item small,
+.dark .nc-dashboard-alerts__detail,
+.dark .nc-dashboard-financial-hero__label,
+.dark .nc-dashboard-financial-hero small,
+.dark .nc-dashboard-financial-list__detail,
+.dark .nc-dashboard-payments__concept,
+.dark .nc-dashboard-payments__method,
+.dark .nc-dashboard-quick-actions__body small {
+  color: #7f8da1;
+}
+
+/* Build-mode depth recalibration: controlled glass, glow and contrast. */
+[data-theme="dark"] {
+  --nc-app-bg: #020817;
+  --nc-page-bg: #020817;
+  --nc-content-bg: #020817;
+  --nc-chart-grid: rgba(148, 163, 184, 0.135);
+  --nc-chart-text: #94a3b8;
+  --nc-chart-cursor: rgba(147, 197, 253, 0.22);
+  --nc-chart-blue: #3b82f6;
+  --nc-chart-cyan: #22d3ee;
+  --nc-chart-active-dot: #071426;
+  background-color: #020817;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #020817;
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main {
+  background:
+    radial-gradient(circle at 30% 0%, rgba(37, 99, 235, 0.062), transparent 32%),
+    radial-gradient(circle at 76% 24%, rgba(6, 182, 212, 0.032), transparent 29%),
+    linear-gradient(180deg, #06111f 0%, #030a16 46%, #020817 100%);
+}
+
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header {
+  border-bottom-color: rgba(148, 163, 184, 0.11);
+  background: rgba(3, 10, 21, 0.78);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.016);
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.115);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(37, 99, 235, 0.04), transparent 34%),
+    linear-gradient(180deg, rgba(3, 10, 22, 0.998) 0%, rgba(2, 7, 16, 0.998) 100%);
+  box-shadow: 5px 0 18px rgba(0, 0, 0, 0.18);
+}
+
+.dark .nc-dashboard-bottom-frame {
+  border-top-color: rgba(148, 163, 184, 0.105);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.18);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.115) 0%, rgba(14, 39, 86, 0.52) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.058),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.024),
+    0 8px 18px rgba(0, 0, 0, 0.12);
+  color: #f6faff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #0b2149;
+}
+
+.dark .nc-dashboard-sidebar__item--active .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:hover .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active:focus-visible .nc-dashboard-sidebar__itemIcon {
+  color: #f8fbff;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.18);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(191, 219, 254, 0.13), transparent 34%),
+    radial-gradient(circle at 92% 88%, rgba(34, 211, 238, 0.105), transparent 39%),
+    radial-gradient(circle at 25% 115%, rgba(37, 99, 235, 0.078), transparent 46%),
+    linear-gradient(150deg, #06183c 0%, #09295f 48%, #053348 100%);
+  box-shadow:
+    0 13px 26px rgba(0, 0, 0, 0.285),
+    inset 0 1px 0 rgba(255, 255, 255, 0.092),
+    inset 0 0 22px rgba(96, 165, 250, 0.028);
+}
+
+.dark .nc-dashboard-impact--dragging {
+  box-shadow:
+    0 15px 29px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.105),
+    inset 0 0 24px rgba(96, 165, 250, 0.036);
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.062);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.062);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.155);
+  background: rgba(5, 13, 27, 0.4);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.075);
+  color: rgba(235, 246, 255, 0.96);
+}
+
+.dark .nc-dashboard-impact__title {
+  color: rgba(255, 255, 255, 0.975);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(234, 242, 255, 0.91);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.48);
+  opacity: 0.5;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.42);
+  opacity: 0.42;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.62;
+}
+
+.dark .nc-dashboard-impact__stem--thin,
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.45;
+}
+
+.dark .nc-dashboard-impact__dot {
+  background: rgba(219, 234, 254, 0.22);
+}
+
+.dark .nc-dashboard-impact__dot--active {
+  background: rgba(248, 250, 252, 0.84);
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card,
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.148);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(255, 255, 255, 0.018), transparent 36%),
+    linear-gradient(180deg, rgba(9, 19, 34, 0.91), rgba(7, 17, 32, 0.865));
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.034);
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.205);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.255),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: linear-gradient(90deg, rgba(37, 99, 255, 0), rgba(96, 165, 250, 0.105), rgba(6, 182, 212, 0));
+}
+
+.dark .nc-dashboard-consultations__item,
+.dark .nc-dashboard-alerts__item,
+.dark .nc-dashboard-payments__item,
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-weekly-summary__item,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.135);
+}
+
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item {
+  background: linear-gradient(180deg, rgba(11, 23, 41, 0.62), rgba(5, 13, 27, 0.5));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.028);
+}
+
+.dark .nc-dashboard-empty-note {
+  position: relative;
+  flex-direction: column;
+  gap: 12px;
+  border-color: rgba(148, 163, 184, 0.19);
+  background:
+    radial-gradient(circle at 50% 15%, rgba(96, 165, 250, 0.075), transparent 36%),
+    rgba(3, 10, 22, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026);
+  color: #93a3b8;
+}
+
+.dark .nc-dashboard-empty-note::before {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(148, 163, 184, 0.28) 0 6px, transparent 6px),
+    radial-gradient(circle at 35% 58%, rgba(148, 163, 184, 0.28) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 64% 58%, rgba(148, 163, 184, 0.2) 0 2px, transparent 2.5px),
+    rgba(8, 17, 31, 0.58);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 18px rgba(0, 0, 0, 0.16);
+  content: "";
+  opacity: 0.62;
+}
+
+.dark .nc-dashboard-section-card--payments .nc-dashboard-empty-note::before {
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, transparent 0 6px, rgba(148, 163, 184, 0.24) 6px 24px, transparent 24px),
+    linear-gradient(90deg, transparent 0 6px, rgba(148, 163, 184, 0.18) 6px 19px, transparent 19px),
+    rgba(8, 17, 31, 0.58);
+  background-position: 0 10px, 0 19px, 0 0;
+  background-repeat: no-repeat;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search {
+  border-color: rgba(148, 163, 184, 0.19);
+  background: rgba(9, 18, 32, 0.78);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover {
+  border-color: rgba(125, 189, 248, 0.28);
+  background: rgba(11, 22, 40, 0.86);
+  box-shadow:
+    0 14px 29px rgba(0, 0, 0, 0.19),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.dark .nc-dashboard-search__placeholder,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__placeholder {
+  color: #a0aec2;
+}
+
+.dark .nc-dashboard-search__kbd,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search__kbd {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: rgba(2, 8, 23, 0.68);
+  color: #c2cbd8;
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
+  border-color: rgba(96, 165, 250, 0.34);
+  background: rgba(9, 18, 32, 0.72);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.038);
+  color: #93c5fd;
+}
+
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button {
+  border-color: rgba(148, 163, 184, 0.165);
+  background: rgba(9, 18, 32, 0.7);
+  box-shadow:
+    0 9px 20px rgba(0, 0, 0, 0.145),
+    inset 0 1px 0 rgba(255, 255, 255, 0.032);
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.22);
+  background: linear-gradient(135deg, #2f6fe8 0%, #1f57bd 100%);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.dark .nc-dashboard-kpi-card__hint,
+.dark .nc-dashboard-consultations__type,
+.dark .nc-dashboard-empty-note,
+.dark .nc-dashboard-chart-legend__item,
+.dark .nc-dashboard-weekly-summary__item small,
+.dark .nc-dashboard-alerts__detail,
+.dark .nc-dashboard-financial-hero__label,
+.dark .nc-dashboard-financial-hero small,
+.dark .nc-dashboard-financial-list__detail,
+.dark .nc-dashboard-payments__concept,
+.dark .nc-dashboard-payments__method,
+.dark .nc-dashboard-quick-actions__body small {
+  color: #93a3b8;
+}
+
+/* Build-mode matte variant: flat navy background, no ambient glow. */
+[data-theme="dark"] {
+  --nc-app-bg: #020617;
+  --nc-page-bg: #020617;
+  --nc-content-bg: #020617;
+  --nc-chart-grid: rgba(148, 163, 184, 0.11);
+  --nc-chart-text: #8b99ad;
+  --nc-chart-cursor: rgba(148, 163, 184, 0.14);
+  --nc-chart-blue: #3b82f6;
+  --nc-chart-cyan: #22c5d7;
+  --nc-chart-active-dot: #07111f;
+  background: #020617;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] #root {
+  background: #020617;
+}
+
+.dark .nc-dashboard-shell,
+.dark .nc-dashboard-shell--tauri,
+.dark .nc-dashboard-shell .nc-dashboard-workspace,
+.dark .nc-dashboard-shell .nc-dashboard-main,
+.dark .nc-dashboard-shell .nc-dashboard-container,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-workspace,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-main,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-container {
+  background: #020617;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-shell::before,
+.dark .nc-dashboard-shell::after,
+.dark .nc-dashboard-workspace::before,
+.dark .nc-dashboard-workspace::after,
+.dark .nc-dashboard-main::before,
+.dark .nc-dashboard-main::after,
+.dark .nc-dashboard-container::before,
+.dark .nc-dashboard-container::after,
+.dark .nc-dashboard-kpi-grid::before {
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-main {
+  scrollbar-color: rgba(148, 163, 184, 0.2) transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: rgba(148, 163, 184, 0.18);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-main::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.25);
+  background-clip: content-box;
+}
+
+.dark .nc-dashboard-desktop-titlebar,
+.dark .nc-dashboard-header,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header,
+.dark .nc-dashboard-bottom-frame,
+.dark .nc-dashboard-bottom-bar {
+  border-color: rgba(148, 163, 184, 0.09);
+  background: #020617;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-sidebar,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar {
+  border-right-color: rgba(148, 163, 184, 0.1);
+  background: #030915;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-sidebar__brandLink:hover,
+.dark .nc-dashboard-sidebar__brandLink:focus-visible,
+.dark .nc-dashboard-sidebar__item:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item:hover {
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active:focus-visible {
+  border-color: rgba(125, 166, 225, 0.16);
+  background: #0b2149;
+  box-shadow: none;
+  color: #f6faff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] {
+  --nc-dashboard-home-cutout: #0b2149;
+}
+
+.dark .nc-dashboard-menu,
+.dark .nc-dashboard-notification-menu,
+.dark .nc-dashboard-avatar-menu {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-notification-menu__item,
+.dark .nc-dashboard-avatar-menu__item {
+  background: #081321;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-notification-menu__icon,
+.dark .nc-dashboard-notification-menu__emptyIcon,
+.dark .nc-dashboard-avatar-menu__initials {
+  background: #0a1424;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.15);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(191, 219, 254, 0.08), transparent 34%),
+    radial-gradient(circle at 92% 88%, rgba(34, 211, 238, 0.055), transparent 39%),
+    linear-gradient(150deg, #061532 0%, #08244f 48%, #052c3d 100%);
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-impact--dragging {
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-impact::before {
+  background: rgba(37, 99, 235, 0.04);
+}
+
+.dark .nc-dashboard-impact::after {
+  background: rgba(45, 212, 191, 0.04);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.12);
+  background: rgba(4, 11, 22, 0.46);
+  box-shadow: none;
+  color: rgba(235, 246, 255, 0.94);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.36);
+  opacity: 0.38;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.32);
+  opacity: 0.32;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.48;
+}
+
+.dark .nc-dashboard-impact__stem--thin,
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.34;
+}
+
+.dark .nc-dashboard-kpi-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card,
+.dark .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--financial,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--payments,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card--actions {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-card::after,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card::after,
+.dark .nc-dashboard-section-card::before,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-section-card::before {
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-kpi-card:hover,
+.dark .nc-dashboard-section-card:hover {
+  border-color: rgba(148, 163, 184, 0.16);
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-consultations__item,
+.dark .nc-dashboard-alerts__item,
+.dark .nc-dashboard-payments__item,
+.dark .nc-dashboard-weekly-summary,
+.dark .nc-dashboard-weekly-summary__item,
+.dark .nc-dashboard-financial-hero,
+.dark .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item,
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.11);
+  background: #081321;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-quick-actions__item:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-quick-actions__item:hover {
+  border-color: rgba(148, 163, 184, 0.15);
+  background: #0a1728;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-empty-note {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: #07111f;
+  box-shadow: none;
+  color: #8b99ad;
+}
+
+.dark .nc-dashboard-empty-note::before {
+  border-color: rgba(148, 163, 184, 0.16);
+  background: #0a1424;
+  box-shadow: none;
+  opacity: 0.48;
+}
+
+.dark .nc-dashboard-section-card--payments .nc-dashboard-empty-note::before {
+  background: #0a1424;
+}
+
+.dark .nc-dashboard-search,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search,
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline,
+.dark .nc-dashboard-button--soft,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft,
+.dark .nc-dashboard-card-action,
+.dark .nc-dashboard-period-button,
+.dark .nc-dashboard-header__notification,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__notification,
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-search:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-search:hover,
+.dark .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--soft:hover,
+.dark .nc-dashboard-card-action:hover,
+.dark .nc-dashboard-period-button:hover {
+  border-color: rgba(148, 163, 184, 0.17);
+  background: #0a1728;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-button--outline,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline {
+  border-color: rgba(96, 165, 250, 0.24);
+  color: #8dbbff;
+}
+
+.dark .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--outline:active {
+  border-color: rgba(96, 165, 250, 0.32);
+  background: #0b1830;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary,
+.dark .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.18);
+  background: #1d4ed8;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar:hover .nc-dashboard-header__avatarFallback,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__avatar[aria-expanded="true"] .nc-dashboard-header__avatarFallback {
+  box-shadow: none;
+}
+
+/* Final focused premium pass: motivational card, Dashboard active item and add-patient CTA only. */
+.dark .nc-dashboard-impact,
+.dark .nc-dashboard-impact--aqua,
+.dark .nc-dashboard-impact--blue,
+.dark .nc-dashboard-impact--teal,
+.dark .nc-dashboard-impact--mint,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-impact {
+  border-color: rgba(125, 189, 248, 0.26);
+  background:
+    radial-gradient(circle at 18% 12%, rgba(147, 197, 253, 0.18), transparent 34%),
+    radial-gradient(circle at 88% 86%, rgba(34, 211, 238, 0.17), transparent 38%),
+    radial-gradient(circle at 42% 112%, rgba(37, 99, 235, 0.16), transparent 48%),
+    linear-gradient(152deg, #071c48 0%, #0a2f6d 48%, #05394c 100%);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.26),
+    0 0 0 1px rgba(96, 165, 250, 0.045),
+    inset 0 1px 0 rgba(255, 255, 255, 0.13),
+    inset 0 0 26px rgba(96, 165, 250, 0.04);
+}
+
+.dark .nc-dashboard-impact::before {
+  inset: auto auto -76px -84px;
+  width: 236px;
+  height: 176px;
+  background: rgba(37, 99, 235, 0.105);
+}
+
+.dark .nc-dashboard-impact::after {
+  right: -54px;
+  bottom: -66px;
+  width: 178px;
+  height: 160px;
+  background: rgba(45, 212, 191, 0.105);
+}
+
+.dark .nc-dashboard-impact__icon {
+  border-color: rgba(219, 234, 254, 0.22);
+  background: rgba(8, 20, 42, 0.42);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.11);
+  color: rgba(239, 248, 255, 0.98);
+}
+
+.dark .nc-dashboard-impact__title {
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.dark .nc-dashboard-impact__text {
+  color: rgba(237, 246, 255, 0.92);
+}
+
+.dark .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-wave .nc-dashboard-impact__plant,
+.dark .nc-dashboard-impact--decor-pulse .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.62);
+  opacity: 0.6;
+}
+
+.dark .nc-dashboard-impact--decor-spark .nc-dashboard-impact__plant {
+  color: rgba(186, 230, 253, 0.54);
+  opacity: 0.5;
+}
+
+.dark .nc-dashboard-impact__stem {
+  opacity: 0.7;
+}
+
+.dark .nc-dashboard-impact__stem--thin,
+.dark .nc-dashboard-impact__leaf {
+  opacity: 0.56;
+}
+
+.dark .nc-dashboard-impact__dot {
+  height: 4px;
+  background: rgba(219, 234, 254, 0.24);
+}
+
+.dark .nc-dashboard-impact__dot:hover {
+  background: rgba(219, 234, 254, 0.42);
+}
+
+.dark .nc-dashboard-impact__dot--active {
+  width: 24px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"],
+.dark .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-sidebar__item--active[href="/"]:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"],
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"],
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:focus-visible {
+  --nc-dashboard-home-cutout: #0e2a5f;
+  border-color: rgba(125, 166, 225, 0.24);
+  background: linear-gradient(135deg, #0d2a5f 0%, #0a214c 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.075),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.035);
+  color: #f8fbff;
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"] .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active[href="/"]:hover .nc-dashboard-sidebar__itemIcon,
+.dark .nc-dashboard-sidebar__item--active[href="/"]:focus-visible .nc-dashboard-sidebar__itemIcon {
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary,
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.26);
+  background: linear-gradient(135deg, #3678f4 0%, #235fcb 52%, #1d4fb2 100%);
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary svg,
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary span {
+  color: currentColor;
+}
+
+/* Dark interaction polish: hover clarity and tactile press feedback. */
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary,
+.dark .nc-dashboard-sidebar__item--active[href="/"],
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"] {
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 120ms ease;
+}
+
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:hover {
+  border-color: rgba(191, 219, 254, 0.34);
+  background: linear-gradient(135deg, #4285ff 0%, #2d6fe2 52%, #245fc8 100%);
+  box-shadow:
+    0 12px 24px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(96, 165, 250, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-sidebar__item--active[href="/"]:focus-visible,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:focus-visible,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:hover,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:focus-visible {
+  --nc-dashboard-home-cutout: #12316d;
+  border-color: rgba(147, 197, 253, 0.32);
+  background: linear-gradient(135deg, #12316d 0%, #0b285b 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.09),
+    inset 0 0 0 1px rgba(147, 197, 253, 0.05);
+  color: #ffffff;
+}
+
+.dark .nc-dashboard-button:active,
+.dark .nc-dashboard-header__notification:active,
+.dark .nc-dashboard-header__avatar:active,
+.dark .nc-dashboard-search:active,
+.dark .nc-dashboard-sidebar__item:active,
+.dark .nc-dashboard-sidebar__collapse:active,
+.dark .nc-dashboard-card-action:active,
+.dark .nc-dashboard-card-link:active,
+.dark .nc-dashboard-quick-actions__item:active,
+.dark .nc-dashboard-bottom-chip--button:active,
+.dark .nc-dashboard-bottom-sync-button:active,
+.dark .nc-dashboard-period-button:active,
+.dark .nc-dashboard-theme-menu__item:active,
+.dark .nc-dashboard-menu__item:active,
+.dark .nc-dashboard-notification-menu__item:active,
+.dark .nc-dashboard-avatar-menu__item:active,
+.dark .nc-dashboard-impact__dot:active,
+.dark .nc-dashboard-desktop-titlebar__theme:active,
+.dark .nc-dashboard-desktop-titlebar__controls button:active,
+.dark .nc-dashboard-mobile-nav__item:active,
+.dark .nc-dashboard-kpi-customizer__close:active,
+.dark .nc-dashboard-kpi-customizer__reset:active,
+.dark .nc-dashboard-kpi-customizer__done:active,
+.dark .nc-dashboard-kpi-customizer__controls button:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 80ms;
+}
+
+.dark .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-header__ctaGroup .nc-dashboard-button--primary:active {
+  border-color: rgba(147, 197, 253, 0.28);
+  background: linear-gradient(135deg, #2d6fe2 0%, #245fc8 52%, #1d4fb2 100%);
+  box-shadow: none;
+  transform: translateY(0) scale(0.982);
+}
+
+.dark .nc-dashboard-sidebar__item--active[href="/"]:active,
+.dark .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:active,
+.dark .nc-dashboard-shell--tauri .nc-dashboard-sidebar__item--active[href="/"]:active {
+  --nc-dashboard-home-cutout: #12316d;
+  border-color: rgba(147, 197, 253, 0.32);
+  background: linear-gradient(135deg, #12316d 0%, #0b285b 100%);
+  box-shadow: none;
+  transform: translateY(0) scale(0.985);
+}
+
+/* Light interaction polish: tactile press feedback for sidebar and buttons. */
+.light .nc-dashboard-button,
+.light .nc-dashboard-header__notification,
+.light .nc-dashboard-header__avatar,
+.light .nc-dashboard-search,
+.light .nc-dashboard-sidebar__item,
+.light .nc-dashboard-sidebar__collapse,
+.light .nc-dashboard-card-action,
+.light .nc-dashboard-card-link,
+.light .nc-dashboard-quick-actions__item,
+.light .nc-dashboard-bottom-chip--button,
+.light .nc-dashboard-bottom-sync-button,
+.light .nc-dashboard-period-button,
+.light .nc-dashboard-theme-menu__item,
+.light .nc-dashboard-menu__item,
+.light .nc-dashboard-notification-menu__item,
+.light .nc-dashboard-avatar-menu__item,
+.light .nc-dashboard-impact__dot,
+.light .nc-dashboard-desktop-titlebar__theme,
+.light .nc-dashboard-desktop-titlebar__controls button,
+.light .nc-dashboard-mobile-nav__item,
+.light .nc-dashboard-kpi-customizer__close,
+.light .nc-dashboard-kpi-customizer__reset,
+.light .nc-dashboard-kpi-customizer__done,
+.light .nc-dashboard-kpi-customizer__controls button {
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    color 150ms ease,
+    transform 120ms ease;
+}
+
+.light .nc-dashboard-button:active,
+.light .nc-dashboard-header__notification:active,
+.light .nc-dashboard-header__avatar:active,
+.light .nc-dashboard-search:active,
+.light .nc-dashboard-sidebar__item:active,
+.light .nc-dashboard-sidebar__collapse:active,
+.light .nc-dashboard-card-action:active,
+.light .nc-dashboard-card-link:active,
+.light .nc-dashboard-quick-actions__item:active,
+.light .nc-dashboard-bottom-chip--button:active,
+.light .nc-dashboard-bottom-sync-button:active,
+.light .nc-dashboard-period-button:active,
+.light .nc-dashboard-theme-menu__item:active,
+.light .nc-dashboard-menu__item:active,
+.light .nc-dashboard-notification-menu__item:active,
+.light .nc-dashboard-avatar-menu__item:active,
+.light .nc-dashboard-impact__dot:active,
+.light .nc-dashboard-desktop-titlebar__theme:active,
+.light .nc-dashboard-desktop-titlebar__controls button:active,
+.light .nc-dashboard-mobile-nav__item:active,
+.light .nc-dashboard-kpi-customizer__close:active,
+.light .nc-dashboard-kpi-customizer__reset:active,
+.light .nc-dashboard-kpi-customizer__done:active,
+.light .nc-dashboard-kpi-customizer__controls button:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: 80ms;
+}
+
+.light .nc-dashboard-sidebar__item:active,
+.light .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item:active {
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: none;
+}
+
+.light .nc-dashboard-sidebar__item--active:active,
+.light .nc-dashboard-sidebar__item--active[href="/"]:active,
+.light .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active:active,
+.light .nc-dashboard-shell--collapsed .nc-dashboard-sidebar__item--active[href="/"]:active {
+  border-color: rgba(37, 99, 235, 0.22);
+  box-shadow: none;
+  transform: translateY(0) scale(0.985);
+}
+
+.light .nc-dashboard-button:active,
+.light .nc-dashboard-card-action:active,
+.light .nc-dashboard-card-link:active,
+.light .nc-dashboard-quick-actions__item:active,
+.light .nc-dashboard-bottom-chip--button:active,
+.light .nc-dashboard-bottom-sync-button:active,
+.light .nc-dashboard-period-button:active {
+  border-color: rgba(37, 99, 235, 0.24);
+  box-shadow: none;
+}
+
+.light .nc-dashboard-button--primary:active,
+.light .nc-dashboard-shell--tauri .nc-dashboard-button--primary:active {
+  background: linear-gradient(135deg, #236cff 0%, #174ed3 100%);
+  box-shadow: none;
+  transform: translateY(0) scale(0.982);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nc-dashboard-shell *,
   .nc-dashboard-shell *::before,
@@ -6896,7 +10371,31 @@
   .nc-dashboard-sidebar__brandLink:focus-visible .nc-dashboard-sidebar__brandText,
   .nc-dashboard-quick-actions__item:hover,
   .nc-dashboard-bottom-chip--button:hover,
-  .nc-dashboard-bottom-sync-button:hover {
+  .nc-dashboard-bottom-sync-button:hover,
+  .nc-dashboard-button:active,
+  .nc-dashboard-header__notification:active,
+  .nc-dashboard-header__avatar:active,
+  .nc-dashboard-search:active,
+  .nc-dashboard-sidebar__item:active,
+  .nc-dashboard-sidebar__collapse:active,
+  .nc-dashboard-card-action:active,
+  .nc-dashboard-card-link:active,
+  .nc-dashboard-quick-actions__item:active,
+  .nc-dashboard-bottom-chip--button:active,
+  .nc-dashboard-bottom-sync-button:active,
+  .nc-dashboard-period-button:active,
+  .nc-dashboard-theme-menu__item:active,
+  .nc-dashboard-menu__item:active,
+  .nc-dashboard-notification-menu__item:active,
+  .nc-dashboard-avatar-menu__item:active,
+  .nc-dashboard-impact__dot:active,
+  .nc-dashboard-desktop-titlebar__theme:active,
+  .nc-dashboard-desktop-titlebar__controls button:active,
+  .nc-dashboard-mobile-nav__item:active,
+  .nc-dashboard-kpi-customizer__close:active,
+  .nc-dashboard-kpi-customizer__reset:active,
+  .nc-dashboard-kpi-customizer__done:active,
+  .nc-dashboard-kpi-customizer__controls button:active {
     transform: none;
   }
 }

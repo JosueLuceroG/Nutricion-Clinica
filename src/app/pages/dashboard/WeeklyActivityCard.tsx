@@ -74,12 +74,12 @@ export function WeeklyActivityCard({ data, summary }: WeeklyActivityCardProps) {
                 <stop offset="100%" stopColor="#2563ff" stopOpacity="0" />
               </linearGradient>
             </defs>
-            <CartesianGrid stroke="#e8eef8" strokeDasharray="4 5" vertical={false} />
-            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "#52617f", fontSize: 12, fontWeight: 700 }} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fill: "#52617f", fontSize: 12, fontWeight: 700 }} domain={[0, yAxisMax]} tickCount={5} allowDecimals={false} />
-            <Tooltip content={<WeeklyTooltip />} cursor={{ stroke: "#c9d8f3", strokeWidth: 2 }} />
-            <Line type="monotone" dataKey="consultas" stroke="#2563ff" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: "#ffffff", strokeWidth: 4, fill: "#2563ff" }} />
-            <Line type="monotone" dataKey="nuevos" stroke="#10b7c8" strokeWidth={2.5} dot={false} activeDot={{ r: 5, stroke: "#ffffff", strokeWidth: 3, fill: "#10b7c8" }} />
+            <CartesianGrid stroke="var(--nc-chart-grid)" strokeDasharray="4 5" vertical={false} />
+            <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fill: "var(--nc-chart-text)", fontSize: 12, fontWeight: 700 }} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: "var(--nc-chart-text)", fontSize: 12, fontWeight: 700 }} domain={[0, yAxisMax]} tickCount={5} allowDecimals={false} />
+            <Tooltip content={<WeeklyTooltip />} cursor={{ stroke: "var(--nc-chart-cursor)", strokeWidth: 2 }} />
+            <Line type="monotone" dataKey="consultas" stroke="var(--nc-chart-blue)" strokeWidth={3} dot={false} activeDot={{ r: 6, stroke: "var(--nc-chart-active-dot)", strokeWidth: 4, fill: "var(--nc-chart-blue)" }} />
+            <Line type="monotone" dataKey="nuevos" stroke="var(--nc-chart-cyan)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, stroke: "var(--nc-chart-active-dot)", strokeWidth: 3, fill: "var(--nc-chart-cyan)" }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
