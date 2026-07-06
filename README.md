@@ -1,7 +1,33 @@
 # NutriClínica
 
-> Plataforma profesional de nutrición clínica para consultorios.
-> Tauri v2 + React 19 + TypeScript. Offline-first, hexagonal, dominio puro.
+NutriClínica es una plataforma profesional para la gestión integral de consultorios de nutrición clínica. Centraliza pacientes, consultas, mediciones antropométricas, laboratorios, planes alimenticios, agenda, cobros, reportes, documentos, telemedicina y portal del paciente en una experiencia moderna de escritorio/web.
+
+El proyecto está pensado para nutriólogos, clínicas y equipos de salud que necesitan una herramienta rápida, segura y organizada para operar su consulta diaria, dar seguimiento clínico y mantener la información del paciente disponible incluso en escenarios offline-first.
+
+## Funcionalidades Principales
+
+- Gestión de pacientes, historial clínico y expediente nutricional.
+- Registro de consultas, mediciones, antropometría y composición corporal.
+- Laboratorios, documentos clínicos y seguimiento de indicadores.
+- Creación y administración de planes alimenticios.
+- Agenda operativa, alertas, notificaciones y pendientes.
+- Cobros, pagos, recibos, gastos y reportes administrativos.
+- Portal del paciente, telemedicina y soporte para videollamadas.
+- Módulos de IA para asistencia clínica y automatización controlada.
+- Aplicación desktop con Tauri y frontend moderno en React.
+
+## Stack Técnico
+
+| Capa               | Tecnología                                         |
+| ------------------ | -------------------------------------------------- |
+| Frontend           | React 19 + TypeScript 5 + Vite 6                   |
+| Desktop            | Tauri 2 (Rust)                                     |
+| Persistencia local | IndexedDB (Dexie 4)                                |
+| Backend            | Express + SQL Server (apps/api)                    |
+| Auth               | JWT + Argon2 + 2FA TOTP                            |
+| Telemedicina       | WebRTC + WebSocket signaling + AES-GCM grabaciones |
+| Tests              | Vitest 3 + Playwright + Testing Library            |
+| CI                 | GitHub Actions (typecheck + lint + build + test)   |
 
 ## Quickstart
 
@@ -17,19 +43,6 @@ pnpm typecheck && pnpm --filter @nutriclinica/api test && pnpm test
 pnpm run lint && pnpm run build  # quality gate adicional
 pnpm run e2e          # requiere servidores arriba
 ```
-
-## Stack
-
-| Capa               | Tecnología                                         |
-| ------------------ | -------------------------------------------------- |
-| Frontend           | React 19 + TypeScript 5 + Vite 6                   |
-| Desktop            | Tauri 2 (Rust)                                     |
-| Persistencia local | IndexedDB (Dexie 4)                                |
-| Backend            | Express + SQL Server (apps/api)                    |
-| Auth               | JWT + Argon2 + 2FA TOTP                            |
-| Telemedicina       | WebRTC + WebSocket signaling + AES-GCM grabaciones |
-| Tests              | Vitest 3 + Playwright + Testing Library            |
-| CI                 | GitHub Actions (typecheck + lint + build + test)   |
 
 ## Operación Segura
 
