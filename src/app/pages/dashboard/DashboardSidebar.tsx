@@ -17,6 +17,12 @@ import {
   type LucideIcon,
   type LucideProps,
 } from "lucide-react";
+import { useTheme } from "@app/providers/ThemeProvider";
+import {
+  ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT,
+  readAlternativeThemeConfig,
+  type AlternativeThemeConfig,
+} from "@app/theme/alternativeTheme";
 import { motivationalMessages } from "./motivationalMessages";
 
 interface DashboardSidebarProps {
@@ -109,6 +115,7 @@ const IMPACT_DRAG_THRESHOLD_PX = 40;
 const IMPACT_DRAG_MAX_OFFSET_PX = 96;
 const IMPACT_SNAP_DURATION_MS = 140;
 const IMPACT_SESSION_STORAGE_KEY = "nutriclinica.dashboard.impactIndex";
+const DEFAULT_IMPACT_MESSAGE_COUNT: number = motivationalMessages.length;
 
 const impactSlides: ImpactSlide[] = [
   {
@@ -141,48 +148,47 @@ const impactSlides: ImpactSlide[] = [
   },
 ];
 
-const IMPACT_MESSAGE_COUNT = motivationalMessages.length;
-
-function normalizeImpactIndex(index: number) {
-  return (index + IMPACT_MESSAGE_COUNT) % IMPACT_MESSAGE_COUNT;
+function normalizeImpactIndex(index: number, count: number = DEFAULT_IMPACT_MESSAGE_COUNT) {
+  const safeCount = Math.max(1, count);
+  return (index + safeCount) % safeCount;
 }
 
 function getImpactStorageDate(date = new Date()) {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-function getDailyImpactIndex(date = new Date()) {
+function getDailyImpactIndex(date = new Date(), count: number = DEFAULT_IMPACT_MESSAGE_COUNT) {
   const startOfYear = Date.UTC(date.getFullYear(), 0, 0);
   const dayOfYear = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - startOfYear) / 86_400_000);
 
-  return normalizeImpactIndex(dayOfYear);
+  return normalizeImpactIndex(dayOfYear, count);
 }
 
-function getInitialImpactIndex() {
-  if (typeof window === "undefined") return getDailyImpactIndex();
+function getInitialImpactIndex(count: number = DEFAULT_IMPACT_MESSAGE_COUNT) {
+  if (typeof window === "undefined") return getDailyImpactIndex(undefined, count);
 
   try {
     const storedValue = window.sessionStorage.getItem(IMPACT_SESSION_STORAGE_KEY);
     if (storedValue) {
       const stored = JSON.parse(storedValue) as { date?: string; index?: number };
       if (stored.date === getImpactStorageDate() && Number.isInteger(stored.index)) {
-        return normalizeImpactIndex(stored.index ?? 0);
+        return normalizeImpactIndex(stored.index ?? 0, count);
       }
     }
   } catch {
     // Ignore unavailable storage or legacy values and fall back to the daily index.
   }
 
-  return getDailyImpactIndex();
+  return getDailyImpactIndex(undefined, count);
 }
 
-function saveImpactIndex(index: number) {
+function saveImpactIndex(index: number, count: number = DEFAULT_IMPACT_MESSAGE_COUNT) {
   if (typeof window === "undefined") return;
 
   try {
     window.sessionStorage.setItem(
       IMPACT_SESSION_STORAGE_KEY,
-      JSON.stringify({ date: getImpactStorageDate(), index: normalizeImpactIndex(index) }),
+      JSON.stringify({ date: getImpactStorageDate(), index: normalizeImpactIndex(index, count) }),
     );
   } catch {
     // Session storage can be unavailable in restricted environments.
@@ -208,15 +214,23 @@ function usePrefersReducedMotion() {
 }
 
 export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSidebarProps) {
+  const { resolvedTheme } = useTheme();
   const [activeImpactIndex, setActiveImpactIndex] = React.useState(getInitialImpactIndex);
   const [impactDragOffset, setImpactDragOffset] = React.useState(0);
   const [isImpactDragging, setIsImpactDragging] = React.useState(false);
+  const [alternativeThemeConfig, setAlternativeThemeConfig] = React.useState<AlternativeThemeConfig>(() => readAlternativeThemeConfig());
   const prefersReducedMotion = usePrefersReducedMotion();
   const pointerStartXRef = React.useRef<number | null>(null);
   const impactSnapTimeoutRef = React.useRef<number | null>(null);
+  const useAlternativeImpactContent = resolvedTheme === "alternative";
+  const alternativeMotivationalCard = alternativeThemeConfig.motivationalCard;
+  const impactMessages = useAlternativeImpactContent ? alternativeMotivationalCard.phrases : motivationalMessages;
+  const impactTitles = useAlternativeImpactContent ? alternativeMotivationalCard.titles : impactSlides.map((slide) => slide.title);
+  const impactMessageCount = impactMessages.length;
   const activeImpactDotIndex = activeImpactIndex % impactSlides.length;
   const activeImpact = impactSlides[activeImpactDotIndex] ?? impactSlides[0];
-  const activeImpactText = motivationalMessages[activeImpactIndex] ?? motivationalMessages[0];
+  const activeImpactTitle = impactTitles[activeImpactIndex % impactTitles.length] ?? alternativeMotivationalCard.defaultTitle;
+  const activeImpactText = impactMessages[activeImpactIndex] ?? alternativeMotivationalCard.defaultText;
   const ImpactIcon = activeImpact.icon;
   const impactDragProgress = Math.min(1, Math.abs(impactDragOffset) / IMPACT_DRAG_MAX_OFFSET_PX);
   const impactDragStyle = {
@@ -236,22 +250,38 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   React.useEffect(() => clearImpactSnapTimeout, []);
 
   React.useEffect(() => {
-    saveImpactIndex(activeImpactIndex);
-  }, [activeImpactIndex]);
+    if (resolvedTheme !== "alternative") return;
+
+    const handleAlternativeThemeConfigChanged = () => {
+      setAlternativeThemeConfig(readAlternativeThemeConfig());
+    };
+
+    handleAlternativeThemeConfigChanged();
+    window.addEventListener(ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT, handleAlternativeThemeConfigChanged);
+    return () => window.removeEventListener(ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT, handleAlternativeThemeConfigChanged);
+  }, [resolvedTheme]);
+
+  React.useEffect(() => {
+    setActiveImpactIndex((index) => normalizeImpactIndex(index, impactMessageCount));
+  }, [impactMessageCount]);
+
+  React.useEffect(() => {
+    saveImpactIndex(activeImpactIndex, impactMessageCount);
+  }, [activeImpactIndex, impactMessageCount]);
 
   const showImpactSlide = (index: number) => {
     clearImpactSnapTimeout();
     setImpactDragOffset(0);
     setIsImpactDragging(false);
-    setActiveImpactIndex(normalizeImpactIndex(activeImpactIndex - activeImpactDotIndex + index));
+    setActiveImpactIndex(normalizeImpactIndex(activeImpactIndex - activeImpactDotIndex + index, impactMessageCount));
   };
 
   const showPreviousImpactSlide = () => {
-    setActiveImpactIndex((index) => normalizeImpactIndex(index - 1));
+    setActiveImpactIndex((index) => normalizeImpactIndex(index - 1, impactMessageCount));
   };
 
   const showNextImpactSlide = () => {
-    setActiveImpactIndex((index) => normalizeImpactIndex(index + 1));
+    setActiveImpactIndex((index) => normalizeImpactIndex(index + 1, impactMessageCount));
   };
 
   const handleImpactPointerDown = (event: React.PointerEvent<HTMLElement>) => {
@@ -372,7 +402,7 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
             <div className="nc-dashboard-impact__icon" aria-hidden="true">
               <ImpactIcon size={18} strokeWidth={1.8} />
             </div>
-            <h2 className="nc-dashboard-impact__title">{activeImpact.title}</h2>
+            <h2 className="nc-dashboard-impact__title">{activeImpactTitle}</h2>
           </div>
           <p className="nc-dashboard-impact__text">{activeImpactText}</p>
         </div>
@@ -396,7 +426,7 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
               type="button"
               className={`nc-dashboard-impact__dot${index === activeImpactDotIndex ? " nc-dashboard-impact__dot--active" : ""}`}
               onClick={() => showImpactSlide(index)}
-              aria-label={`Mostrar frase: ${slide.title}`}
+              aria-label={`Mostrar frase: ${impactTitles[index % impactTitles.length] ?? slide.title}`}
               aria-current={index === activeImpactDotIndex ? "true" : undefined}
               tabIndex={collapsed ? -1 : undefined}
             />

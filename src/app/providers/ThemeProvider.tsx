@@ -1,9 +1,17 @@
 import * as React from "react";
+import {
+  ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT,
+  THEME_STORAGE_KEY,
+  applyAlternativeThemeConfig,
+  readAlternativeThemeConfig,
+} from "@app/theme/alternativeTheme";
 import { useUIStore, type Theme } from "@store/uiStore";
+
+type ResolvedTheme = "light" | "dark" | "alternative";
 
 interface ThemeContextValue {
   theme: Theme;
-  resolvedTheme: "light" | "dark";
+  resolvedTheme: ResolvedTheme;
   setTheme: (theme: Theme) => void;
 }
 
@@ -12,18 +20,35 @@ const ThemeContext = React.createContext<ThemeContextValue | undefined>(undefine
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useUIStore((state) => state.theme);
   const setThemeStore = useUIStore((state) => state.setTheme);
-  const [resolvedTheme, setResolvedTheme] = React.useState<"light" | "dark">("light");
+  const [resolvedTheme, setResolvedTheme] = React.useState<ResolvedTheme>("light");
+
+  React.useLayoutEffect(() => {
+    try {
+      const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+      if (isStoredTheme(storedTheme) && storedTheme !== theme) {
+        setThemeStore(storedTheme);
+      } else if (storedTheme !== null && !isStoredTheme(storedTheme)) {
+        window.localStorage.removeItem(THEME_STORAGE_KEY);
+      }
+    } catch {
+      // The zustand store remains the source of truth if localStorage is unavailable.
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useLayoutEffect(() => {
     const root = window.document.documentElement;
 
     const applyTheme = (newTheme: Theme) => {
-      let nextResolvedTheme: "light" | "dark" = "light";
+      let nextResolvedTheme: ResolvedTheme = "light";
 
-      root.classList.remove("light", "dark", "high-contrast");
+      root.classList.remove("light", "dark", "alternative", "high-contrast");
       if (newTheme === "high-contrast") {
         root.classList.add("high-contrast");
         nextResolvedTheme = "light";
+      } else if (newTheme === "alternative") {
+        applyAlternativeThemeConfig(root, readAlternativeThemeConfig());
+        root.classList.add("alternative");
+        nextResolvedTheme = "alternative";
       } else if (newTheme === "system") {
         nextResolvedTheme = window.matchMedia("(prefers-color-scheme: dark)").matches
           ? "dark"
@@ -35,8 +60,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
 
       root.dataset.theme = nextResolvedTheme;
-      root.style.colorScheme = nextResolvedTheme;
+      root.style.colorScheme = nextResolvedTheme === "dark" ? "dark" : "light";
       setResolvedTheme(nextResolvedTheme);
+
+      try {
+        if (isStoredTheme(newTheme)) {
+          window.localStorage.setItem(THEME_STORAGE_KEY, newTheme);
+        } else {
+          window.localStorage.removeItem(THEME_STORAGE_KEY);
+        }
+      } catch {
+        // Theme persistence is best-effort.
+      }
     };
 
     applyTheme(theme);
@@ -49,12 +84,27 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
   }, [theme]);
 
+  React.useEffect(() => {
+    if (theme !== "alternative") return;
+
+    const handleAlternativeThemeConfigChanged = () => {
+      applyAlternativeThemeConfig(window.document.documentElement, readAlternativeThemeConfig());
+    };
+
+    window.addEventListener(ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT, handleAlternativeThemeConfigChanged);
+    return () => window.removeEventListener(ALTERNATIVE_THEME_CONFIG_CHANGED_EVENT, handleAlternativeThemeConfigChanged);
+  }, [theme]);
+
   const value = React.useMemo(
     () => ({ theme, resolvedTheme, setTheme: setThemeStore }),
     [theme, resolvedTheme, setThemeStore],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
+function isStoredTheme(value: unknown): value is Extract<Theme, "light" | "dark" | "alternative"> {
+  return value === "light" || value === "dark" || value === "alternative";
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

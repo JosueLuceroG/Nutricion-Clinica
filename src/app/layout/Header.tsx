@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Bell, Search, Moon, Sun, MonitorSmartphone, User, Menu } from "lucide-react";
+import { Bell, Check, Search, Moon, Sun, Palette, User, Menu } from "lucide-react";
+import { useTheme } from "@app/providers/ThemeProvider";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
 import {
@@ -12,19 +13,32 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
-import { useUIStore, type Theme } from "@store/uiStore";
+import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
 import { useNotificationStore } from "@store/notificationStore";
 
+const THEME_LONG_PRESS_MS = 1000;
+const headerThemeOptions = [
+  { value: "light", label: "Claro", icon: Sun },
+  { value: "dark", label: "Oscuro", icon: Moon },
+  { value: "alternative", label: "Alternativo", icon: Palette },
+] as const;
+
+type HeaderSelectableTheme = (typeof headerThemeOptions)[number]["value"];
+
 export function Header() {
   const { t } = useTranslation();
-  const theme = useUIStore((s) => s.theme);
-  const setTheme = useUIStore((s) => s.setTheme);
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const openCommand = useCommandPaletteStore((s) => s.setOpen);
   const user = useAuthStore((s) => s.user);
   const unread = useNotificationStore((s) => s.unread);
   const navigate = useNavigate();
+  const [themeMenuOpen, setThemeMenuOpen] = React.useState(false);
+  const themePickerRef = React.useRef<HTMLDivElement>(null);
+  const longPressTimerRef = React.useRef<number | null>(null);
+  const longPressOpenedRef = React.useRef(false);
+  const activeHeaderTheme: HeaderSelectableTheme = theme === "alternative" ? "alternative" : resolvedTheme === "dark" ? "dark" : "light";
 
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -37,14 +51,81 @@ export function Header() {
     return () => window.removeEventListener("keydown", handler);
   }, [openCommand]);
 
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current === null) return;
+    window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+
   const cycleTheme = () => {
-    const order: Theme[] = ["light", "dark", "system", "high-contrast"];
-    const idx = order.indexOf(theme);
-    setTheme(order[(idx + 1) % order.length]);
+    const activeIndex = headerThemeOptions.findIndex((option) => option.value === activeHeaderTheme);
+    const nextOption = headerThemeOptions[(activeIndex + 1) % headerThemeOptions.length] ?? headerThemeOptions[0];
+    setTheme(nextOption.value);
   };
 
   const ThemeIcon =
-    theme === "light" ? Sun : theme === "dark" ? Moon : MonitorSmartphone;
+    activeHeaderTheme === "light" ? Sun : activeHeaderTheme === "dark" ? Moon : Palette;
+
+  React.useEffect(() => clearLongPressTimer, []);
+
+  React.useEffect(() => {
+    if (!themeMenuOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (target && themePickerRef.current?.contains(target)) return;
+      setThemeMenuOpen(false);
+    };
+
+    window.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => window.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, [themeMenuOpen]);
+
+  const handleThemePointerDown = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    longPressOpenedRef.current = false;
+    clearLongPressTimer();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    longPressTimerRef.current = window.setTimeout(() => {
+      longPressOpenedRef.current = true;
+      longPressTimerRef.current = null;
+      setThemeMenuOpen(true);
+    }, THEME_LONG_PRESS_MS);
+  };
+
+  const handleThemePointerUp = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    clearLongPressTimer();
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    if (longPressOpenedRef.current) return;
+    setThemeMenuOpen(false);
+    cycleTheme();
+  };
+
+  const handleThemePointerCancel = (event: React.PointerEvent<HTMLButtonElement>) => {
+    clearLongPressTimer();
+    longPressOpenedRef.current = false;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  const handleThemeKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      setThemeMenuOpen(false);
+      cycleTheme();
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setThemeMenuOpen(true);
+    }
+    if (event.key === "Escape") {
+      setThemeMenuOpen(false);
+    }
+  };
 
   const toggleMobileSidebar = useUIStore((s) => s.toggleMobileSidebar);
 
@@ -86,15 +167,53 @@ export function Header() {
       </div>
 
       <div className="ml-auto flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={cycleTheme}
-          aria-label={t("theme.change_theme")}
-          title={t("layout.theme_title", { theme })}
-        >
-          <ThemeIcon className="h-4 w-4" />
-        </Button>
+        <div className="relative" ref={themePickerRef}>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-haspopup="menu"
+            aria-expanded={themeMenuOpen}
+            aria-label={`${t("theme.change_theme")}. Mantén presionado 1 segundo para elegir tema.`}
+            title={`${t("layout.theme_title", { theme })}. Click para cambiar, mantener presionado 1 segundo para opciones.`}
+            onPointerDown={handleThemePointerDown}
+            onPointerUp={handleThemePointerUp}
+            onPointerCancel={handleThemePointerCancel}
+            onLostPointerCapture={handleThemePointerCancel}
+            onKeyDown={handleThemeKeyDown}
+          >
+            <ThemeIcon className="h-4 w-4" />
+          </Button>
+          {themeMenuOpen && (
+            <div
+              className="absolute right-0 top-full z-50 mt-2 min-w-40 rounded-xl border border-border/80 bg-popover/95 p-1.5 text-popover-foreground shadow-xl backdrop-blur"
+              role="menu"
+              aria-label="Seleccionar tema"
+            >
+              {headerThemeOptions.map((option) => {
+                const OptionIcon = option.icon;
+                const isActive = activeHeaderTheme === option.value;
+
+                return (
+                  <button
+                    type="button"
+                    key={option.value}
+                    role="menuitemradio"
+                    aria-checked={isActive}
+                    className="flex min-h-8 w-full items-center gap-2 rounded-lg px-2.5 text-left text-xs font-semibold transition-colors hover:bg-accent hover:text-accent-foreground active:scale-[0.985]"
+                    onClick={() => {
+                      setTheme(option.value);
+                      setThemeMenuOpen(false);
+                    }}
+                  >
+                    <OptionIcon className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+                    <span className="flex-1">{option.label}</span>
+                    {isActive && <Check className="h-3.5 w-3.5 text-primary" aria-hidden="true" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <Button
           variant="ghost"

@@ -15,6 +15,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  Sparkles,
   Users as UsersIcon,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@components/ui/dialog";
@@ -88,7 +89,7 @@ export function CommandPalette() {
   );
 
   const switchTheme = React.useCallback(
-    (t: "light" | "dark" | "system") => () => {
+    (t: "light" | "dark" | "alternative" | "system") => () => {
       setTheme(t);
       setOpen(false);
       setSearch("");
@@ -204,6 +205,13 @@ export function CommandPalette() {
         group: t("command.actions"),
         icon: Monitor,
         action: switchTheme("system"),
+      },
+      {
+        id: "theme-alternative",
+        label: "Tema alternativo",
+        group: t("command.actions"),
+        icon: Sparkles,
+        action: switchTheme("alternative"),
       },
       {
         id: "lang-es",
