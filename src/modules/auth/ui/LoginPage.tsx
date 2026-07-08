@@ -3,13 +3,19 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
+  Cloud,
   Eye,
   EyeOff,
+  Headphones,
+  Heart,
+  Leaf,
   Lock,
-  LogIn,
   Mail,
-  ShieldCheck,
+  Plus,
   Shield,
+  ShieldCheck,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -23,7 +29,7 @@ import { NutriLogoLoader } from "@components/loaders/NutriLogoLoader";
 import { authApi } from "@services/api/authApi";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
-import { RoleLabel, type AuthSucursalDTO } from "@nutriclinica/shared";
+import { type AuthSucursalDTO } from "@nutriclinica/shared";
 import "./LoginPage.css";
 
 export function LoginPage() {
@@ -77,9 +83,6 @@ export function LoginPage() {
         setPending2faToken(response.pending2faToken);
         setLoading(false);
         return;
-      }
-      if (rememberMe) {
-        localStorage.setItem("nc_remembered_email", email);
       }
       if (rememberMe) {
         localStorage.setItem("nc_remembered_email", email);
@@ -161,57 +164,84 @@ export function LoginPage() {
     navigate("/", { replace: true });
   };
 
-  const rolesList = Object.values(RoleLabel).slice(0, 3).join(" \u00b7 ");
-
   return (
     <main className="nc-login-page">
       {loading && <NutriLogoLoader text="Iniciando sesión..." fullscreen />}
 
       <section className="nc-login-shell">
-
-        <div className="nc-shell-art" aria-hidden="true">
-          <img src="/assets/login-hero.png" alt="" className="nc-shell-art-image" />
-          <div className="nc-shell-art-overlay" />
-        </div>
-
-        {/* ===== LEFT ===== */}
         <section className="nc-brand-panel">
-          <div className="nc-brand-circle" />
-          <div className="nc-brand-dots" />
+          <div className="nc-brand-orbit" aria-hidden="true" />
+          <div className="nc-brand-dots" aria-hidden="true" />
 
-          <div className="nc-brand-content">
-            <img
-              className="nc-logo"
-              src="/assets/nutriclinica-logo.png"
-              alt="NutriClinica"
-            />
+          <img
+            className="nc-logo"
+            src="/assets/nutriclinica-logo.png"
+            alt="NutriClinica"
+          />
 
+          <div className="nc-brand-layout">
             <div className="nc-brand-copy">
               <h1>
-                <span className="nc-title-main">Gesti&oacute;n cl&iacute;nica nutricional</span>
-                <span className="nc-title-line">
-                  m&aacute;s <span className="nc-title-gradient">simple, segura y eficiente</span>
-                </span>
+                <span>{t("auth.hero_title_line_1")}</span>
+                <span>{t("auth.hero_title_line_2")}</span>
+                <span className="nc-title-gradient">{t("auth.hero_title_line_3")}</span>
+                <span className="nc-title-gradient nc-title-gradient-last">{t("auth.hero_title_line_4")}</span>
               </h1>
 
+              <div className="nc-title-accent" aria-hidden="true">
+                <span />
+                <i />
+                <i />
+                <i />
+              </div>
+
               <p className="nc-hero-description">
-  Una plataforma diseñada para nutriólogas
-  <br />
-  y su equipo, que mejora la atención y el
-  <br />
-  seguimiento de cada paciente.
-</p>
+                {t("auth.hero_description")}
+              </p>
             </div>
+
+            <div className="nc-feature-stack" aria-label={t("auth.feature_group_label")}>
+              <article className="nc-feature-card">
+                <div className="nc-feature-icon">
+                  <ShieldCheck size={42} strokeWidth={2.35} />
+                </div>
+                <div>
+                  <strong>{t("auth.feature_security_title")}</strong>
+                  <p>{t("auth.feature_security_desc")}</p>
+                </div>
+              </article>
+
+              <article className="nc-feature-card">
+                <div className="nc-feature-icon">
+                  <TrendingUp size={42} strokeWidth={2.35} />
+                </div>
+                <div>
+                  <strong>{t("auth.feature_efficiency_title")}</strong>
+                  <p>{t("auth.feature_efficiency_desc")}</p>
+                </div>
+              </article>
+
+              <article className="nc-feature-card">
+                <div className="nc-feature-icon">
+                  <Users size={42} strokeWidth={2.35} />
+                </div>
+                <div>
+                  <strong>{t("auth.feature_collaboration_title")}</strong>
+                  <p>{t("auth.feature_collaboration_desc")}</p>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div className="nc-hero-visual" aria-hidden="true">
+            <img src="/assets/login-hero.png" alt="" className="nc-hero-image" />
           </div>
         </section>
 
-        {/* ===== RIGHT ===== */}
         <section className="nc-form-panel">
-
           {requires2fa ? (
-            /* ---------- 2FA ---------- */
-            <div className="nc-login-card nc-card-2fa">
-              <header className="nc-login-header">
+            <div className="nc-login-card nc-login-card-alt">
+              <header className="nc-login-header nc-login-header-alt">
                 <div className="nc-login-icon">
                   <Shield size={31} strokeWidth={2.2} />
                 </div>
@@ -221,10 +251,10 @@ export function LoginPage() {
                 </div>
               </header>
 
-              <form onSubmit={handleTotpSubmit}>
+              <form className="nc-alt-form" onSubmit={handleTotpSubmit}>
                 <div className="nc-field">
                   <label htmlFor="totp">{t("auth.2fa_code")}</label>
-                  <div className="nc-input">
+                  <div className="nc-input nc-input-centered">
                     <input
                       id="totp"
                       type="text"
@@ -256,13 +286,11 @@ export function LoginPage() {
                 </button>
               </form>
             </div>
-
           ) : sucursales && sucursales.length > 1 ? (
-            /* ---------- Branch selection ---------- */
-            <div className="nc-login-card">
-              <header className="nc-login-header">
+            <div className="nc-login-card nc-login-card-alt">
+              <header className="nc-login-header nc-login-header-alt">
                 <div className="nc-login-icon">
-                  <LogIn size={31} strokeWidth={2.2} />
+                  <ArrowRight size={31} strokeWidth={2.2} />
                 </div>
                 <div>
                   <h2>{t("auth.select_branch")}</h2>
@@ -284,21 +312,22 @@ export function LoginPage() {
                 ))}
               </div>
             </div>
-
           ) : (
-            /* ---------- Normal login ---------- */
-            <form className="nc-login-card" onSubmit={handleLogin}>
+            <form className="nc-login-card nc-login-card-main" onSubmit={handleLogin}>
+              <div className="nc-login-emblem" aria-hidden="true">
+                <Heart className="nc-login-emblem-heart" size={92} strokeWidth={2.5} />
+                <Plus className="nc-login-emblem-plus" size={39} strokeWidth={2.7} />
+                <Leaf className="nc-login-emblem-leaf" size={49} strokeWidth={2.15} />
+              </div>
+
               <header className="nc-login-header">
-                <div className="nc-login-icon">
-                  <LogIn size={31} strokeWidth={2.2} />
-                </div>
-                <div>
-                  <h2>{t("auth.login_title")}</h2>
-                  <p>{t("auth.tagline")}</p>
+                <h2>{t("auth.welcome_back")}</h2>
+                <p>{t("auth.signin_subtitle")}</p>
+                <div className="nc-login-header-accent" aria-hidden="true">
+                  <span />
+                  <i />
                 </div>
               </header>
-
-              <div className="nc-divider" />
 
               <div className="nc-field">
                 <label htmlFor="email">{t("auth.email")}</label>
@@ -312,7 +341,7 @@ export function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoFocus
-                    placeholder="correo@ejemplo.com"
+                    placeholder={t("auth.email_placeholder")}
                   />
                 </div>
               </div>
@@ -328,7 +357,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    placeholder="Contraseña"
+                    placeholder={t("auth.password_placeholder")}
                   />
                   <button
                     type="button"
@@ -375,30 +404,53 @@ export function LoginPage() {
                 ) : (
                   <>
                     <span>{t("auth.login_button")}</span>
-                    <ArrowRight size={23} strokeWidth={2.2} />
+                    <ArrowRight size={26} strokeWidth={2.1} />
                   </>
                 )}
               </button>
 
-              <div className="nc-secure-box">
-                <div className="nc-secure-icon">
-                  <ShieldCheck size={22} strokeWidth={2.1} />
-                </div>
-                <div>
-                  <strong>{t("auth.secure_access")}</strong>
-                  <p>{t("auth.secure_access_desc")}</p>
-                </div>
-              </div>
+              <div className="nc-login-card-rule" aria-hidden="true" />
 
-              <footer className="nc-login-footer">
-                <strong>{t("auth.credentials_note")}</strong>
-                <span>{t("auth.roles_available", { roles: rolesList })}</span>
-              </footer>
+              <div className="nc-login-security-row" aria-label={t("auth.secure_access")}>
+                <article className="nc-security-item">
+                  <Lock size={32} strokeWidth={2.2} />
+                  <div>
+                    <strong>{t("auth.security_access_short")}</strong>
+                    <p>{t("auth.security_access_short_desc")}</p>
+                  </div>
+                </article>
+
+                <article className="nc-security-item">
+                  <ShieldCheck size={34} strokeWidth={2.15} />
+                  <div>
+                    <strong>{t("auth.privacy_guaranteed")}</strong>
+                    <p>{t("auth.privacy_guaranteed_desc")}</p>
+                  </div>
+                </article>
+
+                <article className="nc-security-item">
+                  <Cloud size={34} strokeWidth={2.15} />
+                  <div>
+                    <strong>{t("auth.backup_daily_title")}</strong>
+                    <p>{t("auth.backup_daily_desc")}</p>
+                  </div>
+                </article>
+              </div>
             </form>
           )}
-
         </section>
+
+        <footer className="nc-login-footer">
+          <span>{t("auth.footer_copyright")}</span>
+          <span className="nc-footer-mark" aria-hidden="true" />
+          <span className="nc-footer-support">
+            <Headphones size={20} strokeWidth={2.15} />
+            <strong>{t("auth.support_title")}</strong>
+            <span>{t("auth.support_email")}</span>
+          </span>
+        </footer>
       </section>
+
       <Dialog open={forgotOpen} onOpenChange={setForgotOpen}>
         <DialogContent>
           <DialogHeader>
