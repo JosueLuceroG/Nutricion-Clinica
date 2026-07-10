@@ -323,7 +323,6 @@ export function LoginPage() {
                 <p>{t("auth.signin_subtitle")}</p>
                 <div className="nc-login-header-accent" aria-hidden="true">
                   <span />
-                  <i />
                 </div>
               </header>
 

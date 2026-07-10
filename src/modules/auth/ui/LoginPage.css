@@ -154,7 +154,6 @@
   width: 60px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(18, 109, 255, 0.14);
   box-shadow: none;
 }
 
@@ -175,7 +174,6 @@
   width: 4px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(18, 198, 175, 0.22);
 }
 
 .nc-title-accent i::before {
@@ -418,11 +416,9 @@
   width: 34px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(21, 120, 255, 0.16);
 }
 
-.nc-login-header-accent span::before,
-.nc-login-header-accent i::before {
+.nc-login-header-accent span::before {
   content: "";
   position: absolute;
   inset: 0 auto 0 0;
@@ -431,24 +427,9 @@
   animation: nc-login-line-pass 1.6s linear infinite;
 }
 
-.nc-login-header-accent i {
-  position: relative;
-  overflow: hidden;
-  width: 23px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(21, 120, 255, 0.16);
-}
-
 .nc-login-header-accent span::before {
   width: 34px;
   background: linear-gradient(90deg, var(--nc-login-cyan), var(--nc-login-blue));
-}
-
-.nc-login-header-accent i::before {
-  width: 23px;
-  background: rgba(18, 109, 255, 0.28);
-  animation-delay: 0.2s;
 }
 
 @keyframes nc-login-line-pass {
