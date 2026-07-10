@@ -3,18 +3,16 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowRight,
+  ChartNoAxesCombined,
   Cloud,
   Eye,
   EyeOff,
+  HeartHandshake,
   Headphones,
-  Heart,
-  Leaf,
   Lock,
   Mail,
-  Plus,
   Shield,
   ShieldCheck,
-  TrendingUp,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -213,7 +211,7 @@ export function LoginPage() {
 
               <article className="nc-feature-card">
                 <div className="nc-feature-icon">
-                  <TrendingUp size={42} strokeWidth={2.35} />
+                  <ChartNoAxesCombined size={42} strokeWidth={2.35} />
                 </div>
                 <div>
                   <strong>{t("auth.feature_efficiency_title")}</strong>
@@ -234,7 +232,7 @@ export function LoginPage() {
           </div>
 
           <div className="nc-hero-visual" aria-hidden="true">
-            <img src="/assets/login-hero.png" alt="" className="nc-hero-image" />
+            <img src="/assets/login-hero2.png" alt="" className="nc-hero-image" />
           </div>
         </section>
 
@@ -315,9 +313,9 @@ export function LoginPage() {
           ) : (
             <form className="nc-login-card nc-login-card-main" onSubmit={handleLogin}>
               <div className="nc-login-emblem" aria-hidden="true">
-                <Heart className="nc-login-emblem-heart" size={92} strokeWidth={2.5} />
-                <Plus className="nc-login-emblem-plus" size={39} strokeWidth={2.7} />
-                <Leaf className="nc-login-emblem-leaf" size={49} strokeWidth={2.15} />
+                <span className="nc-login-emblem-mark">
+                  <HeartHandshake className="nc-login-emblem-main" size={58} strokeWidth={2.05} />
+                </span>
               </div>
 
               <header className="nc-login-header">
@@ -394,7 +392,7 @@ export function LoginPage() {
               <button
                 type="submit"
                 className="nc-submit"
-                disabled={loading || !email || !password}
+                disabled={loading}
               >
                 {loading ? (
                   <>
