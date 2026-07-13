@@ -1,13 +1,12 @@
 import {
-  AlarmClock,
   Banknote,
   CalendarDays,
   CircleDollarSign,
   ClipboardCheck,
   CreditCard,
-  ReceiptText,
   Send,
   Star,
+  BarChart3,
   UserPlus,
   UsersRound,
   UtensilsCrossed,
@@ -23,6 +22,7 @@ export interface DashboardKpiItem {
   label: string;
   value: string;
   trend?: string;
+  trendTone?: "up" | "down" | "neutral";
   hint: string;
   tone: DashboardKpiTone;
   icon: LucideIcon;
@@ -141,7 +141,7 @@ export interface ActivitySummaryItem {
 export const weeklyActivitySummary: ActivitySummaryItem[] = [
   { value: "69", label: "Consultas", icon: CalendarDays },
   { value: "18", label: "Nuevos pacientes", icon: UsersRound },
-  { value: "87%", label: "Adherencia prom.", icon: AlarmClock },
+  { value: "Jue", label: "Día con más consultas", icon: BarChart3 },
 ];
 
 export type DashboardAlertTone = "pink" | "orange" | "amber";
@@ -152,6 +152,7 @@ export interface DashboardAlertItem {
   count: string;
   tone: DashboardAlertTone;
   icon: LucideIcon;
+  actionTo?: string;
 }
 
 export const dashboardAlerts: DashboardAlertItem[] = [
@@ -161,6 +162,7 @@ export const dashboardAlerts: DashboardAlertItem[] = [
     count: "›",
     tone: "pink",
     icon: CircleDollarSign,
+    actionTo: "/billing",
   },
   {
     title: "5 consultas sin confirmar",
@@ -194,6 +196,7 @@ export interface FinancialSummaryData {
   trend: string;
   objective: string;
   collectionRate: string;
+  sparkline: number[];
   items: FinancialSummaryItem[];
 }
 
@@ -202,6 +205,7 @@ export const financialSummary: FinancialSummaryData = {
   trend: "+8.4% vs. mes anterior",
   objective: "72% del objetivo mensual",
   collectionRate: "72%",
+  sparkline: [420, 610, 560, 720, 850],
   items: [
     {
       label: "Cobrado",
@@ -288,38 +292,45 @@ export interface QuickActionItem {
 
 export const quickActions: QuickActionItem[] = [
   {
-    label: "Agregar paciente",
-    detail: "Crear expediente",
-    to: "/pacientes/nuevo",
-    tone: "blue",
-    icon: UserPlus,
-  },
-  {
     label: "Nueva consulta",
     detail: "Registrar atención",
     to: "/consultas/nueva",
-    tone: "green",
+    tone: "blue",
     icon: ClipboardCheck,
   },
   {
-    label: "Registrar pago",
-    detail: "Actualizar cobros",
-    to: "/billing/payments",
-    tone: "orange",
-    icon: ReceiptText,
+    label: "Agregar paciente",
+    detail: "Crear expediente",
+    to: "/pacientes/nuevo",
+    tone: "green",
+    icon: UserPlus,
   },
   {
     label: "Crear plan",
     detail: "Ver planes activos",
     to: "/planes",
-    tone: "purple",
+    tone: "green",
+    icon: UtensilsCrossed,
+  },
+  {
+    label: "Plan de alimentos",
+    detail: "Planificación semanal",
+    to: "/plan-semanal",
+    tone: "orange",
     icon: UtensilsCrossed,
   },
   {
     label: "Enviar recordatorio",
     detail: "Pacientes pendientes",
     to: "/notificaciones",
-    tone: "blue",
+    tone: "purple",
     icon: Send,
+  },
+  {
+    label: "Reporte financiero",
+    detail: "Ingresos y cobros",
+    to: "/billing/report",
+    tone: "blue",
+    icon: BarChart3,
   },
 ];

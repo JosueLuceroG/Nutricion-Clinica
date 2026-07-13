@@ -1,6 +1,7 @@
 import * as React from "react";
 import { SlidersHorizontal } from "lucide-react";
 import { useDashboardKpis, type DashboardKpis, type DashboardRecentPayment } from "@app/hooks/useDashboardKpis";
+import { AppointmentTypeLabel } from "@modules/agenda/domain/AppointmentType";
 import {
   DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
   usePreferencesStore,
@@ -19,9 +20,6 @@ import {
   dashboardKpis,
   financialSummary,
   quickActions,
-  recentPayments,
-  upcomingConsultations,
-  weeklyActivityData,
   weeklyActivitySummary,
 } from "./dashboardMockData";
 import { FinancialSummaryCard } from "./FinancialSummaryCard";
@@ -33,6 +31,13 @@ import { WeeklyActivityCard } from "./WeeklyActivityCard";
 
 const avatarTones = ["warm", "cool", "rose", "slate"] as const;
 const paymentAvatarTones = ["warm", "cool", "rose"] as const;
+const weekDayLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+const emptyWeeklyActivity: WeeklyActivityPoint[] = weekDayLabels.map((day) => ({
+  day,
+  consultas: 0,
+  nuevos: 0,
+}));
 
 function normalizeKpiOrder(order: DashboardPremiumKpiId[], items: DashboardKpiItem[]): DashboardPremiumKpiId[] {
   const validIds = new Set(items.map((item) => item.id));
@@ -69,6 +74,20 @@ function money(value: number): string {
   }).format(value);
 }
 
+function percentageTrend(current: number, previous: number): { label?: string; tone: "up" | "down" | "neutral" } {
+  if (current === 0 && previous === 0) return { tone: "neutral" };
+  if (previous === 0) return { label: "Nuevo", tone: "up" };
+  const change = Math.round(((current - previous) / previous) * 100);
+  if (change > 0) return { label: `↑ ${change}%`, tone: "up" };
+  if (change < 0) return { label: `↓ ${Math.abs(change)}%`, tone: "down" };
+  return { label: "0%", tone: "neutral" };
+}
+
+function currentMonthRangeLabel(now = new Date()): string {
+  const month = new Intl.DateTimeFormat("es-MX", { month: "short" }).format(now).replace(".", "");
+  return `Del 1 al ${now.getDate()} de ${month}`;
+}
+
 function initialsFromName(name: string): string {
   const initials = name
     .split(/\s+/)
@@ -81,38 +100,81 @@ function initialsFromName(name: string): string {
 }
 
 function buildLiveKpis(data: DashboardKpis | null): DashboardKpiItem[] {
-  if (!data) return dashboardKpis;
   const [patients, consultations, income, pending] = dashboardKpis;
+
+  if (!data) {
+    return [
+      {
+        ...patients!,
+        label: "Pacientes activos",
+        value: "--",
+        trend: undefined,
+        hint: "Esperando datos reales",
+      },
+      {
+        ...consultations!,
+        label: "Consultas de hoy",
+        value: "--",
+        trend: undefined,
+        hint: "Esperando datos reales",
+      },
+      {
+        ...income!,
+        label: "Ingresos del mes",
+        value: money(0),
+        trend: undefined,
+        hint: "Sin datos cargados",
+      },
+      {
+        ...pending!,
+        label: "Pendiente de cobro",
+        value: money(0),
+        trend: undefined,
+        hint: "Sin datos cargados",
+      },
+    ];
+  }
+
+  const patientTrend = percentageTrend(data.newPatientsThisMonth, data.newPatientsPreviousMonth);
+  const incomeTrend = percentageTrend(data.incomeThisMonth, data.incomePreviousMonth);
 
   return [
     {
       ...patients!,
+      label: "Pacientes activos",
       value: data.totalActivePatients.toString(),
-      trend: data.totalActivePatients > 0 ? "Activo" : undefined,
-      hint: `${data.totalPatients} pacientes registrados`,
+      trend: patientTrend.label,
+      trendTone: patientTrend.tone,
+      hint: `${data.newPatientsThisMonth} nuevos este mes · ${data.totalPatients} registrados`,
     },
     {
       ...consultations!,
+      label: "Consultas realizadas hoy",
       value: data.consultationsToday.toString(),
-      hint: `${data.consultationsThisMonth} consultas este mes`,
+      trend: undefined,
+      hint: `${data.scheduledConsultationsToday} citas en agenda`,
     },
     {
       ...income!,
+      label: "Ingresos del mes",
       value: money(data.incomeThisMonth),
-      trend: undefined,
-      hint: "Ingresos liquidados este mes",
+      trend: incomeTrend.label,
+      trendTone: incomeTrend.tone,
+      hint: currentMonthRangeLabel(),
     },
     {
       ...pending!,
+      label: "Saldo pendiente total",
       value: money(data.pendingPaymentsAmount),
-      hint: `${data.pendingPayments} consultas pendientes`,
+      trend: undefined,
+      hint: `${data.pendingPayments} consultas con saldo`,
     },
   ];
 }
 
 function buildLiveAlerts(data: DashboardKpis | null): DashboardAlertItem[] {
-  if (!data) return dashboardAlerts;
-  const [pendingPayment, upcoming, expiring] = dashboardAlerts;
+  if (!data) return [];
+  const [pendingPayment, unconfirmed, expiring] = dashboardAlerts;
 
   return [
     {
@@ -120,63 +182,127 @@ function buildLiveAlerts(data: DashboardKpis | null): DashboardAlertItem[] {
       title: `${data.pendingPayments} consultas pendientes de cobro`,
       detail: `Total: ${money(data.pendingPaymentsAmount)}`,
       count: data.pendingPayments > 0 ? "›" : "0",
+      actionTo: "/billing",
     },
     {
-      ...upcoming!,
-      title: `${data.upcomingConsultations.length} consultas próximas`,
-      detail: "Agenda operativa",
-      count: data.upcomingConsultations.length.toString(),
+      ...unconfirmed!,
+      title: `${data.unconfirmedAppointments.length} citas sin confirmar`,
+      detail: "Requieren confirmación",
+      count: data.unconfirmedAppointments.length.toString(),
     },
     {
       ...expiring!,
       title: `${data.expiringPlans.length} planes por vencer`,
-      detail: "Próximos 30 días",
+      detail: "Próximos 7 días",
       count: data.expiringPlans.length.toString(),
     },
   ];
 }
 
 function buildLiveFinancialSummary(data: DashboardKpis | null): FinancialSummaryData {
-  if (!data) return financialSummary;
-  const totalOperational = data.incomeThisMonth + data.pendingPaymentsAmount;
+  const [paid, pending, average] = financialSummary.items;
+
+  if (!data) {
+    return {
+      total: money(0),
+      trend: "Sin datos cargados",
+      objective: "Esperando datos reales",
+      collectionRate: "0%",
+      sparkline: [],
+      items: [
+        {
+          ...paid!,
+          value: money(0),
+          detail: "Pagos liquidados este mes",
+          percent: 0,
+        },
+        {
+          ...pending!,
+          value: money(0),
+          detail: "Consultas pendientes",
+          percent: 0,
+        },
+        {
+          ...average!,
+          value: money(0),
+          detail: "Sin pagos este mes",
+          percent: 0,
+        },
+      ],
+    };
+  }
+
+  const totalOperational = data.incomeThisMonth + data.pendingPaymentsAmountThisMonth;
   const collectionPercent = totalOperational > 0
     ? Math.round((data.incomeThisMonth / totalOperational) * 100)
-    : 100;
-  const averageTicket = data.consultationsThisMonth > 0
-    ? data.incomeThisMonth / data.consultationsThisMonth
     : 0;
-  const [paid, pending, average] = financialSummary.items;
+  const averageTicket = data.paymentsThisMonth > 0
+    ? data.incomeThisMonth / data.paymentsThisMonth
+    : 0;
+  const incomeTrend = percentageTrend(data.incomeThisMonth, data.incomePreviousMonth);
 
   return {
     total: money(totalOperational),
-    trend: "Datos reales del mes",
-    objective: `${collectionPercent}% recuperado del total operativo`,
+    trend: incomeTrend.label ? `${incomeTrend.label} vs. mes anterior` : "Sin variación mensual",
+    objective: totalOperational > 0 ? `${collectionPercent}% recuperado este mes` : "Sin cobros registrados este mes",
     collectionRate: `${collectionPercent}%`,
+    sparkline: data.incomeActivity,
     items: [
       {
         ...paid!,
         value: money(data.incomeThisMonth),
-        detail: "Pagos liquidados",
+        detail: `${data.paymentsThisMonth} pagos liquidados este mes`,
         percent: collectionPercent,
       },
       {
         ...pending!,
-        value: money(data.pendingPaymentsAmount),
-        detail: `${data.pendingPayments} consultas pendientes`,
+        value: money(data.pendingPaymentsAmountThisMonth),
+        detail: `${data.pendingPaymentsThisMonth} consultas pendientes este mes`,
         percent: Math.max(0, 100 - collectionPercent),
       },
       {
         ...average!,
         value: money(averageTicket),
-        detail: `${data.consultationsThisMonth} consultas del mes`,
-        percent: data.consultationsThisMonth > 0 ? 82 : 0,
+        detail: `${data.paymentsThisMonth} pagos registrados este mes`,
+        percent: 0,
       },
     ],
   };
 }
 
+function appointmentTimeLabel(date: string, time: string): string {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(`${date}T${time}:00`));
+}
+
+function appointmentStatusLabel(status: string) {
+  if (status === "in_progress") return "En curso" as const;
+  if (status === "confirmed") return "Confirmada" as const;
+  return "Pendiente" as const;
+}
+
 function buildLiveUpcomingConsultations(data: DashboardKpis | null) {
-  if (!data) return upcomingConsultations;
+  if (!data) return [];
+  if (data.upcomingAppointments.length > 0) {
+    return data.upcomingAppointments
+      .slice(0, 4)
+      .map((appointment, index) => {
+        const patientName = data.patientNamesById[appointment.patientId] ??
+          `Paciente ${appointment.patientId.slice(0, 6)}`;
+
+        return {
+          time: appointmentTimeLabel(appointment.date, appointment.startTime),
+          patient: patientName,
+          type: appointment.reason || AppointmentTypeLabel[appointment.type],
+          status: appointmentStatusLabel(appointment.status),
+          avatar: initialsFromName(patientName),
+          avatarTone: avatarTones[index % avatarTones.length] ?? "warm",
+        };
+      });
+  }
+
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
@@ -221,20 +347,18 @@ function paymentMethodLabel(method: DashboardRecentPayment["paymentMethod"]) {
 
 function paymentDateLabel(date: Date | null) {
   if (!date) return "Sin fecha";
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
-  const days = Math.round((startOfToday - startOfDate) / 86_400_000);
-  if (days === 0) return "Hoy";
-  if (days === 1) return "Ayer";
-  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" }).format(date);
+  return new Intl.DateTimeFormat("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date).replace(".", "");
 }
 
 function buildLiveRecentPayments(data: DashboardKpis | null) {
-  if (!data) return recentPayments;
+  if (!data) return [];
 
   return data.recentPayments.map((payment, index) => {
-    const date = payment.paidAt ?? payment.updatedAt ?? payment.consultationDate;
+    const date = payment.paidAt ?? payment.consultationDate;
     return {
       patient: payment.patientName,
       concept: payment.concept,
@@ -249,13 +373,43 @@ function buildLiveRecentPayments(data: DashboardKpis | null) {
 }
 
 function buildLiveWeeklyActivity(data: DashboardKpis | null): WeeklyActivityPoint[] {
-  if (!data) return weeklyActivityData;
+  if (!data) return emptyWeeklyActivity;
   return data.weeklyActivity;
 }
 
+function buildLiveMonthlyActivity(data: DashboardKpis | null): WeeklyActivityPoint[] {
+  if (!data) return [];
+  return data.monthlyActivity;
+}
+
+function busiestConsultationPeriod(points: WeeklyActivityPoint[]): string {
+  const busiest = points.reduce<WeeklyActivityPoint | null>(
+    (current, point) => !current || point.consultas > current.consultas ? point : current,
+    null,
+  );
+  return busiest && busiest.consultas > 0 ? busiest.day : "--";
+}
+
 function buildLiveWeeklyActivitySummary(data: DashboardKpis | null): ActivitySummaryItem[] {
-  if (!data) return weeklyActivitySummary;
   const [consultations, newPatients, period] = weeklyActivitySummary;
+  if (!data) {
+    return [
+      {
+        ...consultations!,
+        value: "0",
+      },
+      {
+        ...newPatients!,
+        value: "0",
+      },
+      {
+        ...period!,
+        value: "--",
+        label: "Día con más consultas",
+      },
+    ];
+  }
+
   const totalConsultations = data.weeklyActivity.reduce((sum, item) => sum + item.consultas, 0);
   const totalNewPatients = data.weeklyActivity.reduce((sum, item) => sum + item.nuevos, 0);
 
@@ -270,8 +424,28 @@ function buildLiveWeeklyActivitySummary(data: DashboardKpis | null): ActivitySum
     },
     {
       ...period!,
-      value: "7",
-      label: "Días monitoreados",
+      value: busiestConsultationPeriod(data.weeklyActivity),
+      label: "Día con más consultas",
+    },
+  ];
+}
+
+function buildLiveMonthlyActivitySummary(data: DashboardKpis | null): ActivitySummaryItem[] {
+  const [consultations, newPatients, period] = weeklyActivitySummary;
+  const monthlyData = data?.monthlyActivity ?? [];
+  return [
+    {
+      ...consultations!,
+      value: monthlyData.reduce((sum, item) => sum + item.consultas, 0).toString(),
+    },
+    {
+      ...newPatients!,
+      value: monthlyData.reduce((sum, item) => sum + item.nuevos, 0).toString(),
+    },
+    {
+      ...period!,
+      value: busiestConsultationPeriod(monthlyData),
+      label: "Semana con más consultas",
     },
   ];
 }
@@ -294,7 +468,9 @@ export function DashboardPage() {
   const liveUpcomingConsultations = buildLiveUpcomingConsultations(data);
   const liveRecentPayments = buildLiveRecentPayments(data);
   const liveWeeklyActivity = buildLiveWeeklyActivity(data);
+  const liveMonthlyActivity = buildLiveMonthlyActivity(data);
   const liveWeeklyActivitySummary = buildLiveWeeklyActivitySummary(data);
+  const liveMonthlyActivitySummary = buildLiveMonthlyActivitySummary(data);
 
   const moveKpi = (id: DashboardPremiumKpiId, direction: -1 | 1) => {
     const order = normalizeKpiOrder(kpiOrder, liveKpis);
@@ -323,7 +499,7 @@ export function DashboardPage() {
       {(loading || error) && (
         <div className={`nc-dashboard-data-status${error ? " nc-dashboard-data-status--error" : ""}`} role={error ? "alert" : "status"}>
           {error
-            ? "No se pudieron cargar los datos reales; se muestran valores de referencia."
+            ? "No se pudieron cargar los datos reales; se muestran valores vacíos."
             : "Actualizando métricas reales del consultorio..."}
         </div>
       )}
@@ -343,7 +519,12 @@ export function DashboardPage() {
 
       <section className="nc-dashboard-content-grid" aria-label="Resumen operativo">
         <UpcomingConsultationsCard items={liveUpcomingConsultations} />
-        <WeeklyActivityCard data={liveWeeklyActivity} summary={liveWeeklyActivitySummary} />
+        <WeeklyActivityCard
+          weeklyData={liveWeeklyActivity}
+          monthlyData={liveMonthlyActivity}
+          weeklySummary={liveWeeklyActivitySummary}
+          monthlySummary={liveMonthlyActivitySummary}
+        />
         <AlertsAndPendingCard alerts={liveAlerts} />
       </section>
 

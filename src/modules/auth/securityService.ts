@@ -45,8 +45,15 @@ export function hasModuleAccess(
   if (!permissions) return false;
   if (permissions.includes("*")) return true;
   if (permissions.includes(module)) return true;
+  if (action) {
+    if (permissions.includes(`${module}:${action}`)) return true;
+    if (
+      action === "read" &&
+      (permissions.includes(`${module}:read`) || permissions.includes("*:read"))
+    ) return true;
+    return false;
+  }
   if (permissions.includes(`${module}:read`) || permissions.includes("*:read")) return true;
-  if (action && permissions.includes(`${module}:${action}`)) return true;
   return false;
 }
 

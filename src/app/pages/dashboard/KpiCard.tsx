@@ -22,7 +22,11 @@ export function KpiCard({ item }: KpiCardProps) {
         <span className="nc-dashboard-kpi-card__label">{item.label}</span>
         <span className="nc-dashboard-kpi-card__valueRow">
           <span className="nc-dashboard-kpi-card__value">{item.value}</span>
-          {item.trend && <span className="nc-dashboard-kpi-card__trend">{item.trend}</span>}
+          {item.trend && (
+            <span className={`nc-dashboard-kpi-card__trend nc-dashboard-kpi-card__trend--${item.trendTone ?? "up"}`}>
+              {item.trend}
+            </span>
+          )}
         </span>
         <span className="nc-dashboard-kpi-card__hint">{item.hint}</span>
       </span>

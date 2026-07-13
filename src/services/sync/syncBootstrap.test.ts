@@ -182,6 +182,17 @@ describe('startSync / stopSync — cleanup de subs Zustand', () => {
     setSyncSucursal.mockRestore();
   });
 
+  it('limpia la sucursal de sincronización al cerrar sesión', async () => {
+    const { useSyncStore } = await import('@store/syncStore');
+    useSyncStore.getState().setSucursalId('s-1');
+    useAuthStore.setState({ sucursalActivaId: 's-1', isAuthenticated: true });
+    startSync(db, { intervalMs: 0, runOnStart: false });
+
+    useAuthStore.setState({ sucursalActivaId: null, isAuthenticated: false });
+
+    expect(useSyncStore.getState().sucursalId).toBeNull();
+  });
+
   it('stopSync limpia interval y suscripciones (sin crash tras varios ciclos)', () => {
     for (let i = 0; i < 10; i++) {
       startSync(db, { intervalMs: 0, runOnStart: false });

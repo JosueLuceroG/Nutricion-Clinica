@@ -15,8 +15,11 @@ export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin123!";
  * la app cargue, para que zustand persist lo recoja en `isAuthenticated=true`.
  * Útil para tests que necesitan navegar páginas protegidas sin API server.
  */
-export async function fakeLogin(page: Page): Promise<void> {
-  await page.addInitScript((email) => {
+export async function fakeLogin(
+  page: Page,
+  sucursalActivaId: string | null = null,
+): Promise<void> {
+  await page.addInitScript(({ email, sucursalActivaId }) => {
     localStorage.setItem(
       "auth-store",
       JSON.stringify({
@@ -31,13 +34,13 @@ export async function fakeLogin(page: Page): Promise<void> {
             rol: "admin",
           },
           sucursales: [],
-          sucursalActivaId: null,
+          sucursalActivaId,
           isAuthenticated: true,
         },
         version: 0,
       }),
     );
-  }, ADMIN_EMAIL);
+  }, { email: ADMIN_EMAIL, sucursalActivaId });
 }
 
 /** URL base + hash. El router es `createHashRouter`. */

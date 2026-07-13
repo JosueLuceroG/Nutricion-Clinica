@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   CartesianGrid,
   Line,
@@ -7,13 +8,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChevronDown, LineChart as LineChartIcon } from "lucide-react";
+import { LineChart as LineChartIcon } from "lucide-react";
 import { DashboardSectionCard } from "./DashboardSectionCard";
 import type { ActivitySummaryItem, WeeklyActivityPoint } from "./dashboardMockData";
 
 interface WeeklyActivityCardProps {
-  data: WeeklyActivityPoint[];
-  summary: ActivitySummaryItem[];
+  weeklyData: WeeklyActivityPoint[];
+  monthlyData: WeeklyActivityPoint[];
+  weeklySummary: ActivitySummaryItem[];
+  monthlySummary: ActivitySummaryItem[];
 }
 
 interface TooltipPayloadItem {
@@ -44,19 +47,27 @@ function WeeklyTooltip({ active, label, payload }: { active?: boolean; label?: s
   );
 }
 
-export function WeeklyActivityCard({ data, summary }: WeeklyActivityCardProps) {
+export function WeeklyActivityCard({ weeklyData, monthlyData, weeklySummary, monthlySummary }: WeeklyActivityCardProps) {
+  const [period, setPeriod] = React.useState<"week" | "month">("week");
+  const data = period === "week" ? weeklyData : monthlyData;
+  const summary = period === "week" ? weeklySummary : monthlySummary;
   const maxActivityValue = Math.max(0, ...data.flatMap((item) => [item.consultas, item.nuevos]));
   const yAxisMax = Math.max(5, Math.ceil(maxActivityValue / 5) * 5);
 
   return (
     <DashboardSectionCard
-      title="Actividad semanal"
+      title={period === "week" ? "Actividad semanal" : "Actividad mensual"}
       icon={<LineChartIcon size={20} strokeWidth={1.9} />}
       action={
-        <button type="button" className="nc-dashboard-period-button">
-          Esta semana
-          <ChevronDown size={15} strokeWidth={2} aria-hidden="true" />
-        </button>
+        <select
+          className="nc-dashboard-period-button"
+          value={period}
+          onChange={(event) => setPeriod(event.target.value as "week" | "month")}
+          aria-label="Periodo de actividad"
+        >
+          <option value="week">Semanal</option>
+          <option value="month">Mensual</option>
+        </select>
       }
       className="nc-dashboard-section-card--activity"
     >
@@ -65,7 +76,7 @@ export function WeeklyActivityCard({ data, summary }: WeeklyActivityCardProps) {
         <span className="nc-dashboard-chart-legend__item nc-dashboard-chart-legend__item--teal">Nuevos pacientes</span>
       </div>
 
-      <div className="nc-dashboard-weekly-chart" aria-label="Actividad semanal">
+      <div className="nc-dashboard-weekly-chart" aria-label={period === "week" ? "Actividad semanal" : "Actividad mensual"}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 8, bottom: 0, left: -20 }}>
             <defs>

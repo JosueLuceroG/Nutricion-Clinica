@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
@@ -73,12 +73,23 @@ export function PatientLabPage() {
   const { t } = useTranslation();
   const { patientId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
   );
   const { data: patient, loading: patientLoading } = usePatient(id);
   const { data, loading, error, reload } = usePatientLabPanels(id);
+
+  React.useEffect(() => {
+    const panelId = searchParams.get("panelId");
+    if (!panelId || loading) return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`lab-panel-${panelId}`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus({ preventScroll: true });
+    });
+  }, [data, loading, searchParams]);
 
   const onDelete = async (panelId: LabPanelId) => {
     if (!confirm(t("lab.delete_panel_confirm"))) return;
@@ -181,9 +192,10 @@ export function PatientLabPage() {
               <LabTrendChart panels={items} />
             )}
             {items.map((panel) => (
-              <LabPanelCard
-                key={panel.id.toString()}
-                panel={panel}
+                <LabPanelCard
+                  key={panel.id.toString()}
+                  panel={panel}
+                  highlighted={searchParams.get("panelId") === panel.id.toString()}
                 ageYears={patient.age}
                 sex={sex}
                 onDelete={() => onDelete(panel.id)}
@@ -198,11 +210,13 @@ export function PatientLabPage() {
 
 function LabPanelCard({
   panel,
+  highlighted,
   ageYears,
   sex,
   onDelete,
 }: {
   panel: LabPanel;
+  highlighted: boolean;
   ageYears: number;
   sex: Sex;
   onDelete: () => void;
@@ -221,7 +235,11 @@ function LabPanelCard({
   const derived = React.useMemo(() => deriveCalculations(panel, ageYears, sex, t), [panel, ageYears, sex, t]);
 
   return (
-    <Card>
+    <Card
+      id={`lab-panel-${panel.id.toString()}`}
+      tabIndex={-1}
+      className={cn(highlighted && "ring-2 ring-primary ring-offset-2")}
+    >
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>

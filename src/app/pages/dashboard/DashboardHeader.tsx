@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Archive,
   BarChart3,
@@ -27,18 +28,12 @@ import {
 } from "@components/ui/dropdown-menu";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
+import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
 
 type PeriodOfDay = "morning" | "afternoon" | "night";
 type NotificationTab = "inbox" | "general" | "archived";
 type NotificationAction = "accept" | "reject";
-type NotificationType =
-  | "patient_message"
-  | "consultation"
-  | "nutrition_plan"
-  | "document"
-  | "clinical_record"
-  | "payment"
-  | "system";
+type NotificationType = "patient_message" | "consultation" | "nutrition_plan" | "document" | "clinical_record" | "payment" | "system";
 
 interface DashboardNotification {
   id: string;
@@ -281,9 +276,7 @@ function getStoredNotifications(): DashboardNotification[] {
     if (!Array.isArray(storedNotifications)) return getNotificationDefaults();
 
     const persistedState = new Map(
-      storedNotifications
-        .filter((notification) => typeof notification.id === "string")
-        .map((notification) => [notification.id, notification]),
+      storedNotifications.filter((notification) => typeof notification.id === "string").map((notification) => [notification.id, notification]),
     );
 
     return getNotificationDefaults().map((notification) => {
@@ -316,10 +309,7 @@ function saveNotificationState(notifications: DashboardNotification[], activeTab
   if (typeof window === "undefined") return;
 
   try {
-    window.localStorage.setItem(
-      NOTIFICATION_STATE_STORAGE_KEY,
-      JSON.stringify(notifications.map(({ id, read, archived }) => ({ id, read, archived }))),
-    );
+    window.localStorage.setItem(NOTIFICATION_STATE_STORAGE_KEY, JSON.stringify(notifications.map(({ id, read, archived }) => ({ id, read, archived }))));
     window.localStorage.setItem(NOTIFICATION_TAB_STORAGE_KEY, activeTab);
   } catch {
     // Persistence is best-effort for local mock notifications.
@@ -382,6 +372,7 @@ function getInitials(fullName: string): string {
 
 export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const [activeNotificationTab, setActiveNotificationTab] = React.useState<NotificationTab>(getStoredNotificationTab);
   const [notifications, setNotifications] = React.useState<DashboardNotification[]>(getStoredNotifications);
@@ -390,6 +381,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const suppressNotificationClickRef = React.useRef(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = React.useState(false);
   const openCommand = useCommandPaletteStore((state) => state.setOpen);
+  const searchShortcutLabel = getGlobalSearchShortcutLabel();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const displayName = user?.nombreCompleto?.trim() || "Administrador";
@@ -406,15 +398,20 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const inboxNotifications = notifications.filter((item) => item.type === "patient_message" && !item.archived);
   const generalNotifications = notifications.filter((item) => !item.archived);
   const archivedNotifications = notifications.filter((item) => item.read || item.archived);
-  const visibleNotificationItems = activeNotificationTab === "inbox"
-    ? inboxNotifications
-    : activeNotificationTab === "general"
-      ? generalNotifications
-      : archivedNotifications;
-  const notificationTabs: Array<{ key: NotificationTab; label: string; count: number }> = [
+  const visibleNotificationItems =
+    activeNotificationTab === "inbox" ? inboxNotifications : activeNotificationTab === "general" ? generalNotifications : archivedNotifications;
+  const notificationTabs: Array<{
+    key: NotificationTab;
+    label: string;
+    count: number;
+  }> = [
     { key: "inbox", label: "Bandeja", count: inboxNotifications.length },
     { key: "general", label: "General", count: generalNotifications.length },
-    { key: "archived", label: "Archivadas", count: archivedNotifications.length },
+    {
+      key: "archived",
+      label: "Archivadas",
+      count: archivedNotifications.length,
+    },
   ];
   const notificationCount = generalNotifications.filter((item) => !item.read).length;
   const hasVisibleNotifications = visibleNotificationItems.length > 0;
@@ -440,13 +437,13 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const handleMarkAllNotifications = () => {
     if (markAllDisabled) return;
 
-    setNotifications((current) => current.map((notification) => {
-      const shouldArchive = activeNotificationTab === "inbox"
-        ? notification.type === "patient_message" && !notification.archived
-        : !notification.archived;
+    setNotifications((current) =>
+      current.map((notification) => {
+        const shouldArchive = activeNotificationTab === "inbox" ? notification.type === "patient_message" && !notification.archived : !notification.archived;
 
-      return shouldArchive ? { ...notification, read: true, archived: true } : notification;
-    }));
+        return shouldArchive ? { ...notification, read: true, archived: true } : notification;
+      }),
+    );
     setSwipedNotificationId(null);
   };
   const handleNotificationClick = (notification: DashboardNotification) => {
@@ -463,14 +460,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       openNotificationTarget(notification);
     }
 
-    setNotifications((current) => current.map((item) => (
-      item.id === notification.id ? { ...item, read: true } : item
-    )));
+    setNotifications((current) => current.map((item) => (item.id === notification.id ? { ...item, read: true } : item)));
   };
-  const handleNotificationKeyDown = (
-    event: React.KeyboardEvent<HTMLElement>,
-    notification: DashboardNotification,
-  ) => {
+  const handleNotificationKeyDown = (event: React.KeyboardEvent<HTMLElement>, notification: DashboardNotification) => {
     if (event.target !== event.currentTarget) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
@@ -478,17 +470,11 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   };
   const handleNotificationAction = (id: string, action: NotificationAction) => {
     void action;
-    setNotifications((current) => current.map((notification) => (
-      notification.id === id
-        ? { ...notification, read: true, archived: true }
-        : notification
-    )));
+    setNotifications((current) => current.map((notification) => (notification.id === id ? { ...notification, read: true, archived: true } : notification)));
     setSwipedNotificationId(null);
   };
   const handleArchiveNotification = (id: string) => {
-    setNotifications((current) => current.map((notification) => (
-      notification.id === id ? { ...notification, read: true, archived: true } : notification
-    )));
+    setNotifications((current) => current.map((notification) => (notification.id === id ? { ...notification, read: true, archived: true } : notification)));
     setSwipedNotificationId(null);
   };
   const handleNotificationPointerDown = (event: React.PointerEvent<HTMLElement>, id: string) => {
@@ -506,9 +492,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const handleNotificationPointerMove = (event: React.PointerEvent<HTMLElement>, id: string) => {
-    setNotificationDragState((current) => (
-      current?.id === id ? { ...current, currentX: event.clientX } : current
-    ));
+    setNotificationDragState((current) => (current?.id === id ? { ...current, currentX: event.clientX } : current));
   };
   const finishNotificationSwipe = (event: React.PointerEvent<HTMLElement>, id: string) => {
     if (notificationDragState?.id !== id) return;
@@ -580,27 +564,15 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
-      if (
-        notificationsOpen &&
-        swipedNotificationId &&
-        !target.closest(".nc-dashboard-notification-menu__swipeItem")
-      ) {
+      if (notificationsOpen && swipedNotificationId && !target.closest(".nc-dashboard-notification-menu__swipeItem")) {
         setSwipedNotificationId(null);
       }
 
-      if (
-        notificationsOpen &&
-        !target.closest(".nc-dashboard-notification-menu") &&
-        !target.closest(".nc-dashboard-header__notification")
-      ) {
+      if (notificationsOpen && !target.closest(".nc-dashboard-notification-menu") && !target.closest(".nc-dashboard-header__notification")) {
         setNotificationsOpen(false);
       }
 
-      if (
-        avatarMenuOpen &&
-        !target.closest(".nc-dashboard-avatar-menu") &&
-        !target.closest(".nc-dashboard-header__avatar")
-      ) {
+      if (avatarMenuOpen && !target.closest(".nc-dashboard-avatar-menu") && !target.closest(".nc-dashboard-header__avatar")) {
         setAvatarMenuOpen(false);
       }
     };
@@ -625,8 +597,12 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       <div className="nc-dashboard-header__inner">
         <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
           <h1 className="nc-dashboard-header__title">
-            <span className="nc-dashboard-header__greetingText">{greeting}, {firstName}</span>
-            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">{greetingEmoji}</span>
+            <span className="nc-dashboard-header__greetingText">
+              {greeting}, {firstName}
+            </span>
+            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">
+              {greetingEmoji}
+            </span>
           </h1>
           <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
         </section>
@@ -636,11 +612,12 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             type="button"
             className="nc-dashboard-search"
             onClick={() => openCommand(true)}
-            aria-label="Buscar pacientes, consultas, alimentos"
+            aria-label={t("layout.global_search_placeholder")}
+            aria-haspopup="dialog"
           >
             <Search className="nc-dashboard-search__icon" size={19} strokeWidth={2} aria-hidden="true" />
-            <span className="nc-dashboard-search__placeholder">Buscar pacientes, consultas, alimentos...</span>
-            <kbd className="nc-dashboard-search__kbd">Ctrl K</kbd>
+            <span className="nc-dashboard-search__placeholder">{t("layout.global_search_placeholder")}</span>
+            <kbd className="nc-dashboard-search__kbd">{searchShortcutLabel}</kbd>
           </button>
         </div>
 
@@ -650,19 +627,11 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
               <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
               <span>Personalizar KPIs</span>
             </button>
-            <button
-              type="button"
-              className="nc-dashboard-button nc-dashboard-button--soft"
-              onClick={() => navigate("/consultas/nueva")}
-            >
+            <button type="button" className="nc-dashboard-button nc-dashboard-button--soft" onClick={() => navigate("/consultas/nueva")}>
               <CalendarPlus size={17} strokeWidth={2} aria-hidden="true" />
               <span>Nueva consulta</span>
             </button>
-            <button
-              type="button"
-              className="nc-dashboard-button nc-dashboard-button--primary"
-              onClick={() => navigate("/pacientes/nuevo")}
-            >
+            <button type="button" className="nc-dashboard-button nc-dashboard-button--primary" onClick={() => navigate("/pacientes/nuevo")}>
               <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
               <span>Agregar paciente</span>
             </button>
@@ -685,12 +654,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                 <DropdownMenuLabel className="nc-dashboard-notification-menu__header">
                   <span className="nc-dashboard-notification-menu__title">Notificaciones</span>
                   <span className="nc-dashboard-notification-menu__headerActions">
-                    <button
-                      type="button"
-                      className="nc-dashboard-notification-menu__markAll"
-                      disabled={markAllDisabled}
-                      onClick={handleMarkAllNotifications}
-                    >
+                    <button type="button" className="nc-dashboard-notification-menu__markAll" disabled={markAllDisabled} onClick={handleMarkAllNotifications}>
                       Marcar todas
                     </button>
                     <button
@@ -703,20 +667,14 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                     </button>
                   </span>
                 </DropdownMenuLabel>
-                <div
-                  className="nc-dashboard-notification-menu__tabs"
-                  role="tablist"
-                  aria-label="Secciones de notificaciones"
-                >
+                <div className="nc-dashboard-notification-menu__tabs" role="tablist" aria-label="Secciones de notificaciones">
                   {notificationTabs.map((tab) => {
                     const isActive = activeNotificationTab === tab.key;
 
                     return (
                       <button
                         type="button"
-                        className={`nc-dashboard-notification-menu__tab${
-                          isActive ? " nc-dashboard-notification-menu__tab--active" : ""
-                        }`}
+                        className={`nc-dashboard-notification-menu__tab${isActive ? " nc-dashboard-notification-menu__tab--active" : ""}`}
                         role="tab"
                         aria-selected={isActive}
                         key={tab.key}
@@ -756,7 +714,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                             className="nc-dashboard-notification-menu__item"
                             role="listitem"
                             tabIndex={0}
-                            style={{ transform: `translateX(${swipeOffset}px)` }}
+                            style={{
+                              transform: `translateX(${swipeOffset}px)`,
+                            }}
                             onClick={() => handleNotificationClick(item)}
                             onKeyDown={(event) => handleNotificationKeyDown(event, item)}
                             onPointerDown={(event) => handleNotificationPointerDown(event, item.id)}
@@ -764,11 +724,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                             onPointerUp={(event) => finishNotificationSwipe(event, item.id)}
                             onPointerCancel={(event) => finishNotificationSwipe(event, item.id)}
                           >
-                            <span
-                              className="nc-dashboard-notification-menu__avatar"
-                              data-tone={item.tone}
-                              aria-hidden="true"
-                            >
+                            <span className="nc-dashboard-notification-menu__avatar" data-tone={item.tone} aria-hidden="true">
                               {item.initials}
                               <span className="nc-dashboard-notification-menu__avatarStatus" />
                             </span>
@@ -784,10 +740,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                                 {item.timeAgo} • {item.category}
                               </span>
                               {item.requiresAction && item.actions && !item.read && !item.archived && (
-                                <span
-                                  className="nc-dashboard-notification-menu__itemActions"
-                                  aria-label="Acciones de notificación"
-                                >
+                                <span className="nc-dashboard-notification-menu__itemActions" aria-label="Acciones de notificación">
                                   {item.actions.includes("reject") && (
                                     <button
                                       type="button"
@@ -841,11 +794,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                   </div>
                 )}
                 <div className="nc-dashboard-notification-menu__footer">
-                  <button
-                    type="button"
-                    className="nc-dashboard-notification-menu__footerAction"
-                    onClick={() => navigate("/notificaciones")}
-                  >
+                  <button type="button" className="nc-dashboard-notification-menu__footerAction" onClick={() => navigate("/notificaciones")}>
                     <span>Ver todas las notificaciones</span>
                     <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />
                   </button>
@@ -854,15 +803,8 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             </DropdownMenu>
             <DropdownMenu open={avatarMenuOpen} onOpenChange={setAvatarMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="nc-dashboard-header__avatar"
-                  aria-label="Abrir menú de usuario"
-                  aria-expanded={avatarMenuOpen}
-                >
-                  <span className="nc-dashboard-header__avatarFallback">
-                    {initials || <UserPlus size={18} aria-hidden="true" />}
-                  </span>
+                <button type="button" className="nc-dashboard-header__avatar" aria-label="Abrir menú de usuario" aria-expanded={avatarMenuOpen}>
+                  <span className="nc-dashboard-header__avatarFallback">{initials || <UserPlus size={18} aria-hidden="true" />}</span>
                   <span className="nc-dashboard-header__avatarStatus" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
@@ -914,7 +856,6 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             </DropdownMenu>
           </div>
         </div>
-
       </div>
     </header>
   );

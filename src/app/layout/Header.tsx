@@ -17,6 +17,7 @@ import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
 import { useNotificationStore } from "@store/notificationStore";
+import { getGlobalSearchShortcutLabel } from "./globalSearchEngine";
 
 const THEME_LONG_PRESS_MS = 1000;
 const headerThemeOptions = [
@@ -39,17 +40,7 @@ export function Header() {
   const longPressTimerRef = React.useRef<number | null>(null);
   const longPressOpenedRef = React.useRef(false);
   const activeHeaderTheme: HeaderSelectableTheme = theme === "alternative" ? "alternative" : resolvedTheme === "dark" ? "dark" : "light";
-
-  React.useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        openCommand(true);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [openCommand]);
+  const searchShortcutLabel = getGlobalSearchShortcutLabel();
 
   const clearLongPressTimer = () => {
     if (longPressTimerRef.current === null) return;
@@ -63,8 +54,7 @@ export function Header() {
     setTheme(nextOption.value);
   };
 
-  const ThemeIcon =
-    activeHeaderTheme === "light" ? Sun : activeHeaderTheme === "dark" ? Moon : Palette;
+  const ThemeIcon = activeHeaderTheme === "light" ? Sun : activeHeaderTheme === "dark" ? Moon : Palette;
 
   React.useEffect(() => clearLongPressTimer, []);
 
@@ -131,13 +121,7 @@ export function Header() {
 
   return (
     <header className="flex h-14 min-w-0 items-center gap-2 border-b bg-background px-3 sm:gap-3 sm:px-4">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="lg:hidden"
-        onClick={toggleMobileSidebar}
-        aria-label={t("nav.open_menu")}
-      >
+      <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={toggleMobileSidebar} aria-label={t("nav.open_menu")}>
         <Menu className="h-4 w-4" />
       </Button>
       <button
@@ -145,24 +129,23 @@ export function Header() {
         onClick={() => openCommand(true)}
         className="flex h-9 w-9 items-center justify-center rounded-md border border-input bg-transparent text-muted-foreground hover:bg-accent sm:hidden"
         aria-label={t("layout.global_search_aria")}
+        aria-haspopup="dialog"
       >
         <Search className="h-4 w-4" />
       </button>
       <div className="relative hidden min-w-0 max-w-md flex-1 sm:block">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          aria-hidden
-        />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <button
           type="button"
           onClick={() => openCommand(true)}
           className="flex h-9 w-full items-center rounded-md border border-input bg-transparent pl-9 pr-12 text-left text-sm text-muted-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           aria-label={t("layout.global_search_aria")}
+          aria-haspopup="dialog"
         >
           {t("layout.global_search_placeholder")}
         </button>
         <kbd className="pointer-events-none absolute right-2 top-1/2 hidden h-5 -translate-y-1/2 select-none items-center rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
-          Ctrl K
+          {searchShortcutLabel}
         </kbd>
       </div>
 
@@ -224,10 +207,7 @@ export function Header() {
         >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -right-1 -top-1 h-4 min-w-4 px-1 text-[10px]"
-            >
+            <Badge variant="destructive" className="absolute -right-1 -top-1 h-4 min-w-4 px-1 text-[10px]">
               {unread > 99 ? "99+" : unread}
             </Badge>
           )}
@@ -235,12 +215,7 @@ export function Header() {
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t("layout.user_menu")}
-              className="rounded-full"
-            >
+            <Button variant="ghost" size="icon-sm" aria-label={t("layout.user_menu")} className="rounded-full">
               {user ? (
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
                   {user.nombreCompleto
@@ -266,12 +241,8 @@ export function Header() {
                 <DropdownMenuSeparator />
               </>
             )}
-            <DropdownMenuItem onClick={() => navigate("/perfil")}>
-              {t("layout.profile")}
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate("/configuracion")}>
-              {t("settings.title")}
-            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/perfil")}>{t("layout.profile")}</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => navigate("/configuracion")}>{t("settings.title")}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {

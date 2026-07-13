@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Search } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@components/ui/button";
@@ -12,12 +13,23 @@ import type { RecipeFormInput } from "@modules/recipes/application/recipeFormSch
 
 export function RecipesPage() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
   const { recipes, loading, refresh } = useRecipes();
   const { create } = useCreateRecipe();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
   const [recipesWithNutrition, setRecipesWithNutrition] = React.useState<Record<string, { kcal: number; proteinG: number; carbsG: number; fatG: number }>>({});
   const [recipesWithCosts, setRecipesWithCosts] = React.useState<Record<string, { costTotal: number; currency: string }>>({});
+  const selectedRecipeId = searchParams.get("recipeId");
+
+  React.useEffect(() => {
+    if (!selectedRecipeId || loading) return;
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(`recipe-${selectedRecipeId}`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.focus({ preventScroll: true });
+    });
+  }, [loading, recipes, selectedRecipeId]);
 
   React.useEffect(() => {
     if (recipes.length === 0) return;
@@ -104,6 +116,7 @@ export function RecipesPage() {
                 totalTimeMin={r.totalTimeMin}
                 status={r.status}
                 ingredientCount={r.ingredients.length}
+                highlighted={selectedRecipeId === r.id}
                 {...(recipesWithNutrition[r.id] ?? {})}
                 {...(recipesWithCosts[r.id] ?? {})}
               />

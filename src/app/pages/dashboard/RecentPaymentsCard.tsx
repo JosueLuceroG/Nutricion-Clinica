@@ -16,11 +16,12 @@ function paymentStatusClass(status: RecentPaymentStatus) {
 export function RecentPaymentsCard({ payments }: RecentPaymentsCardProps) {
   return (
     <DashboardSectionCard
-      title="Pagos recientes"
+      title="Cobros recientes"
       icon={<ReceiptText size={20} strokeWidth={1.9} />}
       action={
         <Link className="nc-dashboard-card-action" to="/billing/payments">
-          Ver pagos
+          Ver todos los cobros
+          <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />
         </Link>
       }
       className="nc-dashboard-section-card--payments"
@@ -35,7 +36,9 @@ export function RecentPaymentsCard({ payments }: RecentPaymentsCardProps) {
               <span className="nc-dashboard-payments__body">
                 <span className="nc-dashboard-payments__patient">{payment.patient}</span>
                 <span className="nc-dashboard-payments__concept">{payment.concept}</span>
-                <span className="nc-dashboard-payments__method">{payment.method} - {payment.date}</span>
+                <span className="nc-dashboard-payments__method">
+                  {payment.method} · Cobrado el {payment.date}
+                </span>
               </span>
               <span className="nc-dashboard-payments__meta">
                 <strong>{payment.amount}</strong>
@@ -51,11 +54,6 @@ export function RecentPaymentsCard({ payments }: RecentPaymentsCardProps) {
           No hay pagos recientes registrados.
         </div>
       )}
-
-      <Link className="nc-dashboard-card-link" to="/billing/payments">
-        Administrar pagos
-        <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
-      </Link>
     </DashboardSectionCard>
   );
 }

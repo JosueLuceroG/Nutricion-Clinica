@@ -7,7 +7,7 @@ import {
   User, FileText, Clock, Settings, CheckCircle2, RotateCcw, Stethoscope,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
@@ -46,6 +46,13 @@ function toDateStr(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
+function parseDateStr(value: string | null): Date | null {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return toDateStr(date) === value ? date : null;
+}
+
 const statusLabelKey: Record<string, string> = {
   scheduled: "agenda.status_scheduled",
   confirmed: "agenda.status_confirmed",
@@ -59,9 +66,12 @@ const statusLabelKey: Record<string, string> = {
 export function AgendaPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const today = new Date();
-  const [currentMonth, setCurrentMonth] = React.useState(today);
-  const [selectedDate, setSelectedDate] = React.useState(today);
+  const requestedDate = parseDateStr(searchParams.get("date"));
+  const initialDate = requestedDate ?? today;
+  const [currentMonth, setCurrentMonth] = React.useState(initialDate);
+  const [selectedDate, setSelectedDate] = React.useState(initialDate);
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [availabilityOpen, setAvailabilityOpen] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<Appointment | null>(null);
@@ -82,6 +92,25 @@ export function AgendaPage() {
   const { confirm } = useConfirmAppointment();
   const { complete } = useCompleteAppointment();
   const { reschedule } = useRescheduleAppointment();
+
+  React.useEffect(() => {
+    const date = parseDateStr(searchParams.get("date"));
+    if (!date) return;
+    setSelectedDate(date);
+    setCurrentMonth(date);
+    setView("day");
+  }, [searchParams]);
+
+  React.useEffect(() => {
+    const appointmentId = searchParams.get("appointmentId");
+    if (!appointmentId || loading) return;
+    const appointment = appointments.find((item) => item.id === appointmentId);
+    if (!appointment) return;
+    setDetailTarget(appointment);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("appointmentId");
+    setSearchParams(nextParams, { replace: true });
+  }, [appointments, loading, searchParams, setSearchParams]);
 
   const patients = useLiveQuery(
     () => db.patients

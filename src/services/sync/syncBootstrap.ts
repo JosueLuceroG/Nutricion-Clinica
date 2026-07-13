@@ -88,7 +88,7 @@ export function startSync(db: NutriClinicaDB, options: StartOptions = {}): void 
     useAuthStore.subscribe((state) => {
       const newId = state.sucursalActivaId;
       const prevId = useSyncStore.getState().sucursalId;
-      if (newId && newId !== prevId) {
+      if (newId !== prevId) {
         useSyncStore.getState().setSucursalId(newId);
       }
     }),

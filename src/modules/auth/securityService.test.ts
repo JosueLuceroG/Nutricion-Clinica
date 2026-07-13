@@ -73,8 +73,9 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("agenda", "asistente")).toBe(true);
     });
 
-    it("asistente has patients:read which also matches other actions (current behaviour)", () => {
-      expect(hasModuleAccess("patients", "asistente", "write")).toBe(true);
+    it("asistente cannot write with a patients:read permission", () => {
+      expect(hasModuleAccess("patients", "asistente", "write")).toBe(false);
+      expect(hasModuleAccess("patients", "asistente", "read")).toBe(true);
     });
 
     it("asistente does not have access to billing or mealplan", () => {
@@ -86,6 +87,7 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("patients", "soporte_tecnico")).toBe(true);
       expect(hasModuleAccess("consultations", "soporte_tecnico")).toBe(true);
       expect(hasModuleAccess("billing", "soporte_tecnico")).toBe(true);
+      expect(hasModuleAccess("patients", "soporte_tecnico", "write")).toBe(false);
     });
 
     it("soporte_tecnico has full access to backup and sync", () => {
@@ -97,6 +99,7 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("patients", "auditor")).toBe(true);
       expect(hasModuleAccess("consultations", "auditor")).toBe(true);
       expect(hasModuleAccess("billing", "auditor")).toBe(true);
+      expect(hasModuleAccess("patients", "auditor", "write")).toBe(false);
     });
 
     it("auditor has full access to audit module", () => {
