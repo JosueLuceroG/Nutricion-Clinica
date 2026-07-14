@@ -5,12 +5,13 @@ import type { UpcomingConsultationItem } from "./dashboardMockData";
 
 interface UpcomingConsultationsCardProps {
   items: UpcomingConsultationItem[];
+  title?: string;
 }
 
-export function UpcomingConsultationsCard({ items }: UpcomingConsultationsCardProps) {
+export function UpcomingConsultationsCard({ items, title = "Próximas consultas" }: UpcomingConsultationsCardProps) {
   return (
     <DashboardSectionCard
-      title="Próximas consultas"
+      title={title}
       icon={<CalendarDays size={20} strokeWidth={1.9} />}
       action={
         <Link className="nc-dashboard-card-action" to="/agenda">

@@ -24,6 +24,7 @@ const CompleteSchema = z.object({
   maxTokens: z.number().int().min(1).max(4_000).optional(),
   provider: z.enum(["ollama", "openai"]).optional(),
   apiKey: z.string().max(500).optional(),
+  responseFormat: z.literal("json").optional(),
 });
 
 export type AICompleteRequest = z.infer<typeof CompleteSchema>;
@@ -31,7 +32,7 @@ export type AICompleteRequest = z.infer<typeof CompleteSchema>;
 export interface AICompleteResponse {
   content: string;
   model: string;
-  provider: 'openai';
+  provider: 'openai' | 'ollama';
   finishReason: FinishReason;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
@@ -48,7 +49,7 @@ function getModel(env: NodeJS.ProcessEnv = process.env): string {
   return env.AI_MODEL ?? 'llama3.2';
 }
 
-export function mapOpenAiResponse(data: OpenAiResponse, fallbackModel: string): AICompleteResponse {
+export function mapOpenAiResponse(data: OpenAiResponse, fallbackModel: string, provider: 'openai' | 'ollama' = 'openai'): AICompleteResponse {
   const choice = data.choices?.[0];
   const finishReason: FinishReason = choice?.finish_reason === 'stop'
     ? 'stop'
@@ -59,7 +60,7 @@ export function mapOpenAiResponse(data: OpenAiResponse, fallbackModel: string): 
   return {
     content: choice?.message?.content ?? '',
     model: data.model ?? fallbackModel,
-    provider: 'openai',
+    provider,
     finishReason,
     usage: {
       promptTokens: data.usage?.prompt_tokens ?? 0,
@@ -97,6 +98,7 @@ async function callAIProvider(req: AICompleteRequest, signal?: AbortSignal): Pro
       ],
       temperature: req.temperature ?? 0.3,
       max_tokens: req.maxTokens ?? 1024,
+      ...(req.responseFormat === "json" ? { response_format: { type: "json_object" } } : {}),
       stream: false,
     }),
     signal,
@@ -108,7 +110,7 @@ async function callAIProvider(req: AICompleteRequest, signal?: AbortSignal): Pro
     throw new HttpError(502, 'Proveedor de IA no disponible');
   }
 
-  return mapOpenAiResponse(await response.json() as OpenAiResponse, model);
+  return mapOpenAiResponse(await response.json() as OpenAiResponse, model, provider);
 }
 
 async function auditAiRequest(req: Request, result: { status: 'success' | 'error'; model?: string; usage?: AICompleteResponse['usage'] }): Promise<void> {

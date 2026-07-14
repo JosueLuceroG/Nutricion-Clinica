@@ -6,6 +6,7 @@ import type { FinancialSummaryData } from "./dashboardMockData";
 
 interface FinancialSummaryCardProps {
   summary: FinancialSummaryData;
+  title?: string;
 }
 
 function sparklinePaths(values: number[]): { line: string; area: string } {
@@ -21,7 +22,7 @@ function sparklinePaths(values: number[]): { line: string; area: string } {
   return { line, area: `${line} L218 58 L2 58 Z` };
 }
 
-export function FinancialSummaryCard({ summary }: FinancialSummaryCardProps) {
+export function FinancialSummaryCard({ summary, title = "Resumen financiero" }: FinancialSummaryCardProps) {
   const paid = summary.items[0];
   const pending = summary.items[1];
   const collectionRate = Math.max(0, Math.min(Number.parseFloat(summary.collectionRate) || 0, 100));
@@ -30,7 +31,7 @@ export function FinancialSummaryCard({ summary }: FinancialSummaryCardProps) {
 
   return (
     <DashboardSectionCard
-      title="Resumen financiero"
+      title={title}
       icon={<CircleDollarSign size={20} strokeWidth={1.9} />}
       action={
         <Link className="nc-dashboard-card-action" to="/billing/report">

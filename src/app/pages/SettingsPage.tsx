@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, Copy, DollarSign, Download, Eye, Globe, Hash, Heart, Layers, LayoutDashboard, Lock, Palette, PanelLeft, RotateCcw, Save, ShieldAlert, SlidersHorizontal, Sparkles, Stethoscope, Type, Undo2, Upload, Users, UserPlus, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
@@ -30,8 +31,7 @@ import {
   type AlternativeThemeVisualWeight,
 } from "@app/theme/alternativeTheme";
 import { useUIStore } from "@store/uiStore";
-import { usePreferencesStore, DEFAULT_CLINICAL_SECTION_IDS, DEFAULT_DASHBOARD_WIDGET_IDS, type ClinicalSectionId } from "@store/preferencesStore";
-import { WIDGET_DEFINITIONS } from "@app/hooks/dashboardWidgetConfig";
+import { usePreferencesStore, DEFAULT_CLINICAL_SECTION_IDS, type ClinicalSectionId } from "@store/preferencesStore";
 import { backupService } from "@services/backup/backupService";
 import { aiService } from "@services/ai";
 import { RequireRole } from "@modules/auth/RequireRole";
@@ -1738,19 +1738,7 @@ function AdminCard() {
 
 function DashboardWidgetsCard() {
   const { t } = useTranslation();
-  const widgetIds = usePreferencesStore((s) => s.dashboardWidgetIds);
-  const setDashboardWidgetIds = usePreferencesStore((s) => s.setDashboardWidgetIds);
-  const resetDashboardWidgets = usePreferencesStore((s) => s.resetDashboardWidgets);
-  const activeIds = widgetIds.length > 0 ? widgetIds : DEFAULT_DASHBOARD_WIDGET_IDS;
-  const activeSet = new Set(activeIds);
-
-  const toggleWidget = (id: string, checked: boolean) => {
-    if (checked) {
-      setDashboardWidgetIds([...activeIds, id as typeof activeIds[number]]);
-    } else {
-      setDashboardWidgetIds(activeIds.filter((w) => w !== id));
-    }
-  };
+  const navigate = useNavigate();
 
   return (
     <Card className="md:col-span-2">
@@ -1764,23 +1752,12 @@ function DashboardWidgetsCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-          {WIDGET_DEFINITIONS.map((def) => {
-            const checked = activeSet.has(def.id);
-            return (
-              <label key={def.id} className="flex items-center gap-2 text-sm cursor-pointer">
-                <Checkbox
-                  checked={checked}
-                  onCheckedChange={(val) => toggleWidget(def.id, val === true)}
-                  aria-label={t(def.labelKey)}
-                />
-                <span>{t(def.labelKey)}</span>
-              </label>
-            );
-          })}
-        </div>
-        <Button variant="outline" size="sm" onClick={resetDashboardWidgets}>
-          {t("settings.dashboard_widgets_reset")}
+        <p className="text-sm text-muted-foreground">
+          {t("settings.dashboard_widgets_help")}
+        </p>
+        <Button type="button" onClick={() => navigate("/?customize=1")}>
+          <SlidersHorizontal className="h-4 w-4" />
+          {t("settings.dashboard_widgets_open")}
         </Button>
       </CardContent>
     </Card>

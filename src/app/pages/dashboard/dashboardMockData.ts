@@ -13,20 +13,20 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
-import type { DashboardPremiumKpiId } from "@store/preferencesStore";
-
-export type DashboardKpiTone = "green" | "blue" | "purple" | "orange";
+export type DashboardKpiTone = "green" | "blue" | "purple" | "orange" | "cyan" | "rose" | "slate";
 
 export interface DashboardKpiItem {
-  id: DashboardPremiumKpiId;
+  id: string;
   label: string;
   value: string;
   trend?: string;
   trendTone?: "up" | "down" | "neutral";
   hint: string;
+  progress?: number;
+  visualization?: "largeNumber" | "percentage" | "progress" | "simpleCard";
   tone: DashboardKpiTone;
   icon: LucideIcon;
-  to: string;
+  to?: string;
 }
 
 export const dashboardKpis: DashboardKpiItem[] = [

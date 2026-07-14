@@ -138,6 +138,7 @@ class AIService {
           maxTokens: def.maxTokens,
           provider,
           apiKey,
+          responseFormat: capability === "generateDashboardKpi" ? "json" : undefined,
         },
         { signal: options?.signal },
       );

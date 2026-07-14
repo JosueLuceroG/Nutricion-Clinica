@@ -1496,8 +1496,10 @@
     "pdf_platform_branding": "Platform branding in PDF",
     "pdf_platform_branding_desc": "Free plans keep it enabled; premium will be able to hide it in Sprint 8.",
     "dashboard_widgets_title": "Dashboard KPIs",
-    "dashboard_widgets_desc": "Choose which KPIs appear on the dashboard.",
+    "dashboard_widgets_desc": "Arrange KPIs and widgets from the visual dashboard editor.",
     "dashboard_widgets_reset": "Restore default KPIs",
+    "dashboard_widgets_help": "Add metrics, resize and arrange widgets, and create custom KPIs. The configuration is saved for your user and active branch.",
+    "dashboard_widgets_open": "Open dashboard editor",
     "clinical_sections_title": "Clinical record sections",
     "clinical_sections_desc": "Choose which sections appear and in what order in the patient's record.",
     "clinical_sections_reset": "Restore all",
@@ -2814,7 +2816,9 @@
       "explain_diagnosis": "Explain diagnosis",
       "explain_diagnosis_desc": "Explains diagnosis in patient-friendly language",
       "generate_meal_plan": "Initial menu",
-      "generate_meal_plan_desc": "Generates a draft menu based on SMAE"
+      "generate_meal_plan_desc": "Generates a draft menu based on SMAE",
+      "generate_dashboard_kpi": "Design KPI",
+      "generate_dashboard_kpi_desc": "Suggests a safe KPI from a description"
     },
     "confirm_dialog": {
       "title": "Confirm AI Use",

@@ -1496,8 +1496,10 @@
     "pdf_platform_branding": "Marca de plataforma en PDF",
     "pdf_platform_branding_desc": "En plan gratis permanece activa; en premium podrá ocultarse en Sprint 8.",
     "dashboard_widgets_title": "KPIs del dashboard",
-    "dashboard_widgets_desc": "Elige qué KPIs se muestran en el dashboard.",
+    "dashboard_widgets_desc": "Organiza KPIs y widgets desde el editor visual del dashboard.",
     "dashboard_widgets_reset": "Restaurar KPIs predeterminados",
+    "dashboard_widgets_help": "Agrega métricas, cambia tamaños, acomoda widgets y crea KPIs personalizados. La configuración se guarda para tu usuario y sucursal activa.",
+    "dashboard_widgets_open": "Abrir editor del dashboard",
     "clinical_sections_title": "Secciones del expediente",
     "clinical_sections_desc": "Elige qué secciones mostrar y en qué orden en el expediente del paciente.",
     "clinical_sections_reset": "Restaurar todas",
@@ -2814,7 +2816,9 @@
       "explain_diagnosis": "Explicar diagnóstico",
       "explain_diagnosis_desc": "Explica el diagnóstico en lenguaje para el paciente",
       "generate_meal_plan": "Menú inicial",
-      "generate_meal_plan_desc": "Genera un menú borrador basado en SMAE"
+      "generate_meal_plan_desc": "Genera un menú borrador basado en SMAE",
+      "generate_dashboard_kpi": "Diseñar KPI",
+      "generate_dashboard_kpi_desc": "Propone un KPI seguro a partir de una descripción"
     },
     "confirm_dialog": {
       "title": "Confirmar uso de IA",

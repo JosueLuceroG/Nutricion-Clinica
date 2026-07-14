@@ -2,7 +2,6 @@ import * as React from "react";
 import { ThemeProvider } from "@app/providers/ThemeProvider";
 import { NotificationProvider } from "@app/providers/NotificationProvider";
 import { AppRouter } from "@app/router";
-import { Toaster } from "sonner";
 import { TooltipProvider } from "@components/ui/tooltip";
 
 export function App() {
@@ -45,7 +44,6 @@ export function App() {
       <NotificationProvider>
         <TooltipProvider delayDuration={300}>
           <AppRouter />
-          <Toaster position="top-right" richColors={false} closeButton />
         </TooltipProvider>
       </NotificationProvider>
     </ThemeProvider>

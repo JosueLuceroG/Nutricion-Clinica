@@ -5,6 +5,7 @@ import type { RecentPaymentItem, RecentPaymentStatus } from "./dashboardMockData
 
 interface RecentPaymentsCardProps {
   payments: RecentPaymentItem[];
+  title?: string;
 }
 
 function paymentStatusClass(status: RecentPaymentStatus) {
@@ -13,10 +14,10 @@ function paymentStatusClass(status: RecentPaymentStatus) {
   return "pending";
 }
 
-export function RecentPaymentsCard({ payments }: RecentPaymentsCardProps) {
+export function RecentPaymentsCard({ payments, title = "Cobros recientes" }: RecentPaymentsCardProps) {
   return (
     <DashboardSectionCard
-      title="Cobros recientes"
+      title={title}
       icon={<ReceiptText size={20} strokeWidth={1.9} />}
       action={
         <Link className="nc-dashboard-card-action" to="/billing/payments">

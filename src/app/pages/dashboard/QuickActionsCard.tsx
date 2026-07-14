@@ -5,12 +5,13 @@ import type { QuickActionItem } from "./dashboardMockData";
 
 interface QuickActionsCardProps {
   actions: QuickActionItem[];
+  title?: string;
 }
 
-export function QuickActionsCard({ actions }: QuickActionsCardProps) {
+export function QuickActionsCard({ actions, title = "Acciones rápidas" }: QuickActionsCardProps) {
   return (
     <DashboardSectionCard
-      title="Acciones rápidas"
+      title={title}
       icon={<Sparkles size={20} strokeWidth={1.9} />}
       className="nc-dashboard-section-card--actions"
     >

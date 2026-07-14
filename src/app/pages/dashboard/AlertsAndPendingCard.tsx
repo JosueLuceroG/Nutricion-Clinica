@@ -5,12 +5,13 @@ import type { DashboardAlertItem } from "./dashboardMockData";
 
 interface AlertsAndPendingCardProps {
   alerts: DashboardAlertItem[];
+  title?: string;
 }
 
-export function AlertsAndPendingCard({ alerts }: AlertsAndPendingCardProps) {
+export function AlertsAndPendingCard({ alerts, title = "Alertas y pendientes" }: AlertsAndPendingCardProps) {
   return (
     <DashboardSectionCard
-      title="Alertas y pendientes"
+      title={title}
       icon={<Bell size={20} strokeWidth={1.9} />}
       className="nc-dashboard-section-card--alerts"
     >

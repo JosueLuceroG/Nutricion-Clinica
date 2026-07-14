@@ -10,6 +10,7 @@ import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
 import type { Appointment } from "@modules/agenda/domain/Appointment";
 import { patientRowToDomain } from "@modules/patient/infrastructure/patientMapper";
 import { mealPlanRowToDomain } from "@modules/mealplan/infrastructure/mealPlanMapper";
+import { BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
 
 export interface DashboardKpis {
   totalActivePatients: number;
@@ -159,7 +160,9 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
   const [state, setState] = React.useState<AsyncState<DashboardKpis>>(initial);
   const syncSucursalId = useSyncStore((s) => s.sucursalId);
   const authSucursalId = useAuthStore((s) => s.sucursalActivaId);
+  const role = useAuthStore((s) => s.user?.rol ?? null);
   const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
+  const canViewFinancialData = Boolean(role && (BILLING_REPORT_ROLES as readonly string[]).includes(role));
 
   const load = React.useCallback(() => {
     setState((s) => ({ ...s, loading: true, error: null }));
@@ -193,7 +196,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
           rowMatchesDashboardSucursal(r, activeSucursalId),
         )
         .toArray(),
-      db.consultations
+      canViewFinancialData ? db.consultations
         .filter((r) => {
            if (!rowMatchesDashboardSucursal(r, activeSucursalId)) return false;
            if (r.deleted_at) return false;
@@ -201,8 +204,8 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
            const t = new Date(r.consultation_date).getTime();
            return t >= monthStart.getTime() && t <= now.getTime();
         })
-        .toArray(),
-      db.consultations
+        .toArray() : Promise.resolve([]),
+      canViewFinancialData ? db.consultations
         .filter((r) => {
            if (!rowMatchesDashboardSucursal(r, activeSucursalId)) return false;
            if (r.deleted_at) return false;
@@ -210,7 +213,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
            const t = new Date(r.consultation_date).getTime();
            return t >= weekStart.getTime() && t <= Math.min(weekEnd.getTime(), now.getTime());
         })
-        .toArray(),
+        .toArray() : Promise.resolve([]),
       db.consultations
         .filter((r) =>
           rowMatchesDashboardSucursal(r, activeSucursalId) &&
@@ -440,7 +443,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
           loading: false,
         }),
       );
-  }, [activeSucursalId]);
+  }, [activeSucursalId, canViewFinancialData]);
 
   React.useEffect(() => {
     load();

@@ -10,6 +10,7 @@ export interface AIRequest {
   maxTokens?: number;
   provider?: AIProviderId;
   apiKey?: string;
+  responseFormat?: "json";
 }
 
 export interface AIResponse {

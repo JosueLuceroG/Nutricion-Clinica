@@ -1,14 +1,17 @@
 import * as React from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { ClipboardCheck, RefreshCcw, Settings, Sparkles, UtensilsCrossed } from "lucide-react";
+import { toast } from "sonner";
 import { useDashboardKpis, type DashboardKpis, type DashboardRecentPayment } from "@app/hooks/useDashboardKpis";
+import { useUnsavedChangesGuard } from "@hooks/useUnsavedChangesGuard";
 import { AppointmentTypeLabel } from "@modules/agenda/domain/AppointmentType";
-import {
-  DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
-  usePreferencesStore,
-  type DashboardPremiumKpiId,
-} from "@store/preferencesStore";
+import { BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
+import { hasModuleAccess } from "@modules/auth/securityService";
+import { useAuthStore } from "@store/authStore";
+import { useDashboardLayoutStore } from "@store/dashboardLayoutStore";
+import { usePreferencesStore } from "@store/preferencesStore";
+import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import { AlertsAndPendingCard } from "./AlertsAndPendingCard";
-import { DashboardKpiCustomizer } from "./DashboardKpiCustomizer";
 import { DashboardShell } from "./DashboardShell";
 import {
   type DashboardAlertItem,
@@ -28,6 +31,16 @@ import { QuickActionsCard } from "./QuickActionsCard";
 import { RecentPaymentsCard } from "./RecentPaymentsCard";
 import { UpcomingConsultationsCard } from "./UpcomingConsultationsCard";
 import { WeeklyActivityCard } from "./WeeklyActivityCard";
+import { CustomKpiBuilder } from "./customization/CustomKpiBuilder";
+import { DashboardEditToolbar } from "./customization/DashboardEditToolbar";
+import { DashboardPresetDialog } from "./customization/DashboardPresetDialog";
+import { EditableDashboardGrid } from "./customization/EditableDashboardGrid";
+import { WidgetConfigDialog } from "./customization/WidgetConfigDialog";
+import { WidgetLibraryPanel } from "./customization/WidgetLibraryPanel";
+import { evaluateCustomKpi, getCustomKpiField } from "./customization/dashboardMetricEngine";
+import { createDefaultDashboardPreferences } from "./customization/dashboardPresets";
+import { DASHBOARD_WIDGET_ICONS, getDashboardWidgetDefinition } from "./customization/dashboardWidgetRegistry";
+import type { CustomKpiConfig, CustomKpiSource, DashboardPreferences, DashboardWidgetDefinition, DashboardWidgetInstance } from "./customization/dashboardWidgetTypes";
 
 const avatarTones = ["warm", "cool", "rose", "slate"] as const;
 const paymentAvatarTones = ["warm", "cool", "rose"] as const;
@@ -38,34 +51,6 @@ const emptyWeeklyActivity: WeeklyActivityPoint[] = weekDayLabels.map((day) => ({
   consultas: 0,
   nuevos: 0,
 }));
-
-function normalizeKpiOrder(order: DashboardPremiumKpiId[], items: DashboardKpiItem[]): DashboardPremiumKpiId[] {
-  const validIds = new Set(items.map((item) => item.id));
-  const normalized = order.filter((id, index) => validIds.has(id) && order.indexOf(id) === index);
-  const fallbackOrder = DEFAULT_DASHBOARD_PREMIUM_KPI_IDS.filter((id) => validIds.has(id));
-
-  for (const id of fallbackOrder) {
-    if (!normalized.includes(id)) normalized.push(id);
-  }
-  for (const item of items) {
-    if (!normalized.includes(item.id)) normalized.push(item.id);
-  }
-
-  return normalized;
-}
-
-function normalizeHiddenKpiIds(hiddenIds: DashboardPremiumKpiId[], items: DashboardKpiItem[]): DashboardPremiumKpiId[] {
-  const validIds = new Set(items.map((item) => item.id));
-  const normalized = hiddenIds.filter((id, index) => validIds.has(id) && hiddenIds.indexOf(id) === index);
-  return normalized.length >= items.length ? [] : normalized;
-}
-
-function orderKpis(items: DashboardKpiItem[], order: DashboardPremiumKpiId[]): DashboardKpiItem[] {
-  const byId = new Map(items.map((item) => [item.id, item]));
-  return normalizeKpiOrder(order, items)
-    .map((id) => byId.get(id))
-    .filter((item): item is DashboardKpiItem => Boolean(item));
-}
 
 function money(value: number): string {
   return new Intl.NumberFormat("es-MX", {
@@ -172,31 +157,31 @@ function buildLiveKpis(data: DashboardKpis | null): DashboardKpiItem[] {
   ];
 }
 
-function buildLiveAlerts(data: DashboardKpis | null): DashboardAlertItem[] {
+function buildLiveAlerts(data: DashboardKpis | null, role: string | null): DashboardAlertItem[] {
   if (!data) return [];
   const [pendingPayment, unconfirmed, expiring] = dashboardAlerts;
 
-  return [
-    {
+  const alerts: DashboardAlertItem[] = [];
+  if (canViewFinancialData(role)) alerts.push({
       ...pendingPayment!,
       title: `${data.pendingPayments} consultas pendientes de cobro`,
       detail: `Total: ${money(data.pendingPaymentsAmount)}`,
       count: data.pendingPayments > 0 ? "›" : "0",
       actionTo: "/billing",
-    },
-    {
+    });
+  if (role && hasModuleAccess("agenda", role)) alerts.push({
       ...unconfirmed!,
       title: `${data.unconfirmedAppointments.length} citas sin confirmar`,
       detail: "Requieren confirmación",
       count: data.unconfirmedAppointments.length.toString(),
-    },
-    {
+    });
+  if (role && hasModuleAccess("mealplan", role)) alerts.push({
       ...expiring!,
       title: `${data.expiringPlans.length} planes por vencer`,
       detail: "Próximos 7 días",
       count: data.expiringPlans.length.toString(),
-    },
-  ];
+    });
+  return alerts;
 }
 
 function buildLiveFinancialSummary(data: DashboardKpis | null): FinancialSummaryData {
@@ -450,20 +435,232 @@ function buildLiveMonthlyActivitySummary(data: DashboardKpis | null): ActivitySu
   ];
 }
 
+function buildAdditionalKpi(
+  widget: DashboardWidgetInstance,
+  data: DashboardKpis | null,
+  customKpis: CustomKpiConfig[],
+): DashboardKpiItem {
+  const definition = getDashboardWidgetDefinition(widget.definitionId);
+  const Icon = DASHBOARD_WIDGET_ICONS[definition.iconKey] ?? Sparkles;
+  const title = widget.config.title || definition.name;
+  const tone = widget.config.tone ?? definition.tone;
+
+  if (widget.definitionId === "customKpi") {
+    const custom = customKpis.find((item) => item.id === widget.config.customKpiId);
+    const result = custom
+      ? evaluateCustomKpi(custom, data)
+      : { value: 0, formattedValue: "--", hint: "Configuración no disponible" };
+    return {
+      id: widget.instanceId,
+      label: widget.config.title || custom?.name || "KPI personalizado",
+      value: result.formattedValue,
+      hint: result.hint,
+      trend: result.trend,
+      trendTone: result.trendTone,
+      progress: custom?.visualization === "progress" || custom?.visualization === "percentage" ? result.value : undefined,
+      visualization: custom?.visualization,
+      tone: widget.config.tone ?? custom?.tone ?? "purple",
+      icon: custom ? (DASHBOARD_WIDGET_ICONS[custom.iconKey] ?? Sparkles) : Sparkles,
+    };
+  }
+
+  if (widget.definitionId === "newPatientsThisMonth") {
+    return { id: widget.instanceId, label: title, value: data?.newPatientsThisMonth.toString() ?? "--", hint: "Altas registradas este mes", tone, icon: Icon, to: "/pacientes" };
+  }
+  if (widget.definitionId === "consultationsThisMonth") {
+    return { id: widget.instanceId, label: title, value: data?.consultationsThisMonth.toString() ?? "--", hint: "Consultas completadas este mes", tone, icon: ClipboardCheck, to: "/consultas" };
+  }
+  if (widget.definitionId === "activePlans") {
+    return { id: widget.instanceId, label: title, value: data?.activePlans.toString() ?? "--", hint: `${data?.expiringPlans.length ?? 0} por vencer en 7 días`, tone, icon: UtensilsCrossed, to: "/planes" };
+  }
+  return { id: widget.instanceId, label: title, value: data?.pendingSync.toString() ?? "--", hint: "Cambios locales pendientes", tone, icon: RefreshCcw };
+}
+
+function canUseDashboardDefinition(definition: DashboardWidgetDefinition, role: string | null): boolean {
+  if (!definition.requiredModule) return true;
+  if (!role) return false;
+  if (definition.requiredModule === "billing") {
+    return canViewFinancialData(role);
+  }
+  return hasModuleAccess(definition.requiredModule, role);
+}
+
+function canViewFinancialData(role: string | null): boolean {
+  return Boolean(role && (BILLING_REPORT_ROLES as readonly string[]).includes(role));
+}
+
+function canUseCustomKpiSource(source: CustomKpiSource, role: string | null): boolean {
+  if (!role) return false;
+  const moduleBySource: Record<CustomKpiConfig["source"], string | null> = {
+    patients: "patients",
+    consultations: "consultations",
+    payments: "billing",
+    plans: "mealplan",
+    agenda: "agenda",
+    system: null,
+  };
+  const module = moduleBySource[source];
+  if (!module) return true;
+  if (module === "billing") return canViewFinancialData(role);
+  return hasModuleAccess(module, role);
+}
+
+function canUseCustomKpi(config: CustomKpiConfig, role: string | null): boolean {
+  const field = getCustomKpiField(config.source, config.valueField);
+  return Boolean(field && canUseCustomKpiSource(field.source, role));
+}
+
+function canUseQuickAction(path: string, role: string | null): boolean {
+  if (!role) return false;
+  if (path.startsWith("/billing")) return canViewFinancialData(role);
+  if (path.startsWith("/pacientes")) return hasModuleAccess("patients", role);
+  if (path.startsWith("/consultas")) return hasModuleAccess("consultations", role);
+  if (path.startsWith("/planes")) return hasModuleAccess("mealplan", role);
+  if (path.startsWith("/plan-semanal")) return hasModuleAccess("meal-planner", role);
+  return true;
+}
+
+function filterPreferencesByAccess(
+  preferences: DashboardPreferences,
+  role: string | null,
+): DashboardPreferences {
+  const allowedCustomIds = new Set(preferences.customKpis.filter((config) => canUseCustomKpi(config, role)).map((config) => config.id));
+  const widgets = preferences.widgets.filter((widget) => {
+    const definition = getDashboardWidgetDefinition(widget.definitionId);
+    if (!canUseDashboardDefinition(definition, role)) return false;
+    return widget.definitionId !== "customKpi" || Boolean(widget.config.customKpiId && allowedCustomIds.has(widget.config.customKpiId));
+  });
+  const ids = new Set(widgets.map((widget) => widget.instanceId));
+  return {
+    ...preferences,
+    widgets,
+    customKpis: preferences.customKpis.filter((config) => allowedCustomIds.has(config.id)),
+    layout: preferences.layout.filter((item) => ids.has(item.i)),
+    smallScreenOrder: preferences.smallScreenOrder.filter((id) => ids.has(id)),
+  };
+}
+
 export function DashboardPage() {
   const { data, loading, error } = useDashboardKpis();
-  const [isKpiCustomizerOpen, setKpiCustomizerOpen] = React.useState(false);
-  const kpiOrder = usePreferencesStore((state) => state.dashboardPremiumKpiOrder);
-  const hiddenKpiIds = usePreferencesStore((state) => state.dashboardPremiumKpiHiddenIds);
-  const setKpiOrder = usePreferencesStore((state) => state.setDashboardPremiumKpiOrder);
-  const setHiddenKpiIds = usePreferencesStore((state) => state.setDashboardPremiumKpiHiddenIds);
-  const resetDashboardPremiumKpis = usePreferencesStore((state) => state.resetDashboardPremiumKpis);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [libraryOpen, setLibraryOpen] = React.useState(false);
+  const [highlightedWidgetId, setHighlightedWidgetId] = React.useState<string | null>(null);
+  const [presetsOpen, setPresetsOpen] = React.useState(false);
+  const [customKpiOpen, setCustomKpiOpen] = React.useState(false);
+  const [customKpiEditInstanceId, setCustomKpiEditInstanceId] = React.useState<string | null>(null);
+  const [customKpiLibraryEditId, setCustomKpiLibraryEditId] = React.useState<string | null>(null);
+  const [customKpiDeleteId, setCustomKpiDeleteId] = React.useState<string | null>(null);
+  const [configWidgetId, setConfigWidgetId] = React.useState<string | null>(null);
+  const [confirmCancelOpen, setConfirmCancelOpen] = React.useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = React.useState(false);
+  const userId = useAuthStore((state) => state.user?.id ?? "local");
+  const role = useAuthStore((state) => state.user?.rol ?? null);
+  const sucursalId = useAuthStore((state) => state.sucursalActivaId);
+  const legacyKpiOrder = usePreferencesStore((state) => state.dashboardPremiumKpiOrder);
+  const legacyHiddenKpiIds = usePreferencesStore((state) => state.dashboardPremiumKpiHiddenIds);
+  const saved = useDashboardLayoutStore((state) => state.saved);
+  const draft = useDashboardLayoutStore((state) => state.draft);
+  const isEditing = useDashboardLayoutStore((state) => state.isEditing);
+  const isDirty = useDashboardLayoutStore((state) => state.isDirty);
+  const layoutError = useDashboardLayoutStore((state) => state.error);
+  const hydrate = useDashboardLayoutStore((state) => state.hydrate);
+  const beginEditing = useDashboardLayoutStore((state) => state.beginEditing);
+  const cancelEditing = useDashboardLayoutStore((state) => state.cancelEditing);
+  const saveDraft = useDashboardLayoutStore((state) => state.saveDraft);
+  const applyPreset = useDashboardLayoutStore((state) => state.applyPreset);
+  const updateLayout = useDashboardLayoutStore((state) => state.updateLayout);
+  const addWidget = useDashboardLayoutStore((state) => state.addWidget);
+  const updateWidget = useDashboardLayoutStore((state) => state.updateWidget);
+  const setWidgetSize = useDashboardLayoutStore((state) => state.setWidgetSize);
+  const setRowsMode = useDashboardLayoutStore((state) => state.setRowsMode);
+  const adjustMinRows = useDashboardLayoutStore((state) => state.adjustMinRows);
+  const moveWidgetInOrder = useDashboardLayoutStore((state) => state.moveWidgetInOrder);
+  const duplicateWidget = useDashboardLayoutStore((state) => state.duplicateWidget);
+  const toggleWidgetHidden = useDashboardLayoutStore((state) => state.toggleWidgetHidden);
+  const removeWidget = useDashboardLayoutStore((state) => state.removeWidget);
+  const addCustomKpi = useDashboardLayoutStore((state) => state.addCustomKpi);
+  const removeCustomKpi = useDashboardLayoutStore((state) => state.removeCustomKpi);
+  const scope = React.useMemo(() => ({ userId, sucursalId }), [sucursalId, userId]);
+
+  React.useEffect(() => {
+    hydrate(scope, { kpiOrder: legacyKpiOrder, hiddenKpiIds: legacyHiddenKpiIds });
+  }, [hydrate, legacyHiddenKpiIds, legacyKpiOrder, scope]);
+
+  React.useEffect(() => {
+    if (!saved || searchParams.get("customize") !== "1") return;
+    beginEditing();
+    setLibraryOpen(false);
+    const next = new URLSearchParams(searchParams);
+    next.delete("customize");
+    setSearchParams(next, { replace: true });
+  }, [beginEditing, saved, searchParams, setSearchParams]);
+
+  useUnsavedChangesGuard(isEditing && isDirty, "Tienes cambios sin guardar en el dashboard. ¿Deseas salir?");
+
+  React.useEffect(() => {
+    if (!highlightedWidgetId) return;
+    let animationFrame = 0;
+    let attempts = 0;
+    let settleFrames = 0;
+    const revealHighlightedWidget = () => {
+      const widget = Array.from(document.querySelectorAll<HTMLElement>("[data-dashboard-widget-id]"))
+        .find((element) => element.dataset.dashboardWidgetId === highlightedWidgetId);
+      if (!widget) {
+        attempts += 1;
+        if (attempts < 12) animationFrame = window.requestAnimationFrame(revealHighlightedWidget);
+        return;
+      }
+      if (settleFrames < 12) {
+        settleFrames += 1;
+        animationFrame = window.requestAnimationFrame(revealHighlightedWidget);
+        return;
+      }
+
+      let scrollContainer = widget.parentElement;
+      while (scrollContainer) {
+        const overflowY = window.getComputedStyle(scrollContainer).overflowY;
+        if (/auto|scroll/.test(overflowY) && scrollContainer.scrollHeight > scrollContainer.clientHeight) break;
+        scrollContainer = scrollContainer.parentElement;
+      }
+      const scrollRoot = scrollContainer ?? document.scrollingElement as HTMLElement | null;
+      if (!scrollRoot) return;
+
+      const widgetRect = widget.getBoundingClientRect();
+      const scrollRootRect = scrollRoot.getBoundingClientRect();
+      const toolbarRect = document.querySelector<HTMLElement>(".nc-dashboard-edit-toolbar")?.getBoundingClientRect();
+      const libraryRect = document.querySelector<HTMLElement>(".nc-dashboard-widget-library")?.getBoundingClientRect();
+      const visibleTop = Math.max(scrollRootRect.top + 20, (toolbarRect?.bottom ?? 0) + 18);
+      const overlapsLibrary = Boolean(libraryRect
+        && widgetRect.left < libraryRect.right
+        && widgetRect.right > libraryRect.left);
+      const visibleBottom = overlapsLibrary && libraryRect
+        ? Math.max(visibleTop + 80, libraryRect.top - 18)
+        : Math.min(scrollRootRect.bottom - 24, window.innerHeight - 24);
+      const availableHeight = visibleBottom - visibleTop;
+      const desiredTop = visibleTop + Math.max(0, (availableHeight - Math.min(widgetRect.height, availableHeight)) / 2);
+      const maxScroll = Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight);
+      const nextScroll = Math.max(0, Math.min(maxScroll, scrollRoot.scrollTop + widgetRect.top - desiredTop));
+
+      scrollRoot.scrollTo({
+        top: nextScroll,
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      });
+    };
+    animationFrame = window.requestAnimationFrame(revealHighlightedWidget);
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [highlightedWidgetId]);
+
+  const fallbackPreferences = React.useMemo(
+    () => createDefaultDashboardPreferences(scope, { kpiOrder: legacyKpiOrder, hiddenKpiIds: legacyHiddenKpiIds }),
+    [legacyHiddenKpiIds, legacyKpiOrder, scope],
+  );
+  const preferences = (isEditing ? draft : saved) ?? fallbackPreferences;
+  const visiblePreferences = React.useMemo(
+    () => filterPreferencesByAccess(preferences, role),
+    [preferences, role],
+  );
   const liveKpis = buildLiveKpis(data);
-  const orderedKpis = orderKpis(liveKpis, kpiOrder);
-  const normalizedHiddenKpiIds = normalizeHiddenKpiIds(hiddenKpiIds, liveKpis);
-  const hiddenKpiSet = new Set(normalizedHiddenKpiIds);
-  const visibleKpis = orderedKpis.filter((item) => !hiddenKpiSet.has(item.id));
-  const liveAlerts = buildLiveAlerts(data);
+  const liveAlerts = buildLiveAlerts(data, role);
   const liveFinancialSummary = buildLiveFinancialSummary(data);
   const liveUpcomingConsultations = buildLiveUpcomingConsultations(data);
   const liveRecentPayments = buildLiveRecentPayments(data);
@@ -471,29 +668,94 @@ export function DashboardPage() {
   const liveMonthlyActivity = buildLiveMonthlyActivity(data);
   const liveWeeklyActivitySummary = buildLiveWeeklyActivitySummary(data);
   const liveMonthlyActivitySummary = buildLiveMonthlyActivitySummary(data);
+  const liveQuickActions = quickActions.filter((action) => canUseQuickAction(action.to, role));
+  const canUseKpiSource = React.useCallback(
+    (source: CustomKpiSource) => canUseCustomKpiSource(source, role),
+    [role],
+  );
 
-  const moveKpi = (id: DashboardPremiumKpiId, direction: -1 | 1) => {
-    const order = normalizeKpiOrder(kpiOrder, liveKpis);
-    const index = order.indexOf(id);
-    const nextIndex = index + direction;
-    if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return;
-    const next = [...order];
-    [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
-    setKpiOrder(next);
+  const startEditing = () => {
+    beginEditing();
+    setLibraryOpen(false);
   };
 
-  const toggleKpi = (id: DashboardPremiumKpiId) => {
-    const hiddenIds = normalizeHiddenKpiIds(hiddenKpiIds, liveKpis);
-    if (hiddenIds.includes(id)) {
-      setHiddenKpiIds(hiddenIds.filter((hiddenId) => hiddenId !== id));
+  const renderWidget = (widget: DashboardWidgetInstance) => {
+    const definition = getDashboardWidgetDefinition(widget.definitionId);
+    const title = widget.config.title || definition.name;
+    const limit = widget.config.limit ?? 6;
+    if (definition.kind === "kpi" || definition.kind === "customKpi") {
+      const live = liveKpis.find((item) => item.id === widget.definitionId);
+      const item = live
+        ? { ...live, id: widget.instanceId, label: title, tone: widget.config.tone ?? live.tone }
+        : buildAdditionalKpi(widget, data, visiblePreferences.customKpis);
+      return <KpiCard item={item} />;
+    }
+    if (definition.kind === "upcomingConsultations") return <UpcomingConsultationsCard title={title} items={liveUpcomingConsultations.slice(0, limit)} />;
+    if (definition.kind === "weeklyActivity") return (
+      <WeeklyActivityCard
+        title={title}
+        weeklyData={liveWeeklyActivity}
+        monthlyData={liveMonthlyActivity}
+        weeklySummary={liveWeeklyActivitySummary}
+        monthlySummary={liveMonthlyActivitySummary}
+      />
+    );
+    if (definition.kind === "alerts") return <AlertsAndPendingCard title={title} alerts={liveAlerts.slice(0, limit)} />;
+    if (definition.kind === "financialSummary") return <FinancialSummaryCard title={title} summary={liveFinancialSummary} />;
+    if (definition.kind === "recentPayments") return <RecentPaymentsCard title={title} payments={liveRecentPayments.slice(0, limit)} />;
+    return <QuickActionsCard title={title} actions={liveQuickActions.slice(0, limit)} />;
+  };
+
+  const revealWidgetInGrid = (instanceId: string) => {
+    setHighlightedWidgetId(instanceId);
+    window.setTimeout(() => {
+      setHighlightedWidgetId((current) => current === instanceId ? null : current);
+    }, 2200);
+  };
+
+  const handleAddWidget = (definitionId: DashboardWidgetInstance["definitionId"], customKpiId?: string) => {
+    const existing = draft?.widgets.find((widget) => widget.definitionId === definitionId && (definitionId !== "customKpi" || widget.config.customKpiId === customKpiId));
+    if (existing?.hidden) {
+      toggleWidgetHidden(existing.instanceId);
+      revealWidgetInGrid(existing.instanceId);
+      toast.success("Widget mostrado nuevamente");
       return;
     }
-    if (liveKpis.length - hiddenIds.length <= 1) return;
-    setHiddenKpiIds([...hiddenIds, id]);
+    const previousIds = new Set(draft?.widgets.map((widget) => widget.instanceId));
+    addWidget(definitionId, customKpiId);
+    const addedWidget = [...(useDashboardLayoutStore.getState().draft?.widgets ?? [])]
+      .reverse()
+      .find((widget) => !previousIds.has(widget.instanceId)
+        && widget.definitionId === definitionId
+        && (definitionId !== "customKpi" || widget.config.customKpiId === customKpiId));
+    if (addedWidget) revealWidgetInGrid(addedWidget.instanceId);
+    toast.success("Widget agregado al dashboard");
+  };
+
+  const configuredWidget = configWidgetId
+    ? visiblePreferences.widgets.find((widget) => widget.instanceId === configWidgetId) ?? null
+    : null;
+  const customKpiEditWidget = customKpiEditInstanceId
+    ? visiblePreferences.widgets.find((widget) => widget.instanceId === customKpiEditInstanceId) ?? null
+    : null;
+  const customKpiInitialConfig = visiblePreferences.customKpis.find((config) =>
+    config.id === (customKpiEditWidget?.config.customKpiId ?? customKpiLibraryEditId),
+  ) ?? null;
+  const customKpiDeleteConfig = (draft?.customKpis ?? visiblePreferences.customKpis)
+    .find((config) => config.id === customKpiDeleteId) ?? null;
+
+  const openWidgetConfiguration = (instanceId: string) => {
+    const widget = visiblePreferences.widgets.find((item) => item.instanceId === instanceId);
+    if (widget?.definitionId === "customKpi") {
+      setCustomKpiEditInstanceId(instanceId);
+      setCustomKpiOpen(true);
+      return;
+    }
+    setConfigWidgetId(instanceId);
   };
 
   return (
-    <DashboardShell onCustomizeKpis={() => setKpiCustomizerOpen(true)}>
+    <DashboardShell onCustomizeKpis={startEditing}>
       <h1 className="sr-only">Dashboard</h1>
 
       {(loading || error) && (
@@ -504,44 +766,166 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="nc-dashboard-kpi-action-row">
-        <button type="button" className="nc-dashboard-kpi-action" onClick={() => setKpiCustomizerOpen(true)}>
-          <SlidersHorizontal size={14} strokeWidth={2} aria-hidden="true" />
-          <span>Reordenar / ocultar métricas</span>
-        </button>
+      {isEditing ? (
+        <DashboardEditToolbar
+          dirty={isDirty}
+          rowsMode={preferences.grid.rowsMode}
+          minRows={preferences.grid.minRows}
+          onOpenLibrary={() => setLibraryOpen(true)}
+          onOpenPresets={() => setPresetsOpen(true)}
+          onReset={() => setConfirmResetOpen(true)}
+          onRowsModeChange={setRowsMode}
+          onAdjustRows={adjustMinRows}
+          onCancel={() => {
+            setLibraryOpen(false);
+            if (isDirty) setConfirmCancelOpen(true);
+            else cancelEditing();
+          }}
+          onSave={() => {
+            if (saveDraft()) {
+              setLibraryOpen(false);
+              toast.success("Dashboard personalizado guardado");
+            }
+          }}
+        />
+      ) : (
+        <div className="nc-dashboard-kpi-action-row">
+          <button type="button" className="nc-dashboard-kpi-action" onClick={startEditing}>
+            <Settings size={14} strokeWidth={2} aria-hidden="true" />
+            <span>Reordenar / ocultar métricas</span>
+          </button>
+        </div>
+      )}
+
+      {layoutError && <div className="nc-dashboard-data-status nc-dashboard-data-status--error" role="alert">{layoutError}</div>}
+
+      <div className="nc-dashboard-editor-canvas" data-library-open={libraryOpen || undefined}>
+        <EditableDashboardGrid
+          preferences={visiblePreferences}
+          editing={isEditing}
+          highlightedWidgetId={highlightedWidgetId}
+          renderWidget={renderWidget}
+          onLayoutChange={updateLayout}
+          onConfigure={openWidgetConfiguration}
+          onDuplicate={duplicateWidget}
+          onHide={toggleWidgetHidden}
+          onRemove={removeWidget}
+          onMove={moveWidgetInOrder}
+        />
+
+        <WidgetLibraryPanel
+          open={libraryOpen}
+          widgets={draft?.widgets ?? visiblePreferences.widgets}
+          customKpis={(draft?.customKpis ?? visiblePreferences.customKpis).filter((config) => canUseCustomKpi(config, role))}
+          canUseDefinition={(definition) => canUseDashboardDefinition(definition, role)}
+          onOpenChange={setLibraryOpen}
+          onAdd={handleAddWidget}
+          onCreateCustom={() => {
+            setCustomKpiEditInstanceId(null);
+            setCustomKpiLibraryEditId(null);
+            setCustomKpiOpen(true);
+          }}
+          onEditCustom={(customKpiId) => {
+            setLibraryOpen(false);
+            setCustomKpiEditInstanceId(null);
+            setCustomKpiLibraryEditId(customKpiId);
+            window.setTimeout(() => setCustomKpiOpen(true), 0);
+          }}
+          onDeleteCustom={(customKpiId) => {
+            setLibraryOpen(false);
+            setCustomKpiDeleteId(customKpiId);
+          }}
+        />
       </div>
 
-      <section className="nc-dashboard-kpi-grid" aria-label="Métricas principales">
-        {visibleKpis.map((item) => (
-          <KpiCard key={item.id} item={item} />
-        ))}
-      </section>
+      <WidgetConfigDialog
+        widget={configuredWidget}
+        position={configuredWidget
+          ? visiblePreferences.layout.find((position) => position.i === configuredWidget.instanceId) ?? null
+          : null}
+        onOpenChange={(open) => { if (!open) setConfigWidgetId(null); }}
+        onSave={(instanceId, config, size) => {
+          updateWidget(instanceId, config);
+          if (size) setWidgetSize(instanceId, size);
+        }}
+      />
 
-      <section className="nc-dashboard-content-grid" aria-label="Resumen operativo">
-        <UpcomingConsultationsCard items={liveUpcomingConsultations} />
-        <WeeklyActivityCard
-          weeklyData={liveWeeklyActivity}
-          monthlyData={liveMonthlyActivity}
-          weeklySummary={liveWeeklyActivitySummary}
-          monthlySummary={liveMonthlyActivitySummary}
-        />
-        <AlertsAndPendingCard alerts={liveAlerts} />
-      </section>
+      <DashboardPresetDialog
+        open={presetsOpen}
+        activePresetId={visiblePreferences.activePresetId}
+        onOpenChange={setPresetsOpen}
+        onApply={applyPreset}
+      />
 
-      <section className="nc-dashboard-content-grid nc-dashboard-content-grid--compact" aria-label="Resumen financiero y accesos rápidos">
-        <FinancialSummaryCard summary={liveFinancialSummary} />
-        <RecentPaymentsCard payments={liveRecentPayments} />
-        <QuickActionsCard actions={quickActions} />
-      </section>
+      <CustomKpiBuilder
+        open={customKpiOpen}
+        initialConfig={customKpiInitialConfig}
+        canUseSource={canUseKpiSource}
+        onOpenChange={(open) => {
+          setCustomKpiOpen(open);
+          if (!open) {
+            setCustomKpiEditInstanceId(null);
+            setCustomKpiLibraryEditId(null);
+          }
+        }}
+        onCreate={(config) => {
+          addCustomKpi(config);
+          if (customKpiEditInstanceId) {
+            setWidgetSize(customKpiEditInstanceId, config.size);
+            toast.success("KPI personalizado actualizado");
+          } else if (customKpiLibraryEditId) {
+            toast.success("KPI personalizado actualizado");
+          } else {
+            const previousIds = new Set(useDashboardLayoutStore.getState().draft?.widgets.map((widget) => widget.instanceId));
+            addWidget("customKpi", config.id, config.size);
+            const addedWidget = [...(useDashboardLayoutStore.getState().draft?.widgets ?? [])]
+              .reverse()
+              .find((widget) => !previousIds.has(widget.instanceId) && widget.config.customKpiId === config.id);
+            if (addedWidget) revealWidgetInGrid(addedWidget.instanceId);
+            toast.success("KPI personalizado agregado");
+          }
+        }}
+      />
 
-      <DashboardKpiCustomizer
-        open={isKpiCustomizerOpen}
-        items={orderedKpis}
-        hiddenIds={normalizedHiddenKpiIds}
-        onClose={() => setKpiCustomizerOpen(false)}
-        onMove={moveKpi}
-        onToggle={toggleKpi}
-        onReset={resetDashboardPremiumKpis}
+      <ConfirmDialog
+        open={Boolean(customKpiDeleteConfig)}
+        onOpenChange={(open) => { if (!open) setCustomKpiDeleteId(null); }}
+        title="¿Eliminar este KPI personalizado?"
+        description={customKpiDeleteConfig
+          ? `${customKpiDeleteConfig.name} y sus widgets asociados se eliminarán del borrador.`
+          : undefined}
+        confirmLabel="Eliminar KPI"
+        tone="warning"
+        onConfirm={() => {
+          if (customKpiDeleteId) removeCustomKpi(customKpiDeleteId);
+          setCustomKpiDeleteId(null);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmCancelOpen}
+        onOpenChange={setConfirmCancelOpen}
+        title="¿Descartar los cambios?"
+        description="El dashboard volverá a la última configuración guardada."
+        confirmLabel="Descartar cambios"
+        tone="warning"
+        onConfirm={() => {
+          cancelEditing();
+          setConfirmCancelOpen(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmResetOpen}
+        onOpenChange={setConfirmResetOpen}
+        title="¿Restaurar el dashboard predeterminado?"
+        description="Se reemplazará el acomodo del borrador. Tus KPIs personalizados seguirán disponibles en la biblioteca."
+        confirmLabel="Restaurar"
+        tone="warning"
+        onConfirm={() => {
+          applyPreset("default");
+          setConfirmResetOpen(false);
+        }}
       />
     </DashboardShell>
   );

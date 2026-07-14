@@ -17,6 +17,7 @@ interface WeeklyActivityCardProps {
   monthlyData: WeeklyActivityPoint[];
   weeklySummary: ActivitySummaryItem[];
   monthlySummary: ActivitySummaryItem[];
+  title?: string;
 }
 
 interface TooltipPayloadItem {
@@ -47,7 +48,7 @@ function WeeklyTooltip({ active, label, payload }: { active?: boolean; label?: s
   );
 }
 
-export function WeeklyActivityCard({ weeklyData, monthlyData, weeklySummary, monthlySummary }: WeeklyActivityCardProps) {
+export function WeeklyActivityCard({ weeklyData, monthlyData, weeklySummary, monthlySummary, title }: WeeklyActivityCardProps) {
   const [period, setPeriod] = React.useState<"week" | "month">("week");
   const data = period === "week" ? weeklyData : monthlyData;
   const summary = period === "week" ? weeklySummary : monthlySummary;
@@ -56,7 +57,7 @@ export function WeeklyActivityCard({ weeklyData, monthlyData, weeklySummary, mon
 
   return (
     <DashboardSectionCard
-      title={period === "week" ? "Actividad semanal" : "Actividad mensual"}
+      title={title ?? (period === "week" ? "Actividad semanal" : "Actividad mensual")}
       icon={<LineChartIcon size={20} strokeWidth={1.9} />}
       action={
         <select

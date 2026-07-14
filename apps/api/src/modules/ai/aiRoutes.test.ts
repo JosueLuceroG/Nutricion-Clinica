@@ -52,6 +52,16 @@ describe('aiRoutes', () => {
     });
   });
 
+  it('preserves the configured Ollama provider in the public response', () => {
+    const mapped = mapOpenAiResponse({
+      choices: [{ message: { content: '{"name":"KPI"}' }, finish_reason: 'stop' }],
+      model: 'llama3.2:latest',
+    }, 'llama3.2', 'ollama');
+
+    expect(mapped.provider).toBe('ollama');
+    expect(mapped.model).toBe('llama3.2:latest');
+  });
+
   it('requires auth and branch access before AI routes', () => {
     const firstRouteIndex = routerStack().findIndex((layer) => layer.route);
     const middlewareNames = routerStack().slice(0, firstRouteIndex).map((layer) => layer.handle?.name);
