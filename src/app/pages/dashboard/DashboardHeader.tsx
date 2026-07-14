@@ -593,7 +593,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   }, [avatarMenuOpen, notificationsOpen, swipedNotificationId]);
 
   return (
-    <header className="nc-dashboard-header">
+    <header className="nc-dashboard-header" data-quick-notes-header>
       <div className="nc-dashboard-header__inner">
         <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
           <h1 className="nc-dashboard-header__title">

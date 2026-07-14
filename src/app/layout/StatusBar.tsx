@@ -20,6 +20,7 @@ import { usePWAInstall } from "@hooks/usePWAInstall";
 import { Badge } from "@components/ui/badge";
 import { Button } from "@components/ui/button";
 import { cn } from "@utils/cn";
+import { QuickNotesButton } from "@modules/quick-notes/ui";
 
 const STATUS_CONFIG: Record<
   SyncStatus,
@@ -72,6 +73,7 @@ export function StatusBar() {
       <footer
         className="flex h-7 items-center gap-3 border-t bg-muted/30 px-3 text-[11px] text-muted-foreground"
         role="contentinfo"
+        data-quick-notes-status-bar
       >
         <Badge
           variant={cfg.variant}
@@ -117,6 +119,7 @@ export function StatusBar() {
         </span>
 
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <QuickNotesButton />
           {canInstall && (
             <Button
               variant="ghost"

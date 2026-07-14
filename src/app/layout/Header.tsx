@@ -120,7 +120,7 @@ export function Header() {
   const toggleMobileSidebar = useUIStore((s) => s.toggleMobileSidebar);
 
   return (
-    <header className="flex h-14 min-w-0 items-center gap-2 border-b bg-background px-3 sm:gap-3 sm:px-4">
+    <header className="flex h-14 min-w-0 items-center gap-2 border-b bg-background px-3 sm:gap-3 sm:px-4" data-quick-notes-header>
       <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={toggleMobileSidebar} aria-label={t("nav.open_menu")}>
         <Menu className="h-4 w-4" />
       </Button>

@@ -6,6 +6,7 @@ import { Header } from "./Header";
 import { StatusBar } from "./StatusBar";
 import { CommandPalette } from "./CommandPalette";
 import { ContextPanel } from "./ContextPanel";
+import { QuickNotesProvider } from "@modules/quick-notes/ui";
 import { useUIStore } from "@store/uiStore";
 import { cn } from "@utils/cn";
 
@@ -61,6 +62,7 @@ export function AppLayout() {
         {!isDashboardRoute && <StatusBar />}
       </div>
 
+      <QuickNotesProvider />
       <CommandPalette />
     </div>
   );

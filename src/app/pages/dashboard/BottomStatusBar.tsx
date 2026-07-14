@@ -16,6 +16,7 @@ import { ConflictResolutionModal } from "@modules/sync/ui/ConflictResolutionModa
 import { SyncQueueDiagnosticModal } from "@modules/sync/ui/SyncQueueDiagnosticModal";
 import { useSyncActions } from "@services/sync/useSyncActions";
 import { useSyncStore, type SyncStatus } from "@store/syncStore";
+import { QuickNotesButton } from "@modules/quick-notes/ui";
 
 const STATUS_CONFIG: Record<SyncStatus, { labelKey: string; icon: LucideIcon; tone: string }> = {
   idle: { labelKey: "sync.synced", icon: CheckCircle2, tone: "synced" },
@@ -63,7 +64,7 @@ export function BottomStatusBar() {
 
   return (
     <>
-      <footer className="nc-dashboard-bottom-frame nc-dashboard-bottom-bar" role="contentinfo">
+      <footer className="nc-dashboard-bottom-frame nc-dashboard-bottom-bar" role="contentinfo" data-quick-notes-status-bar>
         <div
           className={`nc-dashboard-bottom-status nc-dashboard-bottom-status--${config.tone}`}
           title={lastError ?? undefined}
@@ -105,6 +106,8 @@ export function BottomStatusBar() {
         </span>
 
         <div className="nc-dashboard-bottom-bar__spacer" />
+
+        <QuickNotesButton variant="dashboard" />
 
         <span className={`nc-dashboard-bottom-network${isOnline ? " nc-dashboard-bottom-network--online" : " nc-dashboard-bottom-network--offline"}`}>
           {isOnline ? <Wifi size={15} strokeWidth={2} aria-hidden="true" /> : <WifiOff size={15} strokeWidth={2} aria-hidden="true" />}

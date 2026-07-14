@@ -656,6 +656,7 @@ export function CommandPalette() {
     const handleShortcut = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k")
         return;
+      if (event.target instanceof Element && event.target.closest("[data-quick-notes-editor]")) return;
       event.preventDefault();
       if (open) {
         inputRef.current?.focus();
