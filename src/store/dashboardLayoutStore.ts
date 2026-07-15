@@ -96,7 +96,7 @@ export const useDashboardLayoutStore = create<DashboardLayoutState>((set, get) =
     });
   },
 
-  beginEditing: () => set((state) => state.saved ? {
+  beginEditing: () => set((state) => state.saved && !state.isEditing ? {
     draft: clonePreferences(state.saved),
     isEditing: true,
     isDirty: false,

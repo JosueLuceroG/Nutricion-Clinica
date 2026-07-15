@@ -96,6 +96,19 @@ describe("dashboardLayoutStore", () => {
     ).toBe(true);
   });
 
+  it("no reinicia un draft sucio si la edición ya está activa", () => {
+    useDashboardLayoutStore.getState().hydrate(scope);
+    useDashboardLayoutStore.getState().beginEditing();
+    useDashboardLayoutStore.getState().toggleWidgetHidden("activePatients");
+    const dirtyDraft = structuredClone(useDashboardLayoutStore.getState().draft);
+
+    useDashboardLayoutStore.getState().beginEditing();
+
+    expect(useDashboardLayoutStore.getState().isEditing).toBe(true);
+    expect(useDashboardLayoutStore.getState().isDirty).toBe(true);
+    expect(useDashboardLayoutStore.getState().draft).toEqual(dirtyDraft);
+  });
+
   it("aplica presets y permite agregar y remover widgets antes de persistir", () => {
     useDashboardLayoutStore.getState().hydrate(scope);
     useDashboardLayoutStore.getState().beginEditing();

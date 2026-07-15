@@ -187,6 +187,8 @@ function buildIntelligentSuggestion(
 export function CommandPalette() {
   const open = useCommandPaletteStore((state) => state.open);
   const setOpen = useCommandPaletteStore((state) => state.setOpen);
+  const requestedIntent = useCommandPaletteStore((state) => state.intent);
+  const clearRequestedIntent = useCommandPaletteStore((state) => state.clearIntent);
   const historyEntries = useSearchHistoryStore((state) => state.entries);
   const registerRecent = useSearchHistoryStore((state) => state.register);
   const clearRecentScope = useSearchHistoryStore((state) => state.clearScope);
@@ -570,6 +572,14 @@ export function CommandPalette() {
     },
     [],
   );
+
+  React.useEffect(() => {
+    if (!open || !requestedIntent) return;
+    beginPatientSelection(
+      requestedIntent === "new-consultation" ? "consultation" : "plan",
+    );
+    clearRequestedIntent();
+  }, [beginPatientSelection, clearRequestedIntent, open, requestedIntent]);
 
   const executeResult = React.useCallback(
     (result: GlobalSearchResult) => {

@@ -28,7 +28,7 @@ export function QuickNotesButton({
     "aria-controls": "quick-notes-panel",
     "aria-expanded": panelOpen,
     "aria-label":
-      activeCount > 0
+      variant !== "dashboard" && activeCount > 0
         ? t("quick_notes.launcher_with_count", { count: activeCount })
         : label,
     "data-quick-notes-trigger": "",
@@ -48,11 +48,6 @@ export function QuickNotesButton({
       >
         <StickyNote size={15} strokeWidth={2} aria-hidden="true" />
         <span>{label}</span>
-        {activeCount > 0 && (
-          <span className="nc-dashboard-quick-notes-trigger__count">
-            {activeCount}
-          </span>
-        )}
       </button>
     ) : (
       <Button

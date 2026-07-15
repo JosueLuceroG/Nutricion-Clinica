@@ -38,6 +38,7 @@ import { RequireRole } from "@modules/auth/RequireRole";
 import { authApi } from "@services/api/authApi";
 import { ALL_ROLES, type Role } from "@nutriclinica/shared";
 import { PriceCatalogDialog } from "@modules/pricing/ui/PriceCatalogDialog";
+import { DashboardQuickAccessSettingsCard } from "@modules/dashboard-quick-access/ui";
 
 type PasswordMode = "export" | "import" | null;
 
@@ -1551,6 +1552,8 @@ export function SettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          <DashboardQuickAccessSettingsCard />
 
           <DashboardWidgetsCard />
 

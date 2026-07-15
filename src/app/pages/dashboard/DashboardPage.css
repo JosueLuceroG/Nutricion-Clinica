@@ -1368,6 +1368,29 @@
   transform: translateY(0);
 }
 
+.nc-dashboard-quick-access:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+}
+
+.nc-dashboard-quick-access__label {
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-dashboard-quick-access__chevron {
+  flex: 0 0 auto;
+  margin-left: -2px;
+  transition: transform 160ms ease;
+}
+
+.nc-dashboard-quick-access[data-state="open"] .nc-dashboard-quick-access__chevron {
+  transform: rotate(180deg);
+}
+
 .nc-dashboard-header__notification {
   position: relative;
   display: inline-flex;
@@ -2800,8 +2823,8 @@
 .nc-dashboard-kpi-card__label {
   overflow: hidden;
   color: #0c1746;
-  font-size: clamp(13px, calc(13.5px * var(--nc-font-scale)), 14px);
-  font-weight: 620;
+  font-size: clamp(14px, calc(14.5px * var(--nc-font-scale)), 15px);
+  font-weight: 650;
   letter-spacing: -0.02em;
   line-height: 1.1;
   text-overflow: ellipsis;
@@ -3852,6 +3875,12 @@
   flex: 1 1 auto;
 }
 
+@media (min-width: 768px) {
+  .nc-dashboard-bottom-bar > .nc-dashboard-quick-notes-trigger {
+    margin-right: 12px;
+  }
+}
+
 .nc-dashboard-bottom-network {
   color: #53617e;
 }
@@ -4105,7 +4134,7 @@
   }
 
   .nc-dashboard-kpi-card__label {
-    font-size: 13px;
+    font-size: 14px;
   }
 
   .nc-dashboard-kpi-card__value {
@@ -4494,8 +4523,8 @@
   }
 
   .nc-dashboard-kpi-card__label {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 650;
   }
 
   .nc-dashboard-kpi-card__value {
@@ -5103,7 +5132,7 @@
   }
 
   .nc-dashboard-kpi-card__label {
-    font-size: clamp(13px, calc(13.5px * var(--nc-font-scale)), 14px);
+    font-size: clamp(14px, calc(14.5px * var(--nc-font-scale)), 15px);
   }
 
   .nc-dashboard-kpi-card__value {
@@ -10809,6 +10838,26 @@
   transform: translateY(0) scale(0.985);
 }
 
+.dark .nc-dashboard-bottom-status,
+.dark .nc-dashboard-bottom-chip,
+.dark .nc-dashboard-bottom-sync-button {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-dashboard-quick-notes-trigger--active {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #8abaff !important;
+}
+
+.dark .nc-dashboard-quick-notes-trigger--active:hover {
+  border-color: rgba(125, 166, 225, 0.24) !important;
+  background: rgba(21, 40, 67, 0.66) !important;
+  color: #dbeafe !important;
+}
+
 /* Light interaction polish: tactile press feedback for sidebar and buttons. */
 .light .nc-dashboard-button,
 .light .nc-dashboard-header__notification,
@@ -15408,7 +15457,8 @@
   }
 
   .nc-dashboard-kpi-card__label {
-    font-size: 11px;
+    font-size: 13.5px;
+    font-weight: 650;
   }
 
   .nc-dashboard-kpi-card__valueRow {

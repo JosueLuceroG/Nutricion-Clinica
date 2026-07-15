@@ -675,6 +675,7 @@ export function DashboardPage() {
   );
 
   const startEditing = () => {
+    if (isEditing) return;
     beginEditing();
     setLibraryOpen(false);
   };
@@ -755,7 +756,10 @@ export function DashboardPage() {
   };
 
   return (
-    <DashboardShell onCustomizeKpis={startEditing}>
+    <DashboardShell
+      onCustomizeKpis={startEditing}
+      dashboardEditing={isEditing}
+    >
       <h1 className="sr-only">Dashboard</h1>
 
       {(loading || error) && (

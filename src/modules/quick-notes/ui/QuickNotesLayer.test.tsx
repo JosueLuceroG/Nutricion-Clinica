@@ -46,6 +46,9 @@ describe("QuickNotesLayer", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "quick_notes.create_first" }),
     );
+    expect(
+      screen.queryByLabelText("quick_notes.category_label"),
+    ).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("quick_notes.title_label"), {
       target: { value: "Call Maria" },
     });

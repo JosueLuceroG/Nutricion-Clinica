@@ -26,13 +26,11 @@ import {
 import { Button } from "@components/ui/button";
 import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import {
-  QUICK_NOTE_CATEGORIES,
   QUICK_NOTE_COLORS,
   QUICK_NOTE_MAX_DIMENSIONS,
   QUICK_NOTE_MIN_DIMENSIONS,
   QUICK_NOTE_PRIORITIES,
   type QuickNote,
-  type QuickNoteCategory,
   type QuickNoteColor,
   type QuickNoteId,
   type QuickNotePriority,
@@ -160,7 +158,6 @@ interface QuickNoteDraft {
   content: string;
   color: QuickNoteColor;
   priority: QuickNotePriority;
-  category: QuickNoteCategory;
   size: QuickNoteSizePreset;
   pinned: boolean;
 }
@@ -177,7 +174,6 @@ function QuickNoteEditor({ note }: { note: QuickNote | null }) {
     content: note?.content ?? "",
     color: note?.color ?? preferences.defaultColor,
     priority: note?.priority ?? preferences.defaultPriority,
-    category: note?.category ?? preferences.defaultCategory,
     size: note?.size.preset ?? preferences.defaultSize,
     pinned: note?.pinned ?? false,
   }));
@@ -197,7 +193,6 @@ function QuickNoteEditor({ note }: { note: QuickNote | null }) {
       content: draft.content.trim(),
       color: draft.color,
       priority: draft.priority,
-      category: draft.category,
       size: draft.size,
       pinned: draft.pinned,
     };
@@ -283,25 +278,6 @@ function QuickNoteEditor({ note }: { note: QuickNote | null }) {
       </fieldset>
 
       <div className="qn-editor__grid">
-        <label className="qn-field">
-          <span>{t("quick_notes.category_label")}</span>
-          <select
-            value={draft.category}
-            onChange={(event) =>
-              setDraft((current) => ({
-                ...current,
-                category: event.target.value as QuickNoteCategory,
-              }))
-            }
-          >
-            {QUICK_NOTE_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {t(`quick_notes.categories.${category}`)}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <label className="qn-field">
           <span>{t("quick_notes.priority_label")}</span>
           <select
@@ -401,9 +377,6 @@ function QuickNotesPanel({
   const retry = useQuickNotesStore((state) => state.retry);
   const [query, setQuery] = React.useState("");
   const deferredQuery = React.useDeferredValue(query);
-  const [category, setCategory] = React.useState<"all" | QuickNoteCategory>(
-    "all",
-  );
   const searchRef = React.useRef<HTMLInputElement>(null);
   const editingNote = editorNoteId
     ? (notes.find((note) => note.id === editorNoteId) ?? null)
@@ -411,7 +384,6 @@ function QuickNotesPanel({
   const normalizedQuery = deferredQuery.trim().toLocaleLowerCase(i18n.language);
   const visibleNotes = notes
     .filter((note) => preferences.showCompleted || !note.completed)
-    .filter((note) => category === "all" || note.category === category)
     .filter(
       (note) =>
         !normalizedQuery ||
@@ -505,20 +477,6 @@ function QuickNotesPanel({
               )}
             </label>
             <div className="qn-panel__filters">
-              <select
-                value={category}
-                onChange={(event) =>
-                  setCategory(event.target.value as "all" | QuickNoteCategory)
-                }
-                aria-label={t("quick_notes.filter_category")}
-              >
-                <option value="all">{t("quick_notes.all_categories")}</option>
-                {QUICK_NOTE_CATEGORIES.map((item) => (
-                  <option key={item} value={item}>
-                    {t(`quick_notes.categories.${item}`)}
-                  </option>
-                ))}
-              </select>
               <button
                 type="button"
                 className={cn(
@@ -566,16 +524,16 @@ function QuickNotesPanel({
                   <StickyNote aria-hidden="true" />
                 </span>
                 <h3>
-                  {normalizedQuery || category !== "all"
+                  {normalizedQuery
                     ? t("quick_notes.no_results")
                     : t("quick_notes.empty_title")}
                 </h3>
                 <p>
-                  {normalizedQuery || category !== "all"
+                  {normalizedQuery
                     ? t("quick_notes.no_results_hint")
                     : t("quick_notes.empty_description")}
                 </p>
-                {!normalizedQuery && category === "all" && (
+                {!normalizedQuery && (
                   <Button size="sm" onClick={beginCreate}>
                     <Plus aria-hidden="true" />
                     {t("quick_notes.create_first")}
@@ -603,8 +561,6 @@ function QuickNotesPanel({
                           className="qn-priority-dot"
                           data-priority={note.priority}
                         />
-                        {t(`quick_notes.categories.${note.category}`)}
-                        <span aria-hidden="true">·</span>
                         {new Intl.DateTimeFormat(i18n.language, {
                           day: "2-digit",
                           month: "short",

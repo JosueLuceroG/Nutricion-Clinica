@@ -13,7 +13,6 @@ import {
   Plus,
   Search,
   Settings,
-  SlidersHorizontal,
   Star,
   User,
   UserPlus,
@@ -28,30 +27,16 @@ import {
 } from "@components/ui/dropdown-menu";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
+import {
+  useNotificationStore,
+  type DashboardNotification,
+  type NotificationAction,
+  type NotificationTab,
+} from "@store/notificationStore";
 import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
+import { DashboardQuickAccessButton } from "@modules/dashboard-quick-access/ui";
 
 type PeriodOfDay = "morning" | "afternoon" | "night";
-type NotificationTab = "inbox" | "general" | "archived";
-type NotificationAction = "accept" | "reject";
-type NotificationType = "patient_message" | "consultation" | "nutrition_plan" | "document" | "clinical_record" | "payment" | "system";
-
-interface DashboardNotification {
-  id: string;
-  type: NotificationType;
-  initials: string;
-  tone: "teal" | "blue" | "aqua" | "slate";
-  personName?: string;
-  patientName?: string;
-  message: string;
-  subject?: string;
-  suffix?: string;
-  category: string;
-  timeAgo: string;
-  read: boolean;
-  archived: boolean;
-  requiresAction?: boolean;
-  actions?: NotificationAction[];
-}
 
 interface NotificationDragState {
   id: string;
@@ -68,6 +53,7 @@ declare global {
 
 interface DashboardHeaderProps {
   onCustomizeKpis?: () => void;
+  dashboardEditing?: boolean;
 }
 
 function getFirstName(fullName?: string | null): string {
@@ -90,8 +76,6 @@ function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
 }
 
 const GREETING_EMOJI_STORAGE_KEY = "nutriclinica.dashboard.greetingEmoji";
-const NOTIFICATION_STATE_STORAGE_KEY = "nutriclinica.dashboard.notifications";
-const NOTIFICATION_TAB_STORAGE_KEY = "nutriclinica.dashboard.notificationTab";
 const NOTIFICATION_SWIPE_REVEAL_WIDTH = 92;
 const NOTIFICATION_SWIPE_THRESHOLD = 72;
 
@@ -100,144 +84,6 @@ const greetingEmojisByPeriod: Record<PeriodOfDay, string[]> = {
   afternoon: ["💙", "🌿", "🍎", "✨"],
   night: ["🌙", "✨", "💙", "🌿"],
 };
-
-const notificationPreviewItems: DashboardNotification[] = [
-  {
-    id: "patient-message-plan",
-    type: "patient_message",
-    initials: "AT",
-    tone: "teal",
-    personName: "Ana Torres",
-    patientName: "Ana Torres",
-    message: "envió un mensaje sobre su plan de alimentación.",
-    category: "Mensaje de paciente",
-    timeAgo: "Hace 12 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-followup",
-    type: "patient_message",
-    initials: "CG",
-    tone: "blue",
-    personName: "Carlos Gómez",
-    patientName: "Carlos Gómez",
-    message: "respondió en el chat de seguimiento.",
-    category: "Chat de seguimiento",
-    timeAgo: "Hace 24 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-consultation",
-    type: "patient_message",
-    initials: "ML",
-    tone: "aqua",
-    personName: "María López",
-    patientName: "María López",
-    message: "solicitó información sobre su próxima consulta.",
-    category: "Mensaje de paciente",
-    timeAgo: "Hace 42 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-menu",
-    type: "patient_message",
-    initials: "AV",
-    tone: "slate",
-    personName: "Andrea Vargas",
-    patientName: "Andrea Vargas",
-    message: "envió una duda sobre su menú semanal.",
-    category: "Menú semanal",
-    timeAgo: "Hace 1 hora",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "consultation-note",
-    type: "consultation",
-    initials: "JR",
-    tone: "blue",
-    personName: "Javier Ruiz",
-    patientName: "Carlos Gómez",
-    message: "dejó una nota en la consulta de ",
-    subject: "Carlos Gómez",
-    suffix: ".",
-    category: "Consulta nutricional",
-    timeAgo: "Hace 2 horas",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "shared-file",
-    type: "document",
-    initials: "ML",
-    tone: "aqua",
-    personName: "María López",
-    patientName: "María López",
-    message: "compartió el archivo ",
-    subject: "Bioimpedancia_abril.pdf",
-    suffix: " contigo.",
-    category: "Documentos",
-    timeAgo: "Hace 3 horas",
-    read: false,
-    archived: false,
-    requiresAction: true,
-    actions: ["reject", "accept"],
-  },
-  {
-    id: "clinical-record",
-    type: "clinical_record",
-    initials: "DS",
-    tone: "slate",
-    personName: "Diego Sánchez",
-    patientName: "Andrea Vargas",
-    message: "actualizó la ficha clínica de ",
-    subject: "Andrea Vargas",
-    suffix: ".",
-    category: "Ficha clínica",
-    timeAgo: "Hace 1 día",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "today-consultation",
-    type: "system",
-    initials: "NC",
-    tone: "blue",
-    personName: "NutriClinica",
-    message: "registró una nueva consulta para hoy.",
-    category: "Agenda",
-    timeAgo: "Hace 1 día",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "plan-review",
-    type: "nutrition_plan",
-    initials: "PR",
-    tone: "teal",
-    personName: "Plan alimenticio",
-    message: "pendiente de revisión clínica.",
-    category: "Planes",
-    timeAgo: "Hace 2 días",
-    read: true,
-    archived: true,
-  },
-  {
-    id: "payment-review",
-    type: "payment",
-    initials: "PG",
-    tone: "slate",
-    personName: "Pagos",
-    message: "registró un pago pendiente de validar.",
-    category: "Cobros",
-    timeAgo: "Hace 2 días",
-    read: true,
-    archived: true,
-  },
-];
 
 const notificationEmptyState: Record<NotificationTab, { title: string; subtitle: string }> = {
   inbox: {
@@ -250,71 +96,9 @@ const notificationEmptyState: Record<NotificationTab, { title: string; subtitle:
   },
   archived: {
     title: "No hay notificaciones archivadas",
-    subtitle: "Las notificaciones que marques como leídas aparecerán aquí.",
+    subtitle: "Las notificaciones que archives aparecerán aquí.",
   },
 };
-
-function isNotificationTab(value: unknown): value is NotificationTab {
-  return value === "inbox" || value === "general" || value === "archived";
-}
-
-function getNotificationDefaults(): DashboardNotification[] {
-  return notificationPreviewItems.map((notification) => ({
-    ...notification,
-    actions: notification.actions ? [...notification.actions] : undefined,
-  }));
-}
-
-function getStoredNotifications(): DashboardNotification[] {
-  if (typeof window === "undefined") return getNotificationDefaults();
-
-  try {
-    const storedValue = window.localStorage.getItem(NOTIFICATION_STATE_STORAGE_KEY);
-    if (!storedValue) return getNotificationDefaults();
-
-    const storedNotifications = JSON.parse(storedValue) as Array<Partial<DashboardNotification>>;
-    if (!Array.isArray(storedNotifications)) return getNotificationDefaults();
-
-    const persistedState = new Map(
-      storedNotifications.filter((notification) => typeof notification.id === "string").map((notification) => [notification.id, notification]),
-    );
-
-    return getNotificationDefaults().map((notification) => {
-      const persistedNotification = persistedState.get(notification.id);
-      if (!persistedNotification) return notification;
-
-      return {
-        ...notification,
-        read: persistedNotification.read === true,
-        archived: persistedNotification.archived === true,
-      };
-    });
-  } catch {
-    return getNotificationDefaults();
-  }
-}
-
-function getStoredNotificationTab(): NotificationTab {
-  if (typeof window === "undefined") return "inbox";
-
-  try {
-    const storedValue = window.localStorage.getItem(NOTIFICATION_TAB_STORAGE_KEY);
-    return isNotificationTab(storedValue) ? storedValue : "inbox";
-  } catch {
-    return "inbox";
-  }
-}
-
-function saveNotificationState(notifications: DashboardNotification[], activeTab: NotificationTab) {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(NOTIFICATION_STATE_STORAGE_KEY, JSON.stringify(notifications.map(({ id, read, archived }) => ({ id, read, archived }))));
-    window.localStorage.setItem(NOTIFICATION_TAB_STORAGE_KEY, activeTab);
-  } catch {
-    // Persistence is best-effort for local mock notifications.
-  }
-}
 
 function getRandomIndex(max: number): number {
   if (max <= 1) return 0;
@@ -370,12 +154,18 @@ function getInitials(fullName: string): string {
     .toUpperCase();
 }
 
-export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
+export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: DashboardHeaderProps) {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
-  const [activeNotificationTab, setActiveNotificationTab] = React.useState<NotificationTab>(getStoredNotificationTab);
-  const [notifications, setNotifications] = React.useState<DashboardNotification[]>(getStoredNotifications);
+  const activeNotificationTab = useNotificationStore((state) => state.activeTab);
+  const notifications = useNotificationStore((state) => state.items);
+  const setActiveNotificationTab = useNotificationStore((state) => state.setActiveTab);
+  const markNotificationRead = useNotificationStore((state) => state.markRead);
+  const archiveVisibleNotifications = useNotificationStore((state) => state.archiveVisible);
+  const resolveNotificationAction = useNotificationStore((state) => state.resolveAction);
+  const archiveNotification = useNotificationStore((state) => state.archive);
+  const resetNotificationMockData = useNotificationStore((state) => state.resetMockData);
   const [swipedNotificationId, setSwipedNotificationId] = React.useState<string | null>(null);
   const [notificationDragState, setNotificationDragState] = React.useState<NotificationDragState | null>(null);
   const suppressNotificationClickRef = React.useRef(false);
@@ -397,7 +187,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const initials = getInitials(displayName);
   const inboxNotifications = notifications.filter((item) => item.type === "patient_message" && !item.archived);
   const generalNotifications = notifications.filter((item) => !item.archived);
-  const archivedNotifications = notifications.filter((item) => item.read || item.archived);
+  const archivedNotifications = notifications.filter((item) => item.archived);
   const visibleNotificationItems =
     activeNotificationTab === "inbox" ? inboxNotifications : activeNotificationTab === "general" ? generalNotifications : archivedNotifications;
   const notificationTabs: Array<{
@@ -436,14 +226,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   };
   const handleMarkAllNotifications = () => {
     if (markAllDisabled) return;
-
-    setNotifications((current) =>
-      current.map((notification) => {
-        const shouldArchive = activeNotificationTab === "inbox" ? notification.type === "patient_message" && !notification.archived : !notification.archived;
-
-        return shouldArchive ? { ...notification, read: true, archived: true } : notification;
-      }),
-    );
+    archiveVisibleNotifications(activeNotificationTab);
     setSwipedNotificationId(null);
   };
   const handleNotificationClick = (notification: DashboardNotification) => {
@@ -460,7 +243,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       openNotificationTarget(notification);
     }
 
-    setNotifications((current) => current.map((item) => (item.id === notification.id ? { ...item, read: true } : item)));
+    markNotificationRead(notification.id);
   };
   const handleNotificationKeyDown = (event: React.KeyboardEvent<HTMLElement>, notification: DashboardNotification) => {
     if (event.target !== event.currentTarget) return;
@@ -469,12 +252,11 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     handleNotificationClick(notification);
   };
   const handleNotificationAction = (id: string, action: NotificationAction) => {
-    void action;
-    setNotifications((current) => current.map((notification) => (notification.id === id ? { ...notification, read: true, archived: true } : notification)));
+    resolveNotificationAction(id, action);
     setSwipedNotificationId(null);
   };
   const handleArchiveNotification = (id: string) => {
-    setNotifications((current) => current.map((notification) => (notification.id === id ? { ...notification, read: true, archived: true } : notification)));
+    archiveNotification(id);
     setSwipedNotificationId(null);
   };
   const handleNotificationPointerDown = (event: React.PointerEvent<HTMLElement>, id: string) => {
@@ -532,10 +314,6 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   }, [greetingEmojiState]);
 
   React.useEffect(() => {
-    saveNotificationState(notifications, activeNotificationTab);
-  }, [activeNotificationTab, notifications]);
-
-  React.useEffect(() => {
     setSwipedNotificationId(null);
     setNotificationDragState(null);
   }, [activeNotificationTab]);
@@ -544,10 +322,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     if (typeof window === "undefined") return;
 
     window.resetNutriClinicaNotificationMockData = () => {
-      window.localStorage.removeItem(NOTIFICATION_STATE_STORAGE_KEY);
-      window.localStorage.removeItem(NOTIFICATION_TAB_STORAGE_KEY);
-      setNotifications(getNotificationDefaults());
-      setActiveNotificationTab("inbox");
+      resetNotificationMockData();
       setSwipedNotificationId(null);
       setNotificationDragState(null);
     };
@@ -555,7 +330,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     return () => {
       delete window.resetNutriClinicaNotificationMockData;
     };
-  }, []);
+  }, [resetNotificationMockData]);
 
   React.useEffect(() => {
     if (!notificationsOpen && !avatarMenuOpen) return;
@@ -623,10 +398,10 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
 
         <div className="nc-dashboard-header__actions">
           <div className="nc-dashboard-header__ctaGroup" aria-label="Acciones rápidas del dashboard">
-            <button type="button" className="nc-dashboard-button nc-dashboard-button--outline" onClick={onCustomizeKpis}>
-              <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
-              <span>Personalizar KPIs</span>
-            </button>
+            <DashboardQuickAccessButton
+              onCustomizeDashboard={onCustomizeKpis}
+              dashboardEditing={dashboardEditing}
+            />
             <button type="button" className="nc-dashboard-button nc-dashboard-button--soft" onClick={() => navigate("/consultas/nueva")}>
               <CalendarPlus size={17} strokeWidth={2} aria-hidden="true" />
               <span>Nueva consulta</span>

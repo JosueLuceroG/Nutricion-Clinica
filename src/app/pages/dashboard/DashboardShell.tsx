@@ -11,6 +11,7 @@ import "./DashboardPage.css";
 interface DashboardShellProps {
   children: React.ReactNode;
   onCustomizeKpis?: () => void;
+  dashboardEditing?: boolean;
 }
 
 const THEME_LONG_PRESS_MS = 1000;
@@ -275,7 +276,7 @@ function DesktopWindowTitlebar() {
   );
 }
 
-export function DashboardShell({ children, onCustomizeKpis }: DashboardShellProps) {
+export function DashboardShell({ children, onCustomizeKpis, dashboardEditing }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const isTauriDesktop = useIsTauriDesktop();
 
@@ -301,7 +302,10 @@ export function DashboardShell({ children, onCustomizeKpis }: DashboardShellProp
       </button>
 
       <div className="nc-dashboard-workspace">
-        <DashboardHeader onCustomizeKpis={onCustomizeKpis} />
+        <DashboardHeader
+          onCustomizeKpis={onCustomizeKpis}
+          dashboardEditing={dashboardEditing}
+        />
         <DashboardMobileNav />
 
         <main className="nc-dashboard-main" aria-label="Dashboard NutriClinica">
