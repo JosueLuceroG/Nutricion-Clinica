@@ -7,7 +7,6 @@ import {
   Cloud,
   Eye,
   EyeOff,
-  HeartHandshake,
   Headphones,
   Lock,
   Mail,
@@ -312,12 +311,6 @@ export function LoginPage() {
             </div>
           ) : (
             <form className="nc-login-card nc-login-card-main" onSubmit={handleLogin}>
-              <div className="nc-login-emblem" aria-hidden="true">
-                <span className="nc-login-emblem-mark">
-                  <HeartHandshake className="nc-login-emblem-main" size={58} strokeWidth={2.05} />
-                </span>
-              </div>
-
               <header className="nc-login-header">
                 <h2>{t("auth.welcome_back")}</h2>
                 <p>{t("auth.signin_subtitle")}</p>

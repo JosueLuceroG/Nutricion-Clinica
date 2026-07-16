@@ -1,37 +1,32 @@
+import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Plus,
-  Users as UsersIcon,
-  Search,
+  Archive,
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
+  ClipboardList,
   Mail,
+  MoreHorizontal,
   Phone,
-  Upload,
-  Archive,
+  Plus,
+  RotateCcw,
+  Search,
+  SlidersHorizontal,
   Trash2,
+  Upload,
+  UserRound,
+  UsersRound,
+  Utensils,
+  X,
 } from "lucide-react";
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  getSortedRowModel,
-  useReactTable,
-  type SortingState,
-} from "@tanstack/react-table";
-import * as React from "react";
 import { toast } from "sonner";
-import { PageHeader, PageContent } from "@app/layout/AppLayout";
-import { Button } from "@components/ui/button";
-import { Input } from "@components/ui/input";
-import { Badge } from "@components/ui/badge";
-import { Skeleton } from "@components/ui/skeleton";
-import { EmptyState, NoResultsFound, ErrorState } from "@components/layout/EmptyState";
+import { PageContent } from "@app/layout/AppLayout";
+import { EmptyState, ErrorState } from "@components/layout/EmptyState";
 import { ConfirmDialog } from "@components/layout/ConfirmDialog";
+import { Badge } from "@components/ui/badge";
+import { Button } from "@components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +35,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@components/ui/dropdown-menu";
+import { Input } from "@components/ui/input";
+import { Label } from "@components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@components/ui/select";
+import { Skeleton } from "@components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -48,58 +53,132 @@ import {
   TableHeader,
   TableRow,
 } from "@components/ui/table";
-import { usePatients } from "@modules/patient/ui/usePatientHooks";
-import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
-import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
-import { usePatientsUIStore } from "@store/patientsUIStore";
+import {
+  DEFAULT_PATIENT_DIRECTORY_FILTERS,
+  type PatientDirectoryBooleanFilter,
+  type PatientDirectoryFilters,
+  type PatientDirectoryItem,
+  type PatientDirectoryStatusFilter,
+} from "@modules/patient/application/patientDirectoryTypes";
 import type { Patient } from "@modules/patient/domain/Patient";
+import type { Sex } from "@modules/patient/domain/Sex";
+import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
+import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
+import { usePatientDirectory } from "@modules/patient/ui/usePatientDirectory";
 import { patientService } from "@services/patientService";
+import { useAuthStore } from "@store/authStore";
+import { usePatientsUIStore } from "@store/patientsUIStore";
+import "./PatientsListPage.css";
 
-function patientStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: Patient["status"]) {
+const STATUS_FILTERS: PatientDirectoryStatusFilter[] = [
+  "all",
+  "active",
+  "inactive",
+  "archived",
+  "deleted",
+];
+
+const BOOLEAN_FILTERS: PatientDirectoryBooleanFilter[] = [
+  "all",
+  "with",
+  "without",
+];
+
+function patientStatusLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  status: Patient["status"],
+) {
   if (status === "deceased") return t("patient.status_deceased");
   return t(`common.${status}`);
 }
 
-const columnHelper = createColumnHelper<Patient>();
+function statusFilterLabel(
+  t: ReturnType<typeof useTranslation>["t"],
+  status: PatientDirectoryStatusFilter,
+) {
+  if (status === "all") return t("common.all");
+  if (status === "deleted") return t("common.deleted");
+  return patientStatusLabel(t, status);
+}
+
+function activeFilterCount(filters: PatientDirectoryFilters): number {
+  return [
+    filters.sex !== "all",
+    filters.minimumAge !== null,
+    filters.maximumAge !== null,
+    Boolean(filters.registeredFrom),
+    Boolean(filters.registeredTo),
+    Boolean(filters.tag.trim()),
+    filters.activePlan !== "all",
+    filters.upcomingAppointment !== "all",
+    filters.pendingBalance !== "all",
+  ].filter(Boolean).length;
+}
 
 export function PatientsListPage() {
-  const navigate = useNavigate();
-  const { search, statusFilter, setSearch, setStatusFilter, reset } = usePatientsUIStore();
   const { t } = useTranslation();
-  const isDeletedView = statusFilter === "deleted";
-  const { data, loading, error, reload } = usePatients(
-    isDeletedView
-      ? { search: search || undefined, includeDeleted: true, status: undefined, limit: 50 }
-      : {
-          search: search || undefined,
-          status: statusFilter === "all" ? undefined : statusFilter,
-          limit: 50,
-        },
-  );
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const navigate = useNavigate();
+  const branchId = useAuthStore((state) => state.sucursalActivaId);
+  const {
+    search,
+    statusFilter,
+    filters,
+    pageSize,
+    setSearch,
+    setStatusFilter,
+    setFilters,
+    setPageSize,
+    reset,
+  } = usePatientsUIStore();
+  const deferredSearch = React.useDeferredValue(search);
+  const [page, setPage] = React.useState(1);
+  const [refreshToken, setRefreshToken] = React.useState(0);
+  const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const [draftFilters, setDraftFilters] =
+    React.useState<PatientDirectoryFilters>(filters);
   const [busy, setBusy] = React.useState(false);
-  const [archiveTarget, setArchiveTarget] = React.useState<Patient | null>(null);
+  const [archiveTarget, setArchiveTarget] = React.useState<Patient | null>(
+    null,
+  );
   const [deleteTarget, setDeleteTarget] = React.useState<Patient | null>(null);
-  const [restoreTarget, setRestoreTarget] = React.useState<Patient | null>(null);
+  const [restoreTarget, setRestoreTarget] = React.useState<Patient | null>(
+    null,
+  );
 
-  // Flujo de eliminación: si el paciente tiene entidades vinculadas
-  // abre el modal de cascada con dos opciones (Archivar / Eliminar todo).
-  // Si no tiene, ejecuta el borrado simple directamente.
+  const { data, loading, error } = usePatientDirectory({
+    branchId,
+    search: deferredSearch,
+    status: statusFilter,
+    filters,
+    page,
+    pageSize,
+    refreshToken,
+  });
+
+  React.useEffect(() => {
+    if (!loading && data && page > data.totalPages) setPage(data.totalPages);
+  }, [data, loading, page]);
+
+  const refresh = () => setRefreshToken((value) => value + 1);
+
   const cascade = useCascadeDeletePatient({
     onComplete: (outcome) => {
       if (deleteTarget) {
-        if (outcome === "deleted") {
-          toast.success(t("patient.deleted_success", { name: deleteTarget.fullName }));
-        } else if (outcome === "archived") {
-          toast.success(t("patient.archived_success", { name: deleteTarget.fullName }));
-        }
+        const key =
+          outcome === "deleted"
+            ? "patient.deleted_success"
+            : "patient.archived_success";
+        toast.success(t(key, { name: deleteTarget.fullName }));
       }
       setDeleteTarget(null);
-      void reload();
+      refresh();
     },
-    onError: (err) => {
+    onError: (operationError) => {
       toast.error(t("patient.operation_error"), {
-        description: err instanceof Error ? err.message : String(err),
+        description:
+          operationError instanceof Error
+            ? operationError.message
+            : String(operationError),
       });
     },
   });
@@ -109,12 +188,17 @@ export function PatientsListPage() {
     setBusy(true);
     try {
       await patientService.archive.execute(archiveTarget.id);
-      toast.success(t("patient.archived_success", { name: archiveTarget.fullName }));
+      toast.success(
+        t("patient.archived_success", { name: archiveTarget.fullName }),
+      );
       setArchiveTarget(null);
-      void reload();
-    } catch (err) {
+      refresh();
+    } catch (operationError) {
       toast.error(t("patient.archive_error"), {
-        description: err instanceof Error ? err.message : String(err),
+        description:
+          operationError instanceof Error
+            ? operationError.message
+            : String(operationError),
       });
     } finally {
       setBusy(false);
@@ -126,280 +210,142 @@ export function PatientsListPage() {
     setBusy(true);
     try {
       await patientService.restore.execute(restoreTarget.id);
-      toast.success(t("patient.restored_success", { name: restoreTarget.fullName }));
+      toast.success(
+        t("patient.restored_success", { name: restoreTarget.fullName }),
+      );
       setRestoreTarget(null);
-      void reload();
-    } catch (err) {
+      refresh();
+    } catch (operationError) {
       toast.error(t("patient.restore_error"), {
-        description: err instanceof Error ? err.message : String(err),
+        description:
+          operationError instanceof Error
+            ? operationError.message
+            : String(operationError),
       });
     } finally {
       setBusy(false);
     }
   };
 
-  const columns = React.useMemo(
-    () => [
-      columnHelper.accessor("fullName", {
-        header: t("patient.title_single"),
-        cell: (info) => {
-          const p = info.row.original;
-          return (
-            <div className="flex flex-col">
-              <span className="font-medium">{info.getValue()}</span>
-              <span className="text-xs text-muted-foreground">
-                {t("dashboard.patient_age_sex", { age: p.age, sex: t(`patient.sex_${p.sex}`) })}
-              </span>
-            </div>
-          );
-        },
-      }),
-      columnHelper.accessor("email", {
-        header: t("patient.contact"),
-        cell: (info) => {
-          const p = info.row.original;
-          return (
-            <div className="flex flex-col gap-0.5 text-xs">
-              {p.email && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Mail className="h-3 w-3" /> {p.email.toString()}
-                </span>
-              )}
-              {p.phone && (
-                <span className="flex items-center gap-1 text-muted-foreground">
-                  <Phone className="h-3 w-3" /> {p.phone.toString()}
-                </span>
-              )}
-              {!p.email && !p.phone && <span className="text-muted-foreground">—</span>}
-            </div>
-          );
-        },
-      }),
-      columnHelper.accessor((row) => row.birthDate, {
-        id: "birthDate",
-        header: t("patient.birth_date"),
-        cell: (info) => (
-          <span className="text-xs text-muted-foreground">
-            {new Intl.DateTimeFormat("es-MX", {
-              year: "numeric",
-              month: "short",
-              day: "2-digit",
-            }).format(info.getValue() as Date)}
-          </span>
-        ),
-      }),
-      columnHelper.accessor("status", {
-        header: t("common.status"),
-        cell: (info) => (
-          <StatusBadge status={info.getValue()} deletedAt={info.row.original.deletedAt} />
-        ),
-      }),
-      columnHelper.display({
-        id: "actions",
-        cell: (info) => (
-          <RowActions
-            patient={info.row.original}
-            isDeletedView={isDeletedView}
-            onView={() => navigate(`/pacientes/${info.row.original.id.toString()}`)}
-            onArchive={(p) => setArchiveTarget(p)}
-            onDelete={(p) => {
-              setDeleteTarget(p);
-              void cascade.requestDelete(p.id);
-            }}
-            onRestore={(p) => setRestoreTarget(p)}
-          />
-        ),
-      }),
-    ],
-    [navigate, cascade, isDeletedView, t],
-  );
+  const changeStatus = (status: PatientDirectoryStatusFilter) => {
+    React.startTransition(() => {
+      setStatusFilter(status);
+      setPage(1);
+    });
+  };
 
-  const table = useReactTable({
-    data: data?.items ?? [],
-    columns,
-    state: { sorting },
-    onSortingChange: setSorting,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
-  });
+  const clearAllFilters = () => {
+    reset();
+    setDraftFilters(DEFAULT_PATIENT_DIRECTORY_FILTERS);
+    setPage(1);
+    setFiltersOpen(false);
+  };
 
-  const total = data?.total ?? 0;
-  const showEmpty = !loading && !error && total === 0;
-  const showNoResults = !loading && !error && total > 0 && (data?.items.length ?? 0) === 0;
+  const filterCount = activeFilterCount(filters);
+  const hasQuery =
+    search.trim().length > 0 || statusFilter !== "all" || filterCount > 0;
 
   return (
     <>
-      <PageHeader
-        title={isDeletedView ? `${t("patient.title")} ${t("common.deleted")}` : t("patient.title")}
-        description={
-          isDeletedView
-            ? t("patient.deleted_view_description")
-            : total > 0
-              ? t("patient.count", { count: total })
-              : t("patient.manage_records")
-        }
-        actions={
-          <div className="flex gap-2">
-            <Button asChild variant="outline">
-              <Link to="/importar">
-                <Upload className="mr-2 h-4 w-4" />
-                {`${t("nav.import")} CSV`}
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link to="/pacientes/nuevo">
-                <Plus className="mr-2 h-4 w-4" />
-                {t("patient.new")}
-              </Link>
-            </Button>
-          </div>
-        }
-      />
-      <PageContent>
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative flex-1 sm:max-w-sm">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("patient.search_placeholder")}
-              className="pl-9"
-              aria-label={`${t("common.search")} ${t("patient.title")}`}
-            />
-          </div>
-          <div className="flex gap-1 rounded-md border bg-background p-0.5">
-            {(["all", "active", "inactive", "archived", "deleted"] as const).map((s) => (
-              <Button
-                key={s}
-                variant={statusFilter === s ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setStatusFilter(s)}
-                className="h-7 px-3 text-xs"
-              >
-                {s === "all" ? t("common.all") : s === "deleted" ? t("common.deleted") : patientStatusLabel(t, s)}
-              </Button>
-            ))}
-          </div>
-        </div>
+      <PageContent className="nc-patients-page">
+        <PatientsHero total={data?.counts.total ?? 0} loading={loading} />
 
-        {error ? (
-          <ErrorState
-            message={error.message}
-            onRetry={reload}
+        <section
+          className="nc-patients-directory"
+          aria-label={t("patient.directory.available_results")}
+          aria-busy={loading}
+        >
+          <PatientsToolbar
+            search={search}
+            status={statusFilter}
+            filterCount={filterCount}
+            filtersOpen={filtersOpen}
+            onSearchChange={(value) => {
+              setSearch(value);
+              setPage(1);
+            }}
+            onStatusChange={changeStatus}
+            onToggleFilters={() => {
+              setDraftFilters(filters);
+              setFiltersOpen((open) => !open);
+            }}
           />
-        ) : loading && !data ? (
-          <PatientsTableSkeleton />
-        ) : showEmpty ? (
-          <EmptyState
-            icon={UsersIcon}
-            title={t("patient.no_patients")}
-            description={t("patient.register")}
-            action={{ label: t("patient.new"), onClick: () => navigate("/pacientes/nuevo") }}
-          />
-        ) : showNoResults ? (
-          <NoResultsFound onReset={reset} />
-        ) : (
-          <>
-            <div className="overflow-x-auto rounded-md border bg-card">
-              <Table>
-                <TableHeader>
-                  {table.getHeaderGroups().map((hg) => (
-                    <TableRow key={hg.id}>
-                      {hg.headers.map((header) => (
-                        <TableHead
-                          key={header.id}
-                          className={
-                            header.column.id === "birthDate"
-                              ? "hidden md:table-cell"
-                              : header.column.id === "email" || header.column.id === "status"
-                                ? "hidden lg:table-cell"
-                                : undefined
-                          }
-                        >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(header.column.columnDef.header, header.getContext())}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableHeader>
-                <TableBody>
-                  {table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      className="cursor-pointer"
-                      tabIndex={0}
-                      role="link"
-                      onClick={() => navigate(`/pacientes/${row.original.id.toString()}`)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault()
-                          navigate(`/pacientes/${row.original.id.toString()}`)
-                        }
-                      }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell
-                          key={cell.id}
-                          className={
-                            cell.column.id === "birthDate"
-                              ? "hidden md:table-cell"
-                              : cell.column.id === "email" || cell.column.id === "status"
-                                ? "hidden lg:table-cell"
-                                : undefined
-                          }
-                        >
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
 
-            {table.getPageCount() > 1 && (
-              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                <span>
-                  {t("common.page_info", { current: table.getState().pagination.pageIndex + 1, total: table.getPageCount() })}
-                </span>
-                <div className="flex gap-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.previousPage()}
-                    disabled={!table.getCanPreviousPage()}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    {t("common.previous")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => table.nextPage()}
-                    disabled={!table.getCanNextPage()}
-                  >
-                    {t("common.next")}
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
-        )}
+          {filtersOpen && (
+            <PatientsFiltersPanel
+              filters={draftFilters}
+              onChange={setDraftFilters}
+              onClear={() => setDraftFilters(DEFAULT_PATIENT_DIRECTORY_FILTERS)}
+              onApply={() => {
+                setFilters(draftFilters);
+                setPage(1);
+                setFiltersOpen(false);
+              }}
+            />
+          )}
+
+          <div className="nc-patients-results" id="patients-results">
+            {error ? (
+              <ErrorState message={error.message} onRetry={refresh} />
+            ) : loading && !data ? (
+              <PatientsLoadingState />
+            ) : data && data.filteredTotal === 0 ? (
+              <PatientsEmptyState
+                deleted={statusFilter === "deleted"}
+                filtered={hasQuery}
+                onReset={clearAllFilters}
+                onCreate={() => navigate("/pacientes/nuevo")}
+              />
+            ) : data ? (
+              <>
+                <PatientsDirectory
+                  items={data.items}
+                  onArchive={setArchiveTarget}
+                  onDelete={(patient) => {
+                    setDeleteTarget(patient);
+                    void cascade.requestDelete(patient.id);
+                  }}
+                  onRestore={setRestoreTarget}
+                />
+                <PatientsPagination
+                  page={data.page}
+                  totalPages={data.totalPages}
+                  from={data.from}
+                  to={data.to}
+                  total={data.filteredTotal}
+                  pageSize={pageSize}
+                  onPageChange={setPage}
+                  onPageSizeChange={(value) => {
+                    setPageSize(value);
+                    setPage(1);
+                  }}
+                />
+              </>
+            ) : null}
+          </div>
+
+          <p className="sr-only" role="status" aria-live="polite">
+            {loading
+              ? t("patient.directory.loading")
+              : data
+                ? t("patient.directory.showing", {
+                    from: data.from,
+                    to: data.to,
+                    total: data.filteredTotal,
+                  })
+                : ""}
+          </p>
+        </section>
       </PageContent>
 
       <ConfirmDialog
         open={archiveTarget !== null}
-        onOpenChange={(o) => !o && setArchiveTarget(null)}
-        title={archiveTarget ? t("patient.archive_title", { name: archiveTarget.fullName }) : ""}
+        onOpenChange={(open) => !open && setArchiveTarget(null)}
+        title={
+          archiveTarget
+            ? t("patient.archive_title", { name: archiveTarget.fullName })
+            : ""
+        }
         description={t("patient.archive_desc")}
         confirmLabel={t("common.archive")}
         tone="warning"
@@ -409,8 +355,12 @@ export function PatientsListPage() {
 
       <ConfirmDialog
         open={restoreTarget !== null}
-        onOpenChange={(o) => !o && setRestoreTarget(null)}
-        title={restoreTarget ? t("patient.restore_title", { name: restoreTarget.fullName }) : ""}
+        onOpenChange={(open) => !open && setRestoreTarget(null)}
+        title={
+          restoreTarget
+            ? t("patient.restore_title", { name: restoreTarget.fullName })
+            : ""
+        }
         description={t("patient.restore_desc")}
         confirmLabel={t("common.restore")}
         tone="info"
@@ -435,102 +385,764 @@ export function PatientsListPage() {
   );
 }
 
-function StatusBadge({ status, deletedAt }: { status: Patient["status"]; deletedAt: Date | null }) {
+function PatientsHero({ total, loading }: { total: number; loading: boolean }) {
   const { t } = useTranslation();
-  if (deletedAt !== null) {
-    return <Badge variant="destructive">{t("common.deleted")}</Badge>;
-  }
-  const map: Record<Patient["status"], { variant: "success" | "secondary" | "warning" | "outline" }> = {
-    active: { variant: "success" },
-    inactive: { variant: "secondary" },
-    archived: { variant: "outline" },
-    deceased: { variant: "warning" },
-  };
-  return <Badge variant={map[status].variant}>{patientStatusLabel(t, status)}</Badge>;
+  return (
+    <section className="nc-patients-hero" aria-labelledby="patients-title">
+      <div className="nc-patients-hero__identity">
+        <span className="nc-patients-hero__icon" aria-hidden="true">
+          <UsersRound />
+        </span>
+        <div>
+          <div className="nc-patients-hero__titleRow">
+            <h1 id="patients-title">{t("patient.title")}</h1>
+            <Badge variant="info" className="nc-patients-hero__count">
+              <UsersRound aria-hidden="true" />
+              {loading
+                ? "..."
+                : t("patient.directory.total_patients", { count: total })}
+            </Badge>
+          </div>
+          <p>{t("patient.directory.description")}</p>
+        </div>
+      </div>
+      <div className="nc-patients-hero__actions">
+        <Button asChild variant="outline" size="lg">
+          <Link to="/importar">
+            <Upload aria-hidden="true" />
+            {t("patient.directory.import_csv")}
+          </Link>
+        </Button>
+        <Button asChild size="lg">
+          <Link to="/pacientes/nuevo">
+            <Plus aria-hidden="true" />
+            {t("patient.new")}
+          </Link>
+        </Button>
+      </div>
+    </section>
+  );
 }
 
-function RowActions({
+function PatientsToolbar({
+  search,
+  status,
+  filterCount,
+  filtersOpen,
+  onSearchChange,
+  onStatusChange,
+  onToggleFilters,
+}: {
+  search: string;
+  status: PatientDirectoryStatusFilter;
+  filterCount: number;
+  filtersOpen: boolean;
+  onSearchChange: (value: string) => void;
+  onStatusChange: (status: PatientDirectoryStatusFilter) => void;
+  onToggleFilters: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="nc-patients-toolbar">
+      <label className="nc-patients-search">
+        <Search aria-hidden="true" />
+        <span className="sr-only">{t("patient.directory.search_label")}</span>
+        <Input
+          value={search}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder={t("patient.directory.search_placeholder")}
+          autoComplete="off"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => onSearchChange("")}
+            aria-label={t("patient.directory.clear_search")}
+          >
+            <X aria-hidden="true" />
+          </button>
+        )}
+      </label>
+
+      <div
+        className="nc-patients-tabs"
+        role="tablist"
+        aria-label={t("common.status")}
+      >
+        {STATUS_FILTERS.map((filter) => (
+          <button
+            key={filter}
+            id={`patient-status-${filter}`}
+            type="button"
+            role="tab"
+            aria-selected={status === filter}
+            aria-controls="patients-results"
+            tabIndex={status === filter ? 0 : -1}
+            data-active={status === filter || undefined}
+            onClick={() => onStatusChange(filter)}
+            onKeyDown={(event) => {
+              const currentIndex = STATUS_FILTERS.indexOf(filter);
+              const targetIndex =
+                event.key === "ArrowRight"
+                  ? (currentIndex + 1) % STATUS_FILTERS.length
+                  : event.key === "ArrowLeft"
+                    ? (currentIndex - 1 + STATUS_FILTERS.length) %
+                      STATUS_FILTERS.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? STATUS_FILTERS.length - 1
+                        : null;
+              if (targetIndex === null) return;
+              event.preventDefault();
+              const target = STATUS_FILTERS[targetIndex];
+              onStatusChange(target);
+              window.requestAnimationFrame(() =>
+                document.getElementById(`patient-status-${target}`)?.focus(),
+              );
+            }}
+          >
+            {statusFilterLabel(t, filter)}
+          </button>
+        ))}
+      </div>
+
+      <Button
+        type="button"
+        variant="outline"
+        className="nc-patients-filterButton"
+        aria-expanded={filtersOpen}
+        aria-controls="patients-filters"
+        onClick={onToggleFilters}
+      >
+        <SlidersHorizontal aria-hidden="true" />
+        {t("patient.directory.filters")}
+        {filterCount > 0 && (
+          <span>
+            {t("patient.directory.filters_active", { count: filterCount })}
+          </span>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+function PatientsFiltersPanel({
+  filters,
+  onChange,
+  onClear,
+  onApply,
+}: {
+  filters: PatientDirectoryFilters;
+  onChange: React.Dispatch<React.SetStateAction<PatientDirectoryFilters>>;
+  onClear: () => void;
+  onApply: () => void;
+}) {
+  const { t } = useTranslation();
+  const patch = (values: Partial<PatientDirectoryFilters>) =>
+    onChange((current) => ({ ...current, ...values }));
+  const parseAge = (value: string): number | null => {
+    if (!value) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? Math.max(0, Math.min(130, parsed)) : null;
+  };
+
+  return (
+    <section className="nc-patients-filters" id="patients-filters">
+      <div className="nc-patients-filters__heading">
+        <div>
+          <h2>{t("patient.directory.filter_title")}</h2>
+          <p>{t("patient.directory.filter_description")}</p>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+          <RotateCcw aria-hidden="true" />
+          {t("common.clear_filters")}
+        </Button>
+      </div>
+
+      <div className="nc-patients-filters__grid">
+        <div className="nc-patients-field">
+          <Label>{t("patient.sex")}</Label>
+          <Select
+            value={filters.sex}
+            onValueChange={(value) => patch({ sex: value as "all" | Sex })}
+          >
+            <SelectTrigger aria-label={t("patient.sex")}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">
+                {t("patient.directory.sex_all")}
+              </SelectItem>
+              {(["female", "male", "intersex", "undisclosed"] as Sex[]).map(
+                (sex) => (
+                  <SelectItem key={sex} value={sex}>
+                    {t(`patient.sex_${sex}`)}
+                  </SelectItem>
+                ),
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="nc-patients-field nc-patients-field--age">
+          <Label>{t("patient.age")}</Label>
+          <div>
+            <Input
+              type="number"
+              min={0}
+              max={130}
+              value={filters.minimumAge ?? ""}
+              onChange={(event) =>
+                patch({ minimumAge: parseAge(event.target.value) })
+              }
+              placeholder={t("patient.directory.minimum_age")}
+              aria-label={t("patient.directory.minimum_age")}
+            />
+            <Input
+              type="number"
+              min={0}
+              max={130}
+              value={filters.maximumAge ?? ""}
+              onChange={(event) =>
+                patch({ maximumAge: parseAge(event.target.value) })
+              }
+              placeholder={t("patient.directory.maximum_age")}
+              aria-label={t("patient.directory.maximum_age")}
+            />
+          </div>
+        </div>
+
+        <div className="nc-patients-field">
+          <Label htmlFor="patients-registered-from">
+            {t("patient.directory.registered_from")}
+          </Label>
+          <Input
+            id="patients-registered-from"
+            type="date"
+            value={filters.registeredFrom}
+            onChange={(event) => patch({ registeredFrom: event.target.value })}
+          />
+        </div>
+
+        <div className="nc-patients-field">
+          <Label htmlFor="patients-registered-to">
+            {t("patient.directory.registered_to")}
+          </Label>
+          <Input
+            id="patients-registered-to"
+            type="date"
+            value={filters.registeredTo}
+            onChange={(event) => patch({ registeredTo: event.target.value })}
+          />
+        </div>
+
+        <div className="nc-patients-field">
+          <Label htmlFor="patients-tag">{t("patient.directory.tag")}</Label>
+          <Input
+            id="patients-tag"
+            value={filters.tag}
+            onChange={(event) => patch({ tag: event.target.value })}
+            placeholder={t("patient.directory.tag_placeholder")}
+          />
+        </div>
+
+        <BooleanFilter
+          label={t("patient.directory.active_plan")}
+          value={filters.activePlan}
+          onChange={(activePlan) => patch({ activePlan })}
+        />
+        <BooleanFilter
+          label={t("patient.directory.upcoming_appointment")}
+          value={filters.upcomingAppointment}
+          onChange={(upcomingAppointment) => patch({ upcomingAppointment })}
+        />
+        <BooleanFilter
+          label={t("patient.directory.pending_balance")}
+          value={filters.pendingBalance}
+          onChange={(pendingBalance) => patch({ pendingBalance })}
+        />
+      </div>
+
+      <div className="nc-patients-filters__footer">
+        <Button type="button" onClick={onApply}>
+          <SlidersHorizontal aria-hidden="true" />
+          {t("patient.directory.apply_filters")}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function BooleanFilter({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: PatientDirectoryBooleanFilter;
+  onChange: (value: PatientDirectoryBooleanFilter) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="nc-patients-field">
+      <Label>{label}</Label>
+      <Select
+        value={value}
+        onValueChange={(next) =>
+          onChange(next as PatientDirectoryBooleanFilter)
+        }
+      >
+        <SelectTrigger aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {BOOLEAN_FILTERS.map((filter) => (
+            <SelectItem key={filter} value={filter}>
+              {filter === "all"
+                ? t("patient.directory.any")
+                : filter === "with"
+                  ? t("patient.directory.with")
+                  : t("patient.directory.without")}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function PatientsDirectory({
+  items,
+  onArchive,
+  onDelete,
+  onRestore,
+}: {
+  items: PatientDirectoryItem[];
+  onArchive: (patient: Patient) => void;
+  onDelete: (patient: Patient) => void;
+  onRestore: (patient: Patient) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <div className="nc-patients-tableWrap">
+        <Table>
+          <caption className="sr-only">
+            {t("patient.directory.available_results")}
+          </caption>
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">
+                {t("patient.directory.patient_column")}
+              </TableHead>
+              <TableHead scope="col">
+                {t("patient.directory.contact_column")}
+              </TableHead>
+              <TableHead scope="col">
+                {t("patient.directory.age_column")}
+              </TableHead>
+              <TableHead scope="col">
+                {t("patient.directory.status_column")}
+              </TableHead>
+              <TableHead scope="col" className="w-16 text-right">
+                <span className="sr-only">
+                  {t("patient.directory.actions_column")}
+                </span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => (
+              <TableRow key={item.patient.id.toString()}>
+                <TableCell>
+                  <PatientIdentity item={item} />
+                </TableCell>
+                <TableCell>
+                  <PatientContact patient={item.patient} />
+                </TableCell>
+                <TableCell>
+                  <span className="nc-patients-age">
+                    {t("patient.age_value", { age: item.patient.age })}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <PatientStatusBadge patient={item.patient} />
+                </TableCell>
+                <TableCell className="text-right">
+                  <PatientRowActions
+                    patient={item.patient}
+                    onArchive={onArchive}
+                    onDelete={onDelete}
+                    onRestore={onRestore}
+                  />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="nc-patients-mobileList">
+        {items.map((item) => (
+          <article className="nc-patient-card" key={item.patient.id.toString()}>
+            <div className="nc-patient-card__top">
+              <PatientIdentity item={item} />
+              <PatientRowActions
+                patient={item.patient}
+                onArchive={onArchive}
+                onDelete={onDelete}
+                onRestore={onRestore}
+              />
+            </div>
+            <div className="nc-patient-card__meta">
+              <PatientStatusBadge patient={item.patient} />
+              <span>{t("patient.age_value", { age: item.patient.age })}</span>
+            </div>
+            <PatientContact patient={item.patient} />
+            {!item.patient.deletedAt && (
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/pacientes/${item.patient.id.toString()}`}>
+                  <UserRound aria-hidden="true" />
+                  {t("patient.directory.view_profile")}
+                </Link>
+              </Button>
+            )}
+          </article>
+        ))}
+      </div>
+    </>
+  );
+}
+
+function PatientIdentity({ item }: { item: PatientDirectoryItem }) {
+  const { t } = useTranslation();
+  const patientId = item.patient.id.toString();
+  const tone = patientId.charCodeAt(patientId.length - 1) % 5;
+  const recordLabel = /^EXP-/i.test(item.recordNumber)
+    ? item.recordNumber
+    : t("patient.directory.record", { number: item.recordNumber });
+  return (
+    <div className="nc-patient-identity">
+      <span className="nc-patient-avatar" data-tone={tone} aria-hidden="true">
+        {item.patient.photoUrl ? (
+          <img src={item.patient.photoUrl} alt="" />
+        ) : (
+          item.initials
+        )}
+      </span>
+      <span className="nc-patient-identity__text">
+        {item.patient.deletedAt ? (
+          <strong>{item.patient.fullName}</strong>
+        ) : (
+          <Link to={`/pacientes/${patientId}`}>{item.patient.fullName}</Link>
+        )}
+        <small>
+          {recordLabel} · {t(`patient.sex_${item.patient.sex}`)}
+        </small>
+      </span>
+    </div>
+  );
+}
+
+function PatientContact({ patient }: { patient: Patient }) {
+  const { t } = useTranslation();
+  if (!patient.email && !patient.phone) {
+    return (
+      <span className="nc-patient-contact nc-patient-contact--empty">
+        {t("patient.directory.no_contact")}
+      </span>
+    );
+  }
+  return (
+    <span className="nc-patient-contact">
+      {patient.email && (
+        <span title={patient.email.toString()}>
+          <Mail aria-hidden="true" />
+          {patient.email.toString()}
+        </span>
+      )}
+      {patient.phone && (
+        <span>
+          <Phone aria-hidden="true" />
+          {patient.phone.toString()}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function PatientStatusBadge({ patient }: { patient: Patient }) {
+  const { t } = useTranslation();
+  if (patient.deletedAt) {
+    return (
+      <Badge variant="destructive" className="nc-patient-status">
+        <span />
+        {t("common.deleted")}
+      </Badge>
+    );
+  }
+  const variant =
+    patient.status === "active"
+      ? "success"
+      : patient.status === "deceased"
+        ? "warning"
+        : patient.status === "inactive"
+          ? "secondary"
+          : "outline";
+  return (
+    <Badge
+      variant={variant}
+      className="nc-patient-status"
+      data-status={patient.status}
+    >
+      <span />
+      {patientStatusLabel(t, patient.status)}
+    </Badge>
+  );
+}
+
+function PatientRowActions({
   patient,
-  isDeletedView,
-  onView,
   onArchive,
   onDelete,
   onRestore,
 }: {
   patient: Patient;
-  isDeletedView: boolean;
-  onView: () => void;
-  onArchive: (p: Patient) => void;
-  onDelete: (p: Patient) => void;
-  onRestore: (p: Patient) => void;
+  onArchive: (patient: Patient) => void;
+  onDelete: (patient: Patient) => void;
+  onRestore: (patient: Patient) => void;
 }) {
   const { t } = useTranslation();
-  const isDeleted = patient.deletedAt !== null;
+  const patientId = patient.id.toString();
+  const deleted = patient.deletedAt !== null;
   return (
-    <div onClick={(e) => e.stopPropagation()}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon-sm" aria-label={t("common.actions")}>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>{patient.fullName}</DropdownMenuLabel>
-          <DropdownMenuItem onClick={onView}>{t("common.view_details")}</DropdownMenuItem>
-          {!isDeleted && (
-            <>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="nc-patient-actions"
+          aria-label={t("patient.directory.actions_for", {
+            name: patient.fullName,
+          })}
+        >
+          <MoreHorizontal aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="nc-patient-menu min-w-52">
+        <DropdownMenuLabel>{patient.fullName}</DropdownMenuLabel>
+        {!deleted && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link to={`/pacientes/${patientId}`}>
+                <UserRound aria-hidden="true" />
+                {t("patient.directory.view_profile")}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={`/pacientes/${patientId}/editar`}>
+                <ClipboardList aria-hidden="true" />
+                {t("common.edit")}
+              </Link>
+            </DropdownMenuItem>
+            {patient.status === "active" && (
               <DropdownMenuItem asChild>
-                <Link to={`/pacientes/${patient.id.toString()}/editar`}>{t("common.edit")}</Link>
+                <Link to={`/pacientes/${patientId}/consultas/nueva`}>
+                  <CalendarPlus aria-hidden="true" />
+                  {t("patient.directory.new_consultation")}
+                </Link>
               </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link to={`/pacientes/${patient.id.toString()}/consultas`}>{t("consultation.new")}</Link>
+            )}
+            <DropdownMenuItem asChild>
+              <Link to={`/pacientes/${patientId}/consultas`}>
+                <ClipboardList aria-hidden="true" />
+                {t("patient.directory.view_consultations")}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link to={`/pacientes/${patientId}/planes`}>
+                <Utensils aria-hidden="true" />
+                {t("patient.directory.view_plan")}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {patient.status !== "archived" && (
+              <DropdownMenuItem onClick={() => onArchive(patient)}>
+                <Archive aria-hidden="true" />
+                {t("common.archive")}
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              {patient.status !== "archived" && (
-                <DropdownMenuItem onClick={() => onArchive(patient)}>
-                  <Archive className="mr-2 h-4 w-4" />
-                  {t("common.archive")}
-                </DropdownMenuItem>
+            )}
+            <DropdownMenuItem
+              onClick={() => onDelete(patient)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 aria-hidden="true" />
+              {t("common.delete")}
+            </DropdownMenuItem>
+          </>
+        )}
+        {deleted && (
+          <DropdownMenuItem
+            onClick={() => onRestore(patient)}
+            className="text-primary focus:text-primary"
+            data-testid="restore-patient-menu-item"
+          >
+            <RotateCcw aria-hidden="true" />
+            {t("common.restore")}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function PatientsPagination({
+  page,
+  totalPages,
+  from,
+  to,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number;
+  totalPages: number;
+  from: number;
+  to: number;
+  total: number;
+  pageSize: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
+}) {
+  const { t } = useTranslation();
+  const pages = Array.from(
+    new Set([1, page - 1, page, page + 1, totalPages]),
+  ).filter((value) => value >= 1 && value <= totalPages);
+
+  return (
+    <div className="nc-patients-pagination">
+      <div>
+        <span>{t("patient.directory.showing", { from, to, total })}</span>
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) => onPageSizeChange(Number(value))}
+        >
+          <SelectTrigger
+            aria-label={t("patient.directory.per_page", { count: pageSize })}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {[10, 25, 50].map((size) => (
+              <SelectItem key={size} value={String(size)}>
+                {t("patient.directory.per_page", { count: size })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <nav aria-label={t("patient.directory.pagination")}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={page === 1}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <ChevronLeft aria-hidden="true" />
+          {t("common.previous")}
+        </Button>
+        <div className="nc-patients-pagination__pages">
+          {pages.map((value, index) => (
+            <React.Fragment key={value}>
+              {index > 0 && value - pages[index - 1] > 1 && (
+                <span aria-hidden="true">…</span>
               )}
-              <DropdownMenuItem
-                onClick={() => onDelete(patient)}
-                className="text-destructive focus:text-destructive"
+              <Button
+                type="button"
+                variant={value === page ? "secondary" : "ghost"}
+                size="icon-sm"
+                aria-current={value === page ? "page" : undefined}
+                onClick={() => onPageChange(value)}
               >
-                <Trash2 className="mr-2 h-4 w-4" />
-                {t("common.delete")}
-              </DropdownMenuItem>
-            </>
-          )}
-          {isDeleted && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => onRestore(patient)}
-                className="text-primary focus:text-primary"
-                data-testid="restore-patient-menu-item"
-              >
-                <Archive className="mr-2 h-4 w-4" />
-                {t("common.restore")}
-              </DropdownMenuItem>
-            </>
-          )}
-          {isDeletedView && !isDeleted && null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+                {value}
+              </Button>
+            </React.Fragment>
+          ))}
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={page === totalPages}
+          onClick={() => onPageChange(page + 1)}
+        >
+          {t("common.next")}
+          <ChevronRight aria-hidden="true" />
+        </Button>
+      </nav>
     </div>
   );
 }
 
-function PatientsTableSkeleton() {
+function PatientsEmptyState({
+  deleted,
+  filtered,
+  onReset,
+  onCreate,
+}: {
+  deleted: boolean;
+  filtered: boolean;
+  onReset: () => void;
+  onCreate: () => void;
+}) {
+  const { t } = useTranslation();
+  if (deleted) {
+    return (
+      <EmptyState
+        icon={Trash2}
+        title={t("patient.directory.empty_deleted_title")}
+        description={t("patient.directory.empty_deleted_description")}
+      />
+    );
+  }
+  if (filtered) {
+    return (
+      <EmptyState
+        variant="search"
+        title={t("patient.directory.no_results_title")}
+        description={t("patient.directory.no_results_description")}
+        action={{ label: t("common.clear_filters"), onClick: onReset }}
+      />
+    );
+  }
   return (
-    <div className="space-y-2 rounded-md border bg-card p-4">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4">
+    <EmptyState
+      icon={UsersRound}
+      title={t("patient.directory.no_patients_title")}
+      description={t("patient.directory.no_patients_description")}
+      action={{ label: t("patient.new"), onClick: onCreate }}
+    />
+  );
+}
+
+function PatientsLoadingState() {
+  const { t } = useTranslation();
+  return (
+    <div className="nc-patients-loading" role="status">
+      <span className="sr-only">{t("patient.directory.loading")}</span>
+      {Array.from({ length: 7 }).map((_, index) => (
+        <div key={index}>
           <Skeleton className="h-10 w-10 rounded-full" />
-          <div className="flex-1 space-y-1.5">
-            <Skeleton className="h-4 w-1/3" />
-            <Skeleton className="h-3 w-1/4" />
-          </div>
+          <span>
+            <Skeleton className="h-3.5 w-36" />
+            <Skeleton className="h-3 w-24" />
+          </span>
+          <Skeleton className="h-3.5 w-44" />
+          <Skeleton className="h-6 w-16 rounded-full" />
         </div>
       ))}
     </div>

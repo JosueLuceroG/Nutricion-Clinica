@@ -149,53 +149,18 @@
 }
 
 .nc-title-accent span {
-  position: relative;
-  overflow: hidden;
   width: 60px;
   height: 4px;
   border-radius: 999px;
+  background: linear-gradient(90deg, var(--nc-login-blue), var(--nc-login-cyan));
   box-shadow: none;
 }
 
-.nc-title-accent span::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 60px;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--nc-login-blue), var(--nc-login-cyan));
-  transform: translateX(-105%);
-  animation: nc-login-line-pass 1.7s linear infinite;
-}
-
 .nc-title-accent i {
-  position: relative;
-  overflow: hidden;
   width: 4px;
   height: 4px;
   border-radius: 999px;
-}
-
-.nc-title-accent i::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
   background: var(--nc-login-cyan);
-  transform: translateX(-130%);
-  animation: nc-login-dot-pass 1.7s linear infinite;
-}
-
-.nc-title-accent i:nth-of-type(1)::before {
-  animation-delay: 0.2s;
-}
-
-.nc-title-accent i:nth-of-type(2)::before {
-  animation-delay: 0.33s;
-}
-
-.nc-title-accent i:nth-of-type(3)::before {
-  animation-delay: 0.46s;
 }
 
 .nc-hero-description {
@@ -318,9 +283,7 @@
   width: min(100%, 760px);
   border: 1px solid rgba(217, 230, 245, 0.9);
   border-radius: 30px;
-  background:
-    radial-gradient(circle at 50% 0%, rgba(236, 249, 255, 0.94), rgba(255, 255, 255, 0) 31%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.965), rgba(255, 255, 255, 0.93));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.965), rgba(255, 255, 255, 0.93));
   box-shadow: none;
   backdrop-filter: blur(18px);
 }
@@ -333,57 +296,13 @@
   padding: 42px 56px 42px;
 }
 
-.nc-login-emblem {
-  position: relative;
-  width: 132px;
-  height: 104px;
-  display: grid;
-  place-items: center;
-  margin: 0 auto 22px;
-}
-
-.nc-login-emblem::before,
-.nc-login-emblem::after {
-  content: "";
-  position: absolute;
-  top: 50px;
-  width: 3px;
-  height: 3px;
-  border-radius: 999px;
-  background: rgba(18, 166, 243, 0.62);
-  box-shadow: 16px 0 0 rgba(18, 166, 243, 0.42);
-}
-
-.nc-login-emblem::before {
-  left: 4px;
-}
-
-.nc-login-emblem::after {
-  right: 20px;
-}
-
-.nc-login-emblem-mark {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: 88px;
-  height: 88px;
-  border: 0;
-  border-radius: 0;
-  color: var(--nc-login-blue);
-  background: transparent;
-  box-shadow: none;
-  filter: drop-shadow(0 12px 20px rgba(18, 109, 255, 0.13));
-}
-
-.nc-login-emblem-main {
-  color: #0da5ee;
-  filter: drop-shadow(0 8px 14px rgba(14, 161, 235, 0.12));
-}
-
 .nc-login-header {
   text-align: center;
   margin-bottom: 42px;
+}
+
+.nc-login-card-main .nc-login-header {
+  margin-top: 78px;
 }
 
 .nc-login-header h2 {
@@ -439,16 +358,6 @@
 
   100% {
     transform: translateX(105%);
-  }
-}
-
-@keyframes nc-login-dot-pass {
-  0% {
-    transform: translateX(-130%);
-  }
-
-  100% {
-    transform: translateX(130%);
   }
 }
 
@@ -578,7 +487,7 @@
 
 .nc-options a {
   color: var(--nc-login-blue);
-  font-weight: 780;
+  font-weight: 400;
   text-decoration: none;
 }
 
@@ -953,24 +862,12 @@
     padding: 38px 54px 30px;
   }
 
-  .nc-login-emblem {
-    width: 124px;
-    height: 92px;
-    margin-bottom: 12px;
-  }
-
-  .nc-login-emblem-mark {
-    width: 72px;
-    height: 72px;
-  }
-
-  .nc-login-emblem-main {
-    width: 46px;
-    height: 46px;
-  }
-
   .nc-login-header {
     margin-bottom: 28px;
+  }
+
+  .nc-login-card-main .nc-login-header {
+    margin-top: 56px;
   }
 
   .nc-login-header h2 {
@@ -1206,31 +1103,12 @@
     padding: 28px 20px 30px;
   }
 
-  .nc-login-emblem {
-    width: 108px;
-    height: 82px;
-    margin-bottom: 18px;
-    transform: none;
-  }
-
-  .nc-login-emblem::before,
-  .nc-login-emblem::after {
-    top: 38px;
-  }
-
-  .nc-login-emblem-mark {
-    width: 64px;
-    height: 64px;
-    border-radius: 21px;
-  }
-
-  .nc-login-emblem-main {
-    width: 41px;
-    height: 41px;
-  }
-
   .nc-login-header {
     margin-bottom: 28px;
+  }
+
+  .nc-login-card-main .nc-login-header {
+    margin-top: 44px;
   }
 
   .nc-login-header h2 {
