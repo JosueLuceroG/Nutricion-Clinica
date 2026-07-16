@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { AppointmentDialog } from "./AppointmentDialog";
 
@@ -16,6 +16,45 @@ vi.mock("react-i18next", () => ({
 const patients = [{ id: "018f0000-0000-7000-8000-000000000001", name: "Ana Perez" }];
 
 describe("AppointmentDialog", () => {
+  it("precarga el paciente al abrir", () => {
+    const props = {
+      onOpenChange: vi.fn(),
+      selectedDate: "2026-06-08",
+      initialPatientId: patients[0].id,
+      patients,
+      onSubmit: vi.fn(),
+    };
+    const { rerender } = render(<AppointmentDialog {...props} open={false} />);
+
+    rerender(<AppointmentDialog {...props} open />);
+
+    expect(screen.getByRole("combobox", { name: "common.patient" })).toHaveTextContent("Ana Perez");
+  });
+
+  it("envia la fecha modificada", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <AppointmentDialog
+        open
+        onOpenChange={vi.fn()}
+        selectedDate="2026-06-08"
+        initialPatientId={patients[0].id}
+        patients={patients}
+        onSubmit={onSubmit}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("common.date"), { target: { value: "2026-06-10" } });
+    fireEvent.click(screen.getByRole("button", { name: "agenda.schedule_appointment" }));
+
+    await waitFor(() => {
+      expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+        patientId: patients[0].id,
+        date: "2026-06-10",
+      }));
+    });
+  });
+
   it("selecciona un horario disponible y actualiza inicio/fin", async () => {
     const loadAvailableSlots = vi.fn().mockResolvedValue([
       { startTime: "09:00", endTime: "09:30", available: false },

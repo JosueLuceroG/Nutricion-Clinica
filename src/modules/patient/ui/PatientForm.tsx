@@ -33,11 +33,17 @@ interface PatientFormProps {
   mode: "create" | "edit";
   patientId?: PatientId;
   initialPatient?: Patient;
+  onCreated?: (patient: Patient) => void;
 }
 
 const selectClass = "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring";
 
-export function PatientForm({ mode, patientId, initialPatient }: PatientFormProps) {
+export function PatientForm({
+  mode,
+  patientId,
+  initialPatient,
+  onCreated,
+}: PatientFormProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
@@ -135,7 +141,11 @@ export function PatientForm({ mode, patientId, initialPatient }: PatientFormProp
       if (mode === "create") {
         const created = await patientService.create.execute(payload);
         toast.success(t("patient.created_success"), { description: created.fullName });
-        navigate(`/pacientes/${created.id.toString()}`);
+        if (onCreated) {
+          onCreated(created);
+        } else {
+          navigate(`/pacientes/${created.id.toString()}`);
+        }
       } else if (patientId) {
         const updated = await patientService.update.execute(patientId, payload);
         toast.success(t("patient.updated_success"), { description: updated.fullName });

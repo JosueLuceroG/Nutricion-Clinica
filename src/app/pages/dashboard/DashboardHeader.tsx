@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
@@ -35,6 +35,11 @@ import {
 } from "@store/notificationStore";
 import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
 import { DashboardQuickAccessButton } from "@modules/dashboard-quick-access/ui";
+import { NewConsultationQuickDialog } from "@modules/consultation/ui/quick-consultation";
+import type {
+  QuickConsultationAction,
+  QuickConsultationPatient,
+} from "@modules/consultation/application/quickConsultationTypes";
 
 type PeriodOfDay = "morning" | "afternoon" | "night";
 
@@ -154,8 +159,16 @@ function getInitials(fullName: string): string {
     .toUpperCase();
 }
 
+function getLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: DashboardHeaderProps) {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
   const activeNotificationTab = useNotificationStore((state) => state.activeTab);
@@ -170,6 +183,9 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
   const [notificationDragState, setNotificationDragState] = React.useState<NotificationDragState | null>(null);
   const suppressNotificationClickRef = React.useRef(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = React.useState(false);
+  const [quickConsultationOpen, setQuickConsultationOpen] = React.useState(false);
+  const [quickConsultationPatientId, setQuickConsultationPatientId] = React.useState<string | undefined>();
+  const quickConsultationTriggerRef = React.useRef<HTMLButtonElement>(null);
   const openCommand = useCommandPaletteStore((state) => state.setOpen);
   const searchShortcutLabel = getGlobalSearchShortcutLabel();
   const user = useAuthStore((state) => state.user);
@@ -209,6 +225,45 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
   const markAllDisabled = activeNotificationTab === "archived" || !hasMarkableNotifications;
   const activeEmptyState = notificationEmptyState[activeNotificationTab];
   const canSwipeNotifications = activeNotificationTab !== "archived";
+
+  React.useEffect(() => {
+    if (searchParams.get("quickConsultation") !== "1") return;
+
+    const patientId = searchParams.get("patientId") ?? undefined;
+    setQuickConsultationPatientId(patientId);
+    setQuickConsultationOpen(true);
+    setNotificationsOpen(false);
+    setAvatarMenuOpen(false);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("quickConsultation");
+    nextParams.delete("patientId");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const openQuickConsultation = () => {
+    setNotificationsOpen(false);
+    setAvatarMenuOpen(false);
+    setQuickConsultationPatientId(undefined);
+    setQuickConsultationOpen(true);
+  };
+
+  const handleQuickConsultationContinue = (
+    patient: QuickConsultationPatient,
+    action: QuickConsultationAction,
+  ) => {
+    setQuickConsultationOpen(false);
+    if (action === "schedule-later") {
+      navigate(
+        `/agenda?date=${getLocalDateKey()}&patientId=${encodeURIComponent(patient.id)}&create=1`,
+      );
+      return;
+    }
+
+    navigate(
+      `/pacientes/${encodeURIComponent(patient.id)}/consultas/nueva?mode=start-now&source=dashboard`,
+    );
+  };
   const getNotificationSwipeOffset = (id: string) => {
     if (notificationDragState?.id === id) {
       return Math.max(Math.min(notificationDragState.currentX - notificationDragState.startX, 0), -NOTIFICATION_SWIPE_REVEAL_WIDTH);
@@ -368,6 +423,7 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
   }, [avatarMenuOpen, notificationsOpen, swipedNotificationId]);
 
   return (
+    <>
     <header className="nc-dashboard-header" data-quick-notes-header>
       <div className="nc-dashboard-header__inner">
         <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
@@ -402,7 +458,14 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
               onCustomizeDashboard={onCustomizeKpis}
               dashboardEditing={dashboardEditing}
             />
-            <button type="button" className="nc-dashboard-button nc-dashboard-button--soft" onClick={() => navigate("/consultas/nueva")}>
+            <button
+              ref={quickConsultationTriggerRef}
+              type="button"
+              className="nc-dashboard-button nc-dashboard-button--soft"
+              onClick={openQuickConsultation}
+              aria-haspopup="dialog"
+              aria-expanded={quickConsultationOpen}
+            >
               <CalendarPlus size={17} strokeWidth={2} aria-hidden="true" />
               <span>Nueva consulta</span>
             </button>
@@ -633,5 +696,24 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
         </div>
       </div>
     </header>
+    <NewConsultationQuickDialog
+      open={quickConsultationOpen}
+      initialPatientId={quickConsultationPatientId}
+      onOpenChange={(nextOpen) => {
+        setQuickConsultationOpen(nextOpen);
+        if (!nextOpen) {
+          setQuickConsultationPatientId(undefined);
+          window.requestAnimationFrame(() =>
+            quickConsultationTriggerRef.current?.focus(),
+          );
+        }
+      }}
+      onRegisterPatient={() => {
+        setQuickConsultationOpen(false);
+        navigate("/pacientes/nuevo?returnTo=quick-consultation");
+      }}
+      onContinue={handleQuickConsultationContinue}
+    />
+    </>
   );
 }

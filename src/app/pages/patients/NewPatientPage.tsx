@@ -1,4 +1,4 @@
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
@@ -10,8 +10,12 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 
 export function NewPatientPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { patientId } = useParams();
+  const [searchParams] = useSearchParams();
   const isEdit = Boolean(patientId);
+  const returnToQuickConsultation =
+    searchParams.get("returnTo") === "quick-consultation";
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
@@ -49,7 +53,17 @@ export function NewPatientPage() {
               />
             ) : null
           ) : (
-            <PatientForm mode="create" />
+            <PatientForm
+              mode="create"
+              onCreated={
+                returnToQuickConsultation
+                  ? (created) =>
+                      navigate(
+                        `/?quickConsultation=1&patientId=${encodeURIComponent(created.id.toString())}`,
+                      )
+                  : undefined
+              }
+            />
           )}
         </div>
       </PageContent>

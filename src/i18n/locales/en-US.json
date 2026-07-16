@@ -1818,6 +1818,51 @@
       "regular": "Regular"
     }
   },
+  "quickConsultation": {
+    "title": "New consultation",
+    "description": "Create a new patient consultation quickly and easily.",
+    "patientStep": "Select patient",
+    "searchLabel": "Search patient",
+    "searchPlaceholder": "Search by name, phone, email, or record...",
+    "clearSearch": "Clear search",
+    "registerPatient": "Register new patient",
+    "patientResults": "Available patients",
+    "loadingPatients": "Loading patients...",
+    "noResults": "No patients found",
+    "noPatients": "There are no active patients yet",
+    "noResultsHint": "Try another search or register a new patient.",
+    "actionStep": "What would you like to do?",
+    "startNow": "Start consultation now",
+    "startNowDescription": "Open the patient's clinical flow to begin.",
+    "scheduleLater": "Schedule for later",
+    "scheduleLaterDescription": "Open the schedule with the selected patient.",
+    "summaryStep": "Useful information before starting",
+    "selectPatientForSummary": "Select a patient to view their summary.",
+    "continue": "Continue",
+    "footer": {
+      "start": "Continuing will open the patient's consultation.",
+      "schedule": "Continuing will let you choose a date and time in the schedule."
+    },
+    "summary": {
+      "lastConsultation": "Last consultation",
+      "currentGoal": "Current goal",
+      "activePlan": "Active plan",
+      "alerts": "Alerts",
+      "pendingBalance": "Pending balance",
+      "followUp": "Follow-up",
+      "noInformation": "No information",
+      "noPreviousConsultations": "No previous consultations",
+      "noActiveGoal": "No active goal",
+      "noActivePlan": "No active plan",
+      "noAlerts": "No alerts",
+      "noFollowUp": "No follow-up",
+      "active": "Active",
+      "allGood": "Everything is in order",
+      "daysAgo": "{{count}} days ago",
+      "moreAlerts": "+{{count}} alerts",
+      "pendingConsultations": "{{count}} consultations with a balance"
+    }
+  },
   "sync": {
     "title": "Sync",
     "synced": "Synced",

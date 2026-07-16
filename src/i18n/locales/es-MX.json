@@ -1818,6 +1818,51 @@
       "regular": "Regular"
     }
   },
+  "quickConsultation": {
+    "title": "Nueva consulta",
+    "description": "Crea una nueva consulta para un paciente de forma rápida y sencilla.",
+    "patientStep": "Seleccionar paciente",
+    "searchLabel": "Buscar paciente",
+    "searchPlaceholder": "Buscar por nombre, teléfono, correo o expediente...",
+    "clearSearch": "Limpiar búsqueda",
+    "registerPatient": "Registrar paciente nuevo",
+    "patientResults": "Pacientes disponibles",
+    "loadingPatients": "Cargando pacientes...",
+    "noResults": "No encontramos pacientes",
+    "noPatients": "Aún no hay pacientes activos",
+    "noResultsHint": "Prueba otra búsqueda o registra un paciente nuevo.",
+    "actionStep": "¿Qué deseas hacer?",
+    "startNow": "Iniciar consulta ahora",
+    "startNowDescription": "Abre el flujo clínico del paciente para comenzar.",
+    "scheduleLater": "Programar para después",
+    "scheduleLaterDescription": "Abre la agenda con el paciente seleccionado.",
+    "summaryStep": "Información útil antes de entrar",
+    "selectPatientForSummary": "Selecciona un paciente para consultar su resumen.",
+    "continue": "Continuar",
+    "footer": {
+      "start": "Al continuar, se abrirá la consulta del paciente.",
+      "schedule": "Al continuar, podrás elegir fecha y hora en la agenda."
+    },
+    "summary": {
+      "lastConsultation": "Última consulta",
+      "currentGoal": "Objetivo actual",
+      "activePlan": "Plan activo",
+      "alerts": "Alertas",
+      "pendingBalance": "Saldo pendiente",
+      "followUp": "Seguimiento",
+      "noInformation": "Sin información",
+      "noPreviousConsultations": "Sin consultas previas",
+      "noActiveGoal": "Sin objetivo activo",
+      "noActivePlan": "Sin plan activo",
+      "noAlerts": "Sin alertas",
+      "noFollowUp": "Sin seguimiento",
+      "active": "Activo",
+      "allGood": "Todo en orden",
+      "daysAgo": "Hace {{count}} días",
+      "moreAlerts": "+{{count}} alertas",
+      "pendingConsultations": "{{count}} consultas con saldo"
+    }
+  },
   "sync": {
     "title": "Sincronización",
     "synced": "Sincronizado",
