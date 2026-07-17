@@ -1,7 +1,8 @@
 .nc-patients-page {
   container-type: inline-size;
   display: grid;
-  gap: 18px;
+  gap: 0;
+  padding-top: 0;
   background:
     radial-gradient(
       circle at 88% 0%,
@@ -14,40 +15,31 @@
 .nc-patients-hero {
   position: relative;
   display: flex;
-  min-height: 122px;
+  min-height: 145px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
   overflow: hidden;
-  border: 1px solid hsl(var(--primary) / 0.1);
-  border-radius: 20px;
-  background: linear-gradient(
-    115deg,
-    hsl(var(--card)) 0%,
-    hsl(var(--primary) / 0.055) 62%,
-    hsl(var(--info) / 0.08) 100%
-  );
-  padding: 24px 28px;
-  box-shadow: var(
-    --alt-shadow-card,
-    0 12px 34px hsl(var(--foreground) / 0.045)
-  );
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 20px 18px;
+  box-shadow: none;
 }
 
 .nc-patients-hero::after {
   position: absolute;
-  top: -110px;
-  right: 13%;
-  width: 360px;
-  height: 230px;
-  border: 36px solid hsl(var(--primary) / 0.04);
+  top: -150px;
+  right: 8%;
+  width: 1000px;
+  height: 300px;
+  border: 40px solid hsl(var(--primary) / 0.04);
   border-radius: 50%;
   content: "";
   transform: rotate(-13deg);
 }
 
 .nc-patients-hero__identity,
-.nc-patients-hero__actions,
 .nc-patients-hero__titleRow {
   position: relative;
   z-index: 1;
@@ -56,14 +48,8 @@
 }
 
 .nc-patients-hero__identity {
-  gap: 18px;
-}
-.nc-patients-hero__actions {
-  gap: 10px;
-}
-.nc-patients-hero__actions svg {
-  width: 17px;
-  height: 17px;
+  gap: 26px;
+  transform: translateY(-7px);
 }
 .nc-patients-hero__titleRow {
   flex-wrap: wrap;
@@ -72,11 +58,11 @@
 
 .nc-patients-hero__icon {
   display: grid;
-  width: 58px;
-  height: 58px;
+  width: 74px;
+  height: 74px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 18px;
+  border-radius: 50%;
   background: hsl(var(--background) / 0.86);
   color: hsl(var(--primary));
   box-shadow:
@@ -85,8 +71,8 @@
 }
 
 .nc-patients-hero__icon svg {
-  width: 29px;
-  height: 29px;
+  width: 36px;
+  height: 36px;
 }
 .nc-patients-hero h1 {
   font-size: clamp(20px, 2vw, 25px);
@@ -100,8 +86,11 @@
 }
 .nc-patients-hero__count {
   gap: 6px;
+  border: 1px solid hsl(var(--primary) / 0.14);
   border-radius: 999px;
+  background: hsl(var(--primary) / 0.035);
   padding: 5px 10px;
+  box-shadow: none;
 }
 .nc-patients-hero__count svg {
   width: 14px;
@@ -111,17 +100,17 @@
 .nc-patients-directory {
   overflow: hidden;
   border: 1px solid hsl(var(--border) / 0.82);
-  border-radius: 18px;
+  border-radius: 14px;
   background: hsl(var(--card));
-  box-shadow: var(--alt-shadow-card, 0 12px 34px hsl(var(--foreground) / 0.04));
+  box-shadow: var(--alt-shadow-card, 0 8px 24px hsl(var(--foreground) / 0.035));
 }
 
 .nc-patients-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto;
+  grid-template-columns: minmax(280px, 36%) minmax(400px, 440px) minmax(0, 1fr) auto;
   align-items: center;
   gap: 16px;
-  padding: 18px;
+  padding: 14px 18px;
 }
 
 .nc-patients-search {
@@ -185,6 +174,7 @@
 }
 .nc-patients-tabs button {
   min-height: 34px;
+  flex: 1 0 auto;
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -206,14 +196,38 @@
   box-shadow: 0 4px 12px hsl(var(--foreground) / 0.07);
 }
 
+.nc-patients-toolbar__actions {
+  grid-column: 4;
+  display: flex;
+  align-items: center;
+  justify-self: end;
+  gap: 10px;
+}
+
+.nc-patients-importButton,
 .nc-patients-filterButton {
   min-height: 44px;
   gap: 8px;
+  border-color: hsl(var(--primary) / 0.14);
   border-radius: 12px;
 }
+.nc-patients-importButton {
+  padding-right: 18px;
+  padding-left: 18px;
+}
+.nc-patients-importButton > svg,
 .nc-patients-filterButton > svg {
   width: 16px;
   height: 16px;
+}
+.nc-patients-filterButton .nc-patients-filterButton__chevron {
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  transition: transform 160ms ease;
+}
+.nc-patients-filterButton__chevron[data-open] {
+  transform: rotate(180deg);
 }
 .nc-patients-filterButton > span {
   border-radius: 999px;
@@ -289,7 +303,11 @@
 
 .nc-patients-results {
   min-height: 260px;
-  border-top: 1px solid hsl(var(--border) / 0.72);
+  overflow: hidden;
+  margin: 0 18px 18px;
+  border: 1px solid hsl(var(--border) / 0.82);
+  border-radius: 12px;
+  background: hsl(var(--card));
 }
 .nc-patients-tableWrap {
   overflow-x: auto;
@@ -301,14 +319,28 @@
   background: hsl(var(--muted) / 0.25);
 }
 .nc-patients-tableWrap th {
-  height: 43px;
+  height: 40px;
+  padding-right: 16px;
+  padding-left: 16px;
   color: hsl(var(--muted-foreground));
   font-size: 10px;
   font-weight: 720;
   letter-spacing: 0.025em;
 }
 .nc-patients-tableWrap td {
-  height: 72px;
+  height: 51px;
+  padding-right: 16px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  padding-left: 16px;
+}
+.nc-patients-tableWrap th:first-child,
+.nc-patients-tableWrap td:first-child {
+  width: 29%;
+}
+.nc-patients-tableWrap th:nth-child(2),
+.nc-patients-tableWrap td:nth-child(2) {
+  width: 35%;
 }
 .nc-patients-tableWrap tbody tr {
   transition: 150ms ease;
@@ -321,12 +353,12 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 11px;
+  gap: 18px;
 }
 .nc-patient-avatar {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   flex: 0 0 auto;
   overflow: hidden;
   place-items: center;
@@ -424,6 +456,8 @@
   background: currentColor;
 }
 .nc-patient-actions {
+  width: 36px;
+  height: 36px;
   border: 1px solid hsl(var(--border) / 0.7);
   border-radius: 10px;
 }
@@ -467,28 +501,24 @@
 
 .nc-patients-pagination {
   display: flex;
-  min-height: 70px;
+  min-height: 58px;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
   border-top: 1px solid hsl(var(--border));
   padding: 12px 18px;
 }
-.nc-patients-pagination > div,
 .nc-patients-pagination nav,
 .nc-patients-pagination__pages {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.nc-patients-pagination > div > span {
+.nc-patients-pagination > p {
+  margin: 0;
   color: hsl(var(--muted-foreground));
-  font-size: 10.5px;
-}
-.nc-patients-pagination [role="combobox"] {
-  width: 120px;
-  height: 34px;
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 560;
 }
 .nc-patients-pagination nav > button {
   gap: 5px;
@@ -522,18 +552,106 @@
   margin: 18px;
 }
 
-.dark .nc-patients-hero {
-  background: linear-gradient(
-    115deg,
-    hsl(var(--card)) 0%,
-    hsl(var(--primary) / 0.1) 100%
-  );
+.dark .nc-patients-page {
+  background: #020617;
 }
-.alternative .nc-patients-hero,
+
+.dark .nc-patients-directory {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-patients-results {
+  background: #07111f;
+}
+
+.dark .nc-patients-hero {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dark .nc-patients-hero::after {
+  border-color: rgba(96, 165, 250, 0.045);
+}
+
+.dark .nc-patients-hero__icon,
+.dark .nc-patient-card {
+  border-color: rgba(148, 163, 184, 0.11);
+  background: #081321;
+  box-shadow: none;
+}
+
+.dark .nc-patients-search input,
+.dark .nc-patients-tabs,
+.dark .nc-patients-importButton,
+.dark .nc-patients-filterButton,
+.dark .nc-patient-actions {
+  border-color: rgba(148, 163, 184, 0.12);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-patients-importButton {
+  color: #dbeafe;
+}
+
+.dark .nc-patients-importButton:hover,
+.dark .nc-patients-filterButton:hover,
+.dark .nc-patient-actions:hover {
+  border-color: rgba(148, 163, 184, 0.17);
+  background: #0a1728;
+}
+
+.dark .nc-patients-tabs {
+  background: #081321;
+}
+
+.dark .nc-patients-tabs button[data-active] {
+  background: #0a1728;
+  box-shadow: none;
+}
+
+.dark .nc-patients-filters,
+.dark .nc-patients-tableWrap thead {
+  border-color: rgba(148, 163, 184, 0.1);
+  background: #081321;
+}
+
+.dark .nc-patients-results,
+.dark .nc-patients-pagination,
+.dark .nc-patients-tableWrap tbody tr,
+.dark .nc-patients-loading > div {
+  border-color: rgba(148, 163, 184, 0.11);
+}
+
+.dark .nc-patients-tableWrap tbody tr:hover {
+  background: #0a1728;
+}
+
+.dark .nc-patients-search > button:hover {
+  background: #0a1728;
+}
+
+.dark .nc-patient-contact svg {
+  color: #60a5fa;
+}
 .alternative .nc-patients-directory {
   border-color: var(--alt-card-border, hsl(var(--border)));
   background-color: var(--alt-card-bg, hsl(var(--card)));
   box-shadow: var(--alt-shadow-card, 0 12px 34px hsl(var(--foreground) / 0.05));
+}
+
+.alternative .nc-patients-results {
+  border-color: var(--alt-card-border, hsl(var(--border)));
+  background-color: var(--alt-card-bg, hsl(var(--card)));
+}
+
+.alternative .nc-patients-hero {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
 }
 
 @container (max-width: 980px) {
@@ -544,29 +662,36 @@
     grid-column: 1 / -1;
     grid-row: 2;
   }
+  .nc-patients-toolbar__actions {
+    grid-column: auto;
+  }
   .nc-patients-filters__grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @container (max-width: 720px) {
+  .nc-patients-hero__identity {
+    transform: none;
+  }
   .nc-patients-hero {
     align-items: flex-start;
   }
   .nc-patients-hero__identity {
     align-items: flex-start;
   }
-  .nc-patients-hero__actions {
-    flex-direction: column;
-  }
-  .nc-patients-hero__actions a {
-    width: 100%;
-  }
   .nc-patients-filters__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .nc-patients-tableWrap {
     display: none;
+  }
+  .nc-patients-results {
+    margin: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 0;
   }
   .nc-patients-mobileList {
     display: grid;
@@ -588,15 +713,17 @@
     flex-direction: column;
     padding: 20px;
   }
-  .nc-patients-hero__actions {
-    width: 100%;
-  }
   .nc-patients-toolbar {
     grid-template-columns: minmax(0, 1fr);
     padding: 14px;
   }
-  .nc-patients-filterButton {
+  .nc-patients-toolbar__actions {
+    grid-column: 1;
     width: 100%;
+  }
+  .nc-patients-importButton,
+  .nc-patients-filterButton {
+    flex: 1 1 0;
   }
   .nc-patients-tabs {
     grid-column: 1;
@@ -611,10 +738,6 @@
   }
   .nc-patients-filters__footer button {
     width: 100%;
-  }
-  .nc-patients-pagination > div {
-    width: 100%;
-    justify-content: space-between;
   }
   .nc-patients-pagination__pages {
     display: none;

@@ -1,21 +1,29 @@
 import * as React from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   Archive,
   BarChart3,
   Bell,
+  CalendarDays,
   CalendarPlus,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   HelpCircle,
   LogOut,
   Plus,
+  ReceiptText,
   Search,
   Settings,
   Star,
+  Stethoscope,
   User,
   UserPlus,
+  UsersRound,
+  UtensilsCrossed,
+  WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -78,6 +86,114 @@ function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
   if (periodOfDay === "morning") return "Buen día";
   if (periodOfDay === "afternoon") return "Buena tarde";
   return "Buena noche";
+}
+
+const sectionLabels: Record<string, string> = {
+  pacientes: "Pacientes",
+  consultas: "Consultas",
+  agenda: "Agenda",
+  planes: "Planes",
+  smae: "Alimentos",
+  billing: "Facturación",
+  configuracion: "Configuración",
+  laboratorio: "Laboratorio",
+  calculos: "Cálculos",
+  recetas: "Recetas",
+  objetivos: "Objetivos",
+  adherencia: "Adherencia",
+  documentos: "Documentos",
+  "plan-semanal": "Plan semanal",
+  importar: "Importar",
+  medicamentos: "Medicamentos",
+  reportes: "Reportes",
+  notificaciones: "Notificaciones",
+  perfil: "Perfil",
+  seguridad: "Seguridad",
+  telemedicina: "Telemedicina",
+  ayuda: "Ayuda",
+};
+
+const sectionIcons: Record<string, LucideIcon> = {
+  pacientes: UsersRound,
+  consultas: ClipboardList,
+  agenda: CalendarDays,
+  planes: ReceiptText,
+  smae: UtensilsCrossed,
+  billing: WalletCards,
+  configuracion: Settings,
+};
+
+function getHeaderBreadcrumbIcon(pathname: string): LucideIcon {
+  const section = pathname.split("/").filter(Boolean)[0];
+  return (section && sectionIcons[section]) || Stethoscope;
+}
+
+function getHeaderBreadcrumb(pathname: string): string[] {
+  const segments = pathname.split("/").filter(Boolean);
+  const section = segments[0];
+  if (!section) return [];
+
+  const labels = [sectionLabels[section] ?? "Página actual"];
+
+  if (section === "pacientes") {
+    if (segments[1] === "nuevo") return [...labels, "Nuevo paciente"];
+    if (segments[1] === "importar") return [...labels, "Importar CSV"];
+    if (!segments[1]) return labels;
+    if (!segments[2]) return [...labels, "Perfil del paciente"];
+
+    const patientAreaLabels: Record<string, string> = {
+      editar: "Editar paciente",
+      antropometria: "Antropometría",
+      laboratorio: "Laboratorio",
+      consultas: "Consultas",
+      planes: "Planes",
+      adherencia: "Adherencia",
+    };
+    const patientArea = patientAreaLabels[segments[2]];
+    if (patientArea) labels.push(patientArea);
+
+    const patientActionLabels: Record<string, string> = {
+      nueva: segments[2] === "consultas" ? "Nueva consulta" : "Nueva medición",
+      nuevo: segments[2] === "planes" ? "Nuevo plan" : "Nuevo panel",
+      scan: "Escanear laboratorio",
+    };
+    const patientAction = patientActionLabels[segments[3]];
+    if (patientAction) labels.push(patientAction);
+    return labels;
+  }
+
+  if (section === "consultas") {
+    if (segments[1] === "nueva") labels.push("Nueva consulta");
+    else if (segments[1]) labels.push("Detalle de consulta");
+  } else if (section === "planes" && segments[1]) {
+    labels.push("Detalle del plan");
+  } else if (section === "billing") {
+    const billingLabels: Record<string, string> = {
+      report: "Reporte",
+      expenses: "Gastos",
+      payments: "Pagos",
+    };
+    if (segments[1] && billingLabels[segments[1]]) labels.push(billingLabels[segments[1]]);
+    else if (segments[2] === "receipt") labels.push("Recibo");
+  } else if (section === "telemedicina") {
+    if (segments[1] === "nueva") labels.push("Nueva sala");
+    else if (segments[1]) labels.push("Videollamada");
+  } else if (section === "seguridad" && segments[1] === "2fa") {
+    labels.push("Autenticación en dos pasos");
+  }
+
+  return labels;
+}
+
+function getHeaderBreadcrumbTarget(pathname: string, index: number): string | null {
+  const segments = pathname.split("/").filter(Boolean);
+  const section = segments[0];
+  if (!section) return null;
+  if (index === 0) return `/${section}`;
+  if (section === "pacientes" && index === 1 && segments.length > 3) {
+    return `/${segments.slice(0, 3).join("/")}`;
+  }
+  return null;
 }
 
 const GREETING_EMOJI_STORAGE_KEY = "nutriclinica.dashboard.greetingEmoji";
@@ -167,6 +283,7 @@ function getLocalDateKey(date = new Date()): string {
 }
 
 export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: DashboardHeaderProps) {
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
@@ -192,6 +309,9 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
   const logout = useAuthStore((state) => state.logout);
   const displayName = user?.nombreCompleto?.trim() || "Administrador";
   const firstName = getFirstName(displayName);
+  const isDashboard = location.pathname === "/";
+  const breadcrumbItems = getHeaderBreadcrumb(location.pathname);
+  const BreadcrumbIcon = getHeaderBreadcrumbIcon(location.pathname);
   const [headerDate, setHeaderDate] = React.useState(() => new Date());
   const periodOfDay = getPeriodOfDay(headerDate);
   const greeting = getGreetingForPeriod(periodOfDay);
@@ -426,7 +546,7 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
     <>
     <header className="nc-dashboard-header" data-quick-notes-header>
       <div className="nc-dashboard-header__inner">
-        <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
+        <section className="nc-dashboard-header__intro" aria-label={isDashboard ? "Resumen del día" : "Contexto de navegación"}>
           <h1 className="nc-dashboard-header__title">
             <span className="nc-dashboard-header__greetingText">
               {greeting}, {firstName}
@@ -435,7 +555,45 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
               {greetingEmoji}
             </span>
           </h1>
-          <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
+          {isDashboard ? (
+            <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
+          ) : (
+            <nav className="nc-dashboard-header__breadcrumb" aria-label="Ruta actual">
+              <BreadcrumbIcon className="nc-dashboard-header__breadcrumbIcon" strokeWidth={1.75} aria-hidden="true" />
+              <ChevronRight className="nc-dashboard-header__breadcrumbChevron" aria-hidden="true" />
+              <Link
+                to="/"
+                className="nc-dashboard-header__breadcrumbSection nc-dashboard-header__breadcrumbLink"
+              >
+                Gestión Clínica y Nutricional
+              </Link>
+              {breadcrumbItems.map((item, index) => {
+                const isCurrent = index === breadcrumbItems.length - 1;
+                const target = isCurrent
+                  ? null
+                  : getHeaderBreadcrumbTarget(location.pathname, index);
+                const className = `nc-dashboard-header__breadcrumbItem${isCurrent ? " nc-dashboard-header__breadcrumbItem--current" : " nc-dashboard-header__breadcrumbLink"}`;
+                return (
+                  <React.Fragment key={`${item}-${index}`}>
+                    <ChevronRight className="nc-dashboard-header__breadcrumbChevron" aria-hidden="true" />
+                    {target ? (
+                      <Link to={target} className={className} title={item}>
+                        {item}
+                      </Link>
+                    ) : (
+                      <span
+                        className={className}
+                        aria-current={isCurrent ? "page" : undefined}
+                        title={item}
+                      >
+                        {item}
+                      </span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
+          )}
         </section>
 
         <div className="nc-dashboard-header__searchSlot">

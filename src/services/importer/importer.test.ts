@@ -10,8 +10,13 @@ import {
   PatientRowImportError,
 } from "./patientImporter";
 import { PatientImporterService } from "./importerService";
+import {
+  currentPatientRowsForBranch,
+  patientRowsToCsv,
+} from "./patientCsvExport";
 import type { PatientRepository } from "@modules/patient/domain/PatientRepository";
 import type { Patient } from "@modules/patient/domain/Patient";
+import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 
 describe("csvParser", () => {
   it("parsea CSV simple con encabezados y filas", () => {
@@ -286,5 +291,82 @@ describe("PatientImporterService", () => {
     const csv = "foo,bar\n1,2\n";
     const preview = svc.preview(csv);
     expect(preview.missingRequiredColumns.length).toBeGreaterThan(0);
+  });
+});
+
+function makePatientRow(
+  id: string,
+  overrides: Partial<PatientRow> = {},
+): PatientRow {
+  return {
+    id,
+    sucursal_id: "branch-1",
+    first_name: "María",
+    last_name: "Gómez",
+    second_last_name: null,
+    birth_date: "1990-05-15T00:00:00.000Z",
+    sex: "female",
+    gender: null,
+    marital_status: null,
+    occupation: "Ingeniera",
+    education: null,
+    email: "maria@example.com",
+    phone: "+52 55 1234 5678",
+    secondary_phone: null,
+    emergency_contact_name: null,
+    emergency_contact_relationship: null,
+    emergency_contact_phone: null,
+    record_status: "active",
+    record_opened_at: "2025-01-01T00:00:00.000Z",
+    general_notes: "Seguimiento, mensual",
+    consentimiento_informado_id: null,
+    fecha_firma_consentimiento: null,
+    version_politica_privacidad: null,
+    clinical_tags: "[]",
+    clave_interna: null,
+    birth_place: null,
+    address: null,
+    nationality: null,
+    id_type: null,
+    id_number: null,
+    discharge_reason: null,
+    responsible_professional_id: null,
+    external_record_number: null,
+    photo_url: null,
+    status: "active",
+    created_at: "2025-01-01T00:00:00.000Z",
+    updated_at: "2025-01-01T00:00:00.000Z",
+    deleted_at: null,
+    ...overrides,
+  };
+}
+
+describe("patientCsvExport", () => {
+  it("exporta un CSV que el importador puede volver a leer", () => {
+    const csv = patientRowsToCsv([
+      makePatientRow("patient-1", {
+        first_name: 'María "Luz"',
+        general_notes: "Seguimiento, mensual",
+      }),
+    ]);
+    const preview = new PatientImporterService(makeFakeRepo()).preview(csv);
+
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.invalid).toHaveLength(0);
+    expect(preview.valid[0].mapped?.firstName).toBe('María "Luz"');
+    expect(preview.valid[0].mapped?.generalNotes).toBe("Seguimiento, mensual");
+  });
+
+  it("incluye pacientes actuales de la sucursal y registros heredados", () => {
+    const rows = [
+      makePatientRow("current"),
+      makePatientRow("legacy", { sucursal_id: null }),
+      makePatientRow("other", { sucursal_id: "branch-2" }),
+      makePatientRow("deleted", { deleted_at: "2026-01-01T00:00:00.000Z" }),
+    ];
+
+    expect(
+      currentPatientRowsForBranch(rows, "branch-1").map((row) => row.id),
+    ).toEqual(["current", "legacy"]);
   });
 });

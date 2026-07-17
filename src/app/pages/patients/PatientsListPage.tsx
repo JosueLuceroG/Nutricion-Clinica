@@ -4,16 +4,16 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Archive,
   CalendarPlus,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  Filter,
   Mail,
   MoreHorizontal,
   Phone,
-  Plus,
   RotateCcw,
   Search,
-  SlidersHorizontal,
   Trash2,
   Upload,
   UserRound,
@@ -127,7 +127,6 @@ export function PatientsListPage() {
     setSearch,
     setStatusFilter,
     setFilters,
-    setPageSize,
     reset,
   } = usePatientsUIStore();
   const deferredSearch = React.useDeferredValue(search);
@@ -310,15 +309,7 @@ export function PatientsListPage() {
                 <PatientsPagination
                   page={data.page}
                   totalPages={data.totalPages}
-                  from={data.from}
-                  to={data.to}
-                  total={data.filteredTotal}
-                  pageSize={pageSize}
                   onPageChange={setPage}
-                  onPageSizeChange={(value) => {
-                    setPageSize(value);
-                    setPage(1);
-                  }}
                 />
               </>
             ) : null}
@@ -391,7 +382,12 @@ function PatientsHero({ total, loading }: { total: number; loading: boolean }) {
     <section className="nc-patients-hero" aria-labelledby="patients-title">
       <div className="nc-patients-hero__identity">
         <span className="nc-patients-hero__icon" aria-hidden="true">
-          <UsersRound />
+          <svg viewBox="0 0 24 24" fill="none">
+            <circle cx="7.5" cy="7" r="3.25" fill="currentColor" />
+            <circle cx="16.5" cy="7" r="3.25" fill="currentColor" />
+            <path d="M1.75 19.75v-2.1c0-3.45 2.58-5.9 5.75-5.9s5.75 2.45 5.75 5.9v2.1H1.75Z" fill="currentColor" />
+            <path d="M10.75 19.75v-2.1c0-3.45 2.58-5.9 5.75-5.9s5.75 2.45 5.75 5.9v2.1h-11.5Z" fill="currentColor" />
+          </svg>
         </span>
         <div>
           <div className="nc-patients-hero__titleRow">
@@ -405,20 +401,6 @@ function PatientsHero({ total, loading }: { total: number; loading: boolean }) {
           </div>
           <p>{t("patient.directory.description")}</p>
         </div>
-      </div>
-      <div className="nc-patients-hero__actions">
-        <Button asChild variant="outline" size="lg">
-          <Link to="/importar">
-            <Upload aria-hidden="true" />
-            {t("patient.directory.import_csv")}
-          </Link>
-        </Button>
-        <Button asChild size="lg">
-          <Link to="/pacientes/nuevo">
-            <Plus aria-hidden="true" />
-            {t("patient.new")}
-          </Link>
-        </Button>
       </div>
     </section>
   );
@@ -507,22 +489,35 @@ function PatientsToolbar({
         ))}
       </div>
 
-      <Button
-        type="button"
-        variant="outline"
-        className="nc-patients-filterButton"
-        aria-expanded={filtersOpen}
-        aria-controls="patients-filters"
-        onClick={onToggleFilters}
-      >
-        <SlidersHorizontal aria-hidden="true" />
-        {t("patient.directory.filters")}
-        {filterCount > 0 && (
-          <span>
-            {t("patient.directory.filters_active", { count: filterCount })}
-          </span>
-        )}
-      </Button>
+      <div className="nc-patients-toolbar__actions">
+        <Button asChild variant="outline" className="nc-patients-importButton">
+          <Link to="/pacientes/importar">
+            <Upload aria-hidden="true" />
+            {t("patient.directory.import_csv")}
+          </Link>
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="nc-patients-filterButton"
+          aria-expanded={filtersOpen}
+          aria-controls="patients-filters"
+          onClick={onToggleFilters}
+        >
+          <Filter aria-hidden="true" />
+          {t("patient.directory.filters")}
+          {filterCount > 0 && (
+            <span>
+              {t("patient.directory.filters_active", { count: filterCount })}
+            </span>
+          )}
+          <ChevronDown
+            className="nc-patients-filterButton__chevron"
+            data-open={filtersOpen || undefined}
+            aria-hidden="true"
+          />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -666,7 +661,7 @@ function PatientsFiltersPanel({
 
       <div className="nc-patients-filters__footer">
         <Button type="button" onClick={onApply}>
-          <SlidersHorizontal aria-hidden="true" />
+          <Filter aria-hidden="true" />
           {t("patient.directory.apply_filters")}
         </Button>
       </div>
@@ -819,9 +814,6 @@ function PatientIdentity({ item }: { item: PatientDirectoryItem }) {
   const { t } = useTranslation();
   const patientId = item.patient.id.toString();
   const tone = patientId.charCodeAt(patientId.length - 1) % 5;
-  const recordLabel = /^EXP-/i.test(item.recordNumber)
-    ? item.recordNumber
-    : t("patient.directory.record", { number: item.recordNumber });
   return (
     <div className="nc-patient-identity">
       <span className="nc-patient-avatar" data-tone={tone} aria-hidden="true">
@@ -838,7 +830,8 @@ function PatientIdentity({ item }: { item: PatientDirectoryItem }) {
           <Link to={`/pacientes/${patientId}`}>{item.patient.fullName}</Link>
         )}
         <small>
-          {recordLabel} · {t(`patient.sex_${item.patient.sex}`)}
+          {t("patient.age_value", { age: item.patient.age })} ·{" "}
+          {t(`patient.sex_${item.patient.sex}`)}
         </small>
       </span>
     </div>
@@ -944,7 +937,7 @@ function PatientRowActions({
             <DropdownMenuItem asChild>
               <Link to={`/pacientes/${patientId}/editar`}>
                 <ClipboardList aria-hidden="true" />
-                {t("common.edit")}
+                {t("patient.directory.edit_patient")}
               </Link>
             </DropdownMenuItem>
             {patient.status === "active" && (
@@ -958,7 +951,7 @@ function PatientRowActions({
             <DropdownMenuItem asChild>
               <Link to={`/pacientes/${patientId}/consultas`}>
                 <ClipboardList aria-hidden="true" />
-                {t("patient.directory.view_consultations")}
+                {t("patient.directory.view_history")}
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
@@ -979,7 +972,7 @@ function PatientRowActions({
               className="text-destructive focus:text-destructive"
             >
               <Trash2 aria-hidden="true" />
-              {t("common.delete")}
+              {t("patient.directory.delete_or_deactivate")}
             </DropdownMenuItem>
           </>
         )}
@@ -1001,49 +994,23 @@ function PatientRowActions({
 function PatientsPagination({
   page,
   totalPages,
-  from,
-  to,
-  total,
-  pageSize,
   onPageChange,
-  onPageSizeChange,
 }: {
   page: number;
   totalPages: number;
-  from: number;
-  to: number;
-  total: number;
-  pageSize: number;
   onPageChange: (page: number) => void;
-  onPageSizeChange: (pageSize: number) => void;
 }) {
   const { t } = useTranslation();
-  const pages = Array.from(
-    new Set([1, page - 1, page, page + 1, totalPages]),
-  ).filter((value) => value >= 1 && value <= totalPages);
+  const pages =
+    totalPages <= 7
+      ? Array.from({ length: totalPages }, (_, index) => index + 1)
+      : Array.from(new Set([1, page - 1, page, page + 1, totalPages])).filter(
+          (value) => value >= 1 && value <= totalPages,
+        );
 
   return (
     <div className="nc-patients-pagination">
-      <div>
-        <span>{t("patient.directory.showing", { from, to, total })}</span>
-        <Select
-          value={String(pageSize)}
-          onValueChange={(value) => onPageSizeChange(Number(value))}
-        >
-          <SelectTrigger
-            aria-label={t("patient.directory.per_page", { count: pageSize })}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[10, 25, 50].map((size) => (
-              <SelectItem key={size} value={String(size)}>
-                {t("patient.directory.per_page", { count: size })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      <p>{t("patient.directory.page_summary", { page, totalPages })}</p>
       <nav aria-label={t("patient.directory.pagination")}>
         <Button
           type="button"

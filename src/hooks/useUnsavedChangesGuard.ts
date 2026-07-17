@@ -1,7 +1,16 @@
 import * as React from "react";
 import { useBlocker } from "react-router-dom";
 
-export function useUnsavedChangesGuard(enabled: boolean, message: string): void {
+interface UnsavedChangesGuardOptions {
+  useNativeNavigationConfirm?: boolean;
+}
+
+export function useUnsavedChangesGuard(
+  enabled: boolean,
+  message: string,
+  options?: UnsavedChangesGuardOptions,
+) {
+  const useNativeNavigationConfirm = options?.useNativeNavigationConfirm ?? true;
   React.useEffect(() => {
     if (!enabled) return;
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -15,11 +24,13 @@ export function useUnsavedChangesGuard(enabled: boolean, message: string): void 
   const blocker = useBlocker(enabled);
 
   React.useEffect(() => {
-    if (blocker.state !== "blocked") return;
+    if (!useNativeNavigationConfirm || blocker.state !== "blocked") return;
     if (window.confirm(message)) {
       blocker.proceed();
       return;
     }
     blocker.reset();
-  }, [blocker, message]);
+  }, [blocker, message, useNativeNavigationConfirm]);
+
+  return blocker;
 }

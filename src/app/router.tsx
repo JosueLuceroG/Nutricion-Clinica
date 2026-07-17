@@ -118,6 +118,7 @@ const router = createHashRouter([
         children: [
           { index: true, element: <PatientsListPage /> },
           { path: "nuevo", element: <NewPatientPage /> },
+          { path: "importar", element: <ImporterPage /> },
           { path: ":patientId", element: <PatientDetailPage /> },
           { path: ":patientId/editar", element: <NewPatientPage /> },
           {

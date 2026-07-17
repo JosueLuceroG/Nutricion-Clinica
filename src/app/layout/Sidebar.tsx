@@ -25,6 +25,7 @@ import {
   Upload,
   Video,
   Shield,
+  Sparkles,
 } from "lucide-react";
 import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
@@ -82,7 +83,7 @@ const secondaryNav: NavItem[] = [
   { to: "/ayuda", labelKey: "nav.help", icon: HelpCircle },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onUsePremiumLayout }: { onUsePremiumLayout?: () => void }) {
   const { t } = useTranslation();
   const collapsed = useUIStore((s) => s.sidebarCollapsed);
   const toggle = useUIStore((s) => s.toggleSidebar);
@@ -152,6 +153,22 @@ export function Sidebar() {
       </nav>
 
       <div className="border-t p-2">
+        {onUsePremiumLayout && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setMobileOpen(false);
+              onUsePremiumLayout();
+            }}
+            className={cn("mb-1 w-full gap-2", collapsed ? "justify-center px-0" : "justify-start px-2")}
+            aria-label="Volver al diseño nuevo"
+            title={collapsed ? "Volver al diseño nuevo" : undefined}
+          >
+            <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+            {!collapsed && <span>Volver al diseño nuevo</span>}
+          </Button>
+        )}
         {collapsed ? (
           <div className="flex flex-col items-center gap-1">
             <ThemeToggle collapsed />
@@ -182,6 +199,7 @@ export function Sidebar() {
           collapsed ? "w-16" : "w-72",
         )}
         aria-label={t("nav.main_menu")}
+        data-layout-sidebar="legacy"
       >
         {sidebarContent}
       </aside>
@@ -199,6 +217,7 @@ export function Sidebar() {
                collapsed ? "w-16" : "w-72",
             )}
             aria-label={t("nav.main_menu")}
+            data-layout-sidebar="legacy"
           >
             {sidebarContent}
           </aside>

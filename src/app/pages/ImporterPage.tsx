@@ -1,12 +1,45 @@
 import * as React from "react";
-import { Upload, FileText, CheckCircle2, AlertTriangle, FileUp, Download, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  CloudUpload,
+  Download,
+  Eye,
+  FileCheck2,
+  FileSpreadsheet,
+  FileText,
+  Info,
+  Upload,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { PageHeader, PageContent } from "@app/layout/AppLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import { PageContent } from "@app/layout/AppLayout";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@components/ui/card";
 import { Button } from "@components/ui/button";
-import { Label } from "@components/ui/label";
 import { Badge } from "@components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@components/ui/table";
 import { Skeleton } from "@components/ui/skeleton";
 import {
   Dialog,
@@ -17,13 +50,35 @@ import {
   DialogTitle,
 } from "@components/ui/dialog";
 import { toast } from "sonner";
-import { patientImporterService, type ImporterPreview, type MappedRow } from "@services/importer";
+import {
+  closeCsvPreviewWindow,
+  currentPatientRowsForBranch,
+  downloadAndOpenCsv,
+  patientImporterService,
+  patientRowsToCsv,
+  prepareCsvPreviewWindow,
+  type ImporterPreview,
+  type MappedRow,
+} from "@services/importer";
+import { db } from "@services/db/dexieSchema";
+import { getActiveSucursalId } from "@services/tenancy/sucursalScope";
 import { SexLabel } from "@modules/patient/domain/Sex";
+import "./ImporterPage.css";
+
+const MAX_CSV_SIZE = 10 * 1024 * 1024;
+type CsvDownloadKind = "sample" | "current";
+
+interface CsvDownloadFeedback {
+  fileName: string;
+  kind: CsvDownloadKind;
+  opened: boolean;
+  patientCount?: number;
+}
 
 const SAMPLE_CSV = `nombre,apellido,segundo apellido,fecha de nacimiento,sexo,correo,teléfono,ocupación,notas
 María,García,López,1990-05-15,femenino,maria.garcia@example.com,+52 55 1234 5678,Ingeniera,Paciente referida por Dr. Pérez
 Juan,Pérez,,1985-03-20,masculino,juan.perez@example.com,+52 55 8765 4321,Profesor,
-Ana,López,Hernández,1992-11-08,F,juan.perez@example.com,+52 33 1234 5678,Estudiante,Sin observaciones`;
+Ana,López,Hernández,1992-11-08,F,ana.lopez@example.com,+52 33 1234 5678,Estudiante,Sin observaciones`;
 
 export function ImporterPage() {
   const { t } = useTranslation();
@@ -32,18 +87,44 @@ export function ImporterPage() {
   const [parsing, setParsing] = React.useState(false);
   const [applying, setApplying] = React.useState(false);
   const [showConfirm, setShowConfirm] = React.useState(false);
+  const [dragging, setDragging] = React.useState(false);
+  const [selectedFileName, setSelectedFileName] = React.useState<string | null>(
+    null,
+  );
+  const [downloading, setDownloading] = React.useState<CsvDownloadKind | null>(
+    null,
+  );
+  const [downloadFeedback, setDownloadFeedback] =
+    React.useState<CsvDownloadFeedback | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const clearImport = () => {
+    setPreview(null);
+    setCsv("");
+    setSelectedFileName(null);
+  };
+
   const handleFile = async (file: File) => {
+    const isCsv =
+      file.name.toLowerCase().endsWith(".csv") || file.type === "text/csv";
+    if (!isCsv) {
+      toast.error(t("pages.importer_invalid_file"));
+      return;
+    }
+    if (file.size > MAX_CSV_SIZE) {
+      toast.error(t("pages.importer_file_too_large"));
+      return;
+    }
+
     setParsing(true);
+    setSelectedFileName(file.name);
     try {
       const text = await file.text();
       setCsv(text);
-      const result = patientImporterService.preview(text);
-      setPreview(result);
-    } catch (err) {
+      setPreview(patientImporterService.preview(text));
+    } catch (error) {
       toast.error(t("pages.importer_file_read_error"), {
-        description: err instanceof Error ? err.message : String(err),
+        description: error instanceof Error ? error.message : String(error),
       });
       setPreview(null);
     } finally {
@@ -55,11 +136,10 @@ export function ImporterPage() {
     if (!csv.trim()) return;
     setParsing(true);
     try {
-      const result = patientImporterService.preview(csv);
-      setPreview(result);
-    } catch (err) {
+      setPreview(patientImporterService.preview(csv));
+    } catch (error) {
       toast.error(t("pages.importer_parse_error"), {
-        description: err instanceof Error ? err.message : String(err),
+        description: error instanceof Error ? error.message : String(error),
       });
       setPreview(null);
     } finally {
@@ -73,87 +153,242 @@ export function ImporterPage() {
     try {
       const result = await patientImporterService.apply(csv);
       if (result.failed.length === 0) {
-        toast.success(t("pages.importer_imported_success", { count: result.imported }));
+        toast.success(
+          t("pages.importer_imported_success", { count: result.imported }),
+        );
       } else {
-        toast.warning(t("pages.importer_imported_warning", { imported: result.imported, failed: result.failed.length }), {
-          description: result.failed.slice(0, 3).map((f) => t("pages.importer_failed_row", { row: f.rowNumber, errors: f.errors.join(", ") })).join("\n"),
-        });
+        toast.warning(
+          t("pages.importer_imported_warning", {
+            imported: result.imported,
+            failed: result.failed.length,
+          }),
+          {
+            description: result.failed
+              .slice(0, 3)
+              .map((failure) =>
+                t("pages.importer_failed_row", {
+                  row: failure.rowNumber,
+                  errors: failure.errors.join(", "),
+                }),
+              )
+              .join("\n"),
+          },
+        );
       }
-      setPreview(null);
-      setCsv("");
-    } catch (err) {
+      clearImport();
+    } catch (error) {
       toast.error(t("pages.importer_import_error_short"), {
-        description: err instanceof Error ? err.message : String(err),
+        description: error instanceof Error ? error.message : String(error),
       });
     } finally {
       setApplying(false);
     }
   };
 
-  const downloadSample = () => {
-    const blob = new Blob([SAMPLE_CSV], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "plantilla-pacientes.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadCsv = async (kind: CsvDownloadKind) => {
+    const previewWindow = prepareCsvPreviewWindow();
+    setDownloading(kind);
+    try {
+      let content = SAMPLE_CSV;
+      let fileName = "plantilla-ejemplo-pacientes.csv";
+      let patientCount: number | undefined;
+
+      if (kind === "current") {
+        const rows = currentPatientRowsForBranch(
+          await db.patients.toArray(),
+          getActiveSucursalId(),
+        );
+        patientCount = rows.length;
+        content = patientRowsToCsv(rows);
+        fileName = `pacientes-actuales-${new Date().toISOString().slice(0, 10)}.csv`;
+      }
+
+      const result = await downloadAndOpenCsv(content, fileName, previewWindow);
+      setDownloadFeedback({
+        fileName,
+        kind,
+        opened: result.opened,
+        patientCount,
+      });
+      toast.success(
+        t(
+          kind === "sample"
+            ? "pages.importer_sample_downloaded"
+            : "pages.importer_patients_downloaded",
+          { count: patientCount },
+        ),
+        { description: fileName },
+      );
+    } catch (error) {
+      closeCsvPreviewWindow(previewWindow);
+      toast.error(t("pages.importer_download_error"), {
+        description: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setDownloading(null);
+    }
   };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragging(false);
+    const file = event.dataTransfer.files[0];
+    if (file) void handleFile(file);
+  };
+
+  const currentStep = showConfirm || applying ? 3 : preview ? 2 : 1;
 
   return (
     <>
-      <PageHeader
-        title={t("pages.importer_patients_title")}
-        description={t("pages.importer_description")}
-      />
-      <PageContent>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileUp className="h-5 w-5" />
-                {t("pages.importer_step_upload")}
-              </CardTitle>
-              <CardDescription>
-                {t("pages.importer_upload_description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      <PageContent className="nc-importer-page">
+        <ImporterHero />
+        <ImporterSteps currentStep={currentStep} />
+
+        <div className="nc-importer-workspace">
+          <Card className="nc-importer-card nc-importer-uploadCard">
+            <ImporterCardHeader
+              icon={CloudUpload}
+              title={t("pages.importer_step_upload")}
+              description={t("pages.importer_upload_description")}
+            />
+            <CardContent className="nc-importer-uploadContent">
               <input
                 ref={fileInputRef}
                 type="file"
                 accept=".csv,text/csv"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
                   if (file) void handleFile(file);
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
-                className="hidden"
+                className="sr-only"
               />
-              <Button onClick={() => fileInputRef.current?.click()} className="w-full" disabled={parsing}>
-                <Upload className="mr-2 h-4 w-4" />
-                {parsing ? t("pages.importer_processing") : t("pages.importer_select_csv")}
-              </Button>
-              <div className="space-y-2">
-                <Label htmlFor="csv-paste">{t("pages.importer_paste_csv")}</Label>
-                <textarea
-                  id="csv-paste"
-                  className="flex min-h-[160px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  placeholder={t("pages.importer_csv_placeholder")}
-                  value={csv}
-                  onChange={(e) => setCsv(e.target.value)}
-                />
+
+              <div
+                className="nc-importer-dropzone"
+                data-dragging={dragging || undefined}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                    setDragging(false);
+                  }
+                }}
+                onDrop={handleDrop}
+              >
+                <span className="nc-importer-dropzone__icon" aria-hidden="true">
+                  <CloudUpload />
+                </span>
+                <strong>{t("pages.importer_drop_title")}</strong>
+                <p>{t("pages.importer_formats")}</p>
+                <Button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={parsing}
+                  className="nc-importer-selectButton"
+                >
+                  <Upload aria-hidden="true" />
+                  {parsing
+                    ? t("pages.importer_processing")
+                    : t("pages.importer_select_csv")}
+                </Button>
               </div>
-              <div className="flex gap-2">
-                <Button onClick={handlePreview} variant="outline" disabled={!csv.trim() || parsing} className="flex-1">
-                  <FileText className="mr-2 h-4 w-4" />
+
+              {selectedFileName && (
+                <div className="nc-importer-selectedFile" role="status">
+                  <FileCheck2 aria-hidden="true" />
+                  <span>
+                    {t("pages.importer_selected_file")}: <strong>{selectedFileName}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={clearImport}
+                    aria-label={t("common.clear")}
+                  >
+                    <X aria-hidden="true" />
+                  </button>
+                </div>
+              )}
+
+              <label className="nc-importer-divider" htmlFor="csv-paste">
+                <span>{t("pages.importer_paste_csv")}</span>
+              </label>
+              <textarea
+                id="csv-paste"
+                className="nc-importer-textarea"
+                placeholder={t("pages.importer_csv_placeholder")}
+                value={csv}
+                onChange={(event) => {
+                  setCsv(event.target.value);
+                  setPreview(null);
+                  setSelectedFileName(null);
+                }}
+              />
+
+              <div className="nc-importer-actions">
+                <Button
+                  type="button"
+                  onClick={handlePreview}
+                  variant="outline"
+                  disabled={!csv.trim() || parsing}
+                >
+                  <FileText aria-hidden="true" />
                   {t("pages.importer_analyze")}
                 </Button>
-                <Button onClick={downloadSample} variant="ghost">
-                  <Download className="mr-2 h-4 w-4" />
-                  {t("pages.importer_template")}
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" disabled={downloading !== null}>
+                      <Download aria-hidden="true" />
+                      {downloading
+                        ? t("pages.importer_preparing_download")
+                        : t("pages.importer_download_csv")}
+                      <ChevronDown aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="nc-importer-downloadMenu"
+                  >
+                    <DropdownMenuItem onSelect={() => void downloadCsv("sample")}>
+                      <FileSpreadsheet aria-hidden="true" />
+                      <span>
+                        <strong>{t("pages.importer_sample_template")}</strong>
+                        <small>{t("pages.importer_sample_template_description")}</small>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void downloadCsv("current")}>
+                      <UsersRound aria-hidden="true" />
+                      <span>
+                        <strong>{t("pages.importer_current_patients")}</strong>
+                        <small>{t("pages.importer_current_patients_description")}</small>
+                      </span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
+
+              {downloadFeedback && (
+                <p className="nc-importer-downloadStatus" role="status" aria-live="polite">
+                  <CheckCircle2 aria-hidden="true" />
+                  <span>
+                    {t(
+                      downloadFeedback.kind === "sample"
+                        ? "pages.importer_sample_downloaded"
+                        : "pages.importer_patients_downloaded",
+                      { count: downloadFeedback.patientCount },
+                    )}
+                    : <strong>{downloadFeedback.fileName}</strong>. {" "}
+                    {t(
+                      downloadFeedback.opened
+                        ? "pages.importer_file_opened"
+                        : "pages.importer_preview_blocked",
+                    )}
+                  </span>
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -161,7 +396,7 @@ export function ImporterPage() {
             preview={preview}
             applying={applying}
             onApply={() => setShowConfirm(true)}
-            onClear={() => { setPreview(null); setCsv(""); }}
+            onClear={clearImport}
           />
         </div>
       </PageContent>
@@ -171,20 +406,94 @@ export function ImporterPage() {
           <DialogHeader>
             <DialogTitle>{t("pages.importer_confirm_title")}</DialogTitle>
             <DialogDescription>
-              {t("pages.importer_confirm_description", { count: preview?.valid.length ?? 0 })}
+              {t("pages.importer_confirm_description", {
+                count: preview?.valid.length ?? 0,
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={applying}>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirm(false)}
+              disabled={applying}
+            >
               {t("common.cancel")}
             </Button>
             <Button onClick={handleApply} disabled={applying}>
-              {applying ? t("pages.importer_importing") : t("pages.importer_import")}
+              {applying
+                ? t("pages.importer_importing")
+                : t("pages.importer_import")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
+  );
+}
+
+function ImporterHero() {
+  const { t } = useTranslation();
+  return (
+    <section className="nc-importer-hero" aria-labelledby="importer-title">
+      <span className="nc-importer-hero__icon" aria-hidden="true">
+        <FileText />
+        <small>CSV</small>
+      </span>
+      <div>
+        <h1 id="importer-title">{t("pages.importer_patients_title")}</h1>
+        <p>{t("pages.importer_description")}</p>
+      </div>
+    </section>
+  );
+}
+
+function ImporterSteps({ currentStep }: { currentStep: number }) {
+  const { t } = useTranslation();
+  const steps = [
+    t("pages.importer_step_upload"),
+    t("pages.importer_step_preview"),
+    t("pages.importer_step_confirm"),
+  ];
+  return (
+    <ol className="nc-importer-steps" aria-label={t("pages.importer_progress")}>
+      {steps.map((step, index) => {
+        const number = index + 1;
+        return (
+          <li
+            key={step}
+            data-current={number === currentStep || undefined}
+            data-complete={number < currentStep || undefined}
+          >
+            <span>{number < currentStep ? <CheckCircle2 /> : number}</span>
+            <strong>{step.replace(/^\d+\.\s*/, "")}</strong>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function ImporterCardHeader({
+  icon: Icon,
+  title,
+  description,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+}) {
+  return (
+    <CardHeader className="nc-importer-cardHeader space-y-0">
+      <span className="nc-importer-cardHeader__icon" aria-hidden="true">
+        <Icon />
+      </span>
+      <div>
+        <CardTitle className="nc-importer-cardTitle">{title}</CardTitle>
+        <CardDescription className="nc-importer-cardDescription">
+          {description}
+        </CardDescription>
+      </div>
+    </CardHeader>
   );
 }
 
@@ -200,20 +509,27 @@ function PreviewPanel({
   onClear: () => void;
 }) {
   const { t } = useTranslation();
+
   if (!preview) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            {t("pages.importer_step_preview")}
-          </CardTitle>
-          <CardDescription>
-            {t("pages.importer_preview_description")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground">
-          {t("pages.importer_preview_body")}
+      <Card className="nc-importer-card nc-importer-previewCard">
+        <ImporterCardHeader
+          icon={Eye}
+          title={t("pages.importer_step_preview")}
+          description={t("pages.importer_preview_description")}
+        />
+        <CardContent className="nc-importer-emptyPreview">
+          <div className="nc-importer-emptyPreview__body">
+            <span aria-hidden="true">
+              <FileSpreadsheet />
+            </span>
+            <h2>{t("pages.importer_empty_title")}</h2>
+            <p>{t("pages.importer_empty_description")}</p>
+          </div>
+          <div className="nc-importer-infoBox">
+            <Info aria-hidden="true" />
+            <p>{t("pages.importer_preview_info")}</p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -221,68 +537,89 @@ function PreviewPanel({
 
   if (preview.missingRequiredColumns.length > 0) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-destructive">
-            <AlertTriangle className="h-5 w-5" />
-            {t("pages.importer_missing_columns")}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            {t("pages.importer_missing_columns_description", { columns: preview.missingRequiredColumns.join(", ") })}
+      <Card className="nc-importer-card nc-importer-previewCard">
+        <ImporterCardHeader
+          icon={Eye}
+          title={t("pages.importer_step_preview")}
+          description={t("pages.importer_preview_description")}
+        />
+        <CardContent className="nc-importer-errorState">
+          <span aria-hidden="true">
+            <AlertTriangle />
+          </span>
+          <h2>{t("pages.importer_missing_columns")}</h2>
+          <p>
+            {t("pages.importer_missing_columns_description", {
+              columns: preview.missingRequiredColumns.join(", "),
+            })}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {t("pages.importer_required_columns")}
-          </p>
-          <Button variant="outline" onClick={onClear}>{t("common.clear")}</Button>
+          <small>{t("pages.importer_required_columns")}</small>
+          <Button variant="outline" onClick={onClear}>
+            {t("common.clear")}
+          </Button>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="h-5 w-5" />
-          {t("pages.importer_step_preview")}
-        </CardTitle>
-        <CardDescription className="space-x-3">
+    <Card className="nc-importer-card nc-importer-previewCard">
+      <CardHeader className="nc-importer-previewHeader space-y-0">
+        <div className="nc-importer-previewHeader__title">
+          <span className="nc-importer-cardHeader__icon" aria-hidden="true">
+            <Eye />
+          </span>
+          <div>
+            <CardTitle className="nc-importer-cardTitle">
+              {t("pages.importer_step_preview")}
+            </CardTitle>
+            <CardDescription className="nc-importer-cardDescription">
+              {t("pages.importer_total_rows", { count: preview.totalRows })}
+            </CardDescription>
+          </div>
+        </div>
+        <div className="nc-importer-previewHeader__badges">
           <Badge variant="default">
-            <CheckCircle2 className="mr-1 h-3 w-3" />
+            <CheckCircle2 aria-hidden="true" />
             {t("pages.importer_valid_rows", { count: preview.valid.length })}
           </Badge>
           {preview.invalid.length > 0 && (
             <Badge variant="destructive">
-              <X className="mr-1 h-3 w-3" />
-              {t("pages.importer_invalid_rows", { count: preview.invalid.length })}
+              <X aria-hidden="true" />
+              {t("pages.importer_invalid_rows", {
+                count: preview.invalid.length,
+              })}
             </Badge>
           )}
-          <span className="text-xs">{t("pages.importer_total_rows", { count: preview.totalRows })}</span>
-        </CardDescription>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="nc-importer-previewContent">
         {applying ? (
-          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-40 w-full" />
         ) : (
           <>
             {preview.invalid.length > 0 && (
-              <details className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                <summary className="cursor-pointer font-medium text-destructive">
-                  {t("pages.importer_view_invalid_rows", { count: preview.invalid.length })}
+              <details className="nc-importer-invalidRows">
+                <summary>
+                  {t("pages.importer_view_invalid_rows", {
+                    count: preview.invalid.length,
+                  })}
                 </summary>
-                <ul className="mt-2 space-y-1 text-xs">
-                  {preview.invalid.map((r) => (
-                    <li key={r.rowNumber}>
-                      {t("pages.importer_row_error", { row: r.rowNumber, errors: r.errors.join("; ") })}
+                <ul>
+                  {preview.invalid.map((row) => (
+                    <li key={row.rowNumber}>
+                      {t("pages.importer_row_error", {
+                        row: row.rowNumber,
+                        errors: row.errors.join("; "),
+                      })}
                     </li>
                   ))}
                 </ul>
               </details>
             )}
+
             {preview.valid.length > 0 ? (
-              <div className="max-h-80 overflow-y-auto rounded-md border">
+              <div className="nc-importer-previewTable">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -294,30 +631,38 @@ function PreviewPanel({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {preview.valid.slice(0, 50).map((r) => (
-                      <RowPreview key={r.rowNumber} row={r} />
+                    {preview.valid.slice(0, 50).map((row) => (
+                      <RowPreview key={row.rowNumber} row={row} />
                     ))}
                   </TableBody>
                 </Table>
                 {preview.valid.length > 50 && (
-                  <p className="border-t p-2 text-center text-xs text-muted-foreground">
-                    {t("pages.importer_showing_first_rows", { count: preview.valid.length })}
+                  <p>
+                    {t("pages.importer_showing_first_rows", {
+                      count: preview.valid.length,
+                    })}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">{t("pages.importer_no_valid_rows")}</p>
+              <p className="nc-importer-noRows">
+                {t("pages.importer_no_valid_rows")}
+              </p>
             )}
-            <div className="flex gap-2">
+
+            <div className="nc-importer-previewActions">
               <Button
                 onClick={onApply}
                 disabled={preview.valid.length === 0 || applying}
-                className="flex-1"
               >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                {t("pages.importer_import_patients", { count: preview.valid.length })}
+                <CheckCircle2 aria-hidden="true" />
+                {t("pages.importer_import_patients", {
+                  count: preview.valid.length,
+                })}
               </Button>
-              <Button variant="outline" onClick={onClear} disabled={applying}>{t("common.clear")}</Button>
+              <Button variant="outline" onClick={onClear} disabled={applying}>
+                {t("common.clear")}
+              </Button>
             </div>
           </>
         )}
@@ -331,13 +676,20 @@ function RowPreview({ row }: { row: MappedRow }) {
   const sex = row.mapped.sex?.toLowerCase().trim() ?? "";
   return (
     <TableRow>
-      <TableCell className="text-xs text-muted-foreground">{row.rowNumber}</TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        {row.rowNumber}
+      </TableCell>
       <TableCell className="font-medium">
-        {row.mapped.firstName} {row.mapped.lastName} {row.mapped.secondLastName ?? ""}
+        {row.mapped.firstName} {row.mapped.lastName}{" "}
+        {row.mapped.secondLastName ?? ""}
       </TableCell>
       <TableCell>{row.mapped.birthDate}</TableCell>
-      <TableCell className="text-xs">{SexLabel[sex as keyof typeof SexLabel] ?? sex}</TableCell>
-      <TableCell className="text-xs text-muted-foreground">{row.mapped.email ?? "—"}</TableCell>
+      <TableCell className="text-xs">
+        {SexLabel[sex as keyof typeof SexLabel] ?? sex}
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">
+        {row.mapped.email ?? "—"}
+      </TableCell>
     </TableRow>
   );
 }

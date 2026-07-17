@@ -320,6 +320,40 @@ test.describe("personalización del dashboard", () => {
     await expect(page.getByText("Editando dashboard")).toBeHidden();
   });
 
+  test("cancela la edición con Escape", async ({ page }) => {
+    await page.getByRole("button", { name: "Personalizar KPIs", exact: true }).click();
+    await expect(page.getByText("Editando dashboard")).toBeVisible();
+
+    await page.keyboard.press("Escape");
+
+    await expect(page.getByText("Editando dashboard")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Personalizar KPIs", exact: true })).toBeEnabled();
+  });
+
+  test("descarta el modo edición al salir del dashboard", async ({ page }) => {
+    await page.getByRole("button", { name: "Personalizar KPIs", exact: true }).click();
+    await expect(page.getByText("Editando dashboard")).toBeVisible();
+    await page.getByRole("button", { name: "Ocultar Pacientes activos" }).click();
+    await expect(page.getByText("Tienes cambios sin guardar")).toBeVisible();
+
+    await page.locator('a[href="#/pacientes"]').first().click();
+    const leaveConfirmation = page.getByRole("dialog", { name: "¿Salir sin guardar?" });
+    await expect(leaveConfirmation).toBeVisible();
+    await expect(leaveConfirmation).toContainText("Los cambios de personalización no guardados se descartarán.");
+    await leaveConfirmation.getByRole("button", { name: "Cancelar" }).click();
+    await expect(page.getByText("Editando dashboard")).toBeVisible();
+
+    await page.locator('a[href="#/pacientes"]').first().click();
+    await page.getByRole("dialog", { name: "¿Salir sin guardar?" })
+      .getByRole("button", { name: "Salir y descartar" }).click();
+    await expect(page.getByRole("heading", { name: "Pacientes", exact: true })).toBeVisible();
+    await page.locator('a[href="#/"]').first().click();
+
+    await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+    await expect(page.getByText("Editando dashboard")).toBeHidden();
+    await expect(page.getByText("Pacientes activos").first()).toBeVisible();
+  });
+
   test("ofrece reordenación simple y mantiene el viewport móvil", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.reload();

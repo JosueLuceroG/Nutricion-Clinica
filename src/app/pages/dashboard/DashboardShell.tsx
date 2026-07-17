@@ -12,6 +12,8 @@ interface DashboardShellProps {
   children: React.ReactNode;
   onCustomizeKpis?: () => void;
   dashboardEditing?: boolean;
+  mainLabel?: string;
+  onUseLegacyLayout?: () => void;
 }
 
 const THEME_LONG_PRESS_MS = 1000;
@@ -276,7 +278,7 @@ function DesktopWindowTitlebar() {
   );
 }
 
-export function DashboardShell({ children, onCustomizeKpis, dashboardEditing }: DashboardShellProps) {
+export function DashboardShell({ children, onCustomizeKpis, dashboardEditing, mainLabel = "Dashboard NutriClinica", onUseLegacyLayout }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const isTauriDesktop = useIsTauriDesktop();
 
@@ -287,6 +289,7 @@ export function DashboardShell({ children, onCustomizeKpis, dashboardEditing }: 
       <DashboardSidebar
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+        onUseLegacyLayout={onUseLegacyLayout}
       />
 
       <button
@@ -308,7 +311,7 @@ export function DashboardShell({ children, onCustomizeKpis, dashboardEditing }: 
         />
         <DashboardMobileNav />
 
-        <main className="nc-dashboard-main" aria-label="Dashboard NutriClinica">
+        <main className="nc-dashboard-main" aria-label={mainLabel}>
           <div className="nc-dashboard-container">{children}</div>
         </main>
 

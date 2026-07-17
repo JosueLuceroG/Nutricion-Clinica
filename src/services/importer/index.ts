@@ -23,3 +23,13 @@ export {
   type ImporterPreview,
   type ImporterApplyResult,
 } from "./importerService";
+export {
+  currentPatientRowsForBranch,
+  patientRowsToCsv,
+} from "./patientCsvExport";
+export {
+  closeCsvPreviewWindow,
+  downloadAndOpenCsv,
+  prepareCsvPreviewWindow,
+  type CsvDownloadResult,
+} from "./csvDownload";

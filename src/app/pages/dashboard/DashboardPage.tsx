@@ -12,7 +12,6 @@ import { useDashboardLayoutStore } from "@store/dashboardLayoutStore";
 import { usePreferencesStore } from "@store/preferencesStore";
 import { ConfirmDialog } from "@components/layout/ConfirmDialog";
 import { AlertsAndPendingCard } from "./AlertsAndPendingCard";
-import { DashboardShell } from "./DashboardShell";
 import {
   type DashboardAlertItem,
   type DashboardKpiItem,
@@ -586,6 +585,10 @@ export function DashboardPage() {
     hydrate(scope, { kpiOrder: legacyKpiOrder, hiddenKpiIds: legacyHiddenKpiIds });
   }, [hydrate, legacyHiddenKpiIds, legacyKpiOrder, scope]);
 
+  React.useEffect(() => () => {
+    useDashboardLayoutStore.getState().cancelEditing();
+  }, []);
+
   React.useEffect(() => {
     if (!saved || searchParams.get("customize") !== "1") return;
     beginEditing();
@@ -595,7 +598,11 @@ export function DashboardPage() {
     setSearchParams(next, { replace: true });
   }, [beginEditing, saved, searchParams, setSearchParams]);
 
-  useUnsavedChangesGuard(isEditing && isDirty, "Tienes cambios sin guardar en el dashboard. ¿Deseas salir?");
+  const navigationBlocker = useUnsavedChangesGuard(
+    isEditing && isDirty,
+    "Tienes cambios sin guardar en el dashboard. ¿Deseas salir?",
+    { useNativeNavigationConfirm: false },
+  );
 
   React.useEffect(() => {
     if (!highlightedWidgetId) return;
@@ -680,6 +687,26 @@ export function DashboardPage() {
     setLibraryOpen(false);
   };
 
+  const requestCancelEditing = React.useCallback(() => {
+    setLibraryOpen(false);
+    if (isDirty) {
+      setConfirmCancelOpen(true);
+      return;
+    }
+    cancelEditing();
+  }, [cancelEditing, isDirty]);
+
+  React.useEffect(() => {
+    if (!isEditing) return;
+    const cancelOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      event.preventDefault();
+      requestCancelEditing();
+    };
+    window.addEventListener("keydown", cancelOnEscape);
+    return () => window.removeEventListener("keydown", cancelOnEscape);
+  }, [isEditing, requestCancelEditing]);
+
   const renderWidget = (widget: DashboardWidgetInstance) => {
     const definition = getDashboardWidgetDefinition(widget.definitionId);
     const title = widget.config.title || definition.name;
@@ -756,10 +783,7 @@ export function DashboardPage() {
   };
 
   return (
-    <DashboardShell
-      onCustomizeKpis={startEditing}
-      dashboardEditing={isEditing}
-    >
+    <>
       <h1 className="sr-only">Dashboard</h1>
 
       {(loading || error) && (
@@ -780,11 +804,7 @@ export function DashboardPage() {
           onReset={() => setConfirmResetOpen(true)}
           onRowsModeChange={setRowsMode}
           onAdjustRows={adjustMinRows}
-          onCancel={() => {
-            setLibraryOpen(false);
-            if (isDirty) setConfirmCancelOpen(true);
-            else cancelEditing();
-          }}
+          onCancel={requestCancelEditing}
           onSave={() => {
             if (saveDraft()) {
               setLibraryOpen(false);
@@ -907,6 +927,20 @@ export function DashboardPage() {
       />
 
       <ConfirmDialog
+        open={navigationBlocker.state === "blocked"}
+        onOpenChange={(open) => {
+          if (!open && navigationBlocker.state === "blocked") navigationBlocker.reset();
+        }}
+        title="¿Salir sin guardar?"
+        description="Los cambios de personalización no guardados se descartarán."
+        confirmLabel="Salir y descartar"
+        tone="warning"
+        onConfirm={() => {
+          if (navigationBlocker.state === "blocked") navigationBlocker.proceed();
+        }}
+      />
+
+      <ConfirmDialog
         open={confirmCancelOpen}
         onOpenChange={setConfirmCancelOpen}
         title="¿Descartar los cambios?"
@@ -931,6 +965,6 @@ export function DashboardPage() {
           setConfirmResetOpen(false);
         }}
       />
-    </DashboardShell>
+    </>
   );
 }
