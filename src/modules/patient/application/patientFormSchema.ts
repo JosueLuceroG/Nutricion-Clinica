@@ -29,8 +29,14 @@ export const PatientFormSchema = z
       .string()
       .min(1, "Requerido")
       .refine((v) => !Number.isNaN(new Date(v).getTime()), "Fecha inválida")
-      .refine((v) => new Date(v).getTime() <= Date.now(), "No puede estar en el futuro")
-      .refine((v) => new Date(v).getTime() >= new Date(1900, 0, 1).getTime(), "No anterior a 1900"),
+      .refine(
+        (v) => new Date(v).getTime() <= Date.now(),
+        "No puede estar en el futuro",
+      )
+      .refine(
+        (v) => new Date(v).getTime() >= new Date(1900, 0, 1).getTime(),
+        "No anterior a 1900",
+      ),
     sex: SexSchema,
     gender: GenderSchema.optional(),
     maritalStatus: MaritalStatusSchema.optional(),
@@ -44,10 +50,24 @@ export const PatientFormSchema = z
       .pipe(z.union([z.literal(""), EmailSchema])),
     phone: optionalPhone,
     secondaryPhone: optionalPhone,
-    emergencyContactName: z.string().trim().max(200).optional().or(z.literal("")),
-    emergencyContactRelationship: z.string().trim().max(100).optional().or(z.literal("")),
+    emergencyContactName: z
+      .string()
+      .trim()
+      .max(200)
+      .optional()
+      .or(z.literal("")),
+    emergencyContactRelationship: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .or(z.literal("")),
     emergencyContactPhone: optionalPhone,
-    generalNotes: z.string().max(2000, "Máximo 2000 caracteres").optional().or(z.literal("")),
+    generalNotes: z
+      .string()
+      .max(2000, "Máximo 2000 caracteres")
+      .optional()
+      .or(z.literal("")),
     clinicalTags: z.string().optional().or(z.literal("")),
     claveInterna: z.string().trim().max(50).optional().or(z.literal("")),
     birthPlace: z.string().trim().max(200).optional().or(z.literal("")),
@@ -56,9 +76,20 @@ export const PatientFormSchema = z
     idType: z.string().trim().max(50).optional().or(z.literal("")),
     idNumber: z.string().trim().max(100).optional().or(z.literal("")),
     dischargeReason: z.string().trim().max(500).optional().or(z.literal("")),
-    responsibleProfessionalId: z.string().trim().max(50).optional().or(z.literal("")),
-    externalRecordNumber: z.string().trim().max(100).optional().or(z.literal("")),
-    photoUrl: z.string().trim().max(500).optional().or(z.literal("")),
+    responsibleProfessionalId: z
+      .string()
+      .trim()
+      .max(50)
+      .optional()
+      .or(z.literal("")),
+    externalRecordNumber: z
+      .string()
+      .trim()
+      .max(100)
+      .optional()
+      .or(z.literal("")),
+    admissionReason: z.string().trim().max(500).optional().or(z.literal("")),
+    photoUrl: z.string().trim().max(7_000_000).optional().or(z.literal("")),
   })
   .strict();
 
@@ -91,5 +122,6 @@ export const patientFormDefaultValues: PatientFormValues = {
   dischargeReason: "",
   responsibleProfessionalId: "",
   externalRecordNumber: "",
+  admissionReason: "",
   photoUrl: "",
 };

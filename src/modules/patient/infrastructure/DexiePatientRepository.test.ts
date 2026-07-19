@@ -7,12 +7,15 @@ import { PatientId } from "../domain/PatientId";
 import { Email, Phone } from "../domain/Contact";
 import type { Sex } from "../domain/Sex";
 
-const makePatient = (overrides: Partial<{
-  firstName: string;
-  lastName: string;
-  email: string | null;
-  status: "active" | "inactive" | "archived" | "deceased";
-}> = {}) => {
+const makePatient = (
+  overrides: Partial<{
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    whatsappEnabled: boolean | null;
+    status: "active" | "inactive" | "archived" | "deceased";
+  }> = {},
+) => {
   return Patient.create({
     firstName: overrides.firstName ?? "Ana",
     lastName: overrides.lastName ?? "Pérez",
@@ -20,6 +23,7 @@ const makePatient = (overrides: Partial<{
     sex: "female" as Sex,
     email: overrides.email ? Email.from(overrides.email) : null,
     phone: overrides.email ? Phone.from("+52 55 1234 5678") : null,
+    whatsappEnabled: overrides.whatsappEnabled,
     status: overrides.status,
   });
 };
@@ -86,7 +90,10 @@ describe("DexiePatientRepository", () => {
 
     const results = await repo.findAll({ search: "mar" });
     expect(results).toHaveLength(2);
-    expect(results.map((p) => p.firstName).sort()).toEqual(["Marisol", "María"]);
+    expect(results.map((p) => p.firstName).sort()).toEqual([
+      "Marisol",
+      "María",
+    ]);
   });
 
   it("filtra por status", async () => {
@@ -139,7 +146,9 @@ describe("DexiePatientRepository", () => {
     const second = await repo.findAll({ limit: 3, offset: 3 });
     expect(first).toHaveLength(3);
     expect(second).toHaveLength(3);
-    expect(first[0]?.id.equals(second[0]?.id ?? PatientId.generate())).toBe(false);
+    expect(first[0]?.id.equals(second[0]?.id ?? PatientId.generate())).toBe(
+      false,
+    );
   });
 
   it("preserva datos a través de save/findById roundtrip", async () => {
@@ -150,13 +159,35 @@ describe("DexiePatientRepository", () => {
       sex: "female" as Sex,
       email: Email.from("lucia@example.com"),
       phone: Phone.from("+52 55 9876 5432"),
+      whatsappEnabled: false,
+      externalRecordNumber: "EXP-2026-001",
+      admissionReason: "Primera valoración nutricional",
+      photoUrl: "data:image/png;base64,AAAA",
     });
     await repo.save(p);
 
     const found = await repo.findById(p.id);
     expect(found?.email?.toString()).toBe("lucia@example.com");
     expect(found?.phone?.toString()).toBe("+52 55 9876 5432");
-    expect(found?.birthDate.toISOString()).toBe(new Date("1992-08-20").toISOString());
+    expect(found?.whatsappEnabled).toBe(false);
+    expect(found?.externalRecordNumber).toBe("EXP-2026-001");
+    expect(found?.admissionReason).toBe("Primera valoración nutricional");
+    expect(found?.photoUrl).toBe("data:image/png;base64,AAAA");
+    expect(found?.birthDate.toISOString()).toBe(
+      new Date("1992-08-20").toISOString(),
+    );
+  });
+
+  it("carga como null una fila heredada sin whatsapp_enabled", async () => {
+    const patient = makePatient({ whatsappEnabled: true });
+    await repo.save(patient);
+    const row = await db.patients.get(patient.id.toString());
+    expect(row).toBeDefined();
+    delete row!.whatsapp_enabled;
+    await db.patients.put(row!);
+
+    const found = await repo.findById(patient.id);
+    expect(found?.whatsappEnabled).toBeNull();
   });
 
   it("soft delete actualiza deletedAt y status", async () => {

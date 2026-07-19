@@ -32,6 +32,7 @@ describe("Patient.create", () => {
     expect(patient.maritalStatus).toBeNull();
     expect(patient.occupation).toBeNull();
     expect(patient.education).toBeNull();
+    expect(patient.whatsappEnabled).toBeNull();
     expect(patient.deletedAt).toBeNull();
     expect(patient.claveInterna).toBeNull();
     expect(patient.birthPlace).toBeNull();
@@ -42,6 +43,7 @@ describe("Patient.create", () => {
     expect(patient.dischargeReason).toBeNull();
     expect(patient.responsibleProfessionalId).toBeNull();
     expect(patient.externalRecordNumber).toBeNull();
+    expect(patient.admissionReason).toBeNull();
     expect(patient.photoUrl).toBeNull();
   });
 
@@ -53,6 +55,7 @@ describe("Patient.create", () => {
       occupation: "Ingeniera",
       education: "bachelor",
       secondaryPhone: null,
+      whatsappEnabled: true,
       emergencyContactName: "Juan Pérez",
       emergencyContactRelationship: "Cónyuge",
       generalNotes: "Paciente con antecedentes",
@@ -66,12 +69,14 @@ describe("Patient.create", () => {
       dischargeReason: "Mejoría clínica",
       responsibleProfessionalId: "PROF-001",
       externalRecordNumber: "EXT-98765",
+      admissionReason: "Primera valoración nutricional",
       photoUrl: "https://example.com/photo.jpg",
     });
     expect(patient.gender).toBe("woman");
     expect(patient.maritalStatus).toBe("married");
     expect(patient.occupation).toBe("Ingeniera");
     expect(patient.education).toBe("bachelor");
+    expect(patient.whatsappEnabled).toBe(true);
     expect(patient.emergencyContactName).toBe("Juan Pérez");
     expect(patient.emergencyContactRelationship).toBe("Cónyuge");
     expect(patient.generalNotes).toBe("Paciente con antecedentes");
@@ -85,6 +90,7 @@ describe("Patient.create", () => {
     expect(patient.dischargeReason).toBe("Mejoría clínica");
     expect(patient.responsibleProfessionalId).toBe("PROF-001");
     expect(patient.externalRecordNumber).toBe("EXT-98765");
+    expect(patient.admissionReason).toBe("Primera valoración nutricional");
     expect(patient.photoUrl).toBe("https://example.com/photo.jpg");
   });
 
@@ -100,17 +106,17 @@ describe("Patient.create", () => {
   });
 
   it("rechaza nombre muy corto", () => {
-    expect(() =>
-      Patient.create({ ...baseProps, firstName: "A" }),
-    ).toThrow(/al menos 2 caracteres/);
+    expect(() => Patient.create({ ...baseProps, firstName: "A" })).toThrow(
+      /al menos 2 caracteres/,
+    );
   });
 
   it("rechaza fecha de nacimiento en el futuro", () => {
     const future = new Date();
     future.setFullYear(future.getFullYear() + 1);
-    expect(() =>
-      Patient.create({ ...baseProps, birthDate: future }),
-    ).toThrow(/futuro/);
+    expect(() => Patient.create({ ...baseProps, birthDate: future })).toThrow(
+      /futuro/,
+    );
   });
 
   it("rechaza fecha anterior a 1900", () => {
@@ -140,7 +146,9 @@ describe("Patient.inmutabilidad", () => {
   it("with() actualiza updatedAt", () => {
     const original = Patient.create(baseProps);
     const updated = original.with({ status: "inactive" });
-    expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(original.updatedAt.getTime());
+    expect(updated.updatedAt.getTime()).toBeGreaterThanOrEqual(
+      original.updatedAt.getTime(),
+    );
   });
 
   it("with() preserva secondLastName", () => {
@@ -150,13 +158,24 @@ describe("Patient.inmutabilidad", () => {
     expect(updated.occupation).toBe("Doctora");
   });
 
+  it("with() conserva false y permite limpiar la preferencia de WhatsApp", () => {
+    const original = Patient.create({ ...baseProps, whatsappEnabled: true });
+    const disabled = original.with({ whatsappEnabled: false });
+    const cleared = disabled.with({ whatsappEnabled: null });
+
+    expect(disabled.whatsappEnabled).toBe(false);
+    expect(cleared.whatsappEnabled).toBeNull();
+    expect(original.whatsappEnabled).toBe(true);
+  });
+
   it("softDelete() marca deletedAt y status inactive", () => {
-    const patient = Patient.create(baseProps);
+    const patient = Patient.create({ ...baseProps, whatsappEnabled: false });
     const deleted = patient.softDelete();
     expect(deleted.deletedAt).not.toBeNull();
     expect(deleted.status).toBe("inactive");
     expect(deleted.recordStatus).toBe("inactive");
     expect(deleted.isActive).toBe(false);
+    expect(deleted.whatsappEnabled).toBe(false);
   });
 
   it("isActive es true cuando status=active y deletedAt=null", () => {

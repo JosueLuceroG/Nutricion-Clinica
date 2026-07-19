@@ -5,20 +5,60 @@ import type { LabPanelRow } from "@modules/laboratory/infrastructure/labPanelMap
 import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
 import type { MealPlanRow } from "@modules/mealplan/infrastructure/mealPlanMapper";
 import type { SmaeCustomFoodRow } from "@modules/smae/infrastructure/smaeMapper";
-import type { AllergyRow, MedicationRow, ClinicalEventRow, FamilyHistoryRow, PersonalHistoryRow, HabitRow, PhysicalActivityRow, DietHistoryRow, IntoleranceRow, SurgeryRow, HospitalizationRow, SupplementRow, FoodFrequencyRow, GiSymptomRow, SnapshotExpedienteRow } from "@modules/clinical-record/infrastructure/clinicalRecordMapper";
+import type {
+  AllergyRow,
+  MedicationRow,
+  ClinicalEventRow,
+  FamilyHistoryRow,
+  PersonalHistoryRow,
+  HabitRow,
+  PhysicalActivityRow,
+  DietHistoryRow,
+  IntoleranceRow,
+  SurgeryRow,
+  HospitalizationRow,
+  SupplementRow,
+  FoodFrequencyRow,
+  GiSymptomRow,
+  SnapshotExpedienteRow,
+} from "@modules/clinical-record/infrastructure/clinicalRecordMapper";
 import type { AuditEventRow } from "@services/audit/infrastructure/auditEventMapper";
 import type { SyncQueueItem } from "@modules/sync/domain/SyncQueueItem";
-import type { AppointmentRow, ScheduleRow, BlockRow } from "@modules/agenda/infrastructure/agendaMapper";
+import type {
+  AppointmentRow,
+  ScheduleRow,
+  BlockRow,
+} from "@modules/agenda/infrastructure/agendaMapper";
 import type { RecipeRow } from "@modules/recipes/infrastructure/recipeMapper";
-import type { MedicationCatalogRow, NutrientInteractionRow } from "@modules/medication/infrastructure/medicationMapper";
+import type {
+  MedicationCatalogRow,
+  NutrientInteractionRow,
+} from "@modules/medication/infrastructure/medicationMapper";
 import type { GoalRow } from "@modules/goals/infrastructure/goalMapper";
-import type { AdherenceRecordRow, AdherenceIndexRow, BarrierEventRow } from "@modules/adherence/infrastructure/adherenceMapper";
+import type {
+  AdherenceRecordRow,
+  AdherenceIndexRow,
+  BarrierEventRow,
+} from "@modules/adherence/infrastructure/adherenceMapper";
 import type { DocumentRow } from "@modules/documents/infrastructure/documentMapper";
-import type { WeeklyPlanRow, ShoppingListRow } from "@modules/meal-planner/infrastructure/mealPlannerMapper";
+import type {
+  WeeklyPlanRow,
+  ShoppingListRow,
+} from "@modules/meal-planner/infrastructure/mealPlannerMapper";
 import type { BiaDeviceProps } from "@modules/anthropometry/domain/BiaReading";
-import type { IndicatorRow, IndicatorValueRow, GeneratedReportRow, DashboardConfigRow } from "@modules/reports/infrastructure/reportMapper";
+import type {
+  IndicatorRow,
+  IndicatorValueRow,
+  GeneratedReportRow,
+  DashboardConfigRow,
+} from "@modules/reports/infrastructure/reportMapper";
 import type { PatientConsent } from "@modules/auth/PatientConsentService";
-import type { EvolutionRecordRow, EvolutionIndicatorRow, TemporalComparisonRow, StagnationAlertRow } from "@modules/evolution/infrastructure/evolutionMapper";
+import type {
+  EvolutionRecordRow,
+  EvolutionIndicatorRow,
+  TemporalComparisonRow,
+  StagnationAlertRow,
+} from "@modules/evolution/infrastructure/evolutionMapper";
 import type { PaymentRow } from "@modules/payment/infrastructure/paymentMapper";
 import type { ExpenseRow } from "@modules/expense/infrastructure/expenseMapper";
 
@@ -100,7 +140,6 @@ const PATIENT_STORES = [
   "discharge_reason",
   "responsible_professional_id",
   "external_record_number",
-  "photo_url",
   "created_at",
   "updated_at",
   "deleted_at",
@@ -176,21 +215,28 @@ const MEAL_PLANS_STORES = [
 const SMAE_CUSTOM_FOODS_STORES = "id, group, name, created_at";
 
 const ALLERGIES_STORES = "id, patient_id, severity, created_at";
-const MEDICATIONS_STORES = "id, patient_id, frequency, start_date, end_date, created_at";
+const MEDICATIONS_STORES =
+  "id, patient_id, frequency, start_date, end_date, created_at";
 const CLINICAL_EVENTS_STORES = "id, patient_id, type, date, created_at";
-const FAMILY_HISTORIES_STORES = "id, patient_id, relationship, condition, created_at";
-const PERSONAL_HISTORIES_STORES = "id, patient_id, condition, status, created_at";
+const FAMILY_HISTORIES_STORES =
+  "id, patient_id, relationship, condition, created_at";
+const PERSONAL_HISTORIES_STORES =
+  "id, patient_id, condition, status, created_at";
 const HABITS_STORES = "id, patient_id, category, status, created_at";
-const PHYSICAL_ACTIVITIES_STORES = "id, patient_id, type, intensity, created_at";
-const DIET_HISTORIES_STORES = "id, patient_id, diet_type, meals_per_day, created_at";
+const PHYSICAL_ACTIVITIES_STORES =
+  "id, patient_id, type, intensity, created_at";
+const DIET_HISTORIES_STORES =
+  "id, patient_id, diet_type, meals_per_day, created_at";
 const INTOLERANCES_STORES = "id, patient_id, severity, mechanism, created_at";
 const SURGERIES_STORES = "id, patient_id, type, date, created_at";
 const HOSPITALIZATIONS_STORES = "id, patient_id, admission_date, created_at";
 const SUPPLEMENTS_STORES = "id, patient_id, category, created_at";
 const FOOD_FREQUENCIES_STORES = "id, patient_id, frequency, created_at";
 const GI_SYMPTOMS_STORES = "id, patient_id, symptom_type, severity, created_at";
-const SNAPSHOT_EXPEDIENTES_STORES = "id, consulta_id, patient_id, fecha_snapshot, created_at";
-const AUDIT_EVENTS_STORES = "id, patient_id, user_id, module, action, resource_type, resource_id, created_at";
+const SNAPSHOT_EXPEDIENTES_STORES =
+  "id, consulta_id, patient_id, fecha_snapshot, created_at";
+const AUDIT_EVENTS_STORES =
+  "id, patient_id, user_id, module, action, resource_type, resource_id, created_at";
 const SYNC_QUEUE_STORES = "id, entity, status, enqueued_at";
 const APPOINTMENTS_STORES = [
   "id",
@@ -207,30 +253,46 @@ const APPOINTMENTS_STORES = [
 const SCHEDULES_STORES = "id, professional_id, day_of_week";
 const BLOCKS_STORES = "id, professional_id, start_date, end_date";
 const RECIPES_STORES = "id, name, category, difficulty, status, created_at";
-const GOALS_STORES = "id, patient_id, type, variable, status, priority, start_date, target_date";
-const ADHERENCE_RECORDS_STORES = "id, sucursal_id, patient_id, date, source, [patient_id+date]";
-const ADHERENCE_INDEXES_STORES = "id, sucursal_id, patient_id, period_start, period_end";
+const GOALS_STORES =
+  "id, patient_id, type, variable, status, priority, start_date, target_date";
+const ADHERENCE_RECORDS_STORES =
+  "id, sucursal_id, patient_id, date, source, [patient_id+date]";
+const ADHERENCE_INDEXES_STORES =
+  "id, sucursal_id, patient_id, period_start, period_end";
 const ADHERENCE_BARRIERS_STORES = "id, patient_id, type, date";
-const DOCUMENTS_STORES = "id, patient_id, type, status, generated_by, generated_at";
-const WEEKLY_PLANS_STORES = "id, patient_id, type, status, start_date, end_date";
+const DOCUMENTS_STORES =
+  "id, patient_id, type, status, generated_by, generated_at";
+const WEEKLY_PLANS_STORES =
+  "id, patient_id, type, status, start_date, end_date";
 const SHOPPING_LISTS_STORES = "id, patient_id, weekly_plan_id, generated_at";
-const MEDICATION_CATALOG_STORES = "id, nombre_comercial, principio_activo, via_administracion, categoria_farmacologica, created_at";
-const NUTRIENT_INTERACTIONS_STORES = "id, medicamento_id, nutriente, tipo, severidad, created_at";
+const MEDICATION_CATALOG_STORES =
+  "id, nombre_comercial, principio_activo, via_administracion, categoria_farmacologica, created_at";
+const NUTRIENT_INTERACTIONS_STORES =
+  "id, medicamento_id, nutriente, tipo, severidad, created_at";
 const BIA_DEVICES_STORES = "id, name, type";
-const INDICATORS_STORES = "id, name, category, calculation_type, refresh_frequency, is_active, created_at";
-const INDICATOR_VALUES_STORES = "id, indicator_id, dimension, dimension_type, [indicator_id+dimension], created_at";
+const INDICATORS_STORES =
+  "id, name, category, calculation_type, refresh_frequency, is_active, created_at";
+const INDICATOR_VALUES_STORES =
+  "id, indicator_id, dimension, dimension_type, [indicator_id+dimension], created_at";
 const GENERATED_REPORTS_STORES = "id, type, status, generated_by, generated_at";
-const DASHBOARD_CONFIGS_STORES = "id, user_id, widget_type, is_visible, position, created_at";
+const DASHBOARD_CONFIGS_STORES =
+  "id, user_id, widget_type, is_visible, position, created_at";
 const PATIENT_CONSENTS_STORES = "id, patient_id, type, signed_at, revoked_at";
-const AI_CACHE_STORES = ["key", "capability", "created_at", "expires_at"].join(", ");
+const AI_CACHE_STORES = ["key", "capability", "created_at", "expires_at"].join(
+  ", ",
+);
 const AI_USAGE_LOGS_STORES = ["id", "capability", "created_at"].join(", ");
 const TELEMEDICINA_RECORDINGS_STORES = "id, sala_id, created_by, created_at";
 const SYNC_META_STORES = "key";
 
-const EVOLUTION_RECORDS_STORES = "id, patient_id, consultation_id, professional_id, created_at";
-const EVOLUTION_INDICATORS_STORES = "id, patient_id, variable, status, calculated_at";
-const TEMPORAL_COMPARISONS_STORES = "id, patient_id, current_consultation_id, compared_consultation_id";
-const STAGNATION_ALERTS_STORES = "id, patient_id, variable, severity, generated_at";
+const EVOLUTION_RECORDS_STORES =
+  "id, patient_id, consultation_id, professional_id, created_at";
+const EVOLUTION_INDICATORS_STORES =
+  "id, patient_id, variable, status, calculated_at";
+const TEMPORAL_COMPARISONS_STORES =
+  "id, patient_id, current_consultation_id, compared_consultation_id";
+const STAGNATION_ALERTS_STORES =
+  "id, patient_id, variable, severity, generated_at";
 const FOOD_PRICES_STORES = "id, food_id, sucursal_id, created_at";
 
 export interface SyncMetaRow {
@@ -447,8 +509,10 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(29).stores({
       consultations: CONSULTATIONS_BILLING_STORES,
-      payments: "id, patient_id, consultation_id, status, concept, payment_date, [patient_id+status+payment_date], created_at",
-      expenses: "id, patient_id, category, expense_date, [patient_id+expense_date], created_at",
+      payments:
+        "id, patient_id, consultation_id, status, concept, payment_date, [patient_id+status+payment_date], created_at",
+      expenses:
+        "id, patient_id, category, expense_date, [patient_id+expense_date], created_at",
     });
 
     this.version(30).stores({
@@ -461,6 +525,10 @@ export class NutriClinicaDB extends Dexie {
 
     this.version(31).stores({
       food_prices: FOOD_PRICES_STORES,
+    });
+
+    this.version(32).stores({
+      patients: PATIENT_STORES,
     });
   }
 }

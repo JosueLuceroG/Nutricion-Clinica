@@ -8,6 +8,7 @@ const EXPORT_HEADERS = [
   "sexo",
   "correo",
   "teléfono",
+  "whatsapp",
   "ocupación",
   "notas",
 ] as const;
@@ -44,6 +45,11 @@ export function patientRowsToCsv(rows: PatientRow[]): string {
       row.sex,
       row.email,
       row.phone,
+      row.whatsapp_enabled === true
+        ? "true"
+        : row.whatsapp_enabled === false
+          ? "false"
+          : null,
       row.occupation,
       row.general_notes,
     ]

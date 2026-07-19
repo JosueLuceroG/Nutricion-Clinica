@@ -18,13 +18,21 @@ import { test, expect } from "@playwright/test";
 test.describe("Patient CRUD", () => {
   test("dashboard renders the main menu", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toContainText("Panel", { timeout: 10_000 });
-    await expect(page.getByRole("link", { name: /pacientes/i }).first()).toBeVisible();
+    await expect(page.locator("h1")).toContainText("Panel", {
+      timeout: 10_000,
+    });
+    await expect(
+      page.getByRole("link", { name: /pacientes/i }).first(),
+    ).toBeVisible();
   });
 
-  test("patient list shows the empty state when there are no patients", async ({ page }) => {
+  test("patient list shows the empty state when there are no patients", async ({
+    page,
+  }) => {
     await page.goto("/#/pacientes");
-    await expect(page.locator("h1")).toContainText("Pacientes", { timeout: 5_000 });
+    await expect(page.locator("h1")).toContainText("Pacientes", {
+      timeout: 5_000,
+    });
     await expect(page.getByText(/sin pacientes registrados/i)).toBeVisible({
       timeout: 5_000,
     });
@@ -32,35 +40,84 @@ test.describe("Patient CRUD", () => {
 
   test("can create a new patient and see it in the list", async ({ page }) => {
     await page.goto("/#/pacientes/nuevo");
-    await expect(page.locator("h1")).toContainText("Nuevo paciente");
+    await expect(page.locator("h1")).toContainText(
+      /Registrar nuevo paciente|Register new patient/,
+    );
 
     await page.locator('input[name="firstName"]').fill("María Fernanda");
     await page.locator('input[name="lastName"]').fill("García López");
-    await page.locator('input[name="birthDate"]').fill("1990-05-15");
+    await page.locator('input[name="age"]').fill("36");
     await page.locator('select[name="sex"]').selectOption("female");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
     await page.locator('input[name="email"]').fill("maria.garcia@example.com");
     await page.locator('input[name="phone"]').fill("+52 55 1234 5678");
 
-    await page.getByRole("button", { name: /crear paciente/i }).click();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="emergencyContactName"]')
+      .fill("Contacto María");
+    await page
+      .locator('select[name="emergencyContactRelationship"]')
+      .selectOption("Madre");
+    await page
+      .locator('input[name="emergencyContactPhone"]')
+      .fill("+52 55 2468 1357");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="externalRecordNumber"]')
+      .fill(`EXP-${Date.now()}`);
+    await page
+      .locator('textarea[name="admissionReason"]')
+      .fill("Primera valoración nutricional");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .getByRole("button", { name: /crear expediente|create record/i })
+      .last()
+      .click();
 
     // After save, navigate to detail page. A toast also shows the patient
     // name, so we look at the heading area (h2 typically) for the full name.
-    await expect(page).toHaveURL(/#\/pacientes\/[a-f0-9-]+$/, { timeout: 10_000 });
-    await expect(page.getByText("María Fernanda García López").first()).toBeVisible();
+    await expect(page).toHaveURL(/#\/pacientes\/[a-f0-9-]+$/, {
+      timeout: 10_000,
+    });
+    await expect(
+      page.getByText("María Fernanda García López").first(),
+    ).toBeVisible();
 
     // Go back to the list and verify it appears
     await page.goto("/#/pacientes");
-    await expect(page.getByText("María Fernanda García López").first()).toBeVisible({
+    await expect(
+      page.getByText("María Fernanda García López").first(),
+    ).toBeVisible({
       timeout: 5_000,
     });
   });
 
-  test("shows validation errors for empty required fields", async ({ page }) => {
+  test("shows validation errors for empty required fields", async ({
+    page,
+  }) => {
     await page.goto("/#/pacientes/nuevo");
-    await expect(page.locator("h1")).toContainText("Nuevo paciente");
+    await expect(page.locator("h1")).toContainText(
+      /Registrar nuevo paciente|Register new patient/,
+    );
 
     // Submit without filling anything
-    await page.getByRole("button", { name: /crear paciente/i }).click();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
 
     // Per-field error messages from Zod (per ADR-0004)
     await expect(page.getByText(/mínimo 2 caracteres/i).first()).toBeVisible({
@@ -72,17 +129,22 @@ test.describe("Patient CRUD", () => {
     await expect(page).toHaveURL(/#\/pacientes\/nuevo$/);
   });
 
-  test("rejects future birth date", async ({ page }) => {
+  test("rejects an invalid age", async ({ page }) => {
     await page.goto("/#/pacientes/nuevo");
 
     await page.locator('input[name="firstName"]').fill("Test");
     await page.locator('input[name="lastName"]').fill("User");
-    await page.locator('input[name="birthDate"]').fill("2999-01-01");
+    await page.locator('input[name="age"]').fill("126");
     await page.locator('select[name="sex"]').selectOption("undisclosed");
 
-    await page.getByRole("button", { name: /crear paciente/i }).click();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
 
-    await expect(page.getByText(/futuro/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(
+      page.getByText(/edad máxima|maximum age/i).first(),
+    ).toBeVisible({ timeout: 5_000 });
     await expect(page).toHaveURL(/#\/pacientes\/nuevo$/);
   });
 });

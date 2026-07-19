@@ -23,6 +23,7 @@ export class Patient {
     public readonly email: Email | null,
     public readonly phone: Phone | null,
     public readonly secondaryPhone: Phone | null,
+    public readonly whatsappEnabled: boolean | null,
     public readonly emergencyContactName: string | null,
     public readonly emergencyContactRelationship: string | null,
     public readonly emergencyContactPhone: Phone | null,
@@ -42,6 +43,7 @@ export class Patient {
     public readonly dischargeReason: string | null,
     public readonly responsibleProfessionalId: string | null,
     public readonly externalRecordNumber: string | null,
+    public readonly admissionReason: string | null,
     public readonly photoUrl: string | null,
     public readonly status: PatientStatus,
     public readonly createdAt: Date,
@@ -70,7 +72,10 @@ export class Patient {
   }
 
   get hasSignedConsent(): boolean {
-    return this.consentimientoInformadoId !== null && this.fechaFirmaConsentimiento !== null;
+    return (
+      this.consentimientoInformadoId !== null &&
+      this.fechaFirmaConsentimiento !== null
+    );
   }
 
   with(updates: Partial<PatientUpdate>): Patient {
@@ -78,38 +83,94 @@ export class Patient {
       id: this.id,
       firstName: updates.firstName ?? this.firstName,
       lastName: updates.lastName ?? this.lastName,
-      secondLastName: updates.secondLastName !== undefined ? updates.secondLastName : this.secondLastName,
+      secondLastName:
+        updates.secondLastName !== undefined
+          ? updates.secondLastName
+          : this.secondLastName,
       birthDate: updates.birthDate ?? this.birthDate,
       sex: updates.sex ?? this.sex,
       gender: updates.gender !== undefined ? updates.gender : this.gender,
-      maritalStatus: updates.maritalStatus !== undefined ? updates.maritalStatus : this.maritalStatus,
-      occupation: updates.occupation !== undefined ? updates.occupation : this.occupation,
-      education: updates.education !== undefined ? updates.education : this.education,
+      maritalStatus:
+        updates.maritalStatus !== undefined
+          ? updates.maritalStatus
+          : this.maritalStatus,
+      occupation:
+        updates.occupation !== undefined ? updates.occupation : this.occupation,
+      education:
+        updates.education !== undefined ? updates.education : this.education,
       email: updates.email !== undefined ? updates.email : this.email,
       phone: updates.phone !== undefined ? updates.phone : this.phone,
-      secondaryPhone: updates.secondaryPhone !== undefined ? updates.secondaryPhone : this.secondaryPhone,
-      emergencyContactName: updates.emergencyContactName !== undefined ? updates.emergencyContactName : this.emergencyContactName,
-      emergencyContactRelationship: updates.emergencyContactRelationship !== undefined ? updates.emergencyContactRelationship : this.emergencyContactRelationship,
-      emergencyContactPhone: updates.emergencyContactPhone !== undefined ? updates.emergencyContactPhone : this.emergencyContactPhone,
+      secondaryPhone:
+        updates.secondaryPhone !== undefined
+          ? updates.secondaryPhone
+          : this.secondaryPhone,
+      whatsappEnabled:
+        updates.whatsappEnabled !== undefined
+          ? updates.whatsappEnabled
+          : this.whatsappEnabled,
+      emergencyContactName:
+        updates.emergencyContactName !== undefined
+          ? updates.emergencyContactName
+          : this.emergencyContactName,
+      emergencyContactRelationship:
+        updates.emergencyContactRelationship !== undefined
+          ? updates.emergencyContactRelationship
+          : this.emergencyContactRelationship,
+      emergencyContactPhone:
+        updates.emergencyContactPhone !== undefined
+          ? updates.emergencyContactPhone
+          : this.emergencyContactPhone,
       recordStatus: updates.recordStatus ?? this.recordStatus,
       recordOpenedAt: updates.recordOpenedAt ?? this.recordOpenedAt,
-      generalNotes: updates.generalNotes !== undefined ? updates.generalNotes : this.generalNotes,
-      consentimientoInformadoId: updates.consentimientoInformadoId !== undefined
-        ? coerceConsentId(updates.consentimientoInformadoId)
-        : this.consentimientoInformadoId,
-      fechaFirmaConsentimiento: updates.fechaFirmaConsentimiento !== undefined ? updates.fechaFirmaConsentimiento : this.fechaFirmaConsentimiento,
-      versionPoliticaPrivacidad: updates.versionPoliticaPrivacidad !== undefined ? updates.versionPoliticaPrivacidad : this.versionPoliticaPrivacidad,
+      generalNotes:
+        updates.generalNotes !== undefined
+          ? updates.generalNotes
+          : this.generalNotes,
+      consentimientoInformadoId:
+        updates.consentimientoInformadoId !== undefined
+          ? coerceConsentId(updates.consentimientoInformadoId)
+          : this.consentimientoInformadoId,
+      fechaFirmaConsentimiento:
+        updates.fechaFirmaConsentimiento !== undefined
+          ? updates.fechaFirmaConsentimiento
+          : this.fechaFirmaConsentimiento,
+      versionPoliticaPrivacidad:
+        updates.versionPoliticaPrivacidad !== undefined
+          ? updates.versionPoliticaPrivacidad
+          : this.versionPoliticaPrivacidad,
       clinicalTags: updates.clinicalTags ?? this.clinicalTags,
-      claveInterna: updates.claveInterna !== undefined ? updates.claveInterna : this.claveInterna,
-      birthPlace: updates.birthPlace !== undefined ? updates.birthPlace : this.birthPlace,
+      claveInterna:
+        updates.claveInterna !== undefined
+          ? updates.claveInterna
+          : this.claveInterna,
+      birthPlace:
+        updates.birthPlace !== undefined ? updates.birthPlace : this.birthPlace,
       address: updates.address !== undefined ? updates.address : this.address,
-      nationality: updates.nationality !== undefined ? updates.nationality : this.nationality,
+      nationality:
+        updates.nationality !== undefined
+          ? updates.nationality
+          : this.nationality,
       idType: updates.idType !== undefined ? updates.idType : this.idType,
-      idNumber: updates.idNumber !== undefined ? updates.idNumber : this.idNumber,
-      dischargeReason: updates.dischargeReason !== undefined ? updates.dischargeReason : this.dischargeReason,
-      responsibleProfessionalId: updates.responsibleProfessionalId !== undefined ? updates.responsibleProfessionalId : this.responsibleProfessionalId,
-      externalRecordNumber: updates.externalRecordNumber !== undefined ? updates.externalRecordNumber : this.externalRecordNumber,
-      photoUrl: updates.photoUrl !== undefined ? updates.photoUrl : this.photoUrl,
+      idNumber:
+        updates.idNumber !== undefined ? updates.idNumber : this.idNumber,
+      dischargeReason:
+        updates.dischargeReason !== undefined
+          ? updates.dischargeReason
+          : this.dischargeReason,
+      responsibleProfessionalId:
+        updates.responsibleProfessionalId !== undefined
+          ? updates.responsibleProfessionalId
+          : this.responsibleProfessionalId,
+      externalRecordNumber:
+        updates.externalRecordNumber !== undefined
+          ? updates.externalRecordNumber
+          : this.externalRecordNumber,
+      admissionReason:
+        updates.admissionReason !== undefined
+          ? updates.admissionReason
+          : this.admissionReason,
+      photoUrl:
+        updates.photoUrl !== undefined ? updates.photoUrl : this.photoUrl,
       status: updates.status ?? this.status,
       createdAt: this.createdAt,
       updatedAt: new Date(),
@@ -133,6 +194,7 @@ export class Patient {
       email: this.email,
       phone: this.phone,
       secondaryPhone: this.secondaryPhone,
+      whatsappEnabled: this.whatsappEnabled,
       emergencyContactName: this.emergencyContactName,
       emergencyContactRelationship: this.emergencyContactRelationship,
       emergencyContactPhone: this.emergencyContactPhone,
@@ -152,6 +214,7 @@ export class Patient {
       dischargeReason: this.dischargeReason,
       responsibleProfessionalId: this.responsibleProfessionalId,
       externalRecordNumber: this.externalRecordNumber,
+      admissionReason: this.admissionReason,
       photoUrl: this.photoUrl,
       status: "inactive",
       createdAt: this.createdAt,
@@ -183,6 +246,7 @@ export class Patient {
       input.email ?? null,
       input.phone ?? null,
       input.secondaryPhone ?? null,
+      input.whatsappEnabled ?? null,
       input.emergencyContactName?.trim() ?? null,
       input.emergencyContactRelationship?.trim() ?? null,
       input.emergencyContactPhone ?? null,
@@ -202,6 +266,7 @@ export class Patient {
       input.dischargeReason?.trim() ?? null,
       input.responsibleProfessionalId?.trim() ?? null,
       input.externalRecordNumber?.trim() ?? null,
+      input.admissionReason?.trim() ?? null,
       input.photoUrl?.trim() ?? null,
       input.status ?? "active",
       now,
@@ -225,6 +290,7 @@ export class Patient {
       props.email,
       props.phone,
       props.secondaryPhone,
+      props.whatsappEnabled,
       props.emergencyContactName,
       props.emergencyContactRelationship,
       props.emergencyContactPhone,
@@ -244,6 +310,7 @@ export class Patient {
       props.dischargeReason,
       props.responsibleProfessionalId,
       props.externalRecordNumber,
+      props.admissionReason,
       props.photoUrl,
       props.status,
       props.createdAt,
@@ -267,6 +334,7 @@ export interface PatientProps {
   email: Email | null;
   phone: Phone | null;
   secondaryPhone: Phone | null;
+  whatsappEnabled: boolean | null;
   emergencyContactName: string | null;
   emergencyContactRelationship: string | null;
   emergencyContactPhone: Phone | null;
@@ -286,6 +354,7 @@ export interface PatientProps {
   dischargeReason: string | null;
   responsibleProfessionalId: string | null;
   externalRecordNumber: string | null;
+  admissionReason: string | null;
   photoUrl: string | null;
   status: PatientStatus;
   createdAt: Date;
@@ -307,6 +376,7 @@ export interface PatientCreate {
   email?: Email | null;
   phone?: Phone | null;
   secondaryPhone?: Phone | null;
+  whatsappEnabled?: boolean | null;
   emergencyContactName?: string | null;
   emergencyContactRelationship?: string | null;
   emergencyContactPhone?: Phone | null;
@@ -326,6 +396,7 @@ export interface PatientCreate {
   dischargeReason?: string | null;
   responsibleProfessionalId?: string | null;
   externalRecordNumber?: string | null;
+  admissionReason?: string | null;
   photoUrl?: string | null;
   status?: PatientStatus;
 }
@@ -362,7 +433,9 @@ function validateConsentDate(date: Date): void {
   }
   const now = new Date();
   if (date.getTime() > now.getTime()) {
-    throw new Error("La fecha de firma de consentimiento no puede estar en el futuro.");
+    throw new Error(
+      "La fecha de firma de consentimiento no puede estar en el futuro.",
+    );
   }
 }
 

@@ -1,0 +1,1206 @@
+.nc-new-patient__pageHeader {
+  min-height: 74px;
+  padding: 12px 26px;
+  background: hsl(var(--background));
+}
+
+.nc-new-patient__pageHeader h1 {
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.nc-new-patient__pageHeader p {
+  margin-top: 4px;
+  font-size: 13px;
+}
+
+.nc-new-patient__primaryButton {
+  min-width: 106px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: none;
+}
+
+.nc-new-patient__primaryButton:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+}
+
+.nc-new-patient-page {
+  container-type: inline-size;
+  min-height: 0;
+  background:
+    radial-gradient(
+      circle at 70% 20%,
+      hsl(var(--primary) / 0.025),
+      transparent 32%
+    ),
+    hsl(var(--muted) / 0.12);
+  padding: 9px 5px;
+}
+
+.nc-new-patient {
+  container-type: inline-size;
+  display: grid;
+  width: min(1480px, 100%);
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0 auto;
+}
+
+.nc-new-patient__sidebar {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.78);
+  border-radius: 9px;
+  background: hsl(var(--card));
+  box-shadow: 0 5px 18px hsl(var(--foreground) / 0.025);
+}
+
+.nc-new-patient__sidebar nav {
+  position: relative;
+  display: grid;
+  padding: 6px 4px;
+}
+
+.nc-new-patient__sidebar nav::before {
+  position: absolute;
+  top: 51px;
+  bottom: 51px;
+  left: 33px;
+  width: 1px;
+  background: hsl(var(--border));
+  content: "";
+}
+
+.nc-new-patient__menuStep {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 0;
+  min-height: 62px;
+  grid-template-columns: 32px 34px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  padding: 8px 6px 8px 11px;
+  color: hsl(var(--muted-foreground));
+  text-align: left;
+  transition: 160ms ease;
+}
+
+.nc-new-patient__menuStep:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.nc-new-patient__menuStep[data-current] {
+  border-left-color: #2563eb;
+  background: linear-gradient(100deg, rgb(37 99 235 / 8%), rgb(37 99 235 / 2%));
+  color: hsl(var(--foreground));
+}
+
+.nc-new-patient__menuStep[data-completed] {
+  cursor: pointer;
+}
+
+.nc-new-patient__menuStep[data-completed]:hover {
+  background: hsl(var(--muted) / 0.34);
+}
+
+.nc-new-patient__stepNumber {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 50%;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.nc-new-patient__stepNumber svg {
+  width: 12px;
+  height: 12px;
+}
+
+.nc-new-patient__menuStep[data-current] .nc-new-patient__stepNumber {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+  box-shadow: none;
+}
+
+.nc-new-patient__menuStep[data-completed] .nc-new-patient__stepNumber {
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+}
+
+.nc-new-patient__completedIcon {
+  width: 16px;
+  height: 16px;
+  color: hsl(var(--success));
+  stroke-width: 2;
+}
+
+.nc-new-patient__menuIcon {
+  display: grid;
+  width: 34px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  color: hsl(var(--muted-foreground));
+}
+
+.nc-new-patient__menuIcon svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1.7;
+}
+
+.nc-new-patient__menuStep[data-current] .nc-new-patient__menuIcon {
+  background: rgb(37 99 235 / 7%);
+  color: #2563eb;
+  box-shadow: none;
+}
+
+.nc-new-patient__menuText {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.nc-new-patient__menuText strong {
+  overflow: hidden;
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-new-patient__menuText small {
+  overflow: hidden;
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-new-patient__main,
+.nc-new-patient__main form {
+  min-width: 0;
+  height: 100%;
+}
+
+.nc-new-patient__formCard {
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 9px;
+  background: hsl(var(--card));
+  box-shadow: 0 5px 18px hsl(var(--foreground) / 0.03);
+}
+
+.nc-new-patient__formCard {
+  position: relative;
+  display: flex;
+  min-height: clamp(440px, 55vh, 600px);
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
+}
+
+.nc-new-patient__formHeader {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 14px;
+}
+
+.nc-new-patient__formHeaderIcon {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: linear-gradient(
+    145deg,
+    rgb(37 99 235 / 16%),
+    rgb(37 99 235 / 7%)
+  );
+  color: #2563eb;
+}
+
+.nc-new-patient__formHeaderIcon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.7;
+}
+
+.nc-new-patient__formHeader h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.nc-new-patient__formHeader p {
+  margin-top: 4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11.5px;
+}
+
+.nc-new-patient__formCard[data-step="1"] .nc-new-patient__formHeader,
+.nc-new-patient__formCard[data-step="2"] .nc-new-patient__formHeader {
+  border-bottom: 1px solid hsl(var(--border) / 0.7);
+  padding-bottom: 16px;
+}
+
+.nc-new-patient__illustration {
+  position: absolute;
+  top: 20px;
+  right: 22px;
+  width: 195px;
+  height: 185px;
+  pointer-events: none;
+}
+
+.nc-new-patient__illustrationShape {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  display: grid;
+  width: 165px;
+  height: 175px;
+  place-items: center;
+  border-radius: 40% 60% 34% 66% / 27% 34% 66% 73%;
+  background: linear-gradient(
+    145deg,
+    rgb(37 99 235 / 5%),
+    rgb(37 99 235 / 12%)
+  );
+  transform: rotate(8deg);
+}
+
+.nc-new-patient__illustrationShape::before,
+.nc-new-patient__illustrationShape::after {
+  position: absolute;
+  left: 50%;
+  background: rgb(37 99 235 / 52%);
+  content: "";
+  transform: translateX(-50%) rotate(-8deg);
+}
+
+.nc-new-patient__illustrationShape::before {
+  top: 42px;
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+}
+
+.nc-new-patient__illustrationShape::after {
+  bottom: 31px;
+  width: 82px;
+  height: 54px;
+  border-radius: 45px 45px 12px 12px;
+}
+
+.nc-new-patient__illustrationDots {
+  position: absolute;
+  top: 4px;
+  right: 0;
+  z-index: 1;
+  width: 52px;
+  height: 52px;
+  background-image: radial-gradient(
+    circle,
+    rgb(37 99 235 / 20%) 2px,
+    transparent 2.5px
+  );
+  background-size: 17px 17px;
+}
+
+.nc-new-patient__formFields {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  max-width: 820px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 22px;
+  margin-top: 22px;
+  animation: nc-new-patient-step-in 180ms ease-out;
+}
+
+.nc-new-patient__formFields[data-has-illustration] {
+  width: 68%;
+  max-width: 760px;
+}
+
+.nc-new-patient__formFields[data-contact] {
+  width: 100%;
+  max-width: none;
+  gap: 18px 24px;
+  margin-top: 20px;
+}
+
+.nc-new-patient__formFields[data-emergency] {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 34px;
+}
+
+.nc-new-patient__formFields[data-clinical-record] {
+  width: 100%;
+  max-width: none;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.nc-new-patient__formFields[data-contact]
+  > .nc-new-patient__field:nth-child(3) {
+  margin-top: 12px;
+}
+
+.nc-new-patient__field {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 8px;
+}
+
+.nc-new-patient__field--full {
+  grid-column: 1 / -1;
+}
+
+.nc-new-patient__field label {
+  color: hsl(var(--foreground) / 0.88);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.nc-new-patient__field label b {
+  margin-left: 3px;
+  color: hsl(var(--destructive));
+}
+
+.nc-new-patient__field input,
+.nc-new-patient__field select,
+.nc-new-patient__field textarea {
+  width: 100%;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 12.5px;
+  box-shadow: 0 2px 7px hsl(var(--foreground) / 0.025);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.nc-new-patient__field input,
+.nc-new-patient__field select {
+  height: 44px;
+}
+
+.nc-new-patient__field select {
+  appearance: auto;
+  padding-right: 15px;
+  outline: none;
+}
+
+.nc-new-patient__field textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.nc-new-patient__field input:focus,
+.nc-new-patient__field select:focus,
+.nc-new-patient__field textarea:focus {
+  border-color: rgb(37 99 235 / 60%);
+  box-shadow: 0 0 0 3px rgb(37 99 235 / 8%);
+}
+
+.nc-new-patient__field > p {
+  color: hsl(var(--destructive));
+  font-size: 10px;
+}
+
+.nc-new-patient__fieldHint {
+  margin-top: -4px;
+  color: hsl(var(--muted-foreground));
+  font-size: 10.5px;
+}
+
+.nc-new-patient__whatsappField {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(210px, 1fr) auto minmax(260px, 1fr);
+  align-items: center;
+  gap: 20px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9px;
+  background: hsl(var(--card));
+  margin: 0;
+  padding: 8px 12px;
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.nc-new-patient__whatsappField[data-enabled="true"] {
+  border-color: #16a34a;
+  background: linear-gradient(90deg, hsl(var(--card)), rgb(34 197 94 / 2%));
+}
+
+.nc-new-patient__whatsappField[data-enabled="false"] {
+  grid-template-columns: minmax(210px, 1fr) auto;
+}
+
+.nc-new-patient__whatsappQuestion {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  color: hsl(var(--foreground) / 0.88);
+}
+
+.nc-new-patient__whatsappQuestion strong {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.nc-new-patient__whatsappQuestion small {
+  color: hsl(var(--muted-foreground));
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.nc-new-patient__whatsappOptions {
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  gap: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--background));
+}
+
+.nc-new-patient__whatsappOptions label {
+  position: relative;
+  cursor: pointer;
+}
+
+.nc-new-patient__whatsappOptions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.nc-new-patient__whatsappOptions label > span {
+  display: flex;
+  min-width: 74px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-right: 1px solid hsl(var(--border));
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+  transition: 150ms ease;
+}
+
+.nc-new-patient__whatsappOptions label:last-child > span {
+  border-right: 0;
+}
+
+.nc-new-patient__whatsappOptions label > span svg {
+  width: 16px;
+  height: 16px;
+}
+
+.nc-new-patient__whatsappOptions input:checked + span {
+  border-color: #2563eb;
+  background: rgb(37 99 235 / 7%);
+  color: #2563eb;
+  box-shadow: inset 0 0 0 1px #2563eb;
+}
+
+.nc-new-patient__whatsappOptions input:focus-visible + span {
+  outline: 3px solid rgb(37 99 235 / 16%);
+  outline-offset: 2px;
+}
+
+.nc-new-patient__whatsappSame {
+  display: flex;
+  min-width: 0;
+  min-height: 46px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgb(34 197 94 / 8%), rgb(34 197 94 / 3%));
+  padding: 7px 12px;
+  color: #15803d;
+}
+
+.nc-new-patient__whatsappSame > svg {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  stroke-width: 1.8;
+}
+
+.nc-new-patient__whatsappSame span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.nc-new-patient__whatsappSame strong {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.nc-new-patient__whatsappSame small {
+  color: #16a34a;
+  font-size: 10px;
+}
+
+.nc-new-patient__iconInput {
+  position: relative;
+}
+
+.nc-new-patient__iconInput > svg {
+  position: absolute;
+  top: 50%;
+  left: 16px;
+  z-index: 1;
+  width: 17px;
+  height: 17px;
+  color: hsl(var(--muted-foreground));
+  stroke-width: 1.7;
+  transform: translateY(-50%);
+}
+
+.nc-new-patient__iconInput[data-align-top] > svg {
+  top: 14px;
+  transform: none;
+}
+
+.nc-new-patient__iconInput input,
+.nc-new-patient__iconInput select,
+.nc-new-patient__iconInput textarea {
+  padding-left: 48px;
+}
+
+.nc-new-patient__formCard[data-step="1"] .nc-new-patient__iconInput > svg,
+.nc-new-patient__formCard[data-step="2"] .nc-new-patient__iconInput > svg,
+.nc-new-patient__formCard[data-step="3"] .nc-new-patient__iconInput > svg {
+  color: #2563eb;
+}
+
+.nc-new-patient__clinicalTop {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
+  align-items: stretch;
+  gap: 28px;
+}
+
+.nc-new-patient__clinicalDetails {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 22px;
+}
+
+.nc-new-patient__clinicalDivider {
+  background: hsl(var(--border) / 0.78);
+}
+
+.nc-new-patient__responsibleField,
+.nc-new-patient__photoField {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 8px;
+}
+
+.nc-new-patient__responsibleField > label,
+.nc-new-patient__photoField > label {
+  color: hsl(var(--foreground) / 0.88);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.nc-new-patient__responsibleCard {
+  display: grid;
+  min-height: 76px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgb(37 99 235 / 35%);
+  border-radius: 9px;
+  background: linear-gradient(100deg, rgb(37 99 235 / 5%), rgb(37 99 235 / 2%));
+  padding: 10px 14px;
+}
+
+.nc-new-patient__responsibleAvatar {
+  position: relative;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #2563eb, #1d4ed8);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nc-new-patient__responsibleAvatar i {
+  position: absolute;
+  right: -1px;
+  bottom: 1px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid hsl(var(--card));
+  border-radius: 50%;
+  background: #22c55e;
+}
+
+.nc-new-patient__responsibleIdentity,
+.nc-new-patient__responsibleAssignment {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.nc-new-patient__responsibleIdentity strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-new-patient__responsibleIdentity small,
+.nc-new-patient__responsibleAssignment small {
+  color: hsl(var(--muted-foreground));
+  font-size: 10px;
+}
+
+.nc-new-patient__responsibleAssignment {
+  justify-items: end;
+  text-align: right;
+}
+
+.nc-new-patient__responsibleAssignment b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: rgb(37 99 235 / 8%);
+  padding: 5px 9px;
+  color: #2563eb;
+  font-size: 9.5px;
+  font-weight: 600;
+}
+
+.nc-new-patient__responsibleAssignment b svg {
+  width: 13px;
+  height: 13px;
+}
+
+.nc-new-patient__responsibleError,
+.nc-new-patient__photoField > p {
+  color: hsl(var(--destructive));
+  font-size: 10px;
+}
+
+.nc-new-patient__photoInput {
+  display: none;
+}
+
+.nc-new-patient__photoDropzone {
+  display: grid;
+  min-height: 168px;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  border: 1px dashed rgb(37 99 235 / 28%);
+  border-radius: 9px;
+  background:
+    linear-gradient(rgb(37 99 235 / 1.5%), rgb(37 99 235 / 0.5%)),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  text-align: center;
+  transition: 150ms ease;
+}
+
+.nc-new-patient__photoDropzone:hover,
+.nc-new-patient__photoDropzone[data-dragging] {
+  border-color: #2563eb;
+  background: rgb(37 99 235 / 4%);
+}
+
+.nc-new-patient__photoDropzone > svg {
+  width: 36px;
+  height: 36px;
+  margin-bottom: 4px;
+  color: #2563eb;
+  stroke-width: 1.7;
+}
+
+.nc-new-patient__photoDropzone strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nc-new-patient__photoDropzone span,
+.nc-new-patient__photoDropzone small {
+  color: hsl(var(--muted-foreground));
+  font-size: 10.5px;
+}
+
+.nc-new-patient__photoPreview {
+  display: grid;
+  min-height: 168px;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  overflow: hidden;
+  border: 1px dashed hsl(var(--border));
+  border-radius: 9px;
+  padding: 10px;
+}
+
+.nc-new-patient__photoPreview img {
+  width: 150px;
+  height: 146px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+
+.nc-new-patient__photoPreview > div {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.nc-new-patient__photoPreview button {
+  min-width: 112px;
+  font-size: 10.5px;
+}
+
+.nc-new-patient__formFields[data-clinical-record]
+  > .nc-new-patient__field--full
+  textarea {
+  height: 76px;
+  min-height: 76px;
+}
+
+.nc-new-patient__requiredCallout {
+  position: static;
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  gap: 9px;
+  border-radius: 9px;
+  background: linear-gradient(100deg, rgb(37 99 235 / 8%), rgb(37 99 235 / 3%));
+  margin-top: 22px;
+  padding: 10px 15px;
+  color: rgb(29 78 216 / 90%);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+.nc-new-patient__requiredCallout svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+}
+
+.nc-new-patient__requiredCallout b {
+  color: hsl(var(--destructive));
+}
+
+.nc-new-patient__contactNotice {
+  display: grid;
+  min-height: 60px;
+  grid-template-columns: 24px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(100deg, rgb(37 99 235 / 9%), rgb(37 99 235 / 4%));
+  margin: 16px 0 14px;
+  padding: 10px 14px;
+  color: rgb(29 78 216 / 92%);
+}
+
+.nc-new-patient__contactNoticeIcon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: #2563eb;
+  color: white;
+}
+
+.nc-new-patient__contactNoticeIcon svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 2.2;
+}
+
+.nc-new-patient__contactNotice strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.nc-new-patient__contactNotice p {
+  margin-top: 3px;
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.nc-new-patient__contactNotice button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.nc-new-patient__contactNotice button:hover {
+  background: rgb(37 99 235 / 8%);
+  color: rgb(29 78 216);
+}
+
+.nc-new-patient__contactNotice button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.nc-new-patient__contactNotice--emergency {
+  min-height: 72px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  margin-top: 34px;
+  padding-right: 20px;
+}
+
+.nc-new-patient__navigationCard {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border-top: 1px solid hsl(var(--border) / 0.72);
+  background: transparent;
+  margin: auto -20px -20px;
+  padding: 10px 16px;
+}
+
+.nc-new-patient__progressBlock {
+  display: flex;
+  min-width: 320px;
+  align-items: center;
+  gap: 20px;
+}
+
+.nc-new-patient__progressBlock strong {
+  flex: 0 0 auto;
+  color: hsl(var(--foreground));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.nc-new-patient__progressTrack {
+  width: 260px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: hsl(var(--muted));
+}
+
+.nc-new-patient__progressTrack span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #2563eb;
+  transition: width 220ms ease;
+}
+
+.nc-new-patient__navigationActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nc-new-patient__navigationActions button {
+  min-width: 112px;
+  height: 36px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dark .nc-new-patient__pageHeader {
+  border-color: rgb(148 163 184 / 12%);
+  background: #07111f;
+}
+
+.dark .nc-new-patient-page {
+  background: #020617;
+}
+
+.dark .nc-new-patient__sidebar,
+.dark .nc-new-patient__formCard {
+  border-color: rgb(148 163 184 / 12%);
+  background: #07111f;
+  box-shadow: none;
+}
+
+.dark .nc-new-patient__stepNumber,
+.dark .nc-new-patient__field input,
+.dark .nc-new-patient__field select,
+.dark .nc-new-patient__field textarea {
+  border-color: rgb(148 163 184 / 14%);
+  background: #081321;
+}
+
+.dark .nc-new-patient__menuStep[data-current] {
+  background: linear-gradient(
+    100deg,
+    rgb(59 130 246 / 13%),
+    rgb(59 130 246 / 3%)
+  );
+}
+
+.dark .nc-new-patient__illustrationShape {
+  background: linear-gradient(
+    145deg,
+    rgb(59 130 246 / 7%),
+    rgb(59 130 246 / 14%)
+  );
+}
+
+.alternative .nc-new-patient__sidebar,
+.alternative .nc-new-patient__formCard {
+  border-color: var(--alt-card-border, hsl(var(--border)));
+  background: var(--alt-card-bg, hsl(var(--card)));
+  box-shadow: var(--alt-shadow-card, 0 10px 30px hsl(var(--foreground) / 0.05));
+}
+
+@container (max-width: 1180px) {
+  .nc-new-patient {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .nc-new-patient__illustration {
+    width: 150px;
+  }
+
+  .nc-new-patient__illustrationShape {
+    width: 135px;
+    height: 145px;
+  }
+
+  .nc-new-patient__formFields[data-has-illustration] {
+    width: auto;
+    max-width: calc(100% - 150px);
+  }
+}
+
+@container (max-width: 900px) {
+  .nc-new-patient {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-new-patient__sidebar {
+    min-height: 0;
+  }
+
+  .nc-new-patient__sidebar nav {
+    overflow-x: auto;
+    grid-template-columns: repeat(5, minmax(210px, 1fr));
+    scrollbar-width: thin;
+  }
+
+  .nc-new-patient__sidebar nav::before {
+    display: none;
+  }
+
+  .nc-new-patient__menuStep {
+    min-height: 68px;
+  }
+}
+
+@container (max-width: 700px) {
+  .nc-new-patient__formCard {
+    min-height: 0;
+    padding: 18px;
+  }
+
+  .nc-new-patient__illustration {
+    display: none;
+  }
+
+  .nc-new-patient__formFields,
+  .nc-new-patient__formFields[data-has-illustration],
+  .nc-new-patient__formFields[data-emergency],
+  .nc-new-patient__formFields[data-clinical-record] {
+    width: auto;
+    max-width: none;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    margin-top: 22px;
+  }
+
+  .nc-new-patient__field--full {
+    grid-column: auto;
+  }
+
+  .nc-new-patient__formFields[data-contact]
+    > .nc-new-patient__field:nth-child(3) {
+    margin-top: 0;
+  }
+
+  .nc-new-patient__whatsappField {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .nc-new-patient__whatsappField[data-enabled="false"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-new-patient__whatsappOptions {
+    justify-self: start;
+  }
+
+  .nc-new-patient__clinicalTop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-new-patient__clinicalDivider {
+    display: none;
+  }
+
+  .nc-new-patient__requiredCallout {
+    margin-top: 20px;
+  }
+
+  .nc-new-patient__navigationCard {
+    align-items: stretch;
+    flex-direction: column;
+    margin: 20px -18px -18px;
+  }
+
+  .nc-new-patient__progressBlock {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .nc-new-patient__progressTrack {
+    width: 100%;
+  }
+
+  .nc-new-patient__navigationActions {
+    justify-content: flex-end;
+  }
+}
+
+@container (max-width: 450px) {
+  .nc-new-patient__responsibleCard {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .nc-new-patient__responsibleAssignment {
+    grid-column: 1 / -1;
+    justify-items: start;
+    padding-left: 56px;
+    text-align: left;
+  }
+
+  .nc-new-patient__photoPreview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-new-patient__photoPreview img {
+    width: 100%;
+    height: 180px;
+  }
+
+  .nc-new-patient__photoPreview > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-items: stretch;
+  }
+
+  .nc-new-patient__photoPreview button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .nc-new-patient__formHeaderIcon {
+    width: 52px;
+    height: 52px;
+  }
+
+  .nc-new-patient__navigationActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nc-new-patient__navigationActions button:only-child {
+    grid-column: 2;
+  }
+
+  .nc-new-patient__navigationActions button {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@keyframes nc-new-patient-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nc-new-patient * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

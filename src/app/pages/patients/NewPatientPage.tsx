@@ -1,10 +1,19 @@
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
-import { PatientForm, PatientFormSkeleton } from "@modules/patient/ui/PatientForm";
+import {
+  PatientForm,
+  PatientFormSkeleton,
+} from "@modules/patient/ui/PatientForm";
+import { NewPatientWizard } from "@modules/patient/ui/NewPatientWizard";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 
@@ -22,18 +31,33 @@ export function NewPatientPage() {
   );
   const { data: patient, loading } = usePatient(isEdit ? id : null);
 
+  if (!isEdit) {
+    return (
+      <NewPatientWizard
+        onCreated={
+          returnToQuickConsultation
+            ? (created) =>
+                navigate(
+                  `/?quickConsultation=1&patientId=${encodeURIComponent(created.id.toString())}`,
+                )
+            : undefined
+        }
+      />
+    );
+  }
+
   return (
     <>
       <PageHeader
-        title={isEdit ? t("patient.edit_title") : t("patient.new")}
-        description={
-          isEdit
-            ? t("patient.edit_description")
-            : t("patient.new_description")
-        }
+        title={t("patient.edit_title")}
+        description={t("patient.edit_description")}
         actions={
           <Button asChild variant="outline">
-            <Link to={isEdit && patient ? `/pacientes/${patient.id.toString()}` : "/pacientes"}>
+            <Link
+              to={
+                patient ? `/pacientes/${patient.id.toString()}` : "/pacientes"
+              }
+            >
               <ArrowLeft className="mr-2 h-4 w-4" />
               {t("common.back")}
             </Link>
@@ -42,29 +66,15 @@ export function NewPatientPage() {
       />
       <PageContent>
         <div className="mx-auto max-w-3xl">
-          {isEdit ? (
-            loading ? (
-              <PatientFormSkeleton />
-            ) : patient ? (
-              <PatientForm
-                mode="edit"
-                patientId={id ?? undefined}
-                initialPatient={patient}
-              />
-            ) : null
-          ) : (
+          {loading ? (
+            <PatientFormSkeleton />
+          ) : patient ? (
             <PatientForm
-              mode="create"
-              onCreated={
-                returnToQuickConsultation
-                  ? (created) =>
-                      navigate(
-                        `/?quickConsultation=1&patientId=${encodeURIComponent(created.id.toString())}`,
-                      )
-                  : undefined
-              }
+              mode="edit"
+              patientId={id ?? undefined}
+              initialPatient={patient}
             />
-          )}
+          ) : null}
         </div>
       </PageContent>
     </>

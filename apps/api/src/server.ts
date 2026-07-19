@@ -6,7 +6,9 @@ import cron from "node-cron";
 import { healthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
 import twoFactorRouter from "./modules/auth/twoFactorRoutes.js";
-import telemedicinaRouter, { turnRouter } from "./modules/telemedicina/telemedicinaRoutes.js";
+import telemedicinaRouter, {
+  turnRouter,
+} from "./modules/telemedicina/telemedicinaRoutes.js";
 import sucursalRouter from "./modules/sucursales/sucursalRoutes.js";
 import pacienteRouter from "./modules/pacientes/pacienteRoutes.js";
 import consultaRouter from "./modules/consultas/consultaRoutes.js";
@@ -21,7 +23,10 @@ import aiRouter from "./modules/ai/aiRoutes.js";
 import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
 import { createChatServer } from "./modules/patientPortal/chatServer.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { runRetentionCleanup, RETENTION_CONFIG } from "./services/retention/index.js";
+import {
+  runRetentionCleanup,
+  RETENTION_CONFIG,
+} from "./services/retention/index.js";
 
 const app = express();
 
@@ -30,25 +35,33 @@ app.use((_req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "no-referrer");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
   next();
 });
 
-const corsOrigins = (process.env.CORS_ORIGIN ?? "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost")
+const corsOrigins = (
+  process.env.CORS_ORIGIN ??
+  "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost"
+)
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin || corsOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error("Origen no permitido por CORS"));
-  },
-}));
-app.use(express.json({ limit: "5mb" }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || corsOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error("Origen no permitido por CORS"));
+    },
+  }),
+);
+app.use(express.json({ limit: "10mb" }));
 
 app.use("/health", healthRouter);
 app.use("/auth", authRouter);
@@ -81,13 +94,19 @@ httpServer.listen(port, () => {
 
 if (RETENTION_CONFIG.cleanupEnabled) {
   const schedule = RETENTION_CONFIG.cronSchedule;
-  console.log(`[retention] scheduling cleanup cron: "${schedule}" (${RETENTION_CONFIG.years} years)`);
+  console.log(
+    `[retention] scheduling cleanup cron: "${schedule}" (${RETENTION_CONFIG.years} years)`,
+  );
   cron.schedule(schedule, () => {
-    console.log('[retention] running scheduled cleanup...');
+    console.log("[retention] running scheduled cleanup...");
     void runRetentionCleanup().then((result) => {
-      console.log(`[retention] cleanup done: ${result.deletedCount} deleted, ${result.errors.length} errors`);
+      console.log(
+        `[retention] cleanup done: ${result.deletedCount} deleted, ${result.errors.length} errors`,
+      );
     });
   });
 } else {
-  console.log('[retention] cleanup disabled via RETENTION_CLEANUP_ENABLED=false');
+  console.log(
+    "[retention] cleanup disabled via RETENTION_CLEANUP_ENABLED=false",
+  );
 }

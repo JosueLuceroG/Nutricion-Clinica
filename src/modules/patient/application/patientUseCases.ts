@@ -1,4 +1,11 @@
-import { Patient, type PatientCreate, type PatientUpdate, type PatientQuery, type PatientRepository, PatientNotFoundError } from "../domain/PatientRepository";
+import {
+  Patient,
+  type PatientCreate,
+  type PatientUpdate,
+  type PatientQuery,
+  type PatientRepository,
+  PatientNotFoundError,
+} from "../domain/PatientRepository";
 import type { PatientId } from "../domain/PatientId";
 
 export interface LinkedCounts {
@@ -66,7 +73,9 @@ export class GetPatientUseCase {
 export class ListPatientsUseCase {
   constructor(private readonly repo: PatientRepository) {}
 
-  async execute(query?: PatientQuery): Promise<{ items: Patient[]; total: number }> {
+  async execute(
+    query?: PatientQuery,
+  ): Promise<{ items: Patient[]; total: number }> {
     const [items, total] = await Promise.all([
       this.repo.findAll(query),
       this.repo.count(query),
@@ -167,6 +176,7 @@ export class RestorePatientUseCase {
       email: existing.email,
       phone: existing.phone,
       secondaryPhone: existing.secondaryPhone,
+      whatsappEnabled: existing.whatsappEnabled,
       emergencyContactName: existing.emergencyContactName,
       emergencyContactRelationship: existing.emergencyContactRelationship,
       emergencyContactPhone: existing.emergencyContactPhone,
@@ -186,6 +196,7 @@ export class RestorePatientUseCase {
       dischargeReason: existing.dischargeReason,
       responsibleProfessionalId: existing.responsibleProfessionalId,
       externalRecordNumber: existing.externalRecordNumber,
+      admissionReason: existing.admissionReason,
       photoUrl: existing.photoUrl,
       status: "active",
       createdAt: existing.createdAt,

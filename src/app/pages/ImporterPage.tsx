@@ -75,10 +75,10 @@ interface CsvDownloadFeedback {
   patientCount?: number;
 }
 
-const SAMPLE_CSV = `nombre,apellido,segundo apellido,fecha de nacimiento,sexo,correo,teléfono,ocupación,notas
-María,García,López,1990-05-15,femenino,maria.garcia@example.com,+52 55 1234 5678,Ingeniera,Paciente referida por Dr. Pérez
-Juan,Pérez,,1985-03-20,masculino,juan.perez@example.com,+52 55 8765 4321,Profesor,
-Ana,López,Hernández,1992-11-08,F,ana.lopez@example.com,+52 33 1234 5678,Estudiante,Sin observaciones`;
+const SAMPLE_CSV = `nombre,apellido,segundo apellido,fecha de nacimiento,sexo,correo,teléfono,whatsapp,ocupación,notas
+María,García,López,1990-05-15,femenino,maria.garcia@example.com,+52 55 1234 5678,true,Ingeniera,Paciente referida por Dr. Pérez
+Juan,Pérez,,1985-03-20,masculino,juan.perez@example.com,+52 55 8765 4321,false,Profesor,
+Ana,López,Hernández,1992-11-08,F,ana.lopez@example.com,+52 33 1234 5678,true,Estudiante,Sin observaciones`;
 
 export function ImporterPage() {
   const { t } = useTranslation();
@@ -273,7 +273,9 @@ export function ImporterPage() {
                 }}
                 onDragOver={(event) => event.preventDefault()}
                 onDragLeave={(event) => {
-                  if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  if (
+                    !event.currentTarget.contains(event.relatedTarget as Node)
+                  ) {
                     setDragging(false);
                   }
                 }}
@@ -301,7 +303,8 @@ export function ImporterPage() {
                 <div className="nc-importer-selectedFile" role="status">
                   <FileCheck2 aria-hidden="true" />
                   <span>
-                    {t("pages.importer_selected_file")}: <strong>{selectedFileName}</strong>
+                    {t("pages.importer_selected_file")}:{" "}
+                    <strong>{selectedFileName}</strong>
                   </span>
                   <button
                     type="button"
@@ -340,7 +343,11 @@ export function ImporterPage() {
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="outline" disabled={downloading !== null}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={downloading !== null}
+                    >
                       <Download aria-hidden="true" />
                       {downloading
                         ? t("pages.importer_preparing_download")
@@ -352,18 +359,26 @@ export function ImporterPage() {
                     align="end"
                     className="nc-importer-downloadMenu"
                   >
-                    <DropdownMenuItem onSelect={() => void downloadCsv("sample")}>
+                    <DropdownMenuItem
+                      onSelect={() => void downloadCsv("sample")}
+                    >
                       <FileSpreadsheet aria-hidden="true" />
                       <span>
                         <strong>{t("pages.importer_sample_template")}</strong>
-                        <small>{t("pages.importer_sample_template_description")}</small>
+                        <small>
+                          {t("pages.importer_sample_template_description")}
+                        </small>
                       </span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => void downloadCsv("current")}>
+                    <DropdownMenuItem
+                      onSelect={() => void downloadCsv("current")}
+                    >
                       <UsersRound aria-hidden="true" />
                       <span>
                         <strong>{t("pages.importer_current_patients")}</strong>
-                        <small>{t("pages.importer_current_patients_description")}</small>
+                        <small>
+                          {t("pages.importer_current_patients_description")}
+                        </small>
                       </span>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -371,7 +386,11 @@ export function ImporterPage() {
               </div>
 
               {downloadFeedback && (
-                <p className="nc-importer-downloadStatus" role="status" aria-live="polite">
+                <p
+                  className="nc-importer-downloadStatus"
+                  role="status"
+                  aria-live="polite"
+                >
                   <CheckCircle2 aria-hidden="true" />
                   <span>
                     {t(
@@ -380,7 +399,7 @@ export function ImporterPage() {
                         : "pages.importer_patients_downloaded",
                       { count: downloadFeedback.patientCount },
                     )}
-                    : <strong>{downloadFeedback.fileName}</strong>. {" "}
+                    : <strong>{downloadFeedback.fileName}</strong>.{" "}
                     {t(
                       downloadFeedback.opened
                         ? "pages.importer_file_opened"
@@ -625,7 +644,9 @@ function PreviewPanel({
                     <TableRow>
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>{t("common.name")}</TableHead>
-                      <TableHead>{t("pages.importer_birth_date_short")}</TableHead>
+                      <TableHead>
+                        {t("pages.importer_birth_date_short")}
+                      </TableHead>
                       <TableHead>{t("patient.sex")}</TableHead>
                       <TableHead>{t("patient.email")}</TableHead>
                     </TableRow>

@@ -2,9 +2,12 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { patientFormProps } = vi.hoisted(() => ({
+const { patientFormProps, newPatientWizardProps } = vi.hoisted(() => ({
   patientFormProps: [] as Array<{
     mode: "create" | "edit";
+    onCreated?: (patient: { id: { toString: () => string } }) => void;
+  }>,
+  newPatientWizardProps: [] as Array<{
     onCreated?: (patient: { id: { toString: () => string } }) => void;
   }>,
 }));
@@ -30,6 +33,13 @@ vi.mock("@modules/patient/ui/PatientForm", () => ({
   PatientFormSkeleton: () => null,
   PatientForm: (props: (typeof patientFormProps)[number]) => {
     patientFormProps.push(props);
+    return <div>Legacy patient form</div>;
+  },
+}));
+
+vi.mock("@modules/patient/ui/NewPatientWizard", () => ({
+  NewPatientWizard: (props: (typeof newPatientWizardProps)[number]) => {
+    newPatientWizardProps.push(props);
     return (
       <button
         type="button"
@@ -69,6 +79,7 @@ function renderPage(initialEntry: string) {
 describe("NewPatientPage quick consultation return", () => {
   beforeEach(() => {
     patientFormProps.length = 0;
+    newPatientWizardProps.length = 0;
   });
 
   it("returns to quick consultation with the created patient ID", () => {
@@ -84,7 +95,7 @@ describe("NewPatientPage quick consultation return", () => {
   it("keeps the normal creation flow when returnTo is absent", () => {
     renderPage("/pacientes/nuevo");
 
-    expect(patientFormProps.at(-1)?.mode).toBe("create");
-    expect(patientFormProps.at(-1)?.onCreated).toBeUndefined();
+    expect(newPatientWizardProps.at(-1)?.onCreated).toBeUndefined();
+    expect(patientFormProps).toHaveLength(0);
   });
 });
