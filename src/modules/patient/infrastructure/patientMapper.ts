@@ -1,4 +1,8 @@
-import { Patient, type PatientProps } from "../domain/Patient";
+import {
+  Patient,
+  type PatientMedicalIntake,
+  type PatientProps,
+} from "../domain/Patient";
 import { PatientId } from "../domain/PatientId";
 import { ConsentId } from "../domain/ConsentId";
 import type { Sex } from "../domain/Sex";
@@ -51,6 +55,7 @@ export interface PatientRow {
   external_record_number: string | null;
   admission_reason?: string | null;
   photo_url: string | null;
+  medical_intake?: string | Partial<PatientMedicalIntake> | null;
   status: PatientStatus;
   created_at: string;
   updated_at: string;
@@ -109,6 +114,10 @@ export const patientRowToDomain = (row: PatientRow): Patient => {
     externalRecordNumber: row.external_record_number,
     admissionReason: row.admission_reason ?? null,
     photoUrl: row.photo_url,
+    medicalIntake: safeJsonParse<Partial<PatientMedicalIntake>>(
+      row.medical_intake,
+      {},
+    ),
     status: row.status,
     createdAt: safeDate(row.created_at, undefined, "patient.created_at")!,
     updatedAt: safeDate(row.updated_at, undefined, "patient.updated_at")!,
@@ -166,6 +175,7 @@ export const patientDomainToRow = (patient: Patient): PatientRow => {
     external_record_number: patient.externalRecordNumber,
     admission_reason: patient.admissionReason,
     photo_url: patient.photoUrl,
+    medical_intake: JSON.stringify(patient.medicalIntake),
     status: patient.status,
     created_at: toIsoStringSafe(
       patient.createdAt,

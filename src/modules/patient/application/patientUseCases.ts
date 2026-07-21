@@ -198,6 +198,7 @@ export class RestorePatientUseCase {
       externalRecordNumber: existing.externalRecordNumber,
       admissionReason: existing.admissionReason,
       photoUrl: existing.photoUrl,
+      medicalIntake: existing.medicalIntake,
       status: "active",
       createdAt: existing.createdAt,
       updatedAt: new Date(),

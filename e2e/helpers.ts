@@ -7,7 +7,8 @@
 
 import { expect, type Page } from "@playwright/test";
 
-export const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@nutriclinica.local";
+export const ADMIN_EMAIL =
+  process.env.E2E_ADMIN_EMAIL ?? "admin@nutriclinica.local";
 export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin123!";
 
 /**
@@ -19,28 +20,31 @@ export async function fakeLogin(
   page: Page,
   sucursalActivaId: string | null = null,
 ): Promise<void> {
-  await page.addInitScript(({ email, sucursalActivaId }) => {
-    localStorage.setItem(
-      "auth-store",
-      JSON.stringify({
-        state: {
-          token: "e2e-test-token",
-          user: {
-            id: "e2e-test-user",
-            email,
-            nombre: "Admin",
-            apellido: "Test",
-            nombreCompleto: "Admin Test",
-            rol: "admin",
+  await page.addInitScript(
+    ({ email, sucursalActivaId }) => {
+      localStorage.setItem(
+        "auth-store",
+        JSON.stringify({
+          state: {
+            token: "e2e-test-token",
+            user: {
+              id: "e2e-test-user",
+              email,
+              nombre: "Admin",
+              apellido: "Test",
+              nombreCompleto: "Admin Test",
+              rol: "admin",
+            },
+            sucursales: [],
+            sucursalActivaId,
+            isAuthenticated: true,
           },
-          sucursales: [],
-          sucursalActivaId,
-          isAuthenticated: true,
-        },
-        version: 0,
-      }),
-    );
-  }, { email: ADMIN_EMAIL, sucursalActivaId });
+          version: 0,
+        }),
+      );
+    },
+    { email: ADMIN_EMAIL, sucursalActivaId },
+  );
 }
 
 /** URL base + hash. El router es `createHashRouter`. */
@@ -64,11 +68,16 @@ export async function loginAsAdmin(page: Page): Promise<void> {
     timeout: 15_000,
   });
   await page.getByLabel(/Correo electr[oó]nico/i).fill(ADMIN_EMAIL);
-  await page.getByRole("textbox", { name: /Contrase[ñn]a/i }).fill(ADMIN_PASSWORD);
-  await page.getByRole("button", { name: /^(Iniciar sesión|Log in)$/i }).click();
+  const passwordInput = page.getByRole("textbox", {
+    name: /Contrase[ñn]a/i,
+  });
+  await passwordInput.fill(ADMIN_PASSWORD);
+  await passwordInput.press("Enter");
   // El router redirige al Panel tras login OK
   await page.waitForURL((url) => url.hash !== "#/login", { timeout: 15_000 });
-  await expect(page.getByRole("heading", { name: /^(Dashboard|Panel)$/i })).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.getByRole("heading", { name: /^(Dashboard|Panel)$/i }),
+  ).toBeVisible({ timeout: 10_000 });
 }
 
 /** Genera un email único para no chocar con datos existentes en la DB. */

@@ -42,10 +42,14 @@
 .nc-new-patient {
   container-type: inline-size;
   display: grid;
-  width: min(1480px, 100%);
+  width: min(1620px, 100%);
   grid-template-columns: 280px minmax(0, 1fr);
   gap: 12px;
   margin: 0 auto;
+}
+
+.nc-new-patient[data-medical-history] {
+  grid-template-columns: 280px 220px minmax(0, 1fr);
 }
 
 .nc-new-patient__sidebar {
@@ -72,6 +76,109 @@
   width: 1px;
   background: hsl(var(--border));
   content: "";
+}
+
+.nc-new-patient__medicalNav {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.78);
+  border-radius: 9px;
+  background: hsl(var(--card));
+  box-shadow: 0 5px 18px hsl(var(--foreground) / 0.025);
+}
+
+.nc-new-patient__medicalNav nav {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 10px;
+}
+
+.nc-new-patient__medicalNav button {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 88px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  border: 1px solid hsl(var(--border) / 0.78);
+  border-radius: 9px;
+  background: hsl(var(--card));
+  padding: 11px 7px;
+  color: hsl(var(--foreground));
+  text-align: left;
+  transition: 150ms ease;
+}
+
+.nc-new-patient__medicalNav button::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  border-radius: 9px 0 0 9px;
+  background: transparent;
+  content: "";
+}
+
+.nc-new-patient__medicalNav button:hover {
+  border-color: hsl(var(--border) / 0.78);
+  background: rgb(37 99 235 / 2%);
+}
+
+.nc-new-patient__medicalNav button:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+.nc-new-patient__medicalNav button[data-current] {
+  border-color: transparent;
+  background: linear-gradient(100deg, rgb(37 99 235 / 8%), rgb(37 99 235 / 3%));
+}
+
+.nc-new-patient__medicalNav button[data-current]::before {
+  background: #2563eb;
+}
+
+.nc-new-patient__medicalNav button > span:first-child {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(37 99 235 / 6%);
+  color: #2563eb;
+}
+
+.nc-new-patient__medicalNav button > span:first-child svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.7;
+}
+
+.nc-new-patient__medicalNav button > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.nc-new-patient__medicalNav strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.nc-new-patient__medicalNav small {
+  color: hsl(var(--muted-foreground));
+  font-size: 9.5px;
+  line-height: 1.35;
+  letter-spacing: -0.015em;
+  text-wrap: pretty;
+}
+
+.nc-new-patient__medicalNav button[data-current] small {
+  color: #2563eb;
 }
 
 .nc-new-patient__menuStep {
@@ -163,6 +270,12 @@
   width: 20px;
   height: 20px;
   stroke-width: 1.7;
+}
+
+.nc-new-patient__menuIcon .lucide-running {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.8;
 }
 
 .nc-new-patient__menuStep[data-current] .nc-new-patient__menuIcon {
@@ -261,9 +374,25 @@
 }
 
 .nc-new-patient__formCard[data-step="1"] .nc-new-patient__formHeader,
-.nc-new-patient__formCard[data-step="2"] .nc-new-patient__formHeader {
+.nc-new-patient__formCard[data-step="2"] .nc-new-patient__formHeader,
+.nc-new-patient__formCard[data-step="4"] .nc-new-patient__formHeader {
   border-bottom: 1px solid hsl(var(--border) / 0.7);
   padding-bottom: 16px;
+}
+
+.nc-new-patient__formCard[data-step="4"] .nc-new-patient__formHeader p {
+  color: #2563eb;
+}
+
+.nc-new-patient__formCard[data-step="4"] .nc-new-patient__formHeaderIcon {
+  border-radius: 0;
+  background: transparent;
+}
+
+.nc-new-patient__formCard[data-step="4"] .nc-new-patient__formHeaderIcon svg {
+  width: 44px;
+  height: 44px;
+  stroke-width: 1.6;
 }
 
 .nc-new-patient__illustration {
@@ -366,6 +495,24 @@
   max-width: none;
   gap: 18px;
   margin-top: 24px;
+}
+
+.nc-new-patient__formFields[data-medical-history],
+.nc-new-patient__formFields[data-physical-activity] {
+  width: 100%;
+  max-width: none;
+  gap: 22px;
+  margin-top: 34px;
+}
+
+.nc-new-patient__formFields[data-medical-history] {
+  column-gap: 18px;
+}
+
+.nc-new-patient__formFields[data-medical-section="family"] {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 14px;
 }
 
 .nc-new-patient__formFields[data-contact]
@@ -819,6 +966,348 @@
   min-height: 76px;
 }
 
+.nc-new-patient__binaryQuestion {
+  display: grid;
+  min-width: 0;
+  min-height: 110px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid hsl(var(--border) / 0.86);
+  border-radius: 9px;
+  background: hsl(var(--card));
+  margin: 0;
+  padding: 18px 14px;
+}
+
+.nc-new-patient__binaryQuestion[data-wide] {
+  grid-column: 1 / -1;
+}
+
+.nc-new-patient__binaryQuestionIcon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(37 99 235 / 6%);
+  color: #2563eb;
+}
+
+.nc-new-patient__binaryQuestionIcon svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 1.7;
+}
+
+.nc-new-patient__formFields[data-medical-section="medications"]
+  .nc-new-patient__binaryQuestionIcon {
+  border-radius: 9px;
+}
+
+.nc-new-patient__binaryQuestion > strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.nc-new-patient__binaryOptions {
+  display: flex;
+  justify-self: end;
+  gap: 4px;
+}
+
+.nc-new-patient__binaryOptions label {
+  position: relative;
+  cursor: pointer;
+}
+
+.nc-new-patient__binaryOptions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.nc-new-patient__binaryOptions span {
+  display: grid;
+  width: 48px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 7px;
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  transition: 150ms ease;
+}
+
+.nc-new-patient__binaryOptions label:first-child span {
+  color: #2563eb;
+}
+
+.nc-new-patient__binaryOptions label:last-child span {
+  color: hsl(var(--foreground));
+}
+
+.nc-new-patient__binaryQuestion[data-field="previousSurgeries"]
+  .nc-new-patient__binaryQuestionIcon
+  svg {
+  transform: rotate(-45deg);
+}
+
+.nc-new-patient__binaryOptions label:first-child input:checked + span {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+}
+
+.nc-new-patient__binaryOptions label:last-child input:checked + span {
+  border-color: hsl(var(--foreground));
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+}
+
+.nc-new-patient__binaryOptions input:focus-visible + span {
+  outline: 3px solid rgb(37 99 235 / 16%);
+  outline-offset: -3px;
+}
+
+.nc-new-patient__binaryQuestion > small {
+  grid-column: 2 / -1;
+  margin-top: -8px;
+  color: hsl(var(--destructive));
+  font-size: 10px;
+}
+
+.nc-new-patient__familyHistory {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.nc-new-patient__familyHistory > h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.nc-new-patient__familyHistoryGrid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.16fr) minmax(0, 1fr);
+  gap: 15px 16px;
+}
+
+.nc-new-patient__familyField,
+.nc-new-patient__familyOtherField,
+.nc-new-patient__familyNotes {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 6px;
+}
+
+.nc-new-patient__familyField > label,
+.nc-new-patient__familyOtherField > label,
+.nc-new-patient__familyNotes > label {
+  display: flex;
+  min-height: 17px;
+  align-items: center;
+  gap: 7px;
+  color: hsl(var(--foreground) / 0.9);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.nc-new-patient__familyField > label svg,
+.nc-new-patient__familyOtherField > label svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: #2563eb;
+  stroke-width: 1.8;
+}
+
+.nc-new-patient__familyOtherField {
+  grid-column: span 2;
+}
+
+.nc-new-patient__familyOtherField input,
+.nc-new-patient__familySelectTrigger {
+  height: 32px;
+  border: 1px solid hsl(var(--border) / 0.72);
+  border-radius: 7px;
+  background: hsl(var(--background));
+  box-shadow: none;
+  font-size: 10.5px;
+}
+
+.nc-new-patient__familyOtherField input {
+  padding-inline: 12px;
+}
+
+.nc-new-patient__familySelect {
+  position: relative;
+  min-width: 0;
+}
+
+.nc-new-patient__familySelect[data-open] {
+  z-index: 30;
+}
+
+.nc-new-patient__familySelectTrigger {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px 0 12px;
+  color: hsl(var(--foreground));
+  cursor: pointer;
+  transition: 150ms ease;
+}
+
+.nc-new-patient__familySelectTrigger:hover,
+.nc-new-patient__familySelect[data-open] .nc-new-patient__familySelectTrigger {
+  border-color: rgb(37 99 235 / 48%);
+}
+
+.nc-new-patient__familySelectTrigger:focus-visible {
+  border-color: #2563eb;
+  outline: 3px solid rgb(37 99 235 / 12%);
+}
+
+.nc-new-patient__familySelectTrigger > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nc-new-patient__familySelectTrigger > span[data-placeholder] {
+  color: hsl(var(--muted-foreground));
+}
+
+.nc-new-patient__familySelectTrigger > svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: hsl(var(--muted-foreground));
+  transition: transform 150ms ease;
+}
+
+.nc-new-patient__familySelect[data-open]
+  .nc-new-patient__familySelectTrigger
+  > svg {
+  transform: rotate(180deg);
+}
+
+.nc-new-patient__familySelectOptions {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 2px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: hsl(var(--popover));
+  padding: 5px;
+  box-shadow: 0 12px 28px hsl(var(--foreground) / 0.12);
+}
+
+.nc-new-patient__familySelectOptions label {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 8px;
+  border-radius: 5px;
+  padding: 5px 7px;
+  font-size: 10.5px;
+  cursor: pointer;
+}
+
+.nc-new-patient__familySelectOptions label:hover {
+  background: rgb(37 99 235 / 6%);
+}
+
+.nc-new-patient__familySelectOptions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.nc-new-patient__familySelectOptions label > span {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  color: transparent;
+}
+
+.nc-new-patient__familySelectOptions label > span svg {
+  width: 11px;
+  height: 11px;
+}
+
+.nc-new-patient__familySelectOptions input:checked + span {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+}
+
+.nc-new-patient__familyField > small,
+.nc-new-patient__familyOtherField > small,
+.nc-new-patient__familyNotes > small {
+  color: hsl(var(--destructive));
+  font-size: 9.5px;
+}
+
+.nc-new-patient__familyField[data-family-field="familyDyslipidemia"] > label {
+  gap: 5px;
+  letter-spacing: -0.015em;
+  white-space: nowrap;
+}
+
+.nc-new-patient__familyField[data-family-field="familyKidneyDisease"] > label,
+.nc-new-patient__familyField[data-family-field="familyThyroidDisease"] > label {
+  letter-spacing: -0.01em;
+}
+
+.nc-new-patient__familyNotes textarea {
+  height: 52px;
+  min-height: 52px;
+  max-height: 96px;
+  resize: vertical;
+  font-size: 10.5px;
+}
+
+.nc-new-patient__familyNotice {
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  gap: 12px;
+  border-radius: 8px;
+  background: linear-gradient(100deg, rgb(37 99 235 / 8%), rgb(37 99 235 / 3%));
+  padding: 9px 14px;
+  color: #2563eb;
+  font-size: 10.5px;
+}
+
+.nc-new-patient__familyNotice svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
 .nc-new-patient__requiredCallout {
   position: static;
   display: flex;
@@ -917,14 +1406,14 @@
 
 .nc-new-patient__navigationCard {
   display: flex;
-  min-height: 58px;
+  min-height: 66px;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   border-top: 1px solid hsl(var(--border) / 0.72);
   background: transparent;
   margin: auto -20px -20px;
-  padding: 10px 16px;
+  padding: 12px 20px;
 }
 
 .nc-new-patient__progressBlock {
@@ -942,7 +1431,7 @@
 }
 
 .nc-new-patient__progressTrack {
-  width: 260px;
+  width: 232px;
   height: 4px;
   overflow: hidden;
   border-radius: 999px;
@@ -1011,6 +1500,7 @@
 }
 
 .alternative .nc-new-patient__sidebar,
+.alternative .nc-new-patient__medicalNav,
 .alternative .nc-new-patient__formCard {
   border-color: var(--alt-card-border, hsl(var(--border)));
   background: var(--alt-card-bg, hsl(var(--card)));
@@ -1020,6 +1510,10 @@
 @container (max-width: 1180px) {
   .nc-new-patient {
     grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .nc-new-patient[data-medical-history] {
+    grid-template-columns: 220px 200px minmax(0, 1fr);
   }
 
   .nc-new-patient__illustration {
@@ -1042,13 +1536,19 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .nc-new-patient[data-medical-history] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .nc-new-patient__sidebar {
     min-height: 0;
   }
 
   .nc-new-patient__sidebar nav {
     overflow-x: auto;
-    grid-template-columns: repeat(5, minmax(210px, 1fr));
+    grid-auto-columns: minmax(210px, 1fr);
+    grid-auto-flow: column;
+    grid-template-columns: none;
     scrollbar-width: thin;
   }
 
@@ -1058,6 +1558,17 @@
 
   .nc-new-patient__menuStep {
     min-height: 68px;
+  }
+
+  .nc-new-patient__medicalNav nav {
+    overflow-x: auto;
+    grid-auto-columns: minmax(220px, 1fr);
+    grid-auto-flow: column;
+    scrollbar-width: thin;
+  }
+
+  .nc-new-patient__medicalNav button {
+    min-height: 78px;
   }
 }
 
@@ -1074,7 +1585,9 @@
   .nc-new-patient__formFields,
   .nc-new-patient__formFields[data-has-illustration],
   .nc-new-patient__formFields[data-emergency],
-  .nc-new-patient__formFields[data-clinical-record] {
+  .nc-new-patient__formFields[data-clinical-record],
+  .nc-new-patient__formFields[data-medical-history],
+  .nc-new-patient__formFields[data-physical-activity] {
     width: auto;
     max-width: none;
     grid-template-columns: minmax(0, 1fr);
@@ -1112,6 +1625,19 @@
     display: none;
   }
 
+  .nc-new-patient__binaryQuestion,
+  .nc-new-patient__binaryQuestion[data-wide] {
+    grid-column: auto;
+  }
+
+  .nc-new-patient__familyHistoryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .nc-new-patient__familyOtherField {
+    grid-column: auto;
+  }
+
   .nc-new-patient__requiredCallout {
     margin-top: 20px;
   }
@@ -1137,6 +1663,27 @@
 }
 
 @container (max-width: 450px) {
+  .nc-new-patient__binaryQuestion {
+    grid-template-columns: 42px minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .nc-new-patient__binaryQuestionIcon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .nc-new-patient__binaryOptions {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .nc-new-patient__binaryQuestion > small {
+    grid-column: 2;
+    margin-top: 0;
+  }
+
   .nc-new-patient__responsibleCard {
     grid-template-columns: 44px minmax(0, 1fr);
   }

@@ -183,6 +183,13 @@ const pacientesMap: EntityColumnMap = {
       nullable: true,
       transform: validatePatientPhotoValue,
     },
+    medical_intake: {
+      dbColumn: "tamizaje_medico_json",
+      sqlType: () => sql.NVarChar(sql.MAX),
+      nullable: true,
+      transform: jsonStringify,
+      parse: jsonParse,
+    },
     emergency_contact_name: {
       dbColumn: "contacto_emergencia_nombre",
       sqlType: () => sql.NVarChar(200),

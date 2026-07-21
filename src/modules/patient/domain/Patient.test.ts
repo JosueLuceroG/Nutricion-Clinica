@@ -45,6 +45,19 @@ describe("Patient.create", () => {
     expect(patient.externalRecordNumber).toBeNull();
     expect(patient.admissionReason).toBeNull();
     expect(patient.photoUrl).toBeNull();
+    expect(patient.medicalIntake).toEqual({
+      diagnosedConditions: null,
+      previousSurgeries: null,
+      currentTreatments: null,
+      intolerances: null,
+      familyHistory: null,
+      familyHistoryDetails: null,
+      medications: null,
+      supplements: null,
+      medicationAllergies: null,
+      adverseMedicationOrSupplementEffects: null,
+      physicalActivity: null,
+    });
   });
 
   it("crea paciente con campos opcionales completos", () => {
@@ -71,6 +84,29 @@ describe("Patient.create", () => {
       externalRecordNumber: "EXT-98765",
       admissionReason: "Primera valoración nutricional",
       photoUrl: "https://example.com/photo.jpg",
+      medicalIntake: {
+        diagnosedConditions: true,
+        previousSurgeries: false,
+        currentTreatments: true,
+        intolerances: false,
+        familyHistory: true,
+        familyHistoryDetails: {
+          diabetes: ["mother"],
+          hypertension: ["father"],
+          obesity: ["none"],
+          cardiovascularDisease: ["maternalGrandparents"],
+          dyslipidemia: ["siblings"],
+          kidneyDisease: ["none"],
+          thyroidDisease: ["none"],
+          otherConditions: "  Cardiopatía congénita  ",
+          notes: "  Diagnóstico antes de los 50 años  ",
+        },
+        medications: true,
+        supplements: false,
+        medicationAllergies: true,
+        adverseMedicationOrSupplementEffects: false,
+        physicalActivity: true,
+      },
     });
     expect(patient.gender).toBe("woman");
     expect(patient.maritalStatus).toBe("married");
@@ -92,6 +128,20 @@ describe("Patient.create", () => {
     expect(patient.externalRecordNumber).toBe("EXT-98765");
     expect(patient.admissionReason).toBe("Primera valoración nutricional");
     expect(patient.photoUrl).toBe("https://example.com/photo.jpg");
+    expect(patient.medicalIntake.diagnosedConditions).toBe(true);
+    expect(patient.medicalIntake.previousSurgeries).toBe(false);
+    expect(patient.medicalIntake.physicalActivity).toBe(true);
+    expect(patient.medicalIntake.familyHistoryDetails).toEqual({
+      diabetes: ["mother"],
+      hypertension: ["father"],
+      obesity: ["none"],
+      cardiovascularDisease: ["maternalGrandparents"],
+      dyslipidemia: ["siblings"],
+      kidneyDisease: ["none"],
+      thyroidDisease: ["none"],
+      otherConditions: "Cardiopatía congénita",
+      notes: "Diagnóstico antes de los 50 años",
+    });
   });
 
   it("calcula edad correcta", () => {

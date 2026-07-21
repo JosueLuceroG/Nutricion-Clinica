@@ -8,6 +8,47 @@ import type { RecordStatus } from "./RecordStatus";
 import type { Email, Phone } from "./Contact";
 import type { PatientStatus } from "./PatientStatus";
 
+export type PatientFamilyRelationship =
+  | "none"
+  | "mother"
+  | "father"
+  | "maternalGrandparents"
+  | "paternalGrandparents"
+  | "siblings";
+
+export interface PatientFamilyHistoryDetails {
+  readonly diabetes: readonly PatientFamilyRelationship[];
+  readonly hypertension: readonly PatientFamilyRelationship[];
+  readonly obesity: readonly PatientFamilyRelationship[];
+  readonly cardiovascularDisease: readonly PatientFamilyRelationship[];
+  readonly dyslipidemia: readonly PatientFamilyRelationship[];
+  readonly kidneyDisease: readonly PatientFamilyRelationship[];
+  readonly thyroidDisease: readonly PatientFamilyRelationship[];
+  readonly otherConditions: string | null;
+  readonly notes: string | null;
+}
+
+export interface PatientMedicalIntake {
+  readonly diagnosedConditions: boolean | null;
+  readonly previousSurgeries: boolean | null;
+  readonly currentTreatments: boolean | null;
+  readonly intolerances: boolean | null;
+  readonly familyHistory: boolean | null;
+  readonly familyHistoryDetails: PatientFamilyHistoryDetails | null;
+  readonly medications: boolean | null;
+  readonly supplements: boolean | null;
+  readonly medicationAllergies: boolean | null;
+  readonly adverseMedicationOrSupplementEffects: boolean | null;
+  readonly physicalActivity: boolean | null;
+}
+
+type PatientMedicalIntakeInput = Omit<
+  Partial<PatientMedicalIntake>,
+  "familyHistoryDetails"
+> & {
+  familyHistoryDetails?: Partial<PatientFamilyHistoryDetails> | null;
+};
+
 export class Patient {
   private constructor(
     public readonly id: PatientId,
@@ -45,6 +86,7 @@ export class Patient {
     public readonly externalRecordNumber: string | null,
     public readonly admissionReason: string | null,
     public readonly photoUrl: string | null,
+    public readonly medicalIntake: PatientMedicalIntake,
     public readonly status: PatientStatus,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
@@ -171,6 +213,10 @@ export class Patient {
           : this.admissionReason,
       photoUrl:
         updates.photoUrl !== undefined ? updates.photoUrl : this.photoUrl,
+      medicalIntake:
+        updates.medicalIntake !== undefined
+          ? normalizeMedicalIntake(updates.medicalIntake)
+          : this.medicalIntake,
       status: updates.status ?? this.status,
       createdAt: this.createdAt,
       updatedAt: new Date(),
@@ -216,6 +262,7 @@ export class Patient {
       externalRecordNumber: this.externalRecordNumber,
       admissionReason: this.admissionReason,
       photoUrl: this.photoUrl,
+      medicalIntake: this.medicalIntake,
       status: "inactive",
       createdAt: this.createdAt,
       updatedAt: now,
@@ -268,6 +315,7 @@ export class Patient {
       input.externalRecordNumber?.trim() ?? null,
       input.admissionReason?.trim() ?? null,
       input.photoUrl?.trim() ?? null,
+      normalizeMedicalIntake(input.medicalIntake),
       input.status ?? "active",
       now,
       now,
@@ -312,6 +360,7 @@ export class Patient {
       props.externalRecordNumber,
       props.admissionReason,
       props.photoUrl,
+      normalizeMedicalIntake(props.medicalIntake),
       props.status,
       props.createdAt,
       props.updatedAt,
@@ -356,6 +405,7 @@ export interface PatientProps {
   externalRecordNumber: string | null;
   admissionReason: string | null;
   photoUrl: string | null;
+  medicalIntake?: PatientMedicalIntakeInput | null;
   status: PatientStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -398,10 +448,82 @@ export interface PatientCreate {
   externalRecordNumber?: string | null;
   admissionReason?: string | null;
   photoUrl?: string | null;
+  medicalIntake?: PatientMedicalIntakeInput | null;
   status?: PatientStatus;
 }
 
 export type PatientUpdate = Omit<Partial<PatientCreate>, "id">;
+
+function normalizeMedicalIntake(
+  value?: PatientMedicalIntakeInput | null,
+): PatientMedicalIntake {
+  return Object.freeze({
+    diagnosedConditions: value?.diagnosedConditions ?? null,
+    previousSurgeries: value?.previousSurgeries ?? null,
+    currentTreatments: value?.currentTreatments ?? null,
+    intolerances: value?.intolerances ?? null,
+    familyHistory: value?.familyHistory ?? null,
+    familyHistoryDetails: normalizeFamilyHistoryDetails(
+      value?.familyHistoryDetails,
+    ),
+    medications: value?.medications ?? null,
+    supplements: value?.supplements ?? null,
+    medicationAllergies: value?.medicationAllergies ?? null,
+    adverseMedicationOrSupplementEffects:
+      value?.adverseMedicationOrSupplementEffects ?? null,
+    physicalActivity: value?.physicalActivity ?? null,
+  });
+}
+
+const PATIENT_FAMILY_RELATIONSHIPS = new Set<PatientFamilyRelationship>([
+  "none",
+  "mother",
+  "father",
+  "maternalGrandparents",
+  "paternalGrandparents",
+  "siblings",
+]);
+
+function normalizeFamilyHistoryDetails(
+  value?: Partial<PatientFamilyHistoryDetails> | null,
+): PatientFamilyHistoryDetails | null {
+  if (!value) return null;
+  return Object.freeze({
+    diabetes: normalizeFamilyRelationships(value.diabetes),
+    hypertension: normalizeFamilyRelationships(value.hypertension),
+    obesity: normalizeFamilyRelationships(value.obesity),
+    cardiovascularDisease: normalizeFamilyRelationships(
+      value.cardiovascularDisease,
+    ),
+    dyslipidemia: normalizeFamilyRelationships(value.dyslipidemia),
+    kidneyDisease: normalizeFamilyRelationships(value.kidneyDisease),
+    thyroidDisease: normalizeFamilyRelationships(value.thyroidDisease),
+    otherConditions: normalizeOptionalText(value.otherConditions),
+    notes: normalizeOptionalText(value.notes),
+  });
+}
+
+function normalizeFamilyRelationships(
+  value?: readonly PatientFamilyRelationship[],
+): readonly PatientFamilyRelationship[] {
+  if (!Array.isArray(value)) return Object.freeze([]);
+  const normalized = Array.from(
+    new Set(
+      value.filter((item): item is PatientFamilyRelationship =>
+        PATIENT_FAMILY_RELATIONSHIPS.has(item),
+      ),
+    ),
+  );
+  if (normalized.length > 1) {
+    return Object.freeze(normalized.filter((item) => item !== "none"));
+  }
+  return Object.freeze(normalized);
+}
+
+function normalizeOptionalText(value?: string | null): string | null {
+  const normalized = value?.trim();
+  return normalized || null;
+}
 
 function validateName(name: string, field: string): void {
   const trimmed = name.trim();

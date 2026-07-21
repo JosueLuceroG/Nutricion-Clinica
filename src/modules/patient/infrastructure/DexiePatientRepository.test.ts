@@ -163,6 +163,25 @@ describe("DexiePatientRepository", () => {
       externalRecordNumber: "EXP-2026-001",
       admissionReason: "Primera valoración nutricional",
       photoUrl: "data:image/png;base64,AAAA",
+      medicalIntake: {
+        diagnosedConditions: true,
+        previousSurgeries: false,
+        medicationAllergies: true,
+        adverseMedicationOrSupplementEffects: false,
+        familyHistory: true,
+        familyHistoryDetails: {
+          diabetes: ["mother", "siblings"],
+          hypertension: ["father"],
+          obesity: ["none"],
+          cardiovascularDisease: ["maternalGrandparents"],
+          dyslipidemia: ["none"],
+          kidneyDisease: ["none"],
+          thyroidDisease: ["paternalGrandparents"],
+          otherConditions: null,
+          notes: "Antecedente materno relevante",
+        },
+        physicalActivity: true,
+      },
     });
     await repo.save(p);
 
@@ -173,6 +192,20 @@ describe("DexiePatientRepository", () => {
     expect(found?.externalRecordNumber).toBe("EXP-2026-001");
     expect(found?.admissionReason).toBe("Primera valoración nutricional");
     expect(found?.photoUrl).toBe("data:image/png;base64,AAAA");
+    expect(found?.medicalIntake.diagnosedConditions).toBe(true);
+    expect(found?.medicalIntake.previousSurgeries).toBe(false);
+    expect(found?.medicalIntake.medicationAllergies).toBe(true);
+    expect(found?.medicalIntake.adverseMedicationOrSupplementEffects).toBe(
+      false,
+    );
+    expect(found?.medicalIntake.physicalActivity).toBe(true);
+    expect(found?.medicalIntake.familyHistoryDetails?.diabetes).toEqual([
+      "mother",
+      "siblings",
+    ]);
+    expect(found?.medicalIntake.familyHistoryDetails?.notes).toBe(
+      "Antecedente materno relevante",
+    );
     expect(found?.birthDate.toISOString()).toBe(
       new Date("1992-08-20").toISOString(),
     );

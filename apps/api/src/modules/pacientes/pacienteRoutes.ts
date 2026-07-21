@@ -35,6 +35,45 @@ const PatientPhotoSchema = z.string().superRefine((value, context) => {
   }
 });
 
+const FamilyRelationshipSchema = z.enum([
+  "none",
+  "mother",
+  "father",
+  "maternalGrandparents",
+  "paternalGrandparents",
+  "siblings",
+]);
+
+const FamilyHistoryDetailsSchema = z
+  .object({
+    diabetes: z.array(FamilyRelationshipSchema).max(6),
+    hypertension: z.array(FamilyRelationshipSchema).max(6),
+    obesity: z.array(FamilyRelationshipSchema).max(6),
+    cardiovascularDisease: z.array(FamilyRelationshipSchema).max(6),
+    dyslipidemia: z.array(FamilyRelationshipSchema).max(6),
+    kidneyDisease: z.array(FamilyRelationshipSchema).max(6),
+    thyroidDisease: z.array(FamilyRelationshipSchema).max(6),
+    otherConditions: z.string().max(500).nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict();
+
+const MedicalIntakeSchema = z
+  .object({
+    diagnosedConditions: z.boolean().nullable().optional(),
+    previousSurgeries: z.boolean().nullable().optional(),
+    currentTreatments: z.boolean().nullable().optional(),
+    intolerances: z.boolean().nullable().optional(),
+    familyHistory: z.boolean().nullable().optional(),
+    familyHistoryDetails: FamilyHistoryDetailsSchema.nullable().optional(),
+    medications: z.boolean().nullable().optional(),
+    supplements: z.boolean().nullable().optional(),
+    medicationAllergies: z.boolean().nullable().optional(),
+    adverseMedicationOrSupplementEffects: z.boolean().nullable().optional(),
+    physicalActivity: z.boolean().nullable().optional(),
+  })
+  .strict();
+
 const PacienteCreateBody = z.object({
   nombres: z.string().min(1).max(120),
   apellidoPaterno: z.string().min(1).max(80),
@@ -52,6 +91,7 @@ const PacienteCreateBody = z.object({
   numeroExpedienteExterno: z.string().max(100).optional().nullable(),
   motivoIngreso: z.string().max(500).optional().nullable(),
   fotoUrl: PatientPhotoSchema.optional().nullable(),
+  tamizajeMedico: MedicalIntakeSchema.optional().nullable(),
   contactoEmergenciaNombre: z.string().max(200).optional().nullable(),
   contactoEmergenciaParentesco: z.string().max(60).optional().nullable(),
   contactoEmergenciaTelefono: z.string().max(40).optional().nullable(),
@@ -83,6 +123,7 @@ interface PacienteRow {
   numero_expediente_externo: string | null;
   motivo_ingreso: string | null;
   foto_url: string | null;
+  tamizaje_medico_json: string | null;
   contacto_emergencia_nombre: string | null;
   contacto_emergencia_parentesco: string | null;
   contacto_emergencia_telefono: string | null;
@@ -114,6 +155,7 @@ function rowToPaciente(row: PacienteRow): Record<string, unknown> {
     numeroExpedienteExterno: row.numero_expediente_externo,
     motivoIngreso: row.motivo_ingreso,
     fotoUrl: row.foto_url,
+    tamizajeMedico: parseJsonObject(row.tamizaje_medico_json),
     contactoEmergenciaNombre: row.contacto_emergencia_nombre,
     contactoEmergenciaParentesco: row.contacto_emergencia_parentesco,
     contactoEmergenciaTelefono: row.contacto_emergencia_telefono,
@@ -128,10 +170,23 @@ function canMutate(rol: string): boolean {
   return ["admin", "nutriologa", "asistente"].includes(rol);
 }
 
+function parseJsonObject(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 const SELECT_PACIENTE = `
   SELECT id, sucursal_id, profesional_titular_id, nombres, apellido_paterno, apellido_materno,
          fecha_nacimiento, sexo, genero, estado_civil, ocupacion, escolaridad, email, telefono,
          telefono_secundario, whatsapp_habilitado, numero_expediente_externo, motivo_ingreso, foto_url,
+         tamizaje_medico_json,
          contacto_emergencia_nombre, contacto_emergencia_parentesco,
          contacto_emergencia_telefono, notas_generales, status, created_at, updated_at, row_version
     FROM pacientes
@@ -227,6 +282,11 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         validatePatientPhotoValue(body.fotoUrl),
       )
       .input(
+        "tamizaje_medico_json",
+        sql.NVarChar(sql.MAX),
+        body.tamizajeMedico ? JSON.stringify(body.tamizajeMedico) : null,
+      )
+      .input(
         "contacto_emergencia_nombre",
         sql.NVarChar(200),
         body.contactoEmergenciaNombre ?? null,
@@ -250,13 +310,15 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
         `INSERT INTO pacientes
            (id, sucursal_id, profesional_titular_id, nombres, apellido_paterno, apellido_materno,
             fecha_nacimiento, sexo, genero, estado_civil, ocupacion, escolaridad, email, telefono,
-            telefono_secundario, whatsapp_habilitado, numero_expediente_externo, motivo_ingreso, foto_url,
+             telefono_secundario, whatsapp_habilitado, numero_expediente_externo, motivo_ingreso, foto_url,
+             tamizaje_medico_json,
             contacto_emergencia_nombre, contacto_emergencia_parentesco,
             contacto_emergencia_telefono, notas_generales)
          VALUES
            (@id, @sucursal_id, @profesional_titular_id, @nombres, @apellido_paterno, @apellido_materno,
             @fecha_nacimiento, @sexo, @genero, @estado_civil, @ocupacion, @escolaridad, @email, @telefono,
-            @telefono_secundario, @whatsapp_habilitado, @numero_expediente_externo, @motivo_ingreso, @foto_url,
+             @telefono_secundario, @whatsapp_habilitado, @numero_expediente_externo, @motivo_ingreso, @foto_url,
+             @tamizaje_medico_json,
             @contacto_emergencia_nombre, @contacto_emergencia_parentesco,
             @contacto_emergencia_telefono, @notas_generales)`,
       );
@@ -466,6 +528,13 @@ router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
         type: sql.NVarChar(sql.MAX),
         val:
           body.fotoUrl == null ? null : validatePatientPhotoValue(body.fotoUrl),
+      },
+      tamizajeMedico: {
+        col: "tamizaje_medico_json",
+        type: sql.NVarChar(sql.MAX),
+        val: body.tamizajeMedico
+          ? JSON.stringify(body.tamizajeMedico)
+          : body.tamizajeMedico,
       },
       profesionalTitularId: {
         col: "profesional_titular_id",

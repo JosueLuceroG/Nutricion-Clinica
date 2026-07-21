@@ -18,7 +18,8 @@ import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
 
 const PATIENT_FIRST = "E2E";
 const PATIENT_LAST = "SmokeTest";
-const SYNC_BUTTON_NAME = /^(Sincronizar|Forzar un ciclo de sync ahora)$/i;
+const SYNC_BUTTON_NAME =
+  /^(Sincronizar(?: ahora)?|Sync Now|Forzar un ciclo de sync ahora)$/i;
 
 async function forceSync(page: Page) {
   const syncBtn = page.getByRole("button", { name: SYNC_BUTTON_NAME });
@@ -123,6 +124,63 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     await page
       .locator('textarea[name="admissionReason"]')
       .fill("Registro de prueba E2E");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+
+    for (const field of [
+      "diagnosedConditions",
+      "previousSurgeries",
+      "currentTreatments",
+      "intolerances",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "familyDiabetes",
+      "familyHypertension",
+      "familyObesity",
+      "familyCardiovascular",
+      "familyDyslipidemia",
+      "familyKidneyDisease",
+      "familyThyroidDisease",
+    ]) {
+      const familySelect = page.locator(`[data-family-field="${field}"]`);
+      await familySelect
+        .locator(".nc-new-patient__familySelectTrigger")
+        .click();
+      await familySelect
+        .locator('input[type="checkbox"][value="none"]')
+        .click();
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "supplements",
+      "medicationAllergies",
+      "medications",
+      "adverseMedicationOrSupplementEffects",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="physicalActivity"][value="no"]')
+      .check({ force: true });
     await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()

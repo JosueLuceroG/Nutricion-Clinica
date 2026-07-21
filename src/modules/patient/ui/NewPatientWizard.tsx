@@ -3,19 +3,29 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
   ArrowRight,
+  Bandage,
   BriefcaseBusiness,
   CalendarDays,
+  ChevronDown,
   CircleCheck,
+  CircleEllipsis,
   CloudUpload,
+  createLucideIcon,
+  Droplet,
   FolderOpen,
   Heart,
+  HeartPulse,
   Info,
   Mail,
   MessageCircle,
   MessageCircleOff,
+  Pill,
+  PillBottle,
   Phone,
   Save,
+  ShieldAlert,
   ShieldCheck,
+  Stethoscope,
   Tags,
   Trash2,
   UserRound,
@@ -23,7 +33,14 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useForm, type FieldError, type Path } from "react-hook-form";
+import {
+  Controller,
+  useForm,
+  type Control,
+  type FieldError,
+  type Path,
+  type UseFormRegister,
+} from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -46,6 +63,137 @@ import { SexSchema, type Sex } from "@modules/patient/domain/Sex";
 import { patientService } from "@services/patientService";
 import { useAuthStore } from "@store/authStore";
 import "./NewPatientWizard.css";
+
+const MedicalClipboardIcon = createLucideIcon("MedicalClipboard", [
+  [
+    "rect",
+    { width: "14", height: "18", x: "5", y: "4", rx: "2", key: "clipboard" },
+  ],
+  ["path", { d: "M9 4V2h6v2", key: "clip" }],
+  ["path", { d: "M8 13h2l1.5-3 2.5 6 1.5-3H18", key: "pulse" }],
+]);
+
+const FamilyGroupIcon = createLucideIcon("FamilyGroup", [
+  ["circle", { cx: "12", cy: "7", r: "3", key: "center-head" }],
+  ["circle", { cx: "5", cy: "9", r: "2", key: "left-head" }],
+  ["circle", { cx: "19", cy: "9", r: "2", key: "right-head" }],
+  ["path", { d: "M6 20v-1a6 6 0 0 1 12 0v1", key: "center-body" }],
+  ["path", { d: "M2 20v-.5A4.5 4.5 0 0 1 6.5 15", key: "left-body" }],
+  ["path", { d: "M22 20v-.5a4.5 4.5 0 0 0-4.5-4.5", key: "right-body" }],
+]);
+
+const RunningIcon = createLucideIcon("Running", [
+  ["circle", { cx: "14", cy: "4", r: "2", key: "head" }],
+  ["path", { d: "m13 7-3 4 3 2 2 4 3 4", key: "body" }],
+  ["path", { d: "m10 11-3 3-3-1", key: "back-arm" }],
+  ["path", { d: "m12 8 4 3 4-1", key: "front-arm" }],
+  ["path", { d: "m13 13-4 3-2 5", key: "back-leg" }],
+]);
+
+const KidneyIcon = createLucideIcon("Kidney", [
+  [
+    "path",
+    {
+      d: "M9.986 6c.157-1.406-.982-3-3.415-3C4.047 3 2 5.462 2 8.5S3.539 14 6.064 14c1.616 0 2.472-1.254 2.292-2.341",
+      key: "left-kidney",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M7 8c1.5 0 3.5.496 3.5 3.64 0 4.16-2 5.72-.5 9.36",
+      key: "left-ureter",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M17 8c-1.5 0-3.5.496-3.5 3.64 0 4.16 2 5.72.5 9.36",
+      key: "right-ureter",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M6.61 6c.204.571.55 1.943.306 2.857C6.814 9.238 6.488 10 6 10",
+      key: "left-hilum",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M14.014 6c-.157-1.406.982-3 3.415-3C19.953 3 22 5.462 22 8.5S20.461 14 17.936 14c-1.695 0-2.554-1.38-2.258-2.5",
+      key: "right-kidney",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M17.39 6c-.204.571-.55 1.943-.306 2.857.102.381.428 1.143.916 1.143",
+      key: "right-hilum",
+    },
+  ],
+]);
+
+const ThyroidIcon = createLucideIcon("Thyroid", [
+  [
+    "path",
+    {
+      d: "M12 18.176a3 3 0 1 1-4.953-2.449l-.025.023A4.502 4.502 0 0 1 8.505 7c1.414 0 2.675.652 3.5 1.671a4.5 4.5 0 1 1 4.983 7.079A3 3 0 1 1 12.005 18Z",
+      key: "lobes",
+    },
+  ],
+  ["path", { d: "M12 19V9", key: "isthmus" }],
+  ["path", { d: "m9 3 3 2 3-2", key: "upper-lobes" }],
+]);
+
+const SupplementBottleIcon = createLucideIcon("SupplementBottle", [
+  ["path", { d: "M8 2h8v3H8Z", key: "cap" }],
+  [
+    "path",
+    { d: "M7 5h10l1 3v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V8Z", key: "bottle" },
+  ],
+  ["path", { d: "M9 10h4", key: "label" }],
+  ["path", { d: "M11 17c0-3 2-5 5-5 0 3-2 5-5 5Z", key: "leaf" }],
+  ["path", { d: "M11 17v2", key: "stem" }],
+]);
+
+const MedicationAllergyIcon = createLucideIcon("MedicationAllergy", [
+  ["path", { d: "M7 2h7v3H7Z", key: "cap" }],
+  [
+    "path",
+    { d: "M6 5h9l1 3v9a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V8Z", key: "bottle" },
+  ],
+  ["path", { d: "M8 10h5m-2-2v5", key: "cross" }],
+  ["path", { d: "m18 13 4 7h-8Z", key: "warning" }],
+  ["path", { d: "M18 16v1.5m0 1.5h.01", key: "alert" }],
+]);
+
+const PrescriptionIcon = createLucideIcon("Prescription", [
+  ["path", { d: "M6 2h8l4 4v16H6Z", key: "page" }],
+  ["path", { d: "M14 2v4h4", key: "fold" }],
+  ["path", { d: "M9 9h3a2 2 0 0 1 0 4H9V9Zm2.5 4 3 4", key: "r" }],
+  ["path", { d: "m10 18 4-4m-4 0 4 4", key: "x" }],
+]);
+
+const FAMILY_RELATIONSHIP_VALUES = [
+  "none",
+  "mother",
+  "father",
+  "maternalGrandparents",
+  "paternalGrandparents",
+  "siblings",
+] as const;
+
+type FamilyRelationship = (typeof FAMILY_RELATIONSHIP_VALUES)[number];
+
+const requiredFamilySelection = z
+  .array(z.enum(FAMILY_RELATIONSHIP_VALUES))
+  .min(1, "Selecciona familiares o Ninguno");
+
+const requiredBinaryAnswer = z
+  .enum(["yes", "no", ""])
+  .refine((value): boolean => value !== "", "Selecciona una opción");
 
 const NewPatientWizardSchema = z.object({
   firstName: z
@@ -100,6 +248,29 @@ const NewPatientWizardSchema = z.object({
     .min(5, "Mínimo 5 caracteres")
     .max(500, "Máximo 500 caracteres"),
   photoUrl: z.string().max(7_000_000, "La imagen no puede superar 5 MB"),
+  diagnosedConditions: requiredBinaryAnswer,
+  previousSurgeries: requiredBinaryAnswer,
+  currentTreatments: requiredBinaryAnswer,
+  intolerances: requiredBinaryAnswer,
+  familyDiabetes: requiredFamilySelection,
+  familyHypertension: requiredFamilySelection,
+  familyObesity: requiredFamilySelection,
+  familyCardiovascular: requiredFamilySelection,
+  familyDyslipidemia: requiredFamilySelection,
+  familyKidneyDisease: requiredFamilySelection,
+  familyThyroidDisease: requiredFamilySelection,
+  familyOtherConditions: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .or(z.literal("")),
+  familyHistoryNotes: z.string().trim().max(1000).optional().or(z.literal("")),
+  medications: requiredBinaryAnswer,
+  supplements: requiredBinaryAnswer,
+  medicationAllergies: requiredBinaryAnswer,
+  adverseMedicationOrSupplementEffects: requiredBinaryAnswer,
+  physicalActivity: requiredBinaryAnswer,
   clinicalTags: z
     .string()
     .trim()
@@ -146,6 +317,24 @@ const DEFAULT_VALUES: NewPatientWizardValues = {
   externalRecordNumber: "",
   admissionReason: "",
   photoUrl: "",
+  diagnosedConditions: "",
+  previousSurgeries: "",
+  currentTreatments: "",
+  intolerances: "",
+  familyDiabetes: [],
+  familyHypertension: [],
+  familyObesity: [],
+  familyCardiovascular: [],
+  familyDyslipidemia: [],
+  familyKidneyDisease: [],
+  familyThyroidDisease: [],
+  familyOtherConditions: "",
+  familyHistoryNotes: "",
+  medications: "",
+  supplements: "",
+  medicationAllergies: "",
+  adverseMedicationOrSupplementEffects: "",
+  physicalActivity: "",
   clinicalTags: "",
   generalNotes: "",
 };
@@ -161,11 +350,59 @@ const EMERGENCY_RELATIONSHIPS = [
   ["Otro", "other"],
 ] as const;
 
+const MEDICAL_SECTION_FIELDS = {
+  personal: [
+    "diagnosedConditions",
+    "previousSurgeries",
+    "currentTreatments",
+    "intolerances",
+  ],
+  family: [
+    "familyDiabetes",
+    "familyHypertension",
+    "familyObesity",
+    "familyCardiovascular",
+    "familyDyslipidemia",
+    "familyKidneyDisease",
+    "familyThyroidDisease",
+    "familyOtherConditions",
+    "familyHistoryNotes",
+  ],
+  medications: [
+    "supplements",
+    "medicationAllergies",
+    "medications",
+    "adverseMedicationOrSupplementEffects",
+  ],
+} satisfies Record<string, Path<NewPatientWizardValues>[]>;
+
+type MedicalSection = keyof typeof MEDICAL_SECTION_FIELDS;
+type FamilyHistoryField =
+  | "familyDiabetes"
+  | "familyHypertension"
+  | "familyObesity"
+  | "familyCardiovascular"
+  | "familyDyslipidemia"
+  | "familyKidneyDisease"
+  | "familyThyroidDisease";
+type BinaryQuestionField =
+  | "diagnosedConditions"
+  | "previousSurgeries"
+  | "currentTreatments"
+  | "intolerances"
+  | "medications"
+  | "supplements"
+  | "medicationAllergies"
+  | "adverseMedicationOrSupplementEffects"
+  | "physicalActivity";
+
 export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const [step, setStep] = React.useState(0);
+  const [medicalSection, setMedicalSection] =
+    React.useState<MedicalSection>("personal");
   const [submitting, setSubmitting] = React.useState(false);
   const [showContactNotice, setShowContactNotice] = React.useState(true);
   const [showClinicalNotice, setShowClinicalNotice] = React.useState(true);
@@ -173,6 +410,40 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
   const [draggingPhoto, setDraggingPhoto] = React.useState(false);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
   const submitLockRef = React.useRef(false);
+  const medicalSections: Array<{
+    id: MedicalSection;
+    title: string;
+    menuDescription: string;
+    cardDescription: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      id: "personal",
+      title: t("patient.wizard.pathological_history_title"),
+      menuDescription: t(
+        "patient.wizard.pathological_history_menu_description",
+      ),
+      cardDescription: t("patient.wizard.pathological_history_description"),
+      icon: MedicalClipboardIcon,
+    },
+    {
+      id: "family",
+      title: t("patient.wizard.family_history_title"),
+      menuDescription: t("patient.wizard.family_history_menu_description"),
+      cardDescription: t("patient.wizard.family_history_description"),
+      icon: FamilyGroupIcon,
+    },
+    {
+      id: "medications",
+      title: t("patient.wizard.medications_supplements_title"),
+      menuDescription: t("patient.wizard.medications_supplements_description"),
+      cardDescription: t("patient.wizard.medications_supplements_description"),
+      icon: Pill,
+    },
+  ];
+  const activeMedicalSection =
+    medicalSections.find((section) => section.id === medicalSection) ??
+    medicalSections[0]!;
   const steps: WizardStep[] = [
     {
       title: t("patient.wizard.personal_short"),
@@ -216,6 +487,38 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       fields: ["externalRecordNumber", "admissionReason", "photoUrl"],
     },
     {
+      title: t("patient.wizard.medical_history_short"),
+      description: t("patient.wizard.medical_history_menu_description"),
+      cardDescription: t("patient.wizard.medical_history_menu_description"),
+      icon: HeartPulse,
+      fields: [
+        "diagnosedConditions",
+        "previousSurgeries",
+        "currentTreatments",
+        "intolerances",
+        "familyDiabetes",
+        "familyHypertension",
+        "familyObesity",
+        "familyCardiovascular",
+        "familyDyslipidemia",
+        "familyKidneyDisease",
+        "familyThyroidDisease",
+        "familyOtherConditions",
+        "familyHistoryNotes",
+        "medications",
+        "supplements",
+        "medicationAllergies",
+        "adverseMedicationOrSupplementEffects",
+      ],
+    },
+    {
+      title: t("patient.wizard.physical_activity_short"),
+      description: t("patient.wizard.physical_activity_menu_description"),
+      cardDescription: t("patient.wizard.physical_activity_description"),
+      icon: RunningIcon,
+      fields: ["physicalActivity"],
+    },
+    {
       title: t("patient.wizard.notes_short"),
       description: t("patient.wizard.notes_menu_description"),
       cardDescription: t("patient.wizard.notes_menu_description"),
@@ -225,6 +528,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
   ];
 
   const {
+    control,
     register,
     handleSubmit,
     trigger,
@@ -249,9 +553,37 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       toast.error(t("patient.wizard.responsible_unavailable"));
       return;
     }
+    if (step === 4) {
+      const isSectionValid = await trigger(
+        MEDICAL_SECTION_FIELDS[medicalSection],
+        { shouldFocus: true },
+      );
+      if (!isSectionValid) return;
+      const sectionIndex = medicalSections.findIndex(
+        (section) => section.id === medicalSection,
+      );
+      if (sectionIndex < medicalSections.length - 1) {
+        setMedicalSection(medicalSections[sectionIndex + 1]!.id);
+        return;
+      }
+    }
     const isValid = await trigger(steps[step].fields, { shouldFocus: true });
     if (!isValid) return;
     setStep((current) => Math.min(current + 1, steps.length - 1));
+  };
+
+  const goToPreviousStep = () => {
+    if (step === 4) {
+      const sectionIndex = medicalSections.findIndex(
+        (section) => section.id === medicalSection,
+      );
+      if (sectionIndex > 0) {
+        setMedicalSection(medicalSections[sectionIndex - 1]!.id);
+        return;
+      }
+    }
+    if (step === 5) setMedicalSection("medications");
+    setStep((current) => Math.max(current - 1, 0));
   };
 
   const onSubmit = async (formValues: NewPatientWizardValues) => {
@@ -284,6 +616,32 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
         externalRecordNumber: formValues.externalRecordNumber.trim(),
         admissionReason: formValues.admissionReason.trim(),
         photoUrl: optionalString(formValues.photoUrl),
+        medicalIntake: {
+          diagnosedConditions: formValues.diagnosedConditions === "yes",
+          previousSurgeries: formValues.previousSurgeries === "yes",
+          currentTreatments: formValues.currentTreatments === "yes",
+          intolerances: formValues.intolerances === "yes",
+          familyHistory:
+            hasRecordedFamilyHistory(formValues) ||
+            Boolean(formValues.familyOtherConditions?.trim()),
+          familyHistoryDetails: {
+            diabetes: formValues.familyDiabetes,
+            hypertension: formValues.familyHypertension,
+            obesity: formValues.familyObesity,
+            cardiovascularDisease: formValues.familyCardiovascular,
+            dyslipidemia: formValues.familyDyslipidemia,
+            kidneyDisease: formValues.familyKidneyDisease,
+            thyroidDisease: formValues.familyThyroidDisease,
+            otherConditions: optionalString(formValues.familyOtherConditions),
+            notes: optionalString(formValues.familyHistoryNotes),
+          },
+          medications: formValues.medications === "yes",
+          supplements: formValues.supplements === "yes",
+          medicationAllergies: formValues.medicationAllergies === "yes",
+          adverseMedicationOrSupplementEffects:
+            formValues.adverseMedicationOrSupplementEffects === "yes",
+          physicalActivity: formValues.physicalActivity === "yes",
+        },
         clinicalTags: parseTags(formValues.clinicalTags),
         generalNotes: optionalString(formValues.generalNotes),
       });
@@ -305,7 +663,16 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
   };
 
   const currentStep = steps[step];
-  const CurrentStepIcon = currentStep.icon;
+  const DisplayStepIcon =
+    step === 4 ? activeMedicalSection.icon : currentStep.icon;
+  const displayStepTitle =
+    step === 4
+      ? activeMedicalSection.title
+      : (currentStep.cardTitle ?? currentStep.title);
+  const displayStepDescription =
+    step === 4
+      ? activeMedicalSection.cardDescription
+      : currentStep.cardDescription;
   const isLastStep = step === steps.length - 1;
   const responsibleInitials = getInitials(user?.nombreCompleto ?? "");
 
@@ -340,7 +707,10 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       />
 
       <PageContent className="nc-new-patient-page">
-        <div className="nc-new-patient">
+        <div
+          className="nc-new-patient"
+          data-medical-history={step === 4 || undefined}
+        >
           <aside className="nc-new-patient__sidebar">
             <nav aria-label={t("patient.wizard.progress_label")}>
               {steps.map((wizardStep, index) => {
@@ -383,6 +753,34 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
             </nav>
           </aside>
 
+          {step === 4 && (
+            <aside className="nc-new-patient__medicalNav">
+              <nav aria-label={t("patient.wizard.medical_sections_label")}>
+                {medicalSections.map((section) => {
+                  const SectionIcon = section.icon;
+                  const current = section.id === medicalSection;
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      data-current={current || undefined}
+                      aria-current={current ? "page" : undefined}
+                      onClick={() => setMedicalSection(section.id)}
+                    >
+                      <span aria-hidden="true">
+                        <SectionIcon />
+                      </span>
+                      <span>
+                        <strong>{section.title}</strong>
+                        <small>{section.menuDescription}</small>
+                      </span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </aside>
+          )}
+
           <main className="nc-new-patient__main">
             <form
               id="new-patient-wizard-form"
@@ -406,13 +804,11 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                     className="nc-new-patient__formHeaderIcon"
                     aria-hidden="true"
                   >
-                    <CurrentStepIcon />
+                    <DisplayStepIcon />
                   </span>
                   <div>
-                    <h2 id="new-patient-step-title">
-                      {currentStep.cardTitle ?? currentStep.title}
-                    </h2>
-                    <p>{currentStep.cardDescription}</p>
+                    <h2 id="new-patient-step-title">{displayStepTitle}</h2>
+                    <p>{displayStepDescription}</p>
                   </div>
                 </header>
 
@@ -424,6 +820,9 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                   data-contact={step === 1 || undefined}
                   data-emergency={step === 2 || undefined}
                   data-clinical-record={step === 3 || undefined}
+                  data-medical-history={step === 4 || undefined}
+                  data-medical-section={step === 4 ? medicalSection : undefined}
+                  data-physical-activity={step === 5 || undefined}
                 >
                   {step === 0 && (
                     <>
@@ -869,7 +1268,186 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                     </>
                   )}
 
-                  {step === 4 && (
+                  {step === 4 && medicalSection === "personal" && (
+                    <>
+                      <BinaryQuestion
+                        field="diagnosedConditions"
+                        question={t(
+                          "patient.wizard.question_diagnosed_conditions",
+                        )}
+                        icon={Stethoscope}
+                        register={register}
+                        error={errors.diagnosedConditions}
+                      />
+                      <BinaryQuestion
+                        field="previousSurgeries"
+                        question={t(
+                          "patient.wizard.question_previous_surgeries",
+                        )}
+                        icon={Bandage}
+                        register={register}
+                        error={errors.previousSurgeries}
+                      />
+                      <BinaryQuestion
+                        field="currentTreatments"
+                        question={t(
+                          "patient.wizard.question_current_treatments",
+                        )}
+                        icon={PillBottle}
+                        register={register}
+                        error={errors.currentTreatments}
+                      />
+                      <BinaryQuestion
+                        field="intolerances"
+                        question={t("patient.wizard.question_intolerances")}
+                        icon={UserRound}
+                        register={register}
+                        error={errors.intolerances}
+                      />
+                    </>
+                  )}
+
+                  {step === 4 && medicalSection === "family" && (
+                    <section className="nc-new-patient__familyHistory">
+                      <h3>{t("patient.wizard.family_conditions_title")}</h3>
+                      <div className="nc-new-patient__familyHistoryGrid">
+                        <FamilyHistorySelect
+                          field="familyDiabetes"
+                          label={t("patient.wizard.family_diabetes")}
+                          icon={Droplet}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyHypertension"
+                          label={t("patient.wizard.family_hypertension")}
+                          icon={HeartPulse}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyObesity"
+                          label={t("patient.wizard.family_obesity")}
+                          icon={UserRound}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyCardiovascular"
+                          label={t("patient.wizard.family_cardiovascular")}
+                          icon={HeartPulse}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyDyslipidemia"
+                          label={t("patient.wizard.family_dyslipidemia")}
+                          icon={Droplet}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyKidneyDisease"
+                          label={t("patient.wizard.family_kidney_disease")}
+                          icon={KidneyIcon}
+                          control={control}
+                        />
+                        <FamilyHistorySelect
+                          field="familyThyroidDisease"
+                          label={t("patient.wizard.family_thyroid_disease")}
+                          icon={ThyroidIcon}
+                          control={control}
+                        />
+                        <div className="nc-new-patient__familyOtherField">
+                          <label htmlFor="field-new-patient-family-other">
+                            <CircleEllipsis aria-hidden="true" />
+                            {t("patient.wizard.family_other_conditions")}
+                          </label>
+                          <Input
+                            id="field-new-patient-family-other"
+                            placeholder={t(
+                              "patient.wizard.family_other_conditions_placeholder",
+                            )}
+                            {...register("familyOtherConditions")}
+                          />
+                          {errors.familyOtherConditions?.message && (
+                            <small role="alert">
+                              {errors.familyOtherConditions.message}
+                            </small>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="nc-new-patient__familyNotes">
+                        <label htmlFor="field-new-patient-family-notes">
+                          {t("patient.wizard.family_notes")}
+                        </label>
+                        <Textarea
+                          id="field-new-patient-family-notes"
+                          rows={3}
+                          placeholder={t(
+                            "patient.wizard.family_notes_placeholder",
+                          )}
+                          {...register("familyHistoryNotes")}
+                        />
+                        {errors.familyHistoryNotes?.message && (
+                          <small role="alert">
+                            {errors.familyHistoryNotes.message}
+                          </small>
+                        )}
+                      </div>
+
+                      <div className="nc-new-patient__familyNotice">
+                        <Info aria-hidden="true" />
+                        <span>{t("patient.wizard.family_notice")}</span>
+                      </div>
+                    </section>
+                  )}
+
+                  {step === 4 && medicalSection === "medications" && (
+                    <>
+                      <BinaryQuestion
+                        field="supplements"
+                        question={t("patient.wizard.question_supplements")}
+                        icon={SupplementBottleIcon}
+                        register={register}
+                        error={errors.supplements}
+                      />
+                      <BinaryQuestion
+                        field="medicationAllergies"
+                        question={t(
+                          "patient.wizard.question_medication_allergies",
+                        )}
+                        icon={MedicationAllergyIcon}
+                        register={register}
+                        error={errors.medicationAllergies}
+                      />
+                      <BinaryQuestion
+                        field="medications"
+                        question={t("patient.wizard.question_medications")}
+                        icon={PrescriptionIcon}
+                        register={register}
+                        error={errors.medications}
+                      />
+                      <BinaryQuestion
+                        field="adverseMedicationOrSupplementEffects"
+                        question={t(
+                          "patient.wizard.question_adverse_medication_effects",
+                        )}
+                        icon={ShieldAlert}
+                        register={register}
+                        error={errors.adverseMedicationOrSupplementEffects}
+                      />
+                    </>
+                  )}
+
+                  {step === 5 && (
+                    <BinaryQuestion
+                      field="physicalActivity"
+                      question={t("patient.wizard.question_physical_activity")}
+                      icon={RunningIcon}
+                      register={register}
+                      error={errors.physicalActivity}
+                      wide
+                    />
+                  )}
+
+                  {step === 6 && (
                     <>
                       <WizardField
                         label={t("patient.clinical_tags")}
@@ -1010,7 +1588,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setStep((current) => current - 1)}
+                        onClick={goToPreviousStep}
                         disabled={submitting}
                       >
                         <ArrowLeft aria-hidden="true" />
@@ -1102,6 +1680,176 @@ function WizardField({
   );
 }
 
+function BinaryQuestion({
+  field,
+  question,
+  icon: Icon,
+  register,
+  error,
+  wide = false,
+}: {
+  field: BinaryQuestionField;
+  question: string;
+  icon: LucideIcon;
+  register: UseFormRegister<NewPatientWizardValues>;
+  error?: FieldError;
+  wide?: boolean;
+}) {
+  const { t } = useTranslation();
+  return (
+    <fieldset
+      className="nc-new-patient__binaryQuestion"
+      data-field={field}
+      data-wide={wide || undefined}
+    >
+      <legend className="sr-only">{question}</legend>
+      <span className="nc-new-patient__binaryQuestionIcon" aria-hidden="true">
+        <Icon />
+      </span>
+      <strong>{question}</strong>
+      <div className="nc-new-patient__binaryOptions">
+        <label>
+          <input type="radio" value="yes" {...register(field)} />
+          <span>{t("common.yes")}</span>
+        </label>
+        <label>
+          <input type="radio" value="no" {...register(field)} />
+          <span>{t("common.no")}</span>
+        </label>
+      </div>
+      {error?.message && <small role="alert">{error.message}</small>}
+    </fieldset>
+  );
+}
+
+function FamilyHistorySelect({
+  field,
+  label,
+  icon: Icon,
+  control,
+}: {
+  field: FamilyHistoryField;
+  label: string;
+  icon: LucideIcon;
+  control: Control<NewPatientWizardValues>;
+}) {
+  const { t } = useTranslation();
+  const [open, setOpen] = React.useState(false);
+  const selectRef = React.useRef<HTMLDivElement>(null);
+  const optionsId = React.useId();
+  const options: Array<{ value: FamilyRelationship; label: string }> =
+    FAMILY_RELATIONSHIP_VALUES.map((value) => ({
+      value,
+      label: t(`patient.wizard.family_member_${value}`),
+    }));
+
+  React.useEffect(() => {
+    if (!open) return;
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const select = selectRef.current;
+      if (select && !event.composedPath().includes(select)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+  }, [open]);
+
+  return (
+    <Controller
+      name={field}
+      control={control}
+      render={({ field: controlledField, fieldState }) => {
+        const selected = Array.isArray(controlledField.value)
+          ? (controlledField.value as FamilyRelationship[])
+          : [];
+        const displayValue = getFamilySelectionLabel(selected, options, t);
+
+        const toggleOption = (value: FamilyRelationship) => {
+          if (value === "none") {
+            controlledField.onChange(["none"]);
+            setOpen(false);
+            return;
+          }
+
+          const current = selected.filter((item) => item !== "none");
+          controlledField.onChange(
+            current.includes(value)
+              ? current.filter((item) => item !== value)
+              : [...current, value],
+          );
+        };
+
+        return (
+          <div
+            className="nc-new-patient__familyField"
+            data-family-field={field}
+          >
+            <label>
+              <Icon aria-hidden="true" />
+              {label}
+            </label>
+            <div
+              ref={selectRef}
+              className="nc-new-patient__familySelect"
+              data-open={open || undefined}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setOpen(false);
+              }}
+            >
+              <button
+                type="button"
+                className="nc-new-patient__familySelectTrigger"
+                aria-label={`${label}: ${displayValue}`}
+                aria-expanded={open}
+                aria-controls={optionsId}
+                onClick={() => setOpen((current) => !current)}
+              >
+                <span data-placeholder={selected.length === 0 || undefined}>
+                  {displayValue}
+                </span>
+                <ChevronDown aria-hidden="true" />
+              </button>
+              {open && (
+                <div
+                  id={optionsId}
+                  className="nc-new-patient__familySelectOptions"
+                  role="group"
+                  aria-label={label}
+                >
+                  {options.map((option) => (
+                    <label key={option.value}>
+                      <input
+                        type="checkbox"
+                        value={option.value}
+                        checked={selected.includes(option.value)}
+                        onChange={() => toggleOption(option.value)}
+                        onBlur={controlledField.onBlur}
+                      />
+                      <span aria-hidden="true">
+                        <CircleCheck />
+                      </span>
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <input
+                type="hidden"
+                name={field}
+                value={selected.join(",")}
+                readOnly
+              />
+            </div>
+            {fieldState.error?.message && (
+              <small role="alert">{fieldState.error.message}</small>
+            )}
+          </div>
+        );
+      }}
+    />
+  );
+}
+
 function IconInput({
   icon: Icon,
   alignTop = false,
@@ -1166,6 +1914,33 @@ function getInitials(name: string): string {
 function optionalString(value?: string): string | null {
   const normalized = value?.trim();
   return normalized || null;
+}
+
+function getFamilySelectionLabel(
+  selected: FamilyRelationship[],
+  options: Array<{ value: FamilyRelationship; label: string }>,
+  t: ReturnType<typeof useTranslation>["t"],
+): string {
+  if (selected.length === 0) {
+    return t("patient.wizard.family_select_placeholder");
+  }
+  const labels = selected.map(
+    (value) => options.find((option) => option.value === value)?.label ?? value,
+  );
+  if (labels.length <= 2) return labels.join(", ");
+  return t("patient.wizard.family_selected_count", { count: labels.length });
+}
+
+function hasRecordedFamilyHistory(values: NewPatientWizardValues): boolean {
+  return [
+    values.familyDiabetes,
+    values.familyHypertension,
+    values.familyObesity,
+    values.familyCardiovascular,
+    values.familyDyslipidemia,
+    values.familyKidneyDisease,
+    values.familyThyroidDisease,
+  ].some((selection) => selection.some((member) => member !== "none"));
 }
 
 function parseTags(value?: string): string[] {

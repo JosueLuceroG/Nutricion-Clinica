@@ -22,6 +22,24 @@ describe("entityColumnMaps — pacientes", () => {
       external_record_number: "EXP-2026-001",
       admission_reason: "Primera valoración nutricional",
       photo_url: "data:image/png;base64,AAAA",
+      medical_intake: {
+        diagnosedConditions: true,
+        previousSurgeries: false,
+        medicationAllergies: true,
+        adverseMedicationOrSupplementEffects: false,
+        familyHistory: true,
+        familyHistoryDetails: {
+          diabetes: ["mother"],
+          hypertension: ["father"],
+          obesity: ["none"],
+          cardiovascularDisease: ["none"],
+          dyslipidemia: ["siblings"],
+          kidneyDisease: ["none"],
+          thyroidDisease: ["none"],
+          otherConditions: null,
+          notes: "Diagnóstico temprano",
+        },
+      },
     });
     expect(db.nombres).toBe("Ana");
     expect(db.apellido_paterno).toBe("Pérez");
@@ -40,6 +58,24 @@ describe("entityColumnMaps — pacientes", () => {
     expect(db.numero_expediente_externo).toBe("EXP-2026-001");
     expect(db.motivo_ingreso).toBe("Primera valoración nutricional");
     expect(db.foto_url).toBe("data:image/png;base64,AAAA");
+    expect(JSON.parse(String(db.tamizaje_medico_json))).toEqual({
+      diagnosedConditions: true,
+      previousSurgeries: false,
+      medicationAllergies: true,
+      adverseMedicationOrSupplementEffects: false,
+      familyHistory: true,
+      familyHistoryDetails: {
+        diabetes: ["mother"],
+        hypertension: ["father"],
+        obesity: ["none"],
+        cardiovascularDisease: ["none"],
+        dyslipidemia: ["siblings"],
+        kidneyDisease: ["none"],
+        thyroidDisease: ["none"],
+        otherConditions: null,
+        notes: "Diagnóstico temprano",
+      },
+    });
   });
 
   it("ignora campos no mapeados (whitelist)", async () => {
@@ -339,11 +375,28 @@ describe("dbRowToClient — parse de columnas JSON (read direction)", () => {
       nombres: "Ana",
       apellido_paterno: "Pérez",
       clinical_tags_json: '["embarazada","diabetes-t2"]',
+      tamizaje_medico_json:
+        '{"diagnosedConditions":true,"previousSurgeries":false,"familyHistoryDetails":{"diabetes":["mother"],"hypertension":["none"],"obesity":["none"],"cardiovascularDisease":["none"],"dyslipidemia":["none"],"kidneyDisease":["none"],"thyroidDisease":["none"],"otherConditions":null,"notes":null}}',
       created_at: "2026-01-01",
       updated_at: "2026-01-01",
       deleted_at: null,
     });
     expect(client.clinical_tags).toEqual(["embarazada", "diabetes-t2"]);
+    expect(client.medical_intake).toEqual({
+      diagnosedConditions: true,
+      previousSurgeries: false,
+      familyHistoryDetails: {
+        diabetes: ["mother"],
+        hypertension: ["none"],
+        obesity: ["none"],
+        cardiovascularDisease: ["none"],
+        dyslipidemia: ["none"],
+        kidneyDisease: ["none"],
+        thyroidDisease: ["none"],
+        otherConditions: null,
+        notes: null,
+      },
+    });
   });
 
   it("consultas.vitals: string JSON en DB → objeto en cliente", () => {

@@ -82,6 +82,62 @@ test.describe("Patient CRUD", () => {
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
+    for (const field of [
+      "diagnosedConditions",
+      "previousSurgeries",
+      "currentTreatments",
+      "intolerances",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "familyDiabetes",
+      "familyHypertension",
+      "familyObesity",
+      "familyCardiovascular",
+      "familyDyslipidemia",
+      "familyKidneyDisease",
+      "familyThyroidDisease",
+    ]) {
+      const familySelect = page.locator(`[data-family-field="${field}"]`);
+      await familySelect
+        .locator(".nc-new-patient__familySelectTrigger")
+        .click();
+      await familySelect
+        .locator('input[type="checkbox"][value="none"]')
+        .click();
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "supplements",
+      "medicationAllergies",
+      "medications",
+      "adverseMedicationOrSupplementEffects",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="physicalActivity"][value="no"]')
+      .check({ force: true });
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
     await page
       .getByRole("button", { name: /crear expediente|create record/i })
       .last()

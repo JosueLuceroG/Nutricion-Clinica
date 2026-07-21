@@ -63,6 +63,74 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
+    for (const field of [
+      "diagnosedConditions",
+      "previousSurgeries",
+      "currentTreatments",
+      "intolerances",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "familyHypertension",
+      "familyObesity",
+      "familyCardiovascular",
+      "familyDyslipidemia",
+      "familyKidneyDisease",
+      "familyThyroidDisease",
+    ]) {
+      const familySelect = page.locator(`[data-family-field="${field}"]`);
+      await familySelect
+        .locator(".nc-new-patient__familySelectTrigger")
+        .click();
+      await familySelect
+        .locator('input[type="checkbox"][value="none"]')
+        .click();
+    }
+    const diabetesSelect = page.locator('[data-family-field="familyDiabetes"]');
+    await diabetesSelect
+      .locator(".nc-new-patient__familySelectTrigger")
+      .click();
+    await diabetesSelect
+      .locator('input[type="checkbox"][value="mother"]')
+      .check();
+    await diabetesSelect
+      .locator('input[type="checkbox"][value="father"]')
+      .check();
+    await expect(
+      diabetesSelect.locator(".nc-new-patient__familySelectTrigger"),
+    ).toContainText(/madre, padre|mother, father/i);
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "supplements",
+      "medicationAllergies",
+      "medications",
+      "adverseMedicationOrSupplementEffects",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="physicalActivity"][value="no"]')
+      .check({ force: true });
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
     await page
       .getByRole("button", { name: /crear expediente|create record/i })
       .last()
