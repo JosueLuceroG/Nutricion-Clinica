@@ -14,31 +14,43 @@
  * son las 3 clases de error que el engine sabe distinguir.
  */
 
-import type { NutriClinicaDB } from '@services/db/dexieSchema';
-import type { SyncQueueItem, SyncOp } from '@modules/sync/domain/SyncQueueItem';
-import { SYNCABLE_ENTITIES, type SyncableEntity } from '@nutriclinica/shared';
-import type { SyncPullChange, SyncPushOperation, SyncPushResultItem } from '@nutriclinica/shared';
-import { SYNC_SCHEMA_VERSION } from '@nutriclinica/shared';
-import { type SyncQueueRepository } from './syncQueueRepository.js';
-import { setSyncApplying } from './syncEnqueuer.js';
-import { type syncApi } from './syncApiClient.js';
-import { withRetry } from './backoff.js';
-import { useAuthStore } from '@store/authStore';
-import { useSyncStore } from '@store/syncStore';
-import { withCurrentSucursalScope } from '@services/tenancy/sucursalScope';
-import { SyncAuthError, SyncSchemaMismatchError } from '@modules/sync/domain/errors.js';
-import { HttpError, NetworkError } from '../api/httpClient.js';
+import type { NutriClinicaDB } from "@services/db/dexieSchema";
+import type { SyncQueueItem, SyncOp } from "@modules/sync/domain/SyncQueueItem";
+import { SYNCABLE_ENTITIES, type SyncableEntity } from "@nutriclinica/shared";
+import type {
+  SyncPullChange,
+  SyncPushOperation,
+  SyncPushResultItem,
+} from "@nutriclinica/shared";
+import { SYNC_SCHEMA_VERSION } from "@nutriclinica/shared";
+import { type SyncQueueRepository } from "./syncQueueRepository.js";
+import { setSyncApplying } from "./syncEnqueuer.js";
+import { type syncApi } from "./syncApiClient.js";
+import { withRetry } from "./backoff.js";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
+import { withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import {
+  SyncAuthError,
+  SyncSchemaMismatchError,
+} from "@modules/sync/domain/errors.js";
+import { HttpError, NetworkError } from "../api/httpClient.js";
 
 const PUSH_MAX_BATCH = 500;
 const MAX_PUSH_RETRIES = 4;
 
+interface PullTable {
+  bulkGet(keys: string[]): Promise<Array<Record<string, unknown> | undefined>>;
+  bulkPut(values: object[]): Promise<unknown>;
+}
+
 const ENTITY_TO_TABLE: Record<SyncableEntity, keyof NutriClinicaDB & string> = {
-  pacientes: 'patients',
-  consultas: 'consultations',
-  antropometrias: 'anthropometry',
-  lab_panels: 'lab_panels',
-  planes_alimenticios: 'meal_plans',
-  adherence_records: 'adherence_records',
+  pacientes: "patients",
+  consultas: "consultations",
+  antropometrias: "anthropometry",
+  lab_panels: "lab_panels",
+  planes_alimenticios: "meal_plans",
+  adherence_records: "adherence_records",
 };
 
 /**
@@ -51,22 +63,29 @@ const ENTITY_TO_TABLE: Record<SyncableEntity, keyof NutriClinicaDB & string> = {
  * (JSON.stringify) en Dexie. Sin esta conversión, los mappers leen
  * `undefined` y los datos JSON se pierden.
  */
-const PULL_JSON_COLUMNS: Record<string, Array<{ serverKey: string; localKey: string }>> = {
-  consultas: [{ serverKey: 'vitals', localKey: 'vitals_json' }],
-  planes_alimenticios: [{ serverKey: 'meals', localKey: 'meals_json' }],
-  pacientes: [{ serverKey: 'clinical_tags', localKey: 'clinical_tags' }],
+const PULL_JSON_COLUMNS: Record<
+  string,
+  Array<{ serverKey: string; localKey: string }>
+> = {
+  consultas: [{ serverKey: "vitals", localKey: "vitals_json" }],
+  planes_alimenticios: [{ serverKey: "meals", localKey: "meals_json" }],
+  pacientes: [{ serverKey: "clinical_tags", localKey: "clinical_tags" }],
   // lab_panels: { results } ya se almacena como array, el mapper LabPanelRow
   // lee `row.results` directamente sin JSON.parse → correcto.
 };
 
-function toLocalRow(entity: SyncableEntity, payload: Record<string, unknown>): object {
+function toLocalRow(
+  entity: SyncableEntity,
+  payload: Record<string, unknown>,
+): object {
   const jsonCols = PULL_JSON_COLUMNS[entity];
   if (!jsonCols) return payload;
   const row = { ...payload };
   for (const { serverKey, localKey } of jsonCols) {
     if (!(serverKey in row)) continue;
     const val = row[serverKey];
-    row[localKey] = val !== null && val !== undefined ? JSON.stringify(val) : null;
+    row[localKey] =
+      val !== null && val !== undefined ? JSON.stringify(val) : null;
     if (serverKey !== localKey) delete row[serverKey];
   }
   return row;
@@ -85,12 +104,18 @@ export interface SyncEngineDeps {
 }
 
 export type SyncEvent =
-  | { type: 'start' }
-  | { type: 'manifest'; serverTime: string }
-  | { type: 'pull'; received: number }
-  | { type: 'push'; sent: number; applied: number; conflicts: number; errors: number }
-  | { type: 'done'; durationMs: number }
-  | { type: 'error'; error: string };
+  | { type: "start" }
+  | { type: "manifest"; serverTime: string }
+  | { type: "pull"; received: number }
+  | {
+      type: "push";
+      sent: number;
+      applied: number;
+      conflicts: number;
+      errors: number;
+    }
+  | { type: "done"; durationMs: number }
+  | { type: "error"; error: string };
 
 export class SyncEngine {
   private running = false;
@@ -105,27 +130,36 @@ export class SyncEngine {
   async sync(): Promise<void> {
     if (this.inFlight) return this.inFlight;
     this.inFlight = this._runSync();
-    try { await this.inFlight; } finally { this.inFlight = null; }
+    try {
+      await this.inFlight;
+    } finally {
+      this.inFlight = null;
+    }
   }
 
   private async _runSync(): Promise<void> {
     this.running = true;
     const start = Date.now();
-    this.emit({ type: 'start' });
-    this.setSyncStore({ status: 'syncing', lastError: null });
+    this.emit({ type: "start" });
+    this.setSyncStore({ status: "syncing", lastError: null });
 
     try {
       const token = useAuthStore.getState().token;
       if (!token) throw new SyncAuthError();
 
       const manifest = await this.deps.api!.manifest();
-      this.emit({ type: 'manifest', serverTime: manifest.serverTime });
+      this.emit({ type: "manifest", serverTime: manifest.serverTime });
       if (manifest.syncSchemaVersion !== SYNC_SCHEMA_VERSION) {
-        throw new SyncSchemaMismatchError(manifest.syncSchemaVersion, SYNC_SCHEMA_VERSION);
+        throw new SyncSchemaMismatchError(
+          manifest.syncSchemaVersion,
+          SYNC_SCHEMA_VERSION,
+        );
       }
 
-      const sucursalId = useSyncStore.getState().sucursalId ?? useAuthStore.getState().sucursalActivaId;
-      if (!sucursalId) throw new SyncAuthError('No hay sucursal activa');
+      const sucursalId =
+        useSyncStore.getState().sucursalId ??
+        useAuthStore.getState().sucursalActivaId;
+      if (!sucursalId) throw new SyncAuthError("No hay sucursal activa");
 
       let since = await this.deps.getLastPullAt(sucursalId);
       let totalReceived = 0;
@@ -139,25 +173,29 @@ export class SyncEngine {
         since = pullResp.nextSince;
       }
 
-      await this.deps.setLastPullAt(sucursalId, since ?? new Date().toISOString());
-      this.emit({ type: 'pull', received: totalReceived });
+      await this.deps.setLastPullAt(
+        sucursalId,
+        since ?? new Date().toISOString(),
+      );
+      this.emit({ type: "pull", received: totalReceived });
 
       const pushSummary = await this.pushPending(sucursalId);
-      this.emit({ type: 'push', ...pushSummary });
+      this.emit({ type: "push", ...pushSummary });
 
       this.setSyncStore({
-        status: 'idle',
+        status: "idle",
         lastSyncAt: new Date().toISOString(),
         pendingChanges: await this.deps.queue.countPending(),
       });
-      this.emit({ type: 'done', durationMs: Date.now() - start });
+      this.emit({ type: "done", durationMs: Date.now() - start });
     } catch (err) {
-      const syncErr = err instanceof HttpError && err.status === 401
-        ? new SyncAuthError('Sesión expirada. Inicia sesión de nuevo.')
-        : err;
+      const syncErr =
+        err instanceof HttpError && err.status === 401
+          ? new SyncAuthError("Sesión expirada. Inicia sesión de nuevo.")
+          : err;
       const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-      this.setSyncStore({ status: 'error', lastError: msg });
-      this.emit({ type: 'error', error: msg });
+      this.setSyncStore({ status: "error", lastError: msg });
+      this.emit({ type: "error", error: msg });
       throw syncErr;
     } finally {
       this.running = false;
@@ -168,42 +206,69 @@ export class SyncEngine {
     if (changes.length === 0) return;
     setSyncApplying(true);
     try {
+      const byTable = new Map<
+        string,
+        {
+          table: PullTable;
+          upserts: object[];
+          deleteIds: string[];
+        }
+      >();
+
       for (const change of changes) {
         const tableName = ENTITY_TO_TABLE[change.entity];
-        const table = (this.deps.db as unknown as Record<string, {
-          put: (v: unknown) => Promise<unknown>;
-          update: (k: string, patch: object) => Promise<unknown>;
-          get: (k: string) => Promise<unknown>;
-        }>)[tableName];
+        const table = (this.deps.db as unknown as Record<string, PullTable>)[
+          tableName
+        ];
         if (!table) continue;
-        if (change.op === 'delete') {
-          // Soft-delete local en vez de hard-delete: preservamos la fila con
-          // `deleted_at` setteado para que la UI pueda mostrarla en una vista
-          // de "papelera" y permitir restaurarla. El server ya hizo el mismo
-          // soft-delete (ver syncService.applyOperation), así que la fila es
-          // recuperable en ambos lados.
-          //
-          // Si la fila no existe localmente (caso normal: server borró algo
-          // que nunca existió en este cliente), no hacemos nada — el delete
-          // ya es idempotente.
-          const existing = await table.get(change.id).catch(() => null);
-          if (existing) {
-            await table.update(change.id, {
-              deleted_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
-          }
+        const group = byTable.get(tableName) ?? {
+          table,
+          upserts: [],
+          deleteIds: [],
+        };
+        byTable.set(tableName, group);
+
+        if (change.op === "delete") {
+          group.deleteIds.push(change.id);
         } else {
-          const localRow = withCurrentSucursalScope(toLocalRow(change.entity, change.payload as Record<string, unknown>));
-          await table.put(localRow);
+          const localRow = withCurrentSucursalScope(
+            toLocalRow(
+              change.entity,
+              change.payload as Record<string, unknown>,
+            ),
+          );
+          group.upserts.push(localRow);
         }
+      }
+
+      for (const { table, upserts, deleteIds } of byTable.values()) {
+        if (upserts.length > 0) await table.bulkPut(upserts);
+        if (deleteIds.length === 0) continue;
+
+        // Preserve local rows for recoverable soft-deletes. Missing rows are
+        // intentionally ignored because the server delete is idempotent.
+        const existingRows = await table.bulkGet(deleteIds);
+        const deletedAt = new Date().toISOString();
+        const softDeletedRows = existingRows
+          .filter((row): row is Record<string, unknown> => row !== undefined)
+          .map((row) => ({
+            ...row,
+            deleted_at: deletedAt,
+            updated_at: deletedAt,
+          }));
+        if (softDeletedRows.length > 0) await table.bulkPut(softDeletedRows);
       }
     } finally {
       setSyncApplying(false);
     }
   }
 
-  private async pushPending(sucursalId: string): Promise<{ sent: number; applied: number; conflicts: number; errors: number }> {
+  private async pushPending(sucursalId: string): Promise<{
+    sent: number;
+    applied: number;
+    conflicts: number;
+    errors: number;
+  }> {
     // Limpieza automática de items con entityId malformado ([object)
     // que quedaron de versiones anteriores del enqueuer.
     await this.deps.queue.clearStale();
@@ -230,34 +295,43 @@ export class SyncEngine {
       await this.deps.queue.markSyncing(item.id);
     }
 
-    const response = await withRetry(() => this.deps.api!.push({ sucursalId, operations }), {
-      maxAttempts: MAX_PUSH_RETRIES,
-      shouldRetry: (err) => isTransient(err),
-      sleep: () => Promise.resolve(),
-    });
+    const response = await withRetry(
+      () => this.deps.api!.push({ sucursalId, operations }),
+      {
+        maxAttempts: MAX_PUSH_RETRIES,
+        shouldRetry: (err) => isTransient(err),
+        sleep: () => Promise.resolve(),
+      },
+    );
 
     for (let i = 0; i < batch.length; i++) {
       const item = batch[i]!;
       const result: SyncPushResultItem | undefined = response.results[i];
       if (!result) {
-        await this.deps.queue.markError(item.id, 'no result for op');
+        await this.deps.queue.markError(item.id, "no result for op");
         errors++;
         continue;
       }
-      if (result.status === 'applied') {
+      if (result.status === "applied") {
         await this.deps.queue.markApplied(item.id);
         applied++;
-      } else if (result.status === 'conflict') {
-        await this.deps.queue.markConflict(item.id, result.error ?? 'row_version mismatch');
+      } else if (result.status === "conflict") {
+        await this.deps.queue.markConflict(
+          item.id,
+          result.error ?? "row_version mismatch",
+        );
         conflicts++;
-      } else if (result.status === 'skipped') {
+      } else if (result.status === "skipped") {
         // Idempotencia: si el server ya tiene la fila o no la encuentra,
         // el push es funcionalmente exitoso. Marcamos applied para limpiar
         // la cola y avanzar.
         await this.deps.queue.markApplied(item.id);
         applied++;
       } else {
-        await this.deps.queue.markError(item.id, result.error ?? 'unknown error');
+        await this.deps.queue.markError(
+          item.id,
+          result.error ?? "unknown error",
+        );
         errors++;
       }
     }
@@ -266,11 +340,19 @@ export class SyncEngine {
     return { sent: batch.length, applied, conflicts, errors };
   }
 
-  private setSyncStore(partial: Partial<{ status: 'idle' | 'syncing' | 'offline' | 'error'; lastSyncAt: string; pendingChanges: number; lastError: string | null }>): void {
+  private setSyncStore(
+    partial: Partial<{
+      status: "idle" | "syncing" | "offline" | "error";
+      lastSyncAt: string;
+      pendingChanges: number;
+      lastError: string | null;
+    }>,
+  ): void {
     const s = useSyncStore.getState();
     if (partial.status !== undefined) s.setStatus(partial.status);
     if (partial.lastSyncAt !== undefined) s.setLastSync(partial.lastSyncAt);
-    if (partial.pendingChanges !== undefined) s.setPendingChanges(partial.pendingChanges);
+    if (partial.pendingChanges !== undefined)
+      s.setPendingChanges(partial.pendingChanges);
     if (partial.lastError !== undefined) s.setLastError(partial.lastError);
   }
 
@@ -280,7 +362,7 @@ export class SyncEngine {
 }
 
 function parsePayload(item: SyncQueueItem): unknown {
-  if (item.op === 'delete') return null;
+  if (item.op === "delete") return null;
   try {
     return JSON.parse(item.payload);
   } catch {

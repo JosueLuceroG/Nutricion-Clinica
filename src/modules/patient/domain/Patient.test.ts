@@ -50,12 +50,22 @@ describe("Patient.create", () => {
       previousSurgeries: null,
       currentTreatments: null,
       intolerances: null,
+      diagnosedConditionDetails: [],
+      previousSurgeryDetails: [],
+      currentTreatmentDetails: [],
+      intoleranceDetails: [],
       familyHistory: null,
+      familyHistoryMode: null,
       familyHistoryDetails: null,
       medications: null,
       supplements: null,
       medicationAllergies: null,
       adverseMedicationOrSupplementEffects: null,
+      supplementDetails: [],
+      medicationAllergyDetails: [],
+      dailyMedicationDetails: [],
+      adverseEffectDetails: null,
+      nutritionIntake: null,
       physicalActivity: null,
     });
   });
@@ -89,7 +99,38 @@ describe("Patient.create", () => {
         previousSurgeries: false,
         currentTreatments: true,
         intolerances: false,
+        diagnosedConditionDetails: [
+          {
+            diagnosis: "  Diabetes mellitus tipo 2  ",
+            diagnosisYear: 2020,
+            status: "controlled",
+            treatment: "  Metformina y plan nutricional  ",
+          },
+        ],
+        previousSurgeryDetails: [
+          {
+            procedure: "  Apendicectomía  ",
+            year: 2008,
+            reason: "  Apendicitis aguda  ",
+          },
+        ],
+        currentTreatmentDetails: [
+          {
+            name: "  Terapia física  ",
+            reason: "  Dolor lumbar  ",
+            frequency: "  Dos veces por semana  ",
+            professional: "  Dra. Laura Martínez  ",
+          },
+        ],
+        intoleranceDetails: [
+          {
+            substance: "  Lactosa  ",
+            reaction: "  Distensión abdominal  ",
+            severity: "moderate",
+          },
+        ],
         familyHistory: true,
+        familyHistoryMode: "recorded",
         familyHistoryDetails: {
           diabetes: ["mother"],
           hypertension: ["father"],
@@ -105,6 +146,97 @@ describe("Patient.create", () => {
         supplements: false,
         medicationAllergies: true,
         adverseMedicationOrSupplementEffects: false,
+        supplementDetails: [
+          {
+            name: "  Omega 3  ",
+            dose: "  1000 mg  ",
+            frequency: "daily",
+            objective: "  Salud cardiovascular  ",
+          },
+        ],
+        medicationAllergyDetails: [
+          {
+            medication: "  Penicilina  ",
+            reaction: "  Urticaria  ",
+            severity: "moderate",
+            requiredMedicalAttention: true,
+          },
+        ],
+        dailyMedicationDetails: [
+          {
+            name: "  Metformina  ",
+            dose: "  850 mg  ",
+            frequency: "twiceDaily",
+            schedule: "  08:00  ",
+            reason: "  Diabetes  ",
+            prescribedByProfessional: true,
+          },
+        ],
+        adverseEffectDetails: null,
+        nutritionIntake: {
+          routine: {
+            breakfastTime: "08:00",
+            mainMealTime: "13:30",
+            dinnerTime: "20:00",
+            snackTimes: ["10:30", "17:00"],
+            mealsPerDay: 5,
+            skipsMeals: true,
+            mostSkippedMeal: "breakfast",
+            scheduleVaries: true,
+            scheduleVariation: "weekendsLater",
+            mealDuration: "20To30",
+          },
+          patterns: {
+            eatingOutFrequency: "oneToTwoPerWeek",
+            snacksBetweenMeals: true,
+            eatsLateAtNight: false,
+            frequentCravings: true,
+            cravingTime: "afternoon",
+            mealPreparer: "self",
+            primaryMealLocation: "home",
+          },
+          preferences: {
+            usualDietType: "other",
+            otherDietDescription: "  Flexitariana  ",
+            avoidsFoods: true,
+            avoidedFoods: "  Mariscos  ",
+            followsFoodRestrictions: true,
+            foodRestrictionDetails: "  Sin carne roja  ",
+            hasFoodDiscomfort: true,
+            discomfortFoods: "  Lácteos  ",
+            specialPreference: "lowSodium",
+            notes: "  Prefiere comida casera  ",
+          },
+          hydration: {
+            waterIntake: "oneAndHalfToTwoLiters",
+            drinksWaterThroughoutDay: true,
+            carriesWaterBottle: true,
+            coffeeTeaFrequency: "oneToTwoPerDay",
+            sugaryDrinkFrequency: "oneToTwoPerWeek",
+            consumesEnergyDrinks: false,
+            otherBeverage: "infusions",
+            alcoholFrequency: "never",
+            notes: "  Agua con limón  ",
+          },
+          digestive: {
+            appetiteLevel: "normal",
+            earlySatiety: false,
+            hasDigestiveDiscomfort: true,
+            symptoms: [
+              "reflux",
+              "gas",
+              "abdominalPain",
+              "heartburn",
+              "vomiting",
+              "belching",
+              "abdominalCramps",
+              "other",
+            ],
+            otherSymptomDescription: "  Sensación de vacío  ",
+            symptomTiming: "afterMeals",
+            notes: "  Después de comidas abundantes  ",
+          },
+        },
         physicalActivity: true,
       },
     });
@@ -130,6 +262,62 @@ describe("Patient.create", () => {
     expect(patient.photoUrl).toBe("https://example.com/photo.jpg");
     expect(patient.medicalIntake.diagnosedConditions).toBe(true);
     expect(patient.medicalIntake.previousSurgeries).toBe(false);
+    expect(patient.medicalIntake.diagnosedConditionDetails).toEqual([
+      {
+        diagnosis: "Diabetes mellitus tipo 2",
+        diagnosisYear: 2020,
+        status: "controlled",
+        treatment: "Metformina y plan nutricional",
+      },
+    ]);
+    expect(patient.medicalIntake.previousSurgeryDetails).toEqual([
+      {
+        procedure: "Apendicectomía",
+        year: 2008,
+        reason: "Apendicitis aguda",
+      },
+    ]);
+    expect(patient.medicalIntake.currentTreatmentDetails).toEqual([
+      {
+        name: "Terapia física",
+        reason: "Dolor lumbar",
+        frequency: "Dos veces por semana",
+        professional: "Dra. Laura Martínez",
+      },
+    ]);
+    expect(patient.medicalIntake.intoleranceDetails).toEqual([
+      {
+        substance: "Lactosa",
+        reaction: "Distensión abdominal",
+        severity: "moderate",
+      },
+    ]);
+    expect(patient.medicalIntake.supplementDetails).toEqual([
+      {
+        name: "Omega 3",
+        dose: "1000 mg",
+        frequency: "daily",
+        objective: "Salud cardiovascular",
+      },
+    ]);
+    expect(patient.medicalIntake.medicationAllergyDetails).toEqual([
+      {
+        medication: "Penicilina",
+        reaction: "Urticaria",
+        severity: "moderate",
+        requiredMedicalAttention: true,
+      },
+    ]);
+    expect(patient.medicalIntake.dailyMedicationDetails).toEqual([
+      {
+        name: "Metformina",
+        dose: "850 mg",
+        frequency: "twiceDaily",
+        schedule: "08:00",
+        reason: "Diabetes",
+        prescribedByProfessional: true,
+      },
+    ]);
     expect(patient.medicalIntake.physicalActivity).toBe(true);
     expect(patient.medicalIntake.familyHistoryDetails).toEqual({
       diabetes: ["mother"],
@@ -141,6 +329,69 @@ describe("Patient.create", () => {
       thyroidDisease: ["none"],
       otherConditions: "Cardiopatía congénita",
       notes: "Diagnóstico antes de los 50 años",
+    });
+    expect(patient.medicalIntake.familyHistoryMode).toBe("recorded");
+    expect(patient.medicalIntake.nutritionIntake?.routine).toEqual({
+      breakfastTime: "08:00",
+      mainMealTime: "13:30",
+      dinnerTime: "20:00",
+      snackTimes: ["10:30", "17:00"],
+      mealsPerDay: 5,
+      skipsMeals: true,
+      mostSkippedMeal: "breakfast",
+      scheduleVaries: true,
+      scheduleVariation: "weekendsLater",
+      mealDuration: "20To30",
+    });
+    expect(patient.medicalIntake.nutritionIntake?.patterns).toEqual({
+      eatingOutFrequency: "oneToTwoPerWeek",
+      snacksBetweenMeals: true,
+      eatsLateAtNight: false,
+      frequentCravings: true,
+      cravingTime: "afternoon",
+      mealPreparer: "self",
+      primaryMealLocation: "home",
+    });
+    expect(patient.medicalIntake.nutritionIntake?.preferences).toEqual({
+      usualDietType: "other",
+      otherDietDescription: "Flexitariana",
+      avoidsFoods: true,
+      avoidedFoods: "Mariscos",
+      followsFoodRestrictions: true,
+      foodRestrictionDetails: "Sin carne roja",
+      hasFoodDiscomfort: true,
+      discomfortFoods: "Lácteos",
+      specialPreference: "lowSodium",
+      notes: "Prefiere comida casera",
+    });
+    expect(patient.medicalIntake.nutritionIntake?.hydration).toEqual({
+      waterIntake: "oneAndHalfToTwoLiters",
+      drinksWaterThroughoutDay: true,
+      carriesWaterBottle: true,
+      coffeeTeaFrequency: "oneToTwoPerDay",
+      sugaryDrinkFrequency: "oneToTwoPerWeek",
+      consumesEnergyDrinks: false,
+      otherBeverage: "infusions",
+      alcoholFrequency: "never",
+      notes: "Agua con limón",
+    });
+    expect(patient.medicalIntake.nutritionIntake?.digestive).toEqual({
+      appetiteLevel: "normal",
+      earlySatiety: false,
+      hasDigestiveDiscomfort: true,
+      symptoms: [
+        "reflux",
+        "gas",
+        "abdominalPain",
+        "heartburn",
+        "vomiting",
+        "belching",
+        "abdominalCramps",
+        "other",
+      ],
+      otherSymptomDescription: "Sensación de vacío",
+      symptomTiming: "afterMeals",
+      notes: "Después de comidas abundantes",
     });
   });
 

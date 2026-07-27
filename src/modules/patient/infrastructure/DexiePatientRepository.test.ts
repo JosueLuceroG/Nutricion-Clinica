@@ -166,9 +166,60 @@ describe("DexiePatientRepository", () => {
       medicalIntake: {
         diagnosedConditions: true,
         previousSurgeries: false,
+        diagnosedConditionDetails: [
+          {
+            diagnosis: "Diabetes mellitus tipo 2",
+            diagnosisYear: 2020,
+            status: "controlled",
+            treatment: "Metformina",
+          },
+        ],
+        previousSurgeryDetails: [],
+        currentTreatmentDetails: [
+          {
+            name: "Terapia física",
+            reason: "Dolor lumbar",
+            frequency: "Semanal",
+            professional: "Dra. Laura Martínez",
+          },
+        ],
+        intoleranceDetails: [
+          {
+            substance: "Lactosa",
+            reaction: "Distensión abdominal",
+            severity: "moderate",
+          },
+        ],
         medicationAllergies: true,
         adverseMedicationOrSupplementEffects: false,
+        supplementDetails: [
+          {
+            name: "Omega 3",
+            dose: "1000 mg",
+            frequency: "daily",
+            objective: "Salud cardiovascular",
+          },
+        ],
+        medicationAllergyDetails: [
+          {
+            medication: "Penicilina",
+            reaction: "Urticaria",
+            severity: "moderate",
+            requiredMedicalAttention: true,
+          },
+        ],
+        dailyMedicationDetails: [
+          {
+            name: "Metformina",
+            dose: "850 mg",
+            frequency: "twiceDaily",
+            schedule: "08:00",
+            reason: "Diabetes",
+            prescribedByProfessional: true,
+          },
+        ],
         familyHistory: true,
+        familyHistoryMode: "recorded",
         familyHistoryDetails: {
           diabetes: ["mother", "siblings"],
           hypertension: ["father"],
@@ -179,6 +230,61 @@ describe("DexiePatientRepository", () => {
           thyroidDisease: ["paternalGrandparents"],
           otherConditions: null,
           notes: "Antecedente materno relevante",
+        },
+        nutritionIntake: {
+          routine: {
+            breakfastTime: "08:00",
+            mainMealTime: "13:30",
+            dinnerTime: "20:00",
+            snackTimes: ["10:30"],
+            mealsPerDay: 4,
+            skipsMeals: false,
+            mostSkippedMeal: null,
+            scheduleVaries: false,
+            scheduleVariation: null,
+            mealDuration: "20To30",
+          },
+          patterns: {
+            eatingOutFrequency: "rarely",
+            snacksBetweenMeals: false,
+            eatsLateAtNight: false,
+            frequentCravings: false,
+            cravingTime: null,
+            mealPreparer: "family",
+            primaryMealLocation: null,
+          },
+          preferences: {
+            usualDietType: "vegetarian",
+            otherDietDescription: null,
+            avoidsFoods: false,
+            avoidedFoods: null,
+            followsFoodRestrictions: true,
+            foodRestrictionDetails: "Vegetariana por elección",
+            hasFoodDiscomfort: false,
+            discomfortFoods: null,
+            specialPreference: "none",
+            notes: null,
+          },
+          hydration: {
+            waterIntake: "twoToThreeLiters",
+            drinksWaterThroughoutDay: true,
+            carriesWaterBottle: true,
+            coffeeTeaFrequency: "onePerDay",
+            sugaryDrinkFrequency: "never",
+            consumesEnergyDrinks: false,
+            otherBeverage: "none",
+            alcoholFrequency: null,
+            notes: null,
+          },
+          digestive: {
+            appetiteLevel: "normal",
+            earlySatiety: false,
+            hasDigestiveDiscomfort: false,
+            symptoms: [],
+            otherSymptomDescription: null,
+            symptomTiming: null,
+            notes: null,
+          },
         },
         physicalActivity: true,
       },
@@ -194,10 +300,47 @@ describe("DexiePatientRepository", () => {
     expect(found?.photoUrl).toBe("data:image/png;base64,AAAA");
     expect(found?.medicalIntake.diagnosedConditions).toBe(true);
     expect(found?.medicalIntake.previousSurgeries).toBe(false);
+    expect(found?.medicalIntake.diagnosedConditionDetails[0]).toEqual({
+      diagnosis: "Diabetes mellitus tipo 2",
+      diagnosisYear: 2020,
+      status: "controlled",
+      treatment: "Metformina",
+    });
+    expect(found?.medicalIntake.currentTreatmentDetails[0]).toEqual({
+      name: "Terapia física",
+      reason: "Dolor lumbar",
+      frequency: "Semanal",
+      professional: "Dra. Laura Martínez",
+    });
+    expect(found?.medicalIntake.intoleranceDetails[0]).toEqual({
+      substance: "Lactosa",
+      reaction: "Distensión abdominal",
+      severity: "moderate",
+    });
     expect(found?.medicalIntake.medicationAllergies).toBe(true);
     expect(found?.medicalIntake.adverseMedicationOrSupplementEffects).toBe(
       false,
     );
+    expect(found?.medicalIntake.supplementDetails[0]).toEqual({
+      name: "Omega 3",
+      dose: "1000 mg",
+      frequency: "daily",
+      objective: "Salud cardiovascular",
+    });
+    expect(found?.medicalIntake.medicationAllergyDetails[0]).toEqual({
+      medication: "Penicilina",
+      reaction: "Urticaria",
+      severity: "moderate",
+      requiredMedicalAttention: true,
+    });
+    expect(found?.medicalIntake.dailyMedicationDetails[0]).toEqual({
+      name: "Metformina",
+      dose: "850 mg",
+      frequency: "twiceDaily",
+      schedule: "08:00",
+      reason: "Diabetes",
+      prescribedByProfessional: true,
+    });
     expect(found?.medicalIntake.physicalActivity).toBe(true);
     expect(found?.medicalIntake.familyHistoryDetails?.diabetes).toEqual([
       "mother",
@@ -206,6 +349,60 @@ describe("DexiePatientRepository", () => {
     expect(found?.medicalIntake.familyHistoryDetails?.notes).toBe(
       "Antecedente materno relevante",
     );
+    expect(found?.medicalIntake.familyHistoryMode).toBe("recorded");
+    expect(found?.medicalIntake.nutritionIntake?.routine).toEqual({
+      breakfastTime: "08:00",
+      mainMealTime: "13:30",
+      dinnerTime: "20:00",
+      snackTimes: ["10:30"],
+      mealsPerDay: 4,
+      skipsMeals: false,
+      mostSkippedMeal: null,
+      scheduleVaries: false,
+      scheduleVariation: null,
+      mealDuration: "20To30",
+    });
+    expect(found?.medicalIntake.nutritionIntake?.patterns).toEqual({
+      eatingOutFrequency: "rarely",
+      snacksBetweenMeals: false,
+      eatsLateAtNight: false,
+      frequentCravings: false,
+      cravingTime: null,
+      mealPreparer: "family",
+      primaryMealLocation: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.preferences).toEqual({
+      usualDietType: "vegetarian",
+      otherDietDescription: null,
+      avoidsFoods: false,
+      avoidedFoods: null,
+      followsFoodRestrictions: true,
+      foodRestrictionDetails: "Vegetariana por elección",
+      hasFoodDiscomfort: false,
+      discomfortFoods: null,
+      specialPreference: "none",
+      notes: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.hydration).toEqual({
+      waterIntake: "twoToThreeLiters",
+      drinksWaterThroughoutDay: true,
+      carriesWaterBottle: true,
+      coffeeTeaFrequency: "onePerDay",
+      sugaryDrinkFrequency: "never",
+      consumesEnergyDrinks: false,
+      otherBeverage: "none",
+      alcoholFrequency: null,
+      notes: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.digestive).toEqual({
+      appetiteLevel: "normal",
+      earlySatiety: false,
+      hasDigestiveDiscomfort: false,
+      symptoms: [],
+      otherSymptomDescription: null,
+      symptomTiming: null,
+      notes: null,
+    });
     expect(found?.birthDate.toISOString()).toBe(
       new Date("1992-08-20").toISOString(),
     );

@@ -143,23 +143,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
-    for (const field of [
-      "familyDiabetes",
-      "familyHypertension",
-      "familyObesity",
-      "familyCardiovascular",
-      "familyDyslipidemia",
-      "familyKidneyDisease",
-      "familyThyroidDisease",
-    ]) {
-      const familySelect = page.locator(`[data-family-field="${field}"]`);
-      await familySelect
-        .locator(".nc-new-patient__familySelectTrigger")
-        .click();
-      await familySelect
-        .locator('input[type="checkbox"][value="none"]')
-        .click();
-    }
+    await page.locator('input[name="familyHistoryMode"][value="none"]').check();
     await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()
@@ -174,6 +158,79 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
         .locator(`input[name="${field}"][value="no"]`)
         .check({ force: true });
     }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('input[name="breakfastTime"]').fill("08:00");
+    await page.locator('input[name="mainMealTime"]').fill("13:30");
+    await page.locator('input[name="dinnerTime"]').fill("20:00");
+    await page.locator('select[name="mealsPerDay"]').selectOption("3");
+    await page.locator('input[name="skipsMeals"][value="no"]').check();
+    await page.locator('input[name="scheduleVaries"][value="no"]').check();
+    await page.locator('select[name="mealDuration"]').selectOption("20To30");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('select[name="eatingOutFrequency"]')
+      .selectOption("rarely");
+    await page.locator('input[name="snacksBetweenMeals"][value="no"]').check();
+    await page.locator('input[name="eatsLateAtNight"][value="no"]').check();
+    await page.locator('input[name="frequentCravings"][value="no"]').check();
+    await page.locator('select[name="mealPreparer"]').selectOption("family");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('select[name="usualDietType"]').selectOption("omnivore");
+    await page.locator('input[name="avoidsFoods"][value="no"]').check();
+    await expect(page.locator('input[name="avoidedFoods"]')).toHaveCount(0);
+    await page
+      .locator('input[name="followsFoodRestrictions"][value="no"]')
+      .check();
+    await expect(
+      page.locator('input[name="foodRestrictionDetails"]'),
+    ).toHaveCount(0);
+    await page.locator('input[name="hasFoodDiscomfort"][value="no"]').check();
+    await expect(page.locator('input[name="discomfortFoods"]')).toHaveCount(0);
+    await page
+      .locator('select[name="specialEatingPreference"]')
+      .selectOption("none");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('select[name="waterIntake"]')
+      .selectOption("oneAndHalfToTwoLiters");
+    await page
+      .locator('input[name="drinksWaterThroughoutDay"][value="yes"]')
+      .check();
+    await page.locator('input[name="carriesWaterBottle"][value="yes"]').check();
+    await page
+      .locator('select[name="coffeeTeaFrequency"]')
+      .selectOption("onePerDay");
+    await page
+      .locator('select[name="sugaryDrinkFrequency"]')
+      .selectOption("never");
+    await page
+      .locator('input[name="consumesEnergyDrinks"][value="no"]')
+      .check();
+    await page.locator('select[name="otherBeverage"]').selectOption("none");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('input[name="appetiteLevel"][value="normal"]').check();
+    await page.locator('input[name="earlySatiety"][value="no"]').check();
+    await page
+      .locator('input[name="hasDigestiveDiscomfort"][value="no"]')
+      .check();
+    await expect(
+      page.locator('input[name="otherDigestiveSymptom"]'),
+    ).toHaveCount(0);
     await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()

@@ -58,18 +58,395 @@ const FamilyHistoryDetailsSchema = z
   })
   .strict();
 
-const MedicalIntakeSchema = z
+const MedicationFrequencySchema = z.enum([
+  "daily",
+  "twiceDaily",
+  "weekly",
+  "asNeeded",
+  "other",
+]);
+
+const SupplementDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    dose: z.string().min(1).max(500),
+    frequency: MedicationFrequencySchema,
+    objective: z.string().min(1).max(500),
+  })
+  .strict();
+
+const MedicationAllergyDetailSchema = z
+  .object({
+    medication: z.string().min(1).max(500),
+    reaction: z.string().min(1).max(500),
+    severity: z.enum(["mild", "moderate", "severe"]),
+    requiredMedicalAttention: z.boolean(),
+  })
+  .strict();
+
+const DailyMedicationDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    dose: z.string().min(1).max(500),
+    frequency: MedicationFrequencySchema,
+    schedule: z.string().min(1).max(500),
+    reason: z.string().min(1).max(500),
+    prescribedByProfessional: z.boolean(),
+  })
+  .strict();
+
+const OptionalClinicalYearSchema = z
+  .number()
+  .int()
+  .min(1900)
+  .max(new Date().getFullYear())
+  .nullable();
+
+const DiagnosedConditionDetailSchema = z
+  .object({
+    diagnosis: z.string().min(1).max(500),
+    diagnosisYear: OptionalClinicalYearSchema,
+    status: z.enum(["active", "controlled", "resolved"]),
+    treatment: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const PreviousSurgeryDetailSchema = z
+  .object({
+    procedure: z.string().min(1).max(500),
+    year: OptionalClinicalYearSchema,
+    reason: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const CurrentTreatmentDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    reason: z.string().min(1).max(500),
+    frequency: z.string().min(1).max(500),
+    professional: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const IntoleranceDetailSchema = z
+  .object({
+    substance: z.string().min(1).max(500),
+    reaction: z.string().min(1).max(500),
+    severity: z.enum(["mild", "moderate", "severe"]),
+  })
+  .strict();
+
+const MealTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid meal time");
+
+const MealRoutineSchema = z
+  .object({
+    breakfastTime: MealTimeSchema,
+    mainMealTime: MealTimeSchema,
+    dinnerTime: MealTimeSchema,
+    snackTimes: z.array(MealTimeSchema).max(4),
+    mealsPerDay: z.number().int().min(1).max(8),
+    skipsMeals: z.boolean(),
+    mostSkippedMeal: z
+      .enum(["breakfast", "mainMeal", "dinner", "snack"])
+      .nullable(),
+    scheduleVaries: z.boolean(),
+    scheduleVariation: z
+      .enum([
+        "weekendsLater",
+        "weekendsEarlier",
+        "workdays",
+        "rotatingShifts",
+        "irregular",
+      ])
+      .nullable(),
+    mealDuration: z.enum([
+      "lessThan15",
+      "15To20",
+      "20To30",
+      "30To45",
+      "moreThan45",
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.skipsMeals && !value.mostSkippedMeal) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mostSkippedMeal"],
+        message: "Required when meals are skipped",
+      });
+    }
+    if (value.scheduleVaries && !value.scheduleVariation) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scheduleVariation"],
+        message: "Required when meal schedules vary",
+      });
+    }
+  });
+
+const EatingPatternsSchema = z
+  .object({
+    eatingOutFrequency: z.enum([
+      "never",
+      "rarely",
+      "oneToTwoPerWeek",
+      "threeToFourPerWeek",
+      "daily",
+    ]),
+    snacksBetweenMeals: z.boolean(),
+    eatsLateAtNight: z.boolean(),
+    frequentCravings: z.boolean(),
+    cravingTime: z
+      .enum(["morning", "afternoon", "evening", "night", "variable"])
+      .nullable(),
+    mealPreparer: z.enum([
+      "self",
+      "partner",
+      "family",
+      "householdHelp",
+      "preparedFood",
+      "varies",
+    ]),
+    primaryMealLocation: z
+      .enum(["home", "work", "school", "restaurant", "street", "varies"])
+      .nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.frequentCravings && !value.cravingTime) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cravingTime"],
+        message: "Required when frequent cravings are reported",
+      });
+    }
+  });
+
+const FoodPreferencesSchema = z
+  .object({
+    usualDietType: z.enum([
+      "omnivore",
+      "vegetarian",
+      "vegan",
+      "pescatarian",
+      "mediterranean",
+      "lowCarb",
+      "other",
+    ]),
+    otherDietDescription: z.string().max(500).nullable(),
+    avoidsFoods: z.boolean(),
+    avoidedFoods: z.string().max(500).nullable(),
+    followsFoodRestrictions: z.boolean(),
+    foodRestrictionDetails: z.string().max(500).nullable(),
+    hasFoodDiscomfort: z.boolean(),
+    discomfortFoods: z.string().max(500).nullable(),
+    specialPreference: z.enum([
+      "none",
+      "lowSodium",
+      "lowSugar",
+      "lowFat",
+      "softTextures",
+      "temperatureSensitive",
+      "other",
+    ]),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.usualDietType === "other" &&
+      !value.otherDietDescription?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherDietDescription"],
+        message: "Required when another diet type is reported",
+      });
+    }
+    if (value.avoidsFoods && !value.avoidedFoods?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["avoidedFoods"],
+        message: "Required when avoided foods are reported",
+      });
+    }
+    if (
+      value.followsFoodRestrictions &&
+      !value.foodRestrictionDetails?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["foodRestrictionDetails"],
+        message: "Required when food restrictions are reported",
+      });
+    }
+    if (value.hasFoodDiscomfort && !value.discomfortFoods?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["discomfortFoods"],
+        message: "Required when food discomfort is reported",
+      });
+    }
+  });
+
+const HydrationHabitsSchema = z
+  .object({
+    waterIntake: z.enum([
+      "lessThanOneLiter",
+      "oneToOneAndHalfLiters",
+      "oneAndHalfToTwoLiters",
+      "twoToThreeLiters",
+      "moreThanThreeLiters",
+    ]),
+    drinksWaterThroughoutDay: z.boolean(),
+    carriesWaterBottle: z.boolean(),
+    coffeeTeaFrequency: z.enum([
+      "never",
+      "occasional",
+      "onePerDay",
+      "oneToTwoPerDay",
+      "threeOrMorePerDay",
+    ]),
+    sugaryDrinkFrequency: z.enum([
+      "never",
+      "oneToTwoPerWeek",
+      "threeToFourPerWeek",
+      "daily",
+      "multiplePerDay",
+    ]),
+    consumesEnergyDrinks: z.boolean(),
+    otherBeverage: z.enum([
+      "none",
+      "infusions",
+      "flavoredWater",
+      "juice",
+      "sportsDrinks",
+      "other",
+    ]),
+    alcoholFrequency: z
+      .enum([
+        "never",
+        "monthlyOrLess",
+        "twoToFourPerMonth",
+        "twoToThreePerWeek",
+        "fourOrMorePerWeek",
+      ])
+      .nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict();
+
+const DigestiveHealthSchema = z
+  .object({
+    appetiteLevel: z.enum(["low", "normal", "high", "variable"]),
+    earlySatiety: z.boolean(),
+    hasDigestiveDiscomfort: z.boolean(),
+    symptoms: z
+      .array(
+        z.enum([
+          "reflux",
+          "bloating",
+          "gas",
+          "nausea",
+          "constipation",
+          "diarrhea",
+          "abdominalPain",
+          "heartburn",
+          "vomiting",
+          "belching",
+          "abdominalCramps",
+          "other",
+        ]),
+      )
+      .max(12),
+    otherSymptomDescription: z.string().max(500).nullable(),
+    symptomTiming: z
+      .enum(["duringMeals", "afterMeals", "morning", "night", "variable"])
+      .nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.hasDigestiveDiscomfort && value.symptoms.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["symptoms"],
+        message: "Select at least one digestive symptom",
+      });
+    }
+    if (value.hasDigestiveDiscomfort && !value.symptomTiming) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["symptomTiming"],
+        message: "Required when digestive discomfort is reported",
+      });
+    }
+    if (
+      value.hasDigestiveDiscomfort &&
+      value.symptoms.includes("other") &&
+      !value.otherSymptomDescription?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherSymptomDescription"],
+        message: "Required when another digestive symptom is reported",
+      });
+    }
+  });
+
+const NutritionIntakeSchema = z
+  .object({
+    routine: MealRoutineSchema.nullable(),
+    patterns: EatingPatternsSchema.nullable().optional(),
+    preferences: FoodPreferencesSchema.nullable().optional(),
+    hydration: HydrationHabitsSchema.nullable().optional(),
+    digestive: DigestiveHealthSchema.nullable().optional(),
+  })
+  .strict();
+
+export const MedicalIntakeSchema = z
   .object({
     diagnosedConditions: z.boolean().nullable().optional(),
     previousSurgeries: z.boolean().nullable().optional(),
     currentTreatments: z.boolean().nullable().optional(),
     intolerances: z.boolean().nullable().optional(),
+    diagnosedConditionDetails: z
+      .array(DiagnosedConditionDetailSchema)
+      .max(12)
+      .optional(),
+    previousSurgeryDetails: z
+      .array(PreviousSurgeryDetailSchema)
+      .max(12)
+      .optional(),
+    currentTreatmentDetails: z
+      .array(CurrentTreatmentDetailSchema)
+      .max(12)
+      .optional(),
+    intoleranceDetails: z.array(IntoleranceDetailSchema).max(12).optional(),
     familyHistory: z.boolean().nullable().optional(),
+    familyHistoryMode: z
+      .enum(["none", "unknown", "recorded"])
+      .nullable()
+      .optional(),
     familyHistoryDetails: FamilyHistoryDetailsSchema.nullable().optional(),
     medications: z.boolean().nullable().optional(),
     supplements: z.boolean().nullable().optional(),
     medicationAllergies: z.boolean().nullable().optional(),
     adverseMedicationOrSupplementEffects: z.boolean().nullable().optional(),
+    supplementDetails: z.array(SupplementDetailSchema).max(12).optional(),
+    medicationAllergyDetails: z
+      .array(MedicationAllergyDetailSchema)
+      .max(12)
+      .optional(),
+    dailyMedicationDetails: z
+      .array(DailyMedicationDetailSchema)
+      .max(12)
+      .optional(),
+    adverseEffectDetails: z.string().max(1000).nullable().optional(),
+    nutritionIntake: NutritionIntakeSchema.nullable().optional(),
     physicalActivity: z.boolean().nullable().optional(),
   })
   .strict();

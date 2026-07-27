@@ -91,7 +91,7 @@ describe("NewPatientWizard", () => {
     createPatient.mockReset();
   });
 
-  it("creates a patient from the seven-step registration", async () => {
+  it("creates a patient from the eight-step registration", async () => {
     const created = {
       id: { toString: () => "patient-123" },
       fullName: "Ana Rivera",
@@ -109,6 +109,9 @@ describe("NewPatientWizard", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText("patient.wizard.physical_activity_short"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.nutrition_short"),
     ).toBeInTheDocument();
     expect(screen.getByText("patient.wizard.notes_short")).toBeInTheDocument();
 
@@ -167,7 +170,51 @@ describe("NewPatientWizard", () => {
     answer("previousSurgeries", "no");
     answer("currentTreatments", "yes");
     answer("intolerances", "no");
-    await nextStep("familyDiabetes");
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText("Completa este dato")).toHaveLength(5),
+    );
+    expect(
+      document.querySelector('[name="familyDiabetes"]'),
+    ).not.toBeInTheDocument();
+    fireEvent.change(input("diagnosedConditionDetails.0.diagnosis"), {
+      target: { value: "Diabetes mellitus tipo 2" },
+    });
+    fireEvent.change(input("diagnosedConditionDetails.0.status"), {
+      target: { value: "controlled" },
+    });
+    fireEvent.change(input("currentTreatmentDetails.0.name"), {
+      target: { value: "Terapia nutricional" },
+    });
+    fireEvent.change(input("currentTreatmentDetails.0.reason"), {
+      target: { value: "Control glucémico" },
+    });
+    fireEvent.change(input("currentTreatmentDetails.0.frequency"), {
+      target: { value: "Mensual" },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", {
+          name: "patient.wizard.hide_medical_details",
+        }),
+      ).toHaveLength(2),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.hide_medical_details",
+      })[0]!,
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.hide_medical_details",
+      })[0]!,
+    );
+    await nextStep("familyHistoryMode");
+    fireEvent.click(
+      document.querySelector('[name="familyHistoryMode"][value="recorded"]')!,
+    );
 
     selectFamilyMember("familyDiabetes", "mother");
     expect(
@@ -198,10 +245,326 @@ describe("NewPatientWizard", () => {
     });
     await nextStep("supplements");
 
-    answer("supplements", "no");
+    answer("supplements", "yes");
     answer("medicationAllergies", "yes");
     answer("medications", "yes");
     answer("adverseMedicationOrSupplementEffects", "no");
+    expect(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.hide_medical_details",
+      }),
+    ).toHaveLength(3);
+    fireEvent.click(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.hide_medical_details",
+      })[0]!,
+    );
+    expect(
+      screen.getByText("patient.wizard.medical_details_pending"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.show_medical_details",
+      }),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    await waitFor(() =>
+      expect(screen.getAllByText("Completa este dato")).toHaveLength(14),
+    );
+    expect(
+      document.querySelector('[name="physicalActivity"]'),
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(input("supplementDetails.0.name"), {
+      target: { value: "Omega 3" },
+    });
+    fireEvent.change(input("supplementDetails.0.dose"), {
+      target: { value: "1000 mg" },
+    });
+    fireEvent.change(input("supplementDetails.0.frequency"), {
+      target: { value: "daily" },
+    });
+    fireEvent.change(input("supplementDetails.0.objective"), {
+      target: { value: "Salud cardiovascular" },
+    });
+    fireEvent.change(input("medicationAllergyDetails.0.medication"), {
+      target: { value: "Penicilina" },
+    });
+    fireEvent.change(input("medicationAllergyDetails.0.reaction"), {
+      target: { value: "Urticaria" },
+    });
+    fireEvent.click(
+      document.querySelector(
+        '[name="medicationAllergyDetails.0.severity"][value="moderate"]',
+      )!,
+    );
+    answer("medicationAllergyDetails.0.requiredMedicalAttention", "yes");
+    fireEvent.change(input("dailyMedicationDetails.0.name"), {
+      target: { value: "Metformina" },
+    });
+    fireEvent.change(input("dailyMedicationDetails.0.dose"), {
+      target: { value: "850 mg" },
+    });
+    fireEvent.change(input("dailyMedicationDetails.0.frequency"), {
+      target: { value: "twiceDaily" },
+    });
+    fireEvent.change(input("dailyMedicationDetails.0.schedule"), {
+      target: { value: "08:00" },
+    });
+    fireEvent.change(input("dailyMedicationDetails.0.reason"), {
+      target: { value: "Diabetes" },
+    });
+    answer("dailyMedicationDetails.0.prescribedByProfessional", "yes");
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole("button", {
+          name: "patient.wizard.hide_medical_details",
+        }),
+      ).toHaveLength(3),
+    );
+    for (let index = 0; index < 3; index += 1) {
+      fireEvent.click(
+        screen.getAllByRole("button", {
+          name: "patient.wizard.hide_medical_details",
+        })[0]!,
+      );
+    }
+    expect(
+      document.querySelector('[name="supplementDetails.0.name"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[name="medicationAllergyDetails.0.medication"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[name="dailyMedicationDetails.0.name"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.show_medical_details",
+      }),
+    ).toHaveLength(3);
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /patient.wizard.family_history_title/,
+      }),
+    );
+    expect(
+      document.querySelector('[name="familyDiabetes"]'),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /patient.wizard.medications_supplements_title/,
+      }),
+    );
+    expect(
+      screen.getAllByRole("button", {
+        name: "patient.wizard.show_medical_details",
+      }),
+    ).toHaveLength(3);
+    expect(
+      document.querySelector('[name="supplementDetails.0.name"]'),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    expect(
+      await screen.findByText("patient.wizard.optional_medical_info_title"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.optional_condition_year"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.optional_medical_info_fill",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector(
+          '[name="diagnosedConditionDetails.0.diagnosisYear"]',
+        ),
+      ).toBeInTheDocument(),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /patient.wizard.medications_supplements_title/,
+      }),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    expect(
+      await screen.findByText("patient.wizard.optional_medical_info_title"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.optional_medical_info_skip",
+      }),
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[name="breakfastTime"]'),
+      ).toBeInTheDocument(),
+    );
+
+    fireEvent.change(input("breakfastTime"), { target: { value: "08:00" } });
+    fireEvent.change(input("mainMealTime"), { target: { value: "13:30" } });
+    fireEvent.change(input("dinnerTime"), { target: { value: "20:00" } });
+    fireEvent.change(input("snackTimes.0.time"), {
+      target: { value: "10:30" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.nutrition_add_snack",
+      }),
+    );
+    fireEvent.change(input("snackTimes.1.time"), {
+      target: { value: "17:00" },
+    });
+    fireEvent.change(document.querySelector('[name="mealsPerDay"]')!, {
+      target: { value: "5" },
+    });
+    expect(
+      document.querySelector('[name="mostSkippedMeal"]'),
+    ).not.toBeInTheDocument();
+    answer("skipsMeals", "yes");
+    fireEvent.change(document.querySelector('[name="mostSkippedMeal"]')!, {
+      target: { value: "breakfast" },
+    });
+    expect(
+      document.querySelector('[name="scheduleVariation"]'),
+    ).not.toBeInTheDocument();
+    answer("scheduleVaries", "yes");
+    fireEvent.change(document.querySelector('[name="scheduleVariation"]')!, {
+      target: { value: "weekendsLater" },
+    });
+    fireEvent.change(document.querySelector('[name="mealDuration"]')!, {
+      target: { value: "20To30" },
+    });
+    await nextStep("eatingOutFrequency");
+    fireEvent.change(document.querySelector('[name="eatingOutFrequency"]')!, {
+      target: { value: "oneToTwoPerWeek" },
+    });
+    answer("snacksBetweenMeals", "yes");
+    answer("eatsLateAtNight", "no");
+    expect(
+      document.querySelector('[name="cravingTime"]'),
+    ).not.toBeInTheDocument();
+    answer("frequentCravings", "yes");
+    fireEvent.change(document.querySelector('[name="cravingTime"]')!, {
+      target: { value: "afternoon" },
+    });
+    fireEvent.change(document.querySelector('[name="mealPreparer"]')!, {
+      target: { value: "self" },
+    });
+    fireEvent.change(document.querySelector('[name="primaryMealLocation"]')!, {
+      target: { value: "home" },
+    });
+    await nextStep("usualDietType");
+    expect(
+      document.querySelectorAll(
+        ".nc-new-patient__nutritionPreferences legend > span",
+      ),
+    ).toHaveLength(0);
+    expect(
+      document.querySelector('[name="otherDietDescription"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('[name="avoidedFoods"]'),
+    ).not.toBeInTheDocument();
+    fireEvent.change(document.querySelector('[name="usualDietType"]')!, {
+      target: { value: "other" },
+    });
+    fireEvent.change(input("otherDietDescription"), {
+      target: { value: "Flexitariana" },
+    });
+    answer("avoidsFoods", "yes");
+    fireEvent.change(document.querySelector('[name="avoidedFoods"]')!, {
+      target: { value: "Mariscos" },
+    });
+    expect(
+      document.querySelector('[name="foodRestrictionDetails"]'),
+    ).not.toBeInTheDocument();
+    answer("followsFoodRestrictions", "yes");
+    fireEvent.change(input("foodRestrictionDetails"), {
+      target: { value: "Sin carne roja" },
+    });
+    expect(
+      document.querySelector('[name="discomfortFoods"]'),
+    ).not.toBeInTheDocument();
+    answer("hasFoodDiscomfort", "yes");
+    fireEvent.change(document.querySelector('[name="discomfortFoods"]')!, {
+      target: { value: "Lácteos" },
+    });
+    fireEvent.change(
+      document.querySelector('[name="specialEatingPreference"]')!,
+      { target: { value: "lowSodium" } },
+    );
+    fireEvent.change(document.querySelector('[name="foodPreferenceNotes"]')!, {
+      target: { value: "Prefiere preparaciones caseras" },
+    });
+    await nextStep("waterIntake");
+    fireEvent.change(document.querySelector('[name="waterIntake"]')!, {
+      target: { value: "oneAndHalfToTwoLiters" },
+    });
+    answer("drinksWaterThroughoutDay", "yes");
+    answer("carriesWaterBottle", "yes");
+    fireEvent.change(document.querySelector('[name="coffeeTeaFrequency"]')!, {
+      target: { value: "oneToTwoPerDay" },
+    });
+    fireEvent.change(document.querySelector('[name="sugaryDrinkFrequency"]')!, {
+      target: { value: "oneToTwoPerWeek" },
+    });
+    answer("consumesEnergyDrinks", "no");
+    fireEvent.change(document.querySelector('[name="otherBeverage"]')!, {
+      target: { value: "infusions" },
+    });
+    fireEvent.change(document.querySelector('[name="alcoholFrequency"]')!, {
+      target: { value: "never" },
+    });
+    fireEvent.change(document.querySelector('[name="hydrationNotes"]')!, {
+      target: { value: "Toma agua con limón" },
+    });
+    await nextStep("appetiteLevel");
+    fireEvent.click(
+      document.querySelector('[name="appetiteLevel"][value="normal"]')!,
+    );
+    answer("earlySatiety", "no");
+    expect(
+      document.querySelector('[name="symptomTiming"]'),
+    ).not.toBeInTheDocument();
+    answer("hasDigestiveDiscomfort", "yes");
+    expect(
+      document.querySelector('[name="otherDigestiveSymptom"]'),
+    ).not.toBeInTheDocument();
+    for (const symptom of [
+      "reflux",
+      "gas",
+      "abdominalPain",
+      "heartburn",
+      "vomiting",
+      "belching",
+      "abdominalCramps",
+      "other",
+    ]) {
+      fireEvent.click(
+        document.querySelector(
+          `[name="digestiveSymptoms"][value="${symptom}"]`,
+        )!,
+      );
+    }
+    fireEvent.change(input("otherDigestiveSymptom"), {
+      target: { value: "Sensación de vacío" },
+    });
+    fireEvent.change(document.querySelector('[name="symptomTiming"]')!, {
+      target: { value: "afterMeals" },
+    });
+    fireEvent.change(document.querySelector('[name="digestiveNotes"]')!, {
+      target: { value: "Más frecuente con comidas abundantes" },
+    });
     await nextStep("physicalActivity");
 
     answer("physicalActivity", "yes");
@@ -238,7 +601,26 @@ describe("NewPatientWizard", () => {
         previousSurgeries: false,
         currentTreatments: true,
         intolerances: false,
+        diagnosedConditionDetails: [
+          {
+            diagnosis: "Diabetes mellitus tipo 2",
+            diagnosisYear: null,
+            status: "controlled",
+            treatment: null,
+          },
+        ],
+        previousSurgeryDetails: [],
+        currentTreatmentDetails: [
+          {
+            name: "Terapia nutricional",
+            reason: "Control glucémico",
+            frequency: "Mensual",
+            professional: null,
+          },
+        ],
+        intoleranceDetails: [],
         familyHistory: true,
+        familyHistoryMode: "recorded",
         familyHistoryDetails: {
           diabetes: ["mother"],
           hypertension: ["none"],
@@ -251,9 +633,100 @@ describe("NewPatientWizard", () => {
           notes: "Madre diagnosticada a los 52 años",
         },
         medications: true,
-        supplements: false,
+        supplements: true,
         medicationAllergies: true,
         adverseMedicationOrSupplementEffects: false,
+        supplementDetails: [
+          {
+            name: "Omega 3",
+            dose: "1000 mg",
+            frequency: "daily",
+            objective: "Salud cardiovascular",
+          },
+        ],
+        medicationAllergyDetails: [
+          {
+            medication: "Penicilina",
+            reaction: "Urticaria",
+            severity: "moderate",
+            requiredMedicalAttention: true,
+          },
+        ],
+        dailyMedicationDetails: [
+          {
+            name: "Metformina",
+            dose: "850 mg",
+            frequency: "twiceDaily",
+            schedule: "08:00",
+            reason: "Diabetes",
+            prescribedByProfessional: true,
+          },
+        ],
+        adverseEffectDetails: null,
+        nutritionIntake: {
+          routine: {
+            breakfastTime: "08:00",
+            mainMealTime: "13:30",
+            dinnerTime: "20:00",
+            snackTimes: ["10:30", "17:00"],
+            mealsPerDay: 5,
+            skipsMeals: true,
+            mostSkippedMeal: "breakfast",
+            scheduleVaries: true,
+            scheduleVariation: "weekendsLater",
+            mealDuration: "20To30",
+          },
+          patterns: {
+            eatingOutFrequency: "oneToTwoPerWeek",
+            snacksBetweenMeals: true,
+            eatsLateAtNight: false,
+            frequentCravings: true,
+            cravingTime: "afternoon",
+            mealPreparer: "self",
+            primaryMealLocation: "home",
+          },
+          preferences: {
+            usualDietType: "other",
+            otherDietDescription: "Flexitariana",
+            avoidsFoods: true,
+            avoidedFoods: "Mariscos",
+            followsFoodRestrictions: true,
+            foodRestrictionDetails: "Sin carne roja",
+            hasFoodDiscomfort: true,
+            discomfortFoods: "Lácteos",
+            specialPreference: "lowSodium",
+            notes: "Prefiere preparaciones caseras",
+          },
+          hydration: {
+            waterIntake: "oneAndHalfToTwoLiters",
+            drinksWaterThroughoutDay: true,
+            carriesWaterBottle: true,
+            coffeeTeaFrequency: "oneToTwoPerDay",
+            sugaryDrinkFrequency: "oneToTwoPerWeek",
+            consumesEnergyDrinks: false,
+            otherBeverage: "infusions",
+            alcoholFrequency: "never",
+            notes: "Toma agua con limón",
+          },
+          digestive: {
+            appetiteLevel: "normal",
+            earlySatiety: false,
+            hasDigestiveDiscomfort: true,
+            symptoms: [
+              "reflux",
+              "gas",
+              "abdominalPain",
+              "heartburn",
+              "vomiting",
+              "belching",
+              "abdominalCramps",
+              "other",
+            ],
+            otherSymptomDescription: "Sensación de vacío",
+            symptomTiming: "afterMeals",
+            notes: "Más frecuente con comidas abundantes",
+          },
+        },
         physicalActivity: true,
       },
       emergencyContactName: "Luis Rivera",
@@ -266,5 +739,5 @@ describe("NewPatientWizard", () => {
     expect(payload.emergencyContactPhone.toString()).toBe("+52 55 2468 1357");
     expect(payload.email.toString()).toBe("ana@example.com");
     expect(onCreated).toHaveBeenCalledWith(created);
-  });
+  }, 20_000);
 });

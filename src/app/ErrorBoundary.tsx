@@ -2,7 +2,13 @@ import * as React from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@components/ui/card";
 import i18n from "@i18n/config";
 
 interface ErrorBoundaryProps {
@@ -15,7 +21,13 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+const DYNAMIC_IMPORT_ERROR =
+  /Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;
+
+export class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
@@ -29,6 +41,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   private handleReset = () => {
+    if (
+      this.state.error &&
+      DYNAMIC_IMPORT_ERROR.test(this.state.error.message)
+    ) {
+      window.location.reload();
+      return;
+    }
+
     this.setState({ hasError: false, error: null });
   };
 
@@ -41,7 +61,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
           <Card className="max-w-md">
             <CardHeader>
               <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-5 w-5 text-destructive" aria-hidden />
+                <AlertTriangle
+                  className="h-5 w-5 text-destructive"
+                  aria-hidden
+                />
               </div>
               <CardTitle>{i18n.t("common.error_title")}</CardTitle>
               <CardDescription>
