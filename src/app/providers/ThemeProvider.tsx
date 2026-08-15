@@ -38,8 +38,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   React.useLayoutEffect(() => {
     const root = window.document.documentElement;
 
-    const applyTheme = (newTheme: Theme) => {
-      let nextResolvedTheme: ResolvedTheme = "light";
+const applyTheme = (newTheme: Theme) => {
+      let nextResolvedTheme: ResolvedTheme;
 
       root.classList.remove("light", "dark", "alternative", "high-contrast");
       if (newTheme === "high-contrast") {

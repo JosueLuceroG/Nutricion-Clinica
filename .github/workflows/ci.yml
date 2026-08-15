@@ -52,6 +52,16 @@ jobs:
       - name: Approve esbuild build scripts
         run: pnpm approve-builds esbuild
 
+      - name: Secret scan (tracked files)
+        shell: bash
+        run: |
+          set -o pipefail
+          if git grep -n -I -E "NutriCl1n1c4[_]2026!|BEGIN (RSA |OPENSSH |EC )?PRIVATE KEY" -- . 2>/dev/null; then
+            echo "::error::Posible secreto comprometido detectado en archivos trackeados"
+            exit 1
+          fi
+          echo "secret-scan: OK"
+
       - name: Lint
         run: pnpm lint
 
@@ -60,6 +70,15 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Backend typecheck
+        run: pnpm --filter @nutriclinica/api typecheck
+
+      - name: Backend test
+        run: pnpm --filter @nutriclinica/api test
+
+      - name: Backend build
+        run: pnpm --filter @nutriclinica/api build
 
       - name: Build
         run: pnpm build

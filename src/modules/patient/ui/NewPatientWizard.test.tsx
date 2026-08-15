@@ -1,13 +1,27 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  BirthDateFormSchema,
+  parseBirthDateForPersistence,
+} from "../application/patientFormSchema";
+import { DEFAULT_PATIENT_RECORD_NUMBER_CONFIG } from "../application/patientRecordNumber";
+import {
+  PATIENT_REGISTRATION_DRAFT_KEY,
+  readPatientRegistrationDraft,
+  savePatientRegistrationDraft,
+} from "../application/patientRegistrationDraft";
+import { usePreferencesStore } from "@store/preferencesStore";
 
 const { createPatient } = vi.hoisted(() => ({
   createPatient: vi.fn(),
 }));
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { resolvedLanguage: "es-MX" },
+  }),
 }));
 
 vi.mock("@hooks/useUnsavedChangesGuard", () => ({
@@ -15,7 +29,31 @@ vi.mock("@hooks/useUnsavedChangesGuard", () => ({
 }));
 
 vi.mock("@components/layout/ConfirmDialog", () => ({
-  ConfirmDialog: () => null,
+  ConfirmDialog: ({
+    open,
+    title,
+    confirmLabel,
+    cancelLabel,
+    onConfirm,
+    onOpenChange,
+  }: {
+    open: boolean;
+    title: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    onConfirm: () => void;
+    onOpenChange: (open: boolean) => void;
+  }) =>
+    open ? (
+      <div role="dialog" aria-label={title}>
+        <button type="button" onClick={() => onOpenChange(false)}>
+          {cancelLabel}
+        </button>
+        <button type="button" onClick={onConfirm}>
+          {confirmLabel}
+        </button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@services/patientService", () => ({
@@ -28,6 +66,7 @@ vi.mock("@store/authStore", () => ({
   useAuthStore: (
     selector: (state: {
       user: { id: string; nombreCompleto: string; rol: string };
+      sucursalActivaId: null;
     }) => unknown,
   ) =>
     selector({
@@ -36,14 +75,12 @@ vi.mock("@store/authStore", () => ({
         nombreCompleto: "Dra. Paula Méndez",
         rol: "nutriologa",
       },
+      sucursalActivaId: null,
     }),
 }));
 
-vi.mock("sonner", () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
-}));
-
 import { NewPatientWizard } from "./NewPatientWizard";
+import { PatientForm } from "./PatientForm";
 
 function input(name: string): HTMLInputElement {
   const element = document.querySelector<HTMLInputElement>(`[name="${name}"]`);
@@ -89,6 +126,11 @@ async function nextStep(nextField: string) {
 describe("NewPatientWizard", () => {
   beforeEach(() => {
     createPatient.mockReset();
+    localStorage.clear();
+    usePreferencesStore.setState({
+      patientRecordNumberConfig: DEFAULT_PATIENT_RECORD_NUMBER_CONFIG,
+      patientRecordNumberNextSequence: 1,
+    });
   });
 
   it("creates a patient from the eight-step registration", async () => {
@@ -97,11 +139,33 @@ describe("NewPatientWizard", () => {
       fullName: "Ana Rivera",
     };
     const onCreated = vi.fn();
-    createPatient.mockResolvedValue(created);
+    let resolveCreate!: (value: typeof created) => void;
+    createPatient.mockReturnValue(
+      new Promise<typeof created>((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    savePatientRegistrationDraft({
+      scope: {
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        sucursalId: null,
+      },
+      values: { firstName: "Paciente anterior" },
+      navigation: {
+        step: 0,
+        medicalSection: "personal",
+        nutritionSection: "routine",
+        physicalActivitySection: "activity",
+      },
+      photoNeedsReselection: false,
+    });
     render(
       <MemoryRouter>
         <NewPatientWizard onCreated={onCreated} />
       </MemoryRouter>,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "patient.wizard.draft_continue" }),
     );
 
     expect(
@@ -117,10 +181,18 @@ describe("NewPatientWizard", () => {
 
     fireEvent.change(input("firstName"), { target: { value: "Ana" } });
     fireEvent.change(input("lastName"), { target: { value: "Rivera" } });
-    fireEvent.change(input("age"), { target: { value: "34" } });
+    fireEvent.change(input("birthDate"), {
+      target: { value: "1991-04-09" },
+    });
+    expect(screen.getByText("patient.age_value")).toBeInTheDocument();
     fireEvent.change(document.querySelector('[name="sex"]')!, {
       target: { value: "female" },
     });
+    expect(
+      Array.from(
+        document.querySelectorAll<HTMLSelectElement>('[name="sex"] option'),
+      ).map((option) => option.value),
+    ).toEqual(["", "female", "male"]);
     fireEvent.change(input("occupation"), { target: { value: "Docente" } });
     await nextStep("phone");
 
@@ -153,14 +225,9 @@ describe("NewPatientWizard", () => {
       document.querySelector('[name="emergencyContactRelationship"]')!,
       { target: { value: "Madre" } },
     );
-    fireEvent.change(input("emergencyContactPhone"), {
-      target: { value: "+52 55 2468 1357" },
-    });
     await nextStep("externalRecordNumber");
 
-    fireEvent.change(input("externalRecordNumber"), {
-      target: { value: "EXT-42" },
-    });
+    expect(input("externalRecordNumber")).toHaveAttribute("readonly");
     fireEvent.change(document.querySelector('[name="admissionReason"]')!, {
       target: { value: "Primera valoración nutricional" },
     });
@@ -274,7 +341,7 @@ describe("NewPatientWizard", () => {
       expect(screen.getAllByText("Completa este dato")).toHaveLength(14),
     );
     expect(
-      document.querySelector('[name="physicalActivity"]'),
+      document.querySelector('[name="activityLevel"]'),
     ).not.toBeInTheDocument();
 
     fireEvent.change(input("supplementDetails.0.name"), {
@@ -565,14 +632,70 @@ describe("NewPatientWizard", () => {
     fireEvent.change(document.querySelector('[name="digestiveNotes"]')!, {
       target: { value: "Más frecuente con comidas abundantes" },
     });
-    await nextStep("physicalActivity");
-
-    answer("physicalActivity", "yes");
-    await nextStep("clinicalTags");
-
-    fireEvent.change(input("clinicalTags"), {
-      target: { value: "diabetes, hypertension" },
+    await nextStep("activityLevel");
+    expect(
+      screen.getByText("patient.wizard.daily_activity_section_title"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      document.querySelector('[name="activityLevel"][value="moderate"]')!,
+    );
+    fireEvent.change(document.querySelector('[name="activityDaysPerWeek"]')!, {
+      target: { value: "3" },
     });
+    fireEvent.change(
+      document.querySelector('[name="activitySessionDuration"]')!,
+      { target: { value: "45" } },
+    );
+    fireEvent.click(
+      document.querySelector('[name="activityTypes"][value="walking"]')!,
+    );
+    fireEvent.click(
+      document.querySelector('[name="activityTypes"][value="gym"]')!,
+    );
+    fireEvent.change(document.querySelector('[name="physicalActivityGoal"]')!, {
+      target: { value: "health" },
+    });
+    answer("hasPhysicalLimitation", "yes");
+    fireEvent.change(input("physicalLimitationDetails"), {
+      target: { value: "Dolor leve de rodilla" },
+    });
+    fireEvent.change(
+      document.querySelector('[name="physicalActivityNotes"]')!,
+      {
+        target: { value: "Prefiere entrenar por la mañana" },
+      },
+    );
+    await nextStep("sedentaryTime");
+
+    fireEvent.click(
+      document.querySelector('[name="sedentaryTime"][value="sixToEight"]')!,
+    );
+    fireEvent.click(
+      document.querySelector('[name="usualTransportation"][value="walking"]')!,
+    );
+    answer("usesStairsFrequently", "yes");
+    fireEvent.click(
+      document.querySelector(
+        '[name="activeBreakFrequency"][value="frequently"]',
+      )!,
+    );
+    fireEvent.click(
+      document.querySelector('[name="dailyRoutineType"][value="mixed"]')!,
+    );
+    fireEvent.change(document.querySelector('[name="dailyActivityNotes"]')!, {
+      target: { value: "Trabajo de oficina y caminata vespertina" },
+    });
+    await nextStep("generalNotes");
+
+    expect(
+      screen.getByText("patient.wizard.notes_observations_title"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.notes_guide_title"),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('[name="clinicalTags"]'),
+    ).not.toBeInTheDocument();
     fireEvent.change(document.querySelector('[name="generalNotes"]')!, {
       target: { value: "Primera valoracion" },
     });
@@ -582,7 +705,33 @@ describe("NewPatientWizard", () => {
     });
     fireEvent.click(createButtons.at(-1)!);
 
+    const reviewDialog = await screen.findByTestId(
+      "final-registration-review-dialog",
+    );
+    expect(
+      reviewDialog.querySelector('[data-review-section="required"]'),
+    ).not.toBeInTheDocument();
+    expect(
+      reviewDialog.querySelector('[data-review-section="optional"]'),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.final_review_save_anyway",
+      }),
+    );
+    expect(
+      await screen.findByText("patient.wizard.saving_patient"),
+    ).toBeInTheDocument();
+    resolveCreate(created);
+
     await waitFor(() => expect(createPatient).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByTestId("patient-created-transition"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.creation_success_title"),
+    ).toBeInTheDocument();
+    expect(onCreated).not.toHaveBeenCalled();
     const payload = createPatient.mock.calls[0][0];
     const today = new Date();
     expect(payload).toMatchObject({
@@ -591,10 +740,10 @@ describe("NewPatientWizard", () => {
       sex: "female",
       occupation: "Docente",
       whatsappEnabled: false,
-      clinicalTags: ["diabetes", "hypertension"],
+      clinicalTags: [],
       generalNotes: "Primera valoracion",
       responsibleProfessionalId: "550e8400-e29b-41d4-a716-446655440000",
-      externalRecordNumber: "EXT-42",
+      externalRecordNumber: `EXP-${String(today.getMonth() + 1).padStart(2, "0")}-ANR${String(today.getFullYear()).slice(-2)}01`,
       admissionReason: "Primera valoración nutricional",
       medicalIntake: {
         diagnosedConditions: true,
@@ -728,16 +877,351 @@ describe("NewPatientWizard", () => {
           },
         },
         physicalActivity: true,
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 3,
+            sessionDurationMinutes: 45,
+            activityTypes: ["walking", "gym"],
+            primaryGoal: "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "Dolor leve de rodilla",
+            notes: "Prefiere entrenar por la mañana",
+          },
+          dailyActivity: {
+            sedentaryTime: "sixToEight",
+            usualTransportation: "walking",
+            usesStairsFrequently: true,
+            activeBreakFrequency: "frequently",
+            routineType: "mixed",
+            notes: "Trabajo de oficina y caminata vespertina",
+          },
+        },
       },
       emergencyContactName: "Luis Rivera",
       emergencyContactRelationship: "Madre",
     });
     expect(payload.birthDate).toBeInstanceOf(Date);
-    expect(payload.birthDate.getFullYear()).toBe(today.getFullYear() - 34);
+    expect(payload.birthDate.getFullYear()).toBe(1991);
+    expect(payload.birthDate.getMonth()).toBe(3);
+    expect(payload.birthDate.getDate()).toBe(9);
+    expect(payload.birthDate.getHours()).toBe(12);
     expect(payload.phone.toString()).toBe("+52 55 1234 5678");
     expect(payload.secondaryPhone.toString()).toBe("+52 55 8765 4321");
-    expect(payload.emergencyContactPhone.toString()).toBe("+52 55 2468 1357");
+    expect(payload.emergencyContactPhone).toBeNull();
     expect(payload.email.toString()).toBe("ana@example.com");
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith(created), {
+      timeout: 5_000,
+    });
+    expect(localStorage.getItem(PATIENT_REGISTRATION_DRAFT_KEY)).toBeNull();
+  }, 60_000);
+
+  it("offers to continue the only draft at its last step", () => {
+    savePatientRegistrationDraft({
+      scope: {
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        sucursalId: null,
+      },
+      values: {
+        firstName: "Elena",
+        phone: "+52 55 1111 2222",
+      },
+      navigation: {
+        step: 1,
+        medicalSection: "family",
+        nutritionSection: "hydration",
+        physicalActivitySection: "daily",
+      },
+      photoNeedsReselection: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+
+    expect(
+      screen.getByRole("heading", {
+        name: "patient.wizard.draft_found_title",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.draft_found_step"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("patient.wizard.draft_photo_reselection"),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "patient.wizard.draft_continue" }),
+    );
+    expect(input("phone")).toHaveValue("+52 55 1111 2222");
+    expect(
+      screen.getByText("patient.wizard.draft_restored"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", {
+        name: "patient.wizard.draft_found_title",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restores a legacy age-only draft without inventing a birth date", () => {
+    savePatientRegistrationDraft({
+      scope: {
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        sucursalId: null,
+      },
+      values: {
+        firstName: "Elena",
+        age: "34",
+      },
+      navigation: {
+        step: 7,
+        medicalSection: "medications",
+        nutritionSection: "digestive",
+        physicalActivitySection: "daily",
+      },
+      photoNeedsReselection: false,
+    });
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "patient.wizard.draft_continue" }),
+    );
+
+    expect(input("firstName")).toHaveValue("Elena");
+    expect(input("birthDate")).toHaveValue("");
+    expect(document.querySelector('[name="age"]')).toBeNull();
+
+    fireEvent.change(input("birthDate"), {
+      target: { value: "1990-08-17" },
+    });
+    unmount();
+
+    const migratedDraft = readPatientRegistrationDraft<Record<string, unknown>>(
+      {
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        sucursalId: null,
+      },
+    );
+    expect(migratedDraft?.values.birthDate).toBe("1990-08-17");
+    expect(migratedDraft?.values).not.toHaveProperty("age");
+  });
+
+  it("requires an exact, non-future birth date from 1900 onward", async () => {
+    render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+    fireEvent.change(input("firstName"), { target: { value: "Ana" } });
+    fireEvent.change(input("lastName"), { target: { value: "Rivera" } });
+    fireEvent.change(document.querySelector('[name="sex"]')!, {
+      target: { value: "female" },
+    });
+
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    expect(await screen.findByText("Requerido")).toBeInTheDocument();
+
+    const futureResult = BirthDateFormSchema.safeParse(
+      `${new Date().getFullYear() + 1}-01-01`,
+    );
+    const tooOldResult = BirthDateFormSchema.safeParse("1899-12-31");
+    const normalizedInvalidResult = BirthDateFormSchema.safeParse("2023-02-29");
+
+    expect(futureResult.success).toBe(false);
+    expect(tooOldResult.success).toBe(false);
+    expect(normalizedInvalidResult.success).toBe(false);
+    if (!futureResult.success) {
+      expect(futureResult.error.issues[0]?.message).toBe(
+        "La fecha de nacimiento no puede estar en el futuro",
+      );
+    }
+    if (!tooOldResult.success) {
+      expect(tooOldResult.error.issues[0]?.message).toBe(
+        "La fecha de nacimiento no puede ser anterior a 1900",
+      );
+    }
+
+    const morning = new Date(2026, 6, 30, 8, 15);
+    const todayBirthDate = parseBirthDateForPersistence("2026-07-30", morning);
+    expect(todayBirthDate?.getFullYear()).toBe(2026);
+    expect(todayBirthDate?.getMonth()).toBe(6);
+    expect(todayBirthDate?.getDate()).toBe(30);
+    expect(todayBirthDate?.getHours()).toBe(8);
+    expect(todayBirthDate?.getTime()).toBeLessThanOrEqual(morning.getTime());
+  });
+
+  it("requires confirmation before deleting a draft to start over", () => {
+    savePatientRegistrationDraft({
+      scope: {
+        userId: "550e8400-e29b-41d4-a716-446655440000",
+        sucursalId: null,
+      },
+      values: { firstName: "Elena", phone: "+52 55 1111 2222" },
+      navigation: {
+        step: 1,
+        medicalSection: "personal",
+        nutritionSection: "routine",
+        physicalActivitySection: "activity",
+      },
+      photoNeedsReselection: false,
+    });
+
+    render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "patient.wizard.draft_start_new" }),
+    );
+    expect(
+      screen.getByRole("dialog", {
+        name: "patient.wizard.draft_discard_title",
+      }),
+    ).toBeInTheDocument();
+    expect(localStorage.getItem(PATIENT_REGISTRATION_DRAFT_KEY)).not.toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.draft_discard_cancel",
+      }),
+    );
+    expect(
+      screen.getByRole("heading", {
+        name: "patient.wizard.draft_found_title",
+      }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "patient.wizard.draft_start_new" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.draft_discard_confirm",
+      }),
+    );
+
+    expect(localStorage.getItem(PATIENT_REGISTRATION_DRAFT_KEY)).toBeNull();
+    expect(input("firstName")).toHaveValue("");
+  });
+
+  it("flushes the latest values on exit without storing generated fields", () => {
+    const { unmount } = render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(input("firstName"), { target: { value: "Marina" } });
+    fireEvent.change(input("lastName"), { target: { value: "Santos" } });
+    unmount();
+
+    const draft = readPatientRegistrationDraft<Record<string, unknown>>({
+      userId: "550e8400-e29b-41d4-a716-446655440000",
+      sucursalId: null,
+    });
+    expect(draft?.values).toMatchObject({
+      firstName: "Marina",
+      lastName: "Santos",
+    });
+    expect(draft?.values).not.toHaveProperty("externalRecordNumber");
+    expect(draft?.values).not.toHaveProperty("photoUrl");
+  });
+
+  it("summarizes required and optional fields before the final save", async () => {
+    render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      screen.getByText("patient.wizard.notes_short").closest("button")!,
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "patient.wizard.create_action",
+      }),
+    );
+
+    const reviewDialog = await screen.findByTestId(
+      "final-registration-review-dialog",
+    );
+    expect(
+      reviewDialog.querySelector('[data-review-section="required"]'),
+    ).toBeInTheDocument();
+    expect(
+      reviewDialog.querySelector('[data-review-section="optional"]'),
+    ).toBeInTheDocument();
+    expect(createPatient).not.toHaveBeenCalled();
+  });
+
+  it("requires configuring the clinical record number before continuing", () => {
+    usePreferencesStore.setState({ patientRecordNumberConfig: null });
+    render(
+      <MemoryRouter>
+        <NewPatientWizard />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(
+      screen
+        .getByText("patient.wizard.clinical_record_short")
+        .closest("button")!,
+    );
+
+    expect(
+      screen.getByText("patient.wizard.record_number_configuration_required"),
+    ).toBeInTheDocument();
+    const configurationAlert = screen.getByRole("alert");
+    expect(
+      screen.getByRole("button", {
+        name: "patient.wizard.record_number_configuration_action",
+      }),
+    ).toBeInTheDocument();
+    expect(document.querySelector('[name="externalRecordNumber"]')).toBeNull();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "common.next" }).at(-1)!,
+    );
+    expect(configurationAlert).toHaveFocus();
+  });
+
+  it("parses PatientForm date-only values at local noon without a UTC shift", async () => {
+    const created = {
+      id: { toString: () => "patient-date-only" },
+      fullName: "Luz Diaz",
+    };
+    const onCreated = vi.fn();
+    createPatient.mockResolvedValue(created);
+    render(
+      <MemoryRouter>
+        <PatientForm mode="create" onCreated={onCreated} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.change(input("firstName"), { target: { value: "Luz" } });
+    fireEvent.change(input("lastName"), { target: { value: "Diaz" } });
+    fireEvent.change(input("birthDate"), {
+      target: { value: "2000-02-29" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "patient.create" }));
+
+    await waitFor(() => expect(createPatient).toHaveBeenCalledTimes(1));
+    const birthDate = createPatient.mock.calls[0][0].birthDate as Date;
+    expect(birthDate.getFullYear()).toBe(2000);
+    expect(birthDate.getMonth()).toBe(1);
+    expect(birthDate.getDate()).toBe(29);
+    expect(birthDate.getHours()).toBe(12);
     expect(onCreated).toHaveBeenCalledWith(created);
-  }, 20_000);
+  });
 });
