@@ -6,12 +6,16 @@ import { LabPanel } from "../domain/LabPanel";
 import { LabPanelId } from "../domain/LabPanelId";
 import { LabResult } from "../domain/LabResult";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import { useSyncStore } from "@store/syncStore";
 
 const makePanel = (
   patientId: PatientId,
   overrides: Partial<{
     daysAgo: number;
-    values: { test: Parameters<typeof LabResult.from>[0]["test"]; value: number }[];
+    values: {
+      test: Parameters<typeof LabResult.from>[0]["test"];
+      value: number;
+    }[];
     notes: string | null;
   }> = {},
 ) => {
@@ -20,7 +24,9 @@ const makePanel = (
   return LabPanel.create({
     patientId,
     takenAt: date,
-    results: (overrides.values ?? [{ test: "GLUCOSA", value: 95 }]).map((v) => LabResult.from(v)),
+    results: (overrides.values ?? [{ test: "GLUCOSA", value: 95 }]).map((v) =>
+      LabResult.from(v),
+    ),
     notes: overrides.notes ?? null,
   });
 };
@@ -33,6 +39,7 @@ describe("DexieLabPanelRepository", () => {
   beforeEach(async () => {
     db = new NutriClinicaDB(`test-lab-${Math.random().toString(36).slice(2)}`);
     await db.open();
+    useSyncStore.getState().setSucursalId("suc-A");
     repo = new DexieLabPanelRepository(db);
   });
 
@@ -73,8 +80,12 @@ describe("DexieLabPanelRepository", () => {
 
     const items = await repo.findAll({ patientId: pid });
     expect(items).toHaveLength(3);
-    expect(items[0]?.takenAt.getTime()).toBeGreaterThanOrEqual(items[1]?.takenAt.getTime() ?? 0);
-    expect(items[1]?.takenAt.getTime()).toBeGreaterThanOrEqual(items[2]?.takenAt.getTime() ?? 0);
+    expect(items[0]?.takenAt.getTime()).toBeGreaterThanOrEqual(
+      items[1]?.takenAt.getTime() ?? 0,
+    );
+    expect(items[1]?.takenAt.getTime()).toBeGreaterThanOrEqual(
+      items[2]?.takenAt.getTime() ?? 0,
+    );
   });
 
   it("excluye soft-deleted", async () => {
@@ -149,6 +160,33 @@ describe("DexieLabPanelRepository", () => {
   });
 
   it("delete en id inexistente (soft) no lanza error", async () => {
-    await expect(repo.delete(LabPanelId.generate(), true)).resolves.not.toThrow();
+    await expect(
+      repo.delete(LabPanelId.generate(), true),
+    ).resolves.not.toThrow();
+  });
+
+  it("preserva ownership y oculta paneles de otra sucursal", async () => {
+    const own = makePanel(pid);
+    await repo.save(own);
+    const stored = await db.lab_panels.get(own.id.toString());
+    expect(stored?.sucursal_id).toBe("suc-A");
+
+    useSyncStore.getState().setSucursalId("suc-B");
+    expect(await repo.findById(own.id)).toBeNull();
+    expect(await repo.findAll({ patientId: pid })).toEqual([]);
+    expect(await repo.count({ patientId: pid })).toBe(0);
+    await repo.delete(own.id, false);
+    expect(await db.lab_panels.get(own.id.toString())).toBeDefined();
+  });
+
+  it("no permite sobrescribir un panel propiedad de otra sucursal", async () => {
+    const panel = makePanel(pid);
+    await repo.save(panel);
+    useSyncStore.getState().setSucursalId("suc-B");
+
+    await expect(repo.save(panel)).rejects.toThrow("otra sucursal");
+    expect((await db.lab_panels.get(panel.id.toString()))?.sucursal_id).toBe(
+      "suc-A",
+    );
   });
 });

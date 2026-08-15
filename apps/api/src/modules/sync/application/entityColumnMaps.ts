@@ -85,15 +85,24 @@ function toDate(value: unknown): unknown {
 
 /**
  * El cliente usa RecordStatus = 'active' | 'inactive' | 'discharged' | 'referred'
- * (workflow clínico). El DB tiene record_status con CHECK ('open','closed')
- * (lifecycle del expediente). Mapeamos:
- *   - 'active' -> 'open'
- *   - resto -> 'closed'
+ * (workflow clínico). El DB usa record_status con CHECK
+ * ('open','closed','discharged','referred') (migración 027). Mapeo 1:1
+ * preservando el roundtrip completo:
+ *   - 'active'    -> 'open'
+ *   - 'inactive'  -> 'closed'
+ *   - 'discharged' -> 'discharged'
+ *   - 'referred'  -> 'referred'
  */
 function recordStatusClientToDb(value: unknown): unknown {
-  if (value == null) return null;
   if (value === "active") return "open";
-  return "closed";
+  if (value === "inactive") return "closed";
+  return value;
+}
+
+function recordStatusDbToClient(value: unknown): unknown {
+  if (value === "open") return "active";
+  if (value === "closed") return "inactive";
+  return value;
 }
 
 /* ----------------------------- pacientes ----------------------------- */
@@ -249,8 +258,9 @@ const pacientesMap: EntityColumnMap = {
       sqlType: () => sql.NVarChar(20),
       nullable: false,
       transform: recordStatusClientToDb,
+      parse: recordStatusDbToClient,
     },
-    record_closed_reason: {
+    discharge_reason: {
       dbColumn: "record_closed_reason",
       sqlType: () => sql.NVarChar(40),
       nullable: true,
@@ -265,6 +275,36 @@ const pacientesMap: EntityColumnMap = {
       dbColumn: "status",
       sqlType: () => sql.NVarChar(20),
       nullable: false,
+    },
+    clave_interna: {
+      dbColumn: "clave_interna",
+      sqlType: () => sql.NVarChar(50),
+      nullable: true,
+    },
+    birth_place: {
+      dbColumn: "birth_place",
+      sqlType: () => sql.NVarChar(255),
+      nullable: true,
+    },
+    address: {
+      dbColumn: "address",
+      sqlType: () => sql.NVarChar(500),
+      nullable: true,
+    },
+    nationality: {
+      dbColumn: "nationality",
+      sqlType: () => sql.NVarChar(100),
+      nullable: true,
+    },
+    id_type: {
+      dbColumn: "id_type",
+      sqlType: () => sql.NVarChar(50),
+      nullable: true,
+    },
+    id_number: {
+      dbColumn: "id_number",
+      sqlType: () => sql.NVarChar(100),
+      nullable: true,
     },
     // Soft-delete: cascade-delete envía `update` con `deleted_at` seteado.
     // El server debe respetarlo para que la próxima pull no resucite la fila.
@@ -454,85 +494,23 @@ const antropometriasMap: EntityColumnMap = {
       sqlType: () => sql.Decimal(4, 2),
       nullable: false,
     },
-    waist_cm: {
-      dbColumn: "waist_cm",
-      sqlType: () => sql.Decimal(5, 1),
+    circumferences: {
+      dbColumn: "circumferences_json",
+      sqlType: () => sql.NVarChar(sql.MAX),
       nullable: true,
+      transform: jsonStringify,
+      parse: jsonParse,
     },
-    hip_cm: {
-      dbColumn: "hip_cm",
-      sqlType: () => sql.Decimal(5, 1),
+    skinfolds: {
+      dbColumn: "skinfolds_json",
+      sqlType: () => sql.NVarChar(sql.MAX),
       nullable: true,
+      transform: jsonStringify,
+      parse: jsonParse,
     },
-    neck_cm: {
-      dbColumn: "neck_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    chest_cm: {
-      dbColumn: "chest_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    arm_cm: {
-      dbColumn: "arm_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    forearm_cm: {
-      dbColumn: "forearm_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    thigh_cm: {
-      dbColumn: "thigh_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    calf_cm: {
-      dbColumn: "calf_cm",
-      sqlType: () => sql.Decimal(5, 1),
-      nullable: true,
-    },
-    tricipital_mm: {
-      dbColumn: "tricipital_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    bicipital_mm: {
-      dbColumn: "bicipital_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    subescapular_mm: {
-      dbColumn: "subescapular_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    suprailiaco_mm: {
-      dbColumn: "suprailiaco_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    abdominal_mm: {
-      dbColumn: "abdominal_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    muslo_mm: {
-      dbColumn: "muslo_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    pantorrilla_mm: {
-      dbColumn: "pantorrilla_mm",
-      sqlType: () => sql.Decimal(4, 1),
-      nullable: true,
-    },
-    bmi: { dbColumn: "bmi", sqlType: () => sql.Decimal(5, 2), nullable: true },
-    body_fat_pct: {
-      dbColumn: "body_fat_pct",
-      sqlType: () => sql.Decimal(4, 1),
+    bia_json: {
+      dbColumn: "bia_json",
+      sqlType: () => sql.NVarChar(sql.MAX),
       nullable: true,
     },
     notes: {

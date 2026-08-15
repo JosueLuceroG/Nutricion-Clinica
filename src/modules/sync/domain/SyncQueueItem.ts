@@ -6,14 +6,21 @@
  * applied / conflict / error.
  */
 
-import type { SyncableEntity } from '@nutriclinica/shared';
+import type { SyncableEntity } from "@nutriclinica/shared";
 
-export type SyncOp = 'create' | 'update' | 'delete';
-export type SyncItemStatus = 'pending' | 'syncing' | 'applied' | 'conflict' | 'error';
+export type SyncOp = "create" | "update" | "delete";
+export type SyncItemStatus =
+  | "pending"
+  | "syncing"
+  | "applied"
+  | "conflict"
+  | "error";
 
 export interface SyncQueueItem {
   /** UUID server-side asignado por la cola. */
   id: string;
+  /** Sucursal inmutable que era activa al crear la mutación. */
+  sucursalId: string;
   entity: SyncableEntity;
   entityId: string;
   op: SyncOp;

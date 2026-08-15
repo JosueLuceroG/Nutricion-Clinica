@@ -1,5 +1,6 @@
 import * as React from "react";
 import { NavLink } from "react-router-dom";
+import { preloadDashboardRoute } from "@app/dashboardRoutePreloaders";
 import {
   CalendarDays,
   ChevronLeft,
@@ -371,6 +372,9 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed, onUseLegacyLayo
               }
               aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
+              onPointerEnter={() => preloadDashboardRoute(item.to)}
+              onPointerDown={() => preloadDashboardRoute(item.to)}
+              onFocus={() => preloadDashboardRoute(item.to)}
             >
               {({ isActive }) => {
                 const isActiveDashboard = item.to === "/" && isActive;

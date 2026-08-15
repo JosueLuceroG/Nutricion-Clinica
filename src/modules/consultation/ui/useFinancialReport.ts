@@ -60,6 +60,12 @@ const monthKeyOf = (d: Date): string => {
   return `${y}-${m}`;
 };
 
+/** Montos con 2 decimales máx. (acumuladores del reporte). */
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
+const isVoidedStatus = (ps: string | null | undefined): boolean =>
+  ps === "refunded" || ps === "cancelled";
+
 const labelOf = (key: string): string => {
   const [y, m] = key.split("-").map(Number);
   return `${MONTH_LABELS[(m ?? 1) - 1]} ${y}`;
@@ -133,8 +139,9 @@ export const useFinancialReport = (
         const key = monthKeyOf(c.consultationDate);
         const bucket = monthlyMap.get(key);
         const ps = c.paymentStatus;
-        if (c.paid || ps === "paid" || ps === "partial") {
-          const amount = ps === "partial" ? c.amountPaid : c.cost;
+        const voided = isVoidedStatus(ps);
+        if (!voided && (c.paid || ps === "paid" || ps === "partial")) {
+          const amount = round2(ps === "partial" ? c.amountPaid : c.cost);
           totalIncome += amount;
           paidCount += 1;
           if (bucket) {
@@ -150,11 +157,12 @@ export const useFinancialReport = (
           cur.totalPaid += amount;
           patientTotals.set(c.patientId.toString(), cur);
         }
-        if (!c.paid || c.paymentStatus === "partial") {
-          totalPending += c.cost - (c.amountPaid || 0);
+        if (!voided && (!c.paid || ps === "partial")) {
+          const pending = round2(c.cost - (c.amountPaid || 0));
+          totalPending += pending;
           pendingCount += 1;
           if (bucket) {
-            bucket.pending += c.cost - (c.amountPaid || 0);
+            bucket.pending += pending;
             bucket.pendingCount += 1;
           }
         }
@@ -165,9 +173,10 @@ export const useFinancialReport = (
         const e = expenseRowToDomain(row);
         const key = monthKeyOf(e.fecha);
         const bucket = monthlyMap.get(key);
-        totalExpenses += e.amount;
+        const amount = round2(e.amount);
+        totalExpenses += amount;
         if (bucket) {
-          bucket.expenses += e.amount;
+          bucket.expenses += amount;
         }
       }
 
@@ -189,9 +198,10 @@ export const useFinancialReport = (
       const conceptMap = new Map<string, { total: number; count: number }>();
       for (const row of consultationRows) {
         const c = consultationRowToDomain(row);
+        if (isVoidedStatus(c.paymentStatus)) continue;
         const concept = c.paymentConcept ?? "consulta";
         if (c.paid || c.paymentStatus === "paid" || c.paymentStatus === "partial") {
-          const amount = c.paymentStatus === "partial" ? (c.amountPaid ?? 0) : c.cost;
+          const amount = round2(c.paymentStatus === "partial" ? (c.amountPaid ?? 0) : c.cost);
           const cur = conceptMap.get(concept) ?? { total: 0, count: 0 };
           cur.total += amount;
           cur.count += 1;
@@ -205,9 +215,10 @@ export const useFinancialReport = (
       const methodMap = new Map<string, { total: number; count: number }>();
       for (const row of consultationRows) {
         const c = consultationRowToDomain(row);
+        if (isVoidedStatus(c.paymentStatus)) continue;
         if (c.paid || c.paymentStatus === "paid" || c.paymentStatus === "partial") {
           const method = c.paymentMethod ?? "other";
-          const amount = c.paymentStatus === "partial" ? (c.amountPaid ?? 0) : c.cost;
+          const amount = round2(c.paymentStatus === "partial" ? (c.amountPaid ?? 0) : c.cost);
           const cur = methodMap.get(method) ?? { total: 0, count: 0 };
           cur.total += amount;
           cur.count += 1;
@@ -221,10 +232,10 @@ export const useFinancialReport = (
       const result: FinancialReport = {
         rangeStart: from,
         rangeEnd: to,
-        totalIncome,
-        totalPending,
-        totalExpenses,
-        netIncome: totalIncome - totalExpenses,
+        totalIncome: round2(totalIncome),
+        totalPending: round2(totalPending),
+        totalExpenses: round2(totalExpenses),
+        netIncome: round2(totalIncome - totalExpenses),
         paidCount,
         pendingCount,
         activePatients: patientActive.size,

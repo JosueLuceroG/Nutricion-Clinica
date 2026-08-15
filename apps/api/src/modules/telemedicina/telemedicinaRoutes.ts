@@ -8,6 +8,8 @@ import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAcce
 import { auditLog } from '../../middleware/auditMiddleware.js';
 import { buildTurnConfig } from './turnConfig.js';
 import type { TelemedicinaGrabacionDTO, TelemedicinaSalaDTO } from '@nutriclinica/shared';
+import { canJoinSala } from './signalingServer.js';
+import { issueWsTicket } from '../ws/websocketGateway.js';
 
 const router: Router = ExpressRouter();
 const turnRouter: Router = ExpressRouter();
@@ -322,6 +324,30 @@ router.post('/',
            VALUES (@id, @paciente_id, @profesional_id, @sucursal_id, @scheduled_at, @notas)`,
         );
       res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+router.post('/:id/ws-ticket',
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const id = String(req.params.id);
+      if (!UUID_REGEX.test(id)) { res.status(400).json({ error: 'id debe ser UUID' }); return; }
+      if (!req.user || !(await canJoinSala(id, req.user))) {
+        res.status(403).json({ error: 'Sin acceso a la sala' });
+        return;
+      }
+      const { ticket, expiresAt } = await issueWsTicket({
+        channel: 'telemedicina',
+        sub: req.user.sub,
+        sucursalId: req.sucursalId ?? null,
+        resourceId: id,
+        pacienteId: null,
+        origin: req.headers.origin ?? '',
+      });
+      res.status(201).json({ ticket, expiresAt });
     } catch (err) {
       next(err);
     }

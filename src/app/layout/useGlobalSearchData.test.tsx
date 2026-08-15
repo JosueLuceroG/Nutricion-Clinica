@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { GlobalSearchAccess } from "./globalSearchTypes";
+import { filterAndRankGlobalSearch } from "./globalSearchEngine";
 import { useGlobalSearchData } from "./useGlobalSearchData";
 
 const database = vi.hoisted(() => {
@@ -11,6 +12,7 @@ const database = vi.hoisted(() => {
     labPanels: [] as Array<Record<string, unknown>>,
     appointments: [] as Array<Record<string, unknown>>,
     recipes: [] as Array<Record<string, unknown>>,
+    foods: [] as Array<Record<string, unknown>>,
   };
   const flags = { recipeNutritionFails: false };
 
@@ -20,6 +22,7 @@ const database = vi.hoisted(() => {
     toArray: async () => [...items],
   });
   const scopedTable = (items: Array<Record<string, unknown>>) => ({
+    ...collection(items),
     where: (field: string) => ({
       equals: (value: string) =>
         collection(items.filter((row) => row[field] === value)),
@@ -51,6 +54,11 @@ vi.mock("@services/recipeService", () => ({
     list: async () => [...database.rows.recipes],
   },
 }));
+vi.mock("@services/smaeService", () => ({
+  smaeService: {
+    search: async () => [...database.rows.foods],
+  },
+}));
 
 const FULL_ACCESS: GlobalSearchAccess = {
   patients: true,
@@ -78,8 +86,28 @@ beforeEach(() => {
       status: "active",
       clave_interna: "EXP-01",
       external_record_number: null,
+      occupation: "Arquitecta",
+      admission_reason: "Control metabólico",
+      general_notes: "Antecedente de diabetes",
+      clinical_tags: '["resistencia a la insulina"]',
       photo_url: null,
       updated_at: "2026-07-04T10:00:00.000Z",
+      deleted_at: null,
+    },
+    {
+      id: "patient-legacy",
+      sucursal_id: null,
+      first_name: "Paciente",
+      last_name: "Legacy",
+      second_last_name: null,
+      phone: null,
+      secondary_phone: null,
+      email: null,
+      status: "active",
+      clave_interna: "LEGACY-01",
+      external_record_number: null,
+      photo_url: null,
+      updated_at: "2026-07-04T09:00:00.000Z",
       deleted_at: null,
     },
     {
@@ -110,6 +138,20 @@ beforeEach(() => {
     status: "completed",
     deleted_at: null,
   });
+  database.rows.consultations.push({
+    id: "consultation-legacy",
+    sucursal_id: null,
+    patient_id: "patient-legacy",
+    consultation_date: "2026-07-02T00:00:00.000Z",
+    consultation_number: 1,
+    reason: "Primera vez",
+    subjective: "Busca mejorar energía",
+    objective: "Antecedente relevante",
+    assessment: "Evaluación legacy",
+    plan: "Seguimiento mensual",
+    status: "completed",
+    deleted_at: null,
+  });
   database.rows.mealPlans.push({
     id: "plan-a",
     sucursal_id: "branch-a",
@@ -120,6 +162,25 @@ beforeEach(() => {
     start_date: "2026-07-03T00:00:00.000Z",
     end_date: "2026-07-31T00:00:00.000Z",
     kcal_target: 1800,
+    protein_target_g: 120,
+    carbs_target_g: 220,
+    fat_target_g: 60,
+    meals_json: JSON.stringify([
+      {
+        slot: "breakfast",
+        exchanges: [{ foodId: "aoa-pechuga-pollo", count: 1 }],
+      },
+      { slot: "morning-snack", exchanges: [] },
+      {
+        slot: "lunch",
+        exchanges: [
+          { foodId: "aoa-pechuga-pollo", count: 1 },
+          { foodId: "aoa-bistec-res", count: 1 },
+        ],
+      },
+      { slot: "afternoon-snack", exchanges: [] },
+      { slot: "dinner", exchanges: [] },
+    ]),
     status: "active",
     updated_at: "2026-07-03T00:00:00.000Z",
     deleted_at: null,
@@ -171,6 +232,22 @@ beforeEach(() => {
     derivedAllergens: [],
     ingredients: [{ name: "Jitomate" }],
   });
+  database.rows.foods.push(
+    {
+      id: "aoa-pechuga-pollo",
+      group: "aoa-muy-bajo",
+      name: "Pechuga de pollo sin piel",
+      shortName: "Pechuga pollo",
+      keywords: ["pollo", "proteína", "magra"],
+    },
+    {
+      id: "aoa-bistec-res",
+      group: "aoa-moderado",
+      name: "Bistec de res",
+      shortName: "Bistec res",
+      keywords: ["res", "carne", "hierro"],
+    },
+  );
 });
 
 describe("useGlobalSearchData", () => {
@@ -180,22 +257,49 @@ describe("useGlobalSearchData", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.results).toHaveLength(6);
-    expect(result.current.results.some((item) => item.title.includes("Otra"))).toBe(false);
+    expect(result.current.results).toHaveLength(8);
+    expect(
+      result.current.results.some((item) => item.title.includes("Otra")),
+    ).toBe(false);
 
     const consultation = result.current.results.find(
       (item) => item.kind === "consultation",
     );
+    const patient = result.current.results.find(
+      (item) => item.id === "patient-patient-a",
+    );
+    expect(patient?.searchableText).toContain("resistencia a la insulina");
+    expect(patient?.searchableText).toContain("Control metabólico");
     expect(consultation?.fields?.date).toBe("2026-07-03");
     expect(consultation?.subtitle).toContain("Completada");
+    expect(
+      result.current.results.find(
+        (item) => item.id === "consultation-consultation-legacy",
+      )?.searchableText,
+    ).toContain("Antecedente relevante");
+    expect(
+      result.current.results.find(
+        (item) => item.id === "patient-patient-legacy",
+      ),
+    ).toBeDefined();
 
     const plan = result.current.results.find((item) => item.kind === "plan");
     expect(plan?.subtitle).toContain("31 jul 2026");
+    expect(plan?.planMetadata?.completeFoodIndex).toBe(true);
+    expect(plan?.planMetadata?.foods).toHaveLength(3);
+    expect(
+      filterAndRankGlobalSearch(
+        result.current.results,
+        "dieta de 1800 kc con carne, pollo 2 veces al día y sin pescado",
+        "all",
+      ).map((item) => item.id),
+    ).toEqual(["plan-plan-a"]);
 
     const laboratory = result.current.results.find(
       (item) => item.kind === "laboratory",
     );
     expect(laboratory?.searchableText).toContain("Hemoglobina glucosilada");
+    expect(laboratory?.searchableText).toContain("5.4");
     expect(laboratory?.path).toContain("panelId=lab-a");
 
     const appointment = result.current.results.find(
@@ -206,7 +310,9 @@ describe("useGlobalSearchData", () => {
       "/agenda?date=2026-07-03&appointmentId=appointment-a",
     );
 
-    const recipe = result.current.results.find((item) => item.kind === "recipe");
+    const recipe = result.current.results.find(
+      (item) => item.kind === "recipe",
+    );
     expect(recipe?.subtitle).toContain("2000 kcal totales");
     expect(recipe?.subtitle).toContain("500 kcal/porción");
     expect(recipe?.path).toBe("/recetas?recipeId=recipe-a");
@@ -229,6 +335,7 @@ describe("useGlobalSearchData", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.results.map((item) => item.kind)).toEqual([
       "consultation",
+      "consultation",
     ]);
     expect(result.current.results[0]?.title).toContain("María López");
   });
@@ -240,7 +347,9 @@ describe("useGlobalSearchData", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    const recipe = result.current.results.find((item) => item.kind === "recipe");
+    const recipe = result.current.results.find(
+      (item) => item.kind === "recipe",
+    );
     expect(recipe?.title).toBe("Ensalada mediterránea");
     expect(recipe?.subtitle).toBe("Entrada · Activa");
     expect(recipe?.fields?.kcalTotal).toBeUndefined();
@@ -253,7 +362,7 @@ describe("useGlobalSearchData", () => {
         useGlobalSearchData(true, branch, "es-MX", FULL_ACCESS),
       { initialProps: { branch: "branch-a" as string | null } },
     );
-    await waitFor(() => expect(result.current.results).toHaveLength(6));
+    await waitFor(() => expect(result.current.results).toHaveLength(8));
 
     rerender({ branch: "branch-b" });
     expect(result.current.results).toEqual([]);
@@ -261,12 +370,18 @@ describe("useGlobalSearchData", () => {
     await waitFor(() =>
       expect(result.current.results.map((item) => item.id)).toEqual([
         "patient-patient-b",
+        "patient-patient-legacy",
+        "consultation-consultation-legacy",
         "laboratory-lab-b",
         "recipe-recipe-a",
       ]),
     );
 
     rerender({ branch: null });
-    expect(result.current).toEqual({ results: [], loading: false, error: null });
+    expect(result.current).toEqual({
+      results: [],
+      loading: false,
+      error: null,
+    });
   });
 });

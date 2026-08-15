@@ -14,6 +14,9 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "ai:evaluate": "tsx src/scripts/evaluateModels.ts",
+    "ai:evaluate-retrieval": "tsx src/scripts/evaluateRetrieval.ts",
+    "ai:evaluate-groundness": "tsx src/scripts/evaluateGroundness.ts",
     "test": "vitest run"
   },
   "dependencies": {

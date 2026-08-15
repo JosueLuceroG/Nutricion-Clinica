@@ -4,8 +4,9 @@
  * Flujo por ciclo (sync()):
  *   1. Si no hay token \u2192 noop (usuario no autenticado).
  *   2. GET /sync/manifest \u2192 valida SYNC_SCHEMA_VERSION.
- *   3. Pull: GET /sync/pull?since=<lastPullAt>; aplica cada cambio a la tabla
- *      correspondiente con setSyncApplying(true) para no re-encolar.
+ *   3. Pull: GET /sync/pull?since=<cursors por entidad>; aplica cada cambio a
+ *      la tabla correspondiente con setSyncApplying(true) para no re-encolar,
+ *      en una sola transacción Dexie por lote.
  *   4. Push: lee sync_queue donde status IN (pending, error), arma el batch,
  *      POST /sync/push; actualiza status seg\u00fan resultado.
  *   5. Actualiza syncStore (status, lastSyncAt, pendingChanges).
@@ -16,7 +17,11 @@
 
 import type { NutriClinicaDB } from "@services/db/dexieSchema";
 import type { SyncQueueItem, SyncOp } from "@modules/sync/domain/SyncQueueItem";
-import { SYNCABLE_ENTITIES, type SyncableEntity } from "@nutriclinica/shared";
+import {
+  SYNCABLE_ENTITIES,
+  type SyncableEntity,
+  type SyncPullCursors,
+} from "@nutriclinica/shared";
 import type {
   SyncPullChange,
   SyncPushOperation,
@@ -24,12 +29,17 @@ import type {
 } from "@nutriclinica/shared";
 import { SYNC_SCHEMA_VERSION } from "@nutriclinica/shared";
 import { type SyncQueueRepository } from "./syncQueueRepository.js";
-import { setSyncApplying } from "./syncEnqueuer.js";
+import {
+  isSyncApplying,
+  setSyncApplying,
+  setSyncRunning,
+} from "./syncEnqueuer.js";
+import { withDatabaseOperationLock } from "./databaseOperationLock.js";
 import { type syncApi } from "./syncApiClient.js";
 import { withRetry } from "./backoff.js";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
-import { withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import { withSucursalScope } from "@services/tenancy/sucursalScope";
 import {
   SyncAuthError,
   SyncSchemaMismatchError,
@@ -79,14 +89,21 @@ function toLocalRow(
   payload: Record<string, unknown>,
 ): object {
   const jsonCols = PULL_JSON_COLUMNS[entity];
-  if (!jsonCols) return payload;
   const row = { ...payload };
-  for (const { serverKey, localKey } of jsonCols) {
+  for (const { serverKey, localKey } of jsonCols ?? []) {
     if (!(serverKey in row)) continue;
     const val = row[serverKey];
     row[localKey] =
       val !== null && val !== undefined ? JSON.stringify(val) : null;
     if (serverKey !== localKey) delete row[serverKey];
+  }
+  if (entity === "pacientes") {
+    if (row.record_status === "open") row.record_status = "active";
+    if (row.record_status === "closed") row.record_status = "inactive";
+    if (!("discharge_reason" in row) && "record_closed_reason" in row) {
+      row.discharge_reason = row.record_closed_reason;
+      delete row.record_closed_reason;
+    }
   }
   return row;
 }
@@ -94,13 +111,20 @@ function toLocalRow(
 export interface SyncEngineDeps {
   db: NutriClinicaDB;
   queue: SyncQueueRepository;
-  /** Devuelve el lastPullAt persistido (puede ser null la primera vez). */
-  getLastPullAt: (sucursalId: string) => string | null | Promise<string | null>;
-  setLastPullAt: (sucursalId: string, iso: string) => void | Promise<void>;
+  /** Cursors de pull por entidad persistidos (null la primera vez = pull completo). */
+  getLastPullAt: (
+    sucursalId: string,
+  ) => SyncPullCursors | null | Promise<SyncPullCursors | null>;
+  setLastPullAt: (
+    sucursalId: string,
+    cursors: SyncPullCursors,
+  ) => void | Promise<void>;
   /** Caller puede sobreescribir el cliente HTTP (test). */
   api?: typeof syncApi;
   /** Hook opcional para notificar al UI. */
   onProgress?: (event: SyncEvent) => void;
+  /** Inyectable para tests; por defecto backoff exponencial real (1s→60s + jitter). */
+  retrySleep?: (ms: number) => Promise<void>;
 }
 
 export type SyncEvent =
@@ -128,8 +152,9 @@ export class SyncEngine {
   }
 
   async sync(): Promise<void> {
+    if (isSyncApplying()) return;
     if (this.inFlight) return this.inFlight;
-    this.inFlight = this._runSync();
+    this.inFlight = withDatabaseOperationLock(() => this._runSync());
     try {
       await this.inFlight;
     } finally {
@@ -139,6 +164,7 @@ export class SyncEngine {
 
   private async _runSync(): Promise<void> {
     this.running = true;
+    setSyncRunning(true);
     const start = Date.now();
     this.emit({ type: "start" });
     this.setSyncStore({ status: "syncing", lastError: null });
@@ -146,6 +172,10 @@ export class SyncEngine {
     try {
       const token = useAuthStore.getState().token;
       if (!token) throw new SyncAuthError();
+      const sucursalId =
+        useSyncStore.getState().sucursalId ??
+        useAuthStore.getState().sucursalActivaId;
+      if (!sucursalId) throw new SyncAuthError("No hay sucursal activa");
 
       const manifest = await this.deps.api!.manifest();
       this.emit({ type: "manifest", serverTime: manifest.serverTime });
@@ -156,27 +186,20 @@ export class SyncEngine {
         );
       }
 
-      const sucursalId =
-        useSyncStore.getState().sucursalId ??
-        useAuthStore.getState().sucursalActivaId;
-      if (!sucursalId) throw new SyncAuthError("No hay sucursal activa");
-
-      let since = await this.deps.getLastPullAt(sucursalId);
+      let cursors = await this.deps.getLastPullAt(sucursalId);
       let totalReceived = 0;
       let hasMore = true;
 
       while (hasMore) {
-        const pullResp = await this.deps.api!.pull({ since, sucursalId });
-        await this.applyPull(pullResp.changes);
+        const pullResp = await this.deps.api!.pull({ since: cursors, sucursalId });
+        await this.applyPull(pullResp.changes, sucursalId);
         totalReceived += pullResp.changes.length;
         hasMore = pullResp.hasMore;
-        since = pullResp.nextSince;
+        // Cada entidad avanza su propio cursor; las sin cambios conservan el suyo.
+        cursors = { ...(cursors ?? {}), ...pullResp.cursors };
       }
 
-      await this.deps.setLastPullAt(
-        sucursalId,
-        since ?? new Date().toISOString(),
-      );
+      await this.deps.setLastPullAt(sucursalId, cursors ?? {});
       this.emit({ type: "pull", received: totalReceived });
 
       const pushSummary = await this.pushPending(sucursalId);
@@ -185,7 +208,7 @@ export class SyncEngine {
       this.setSyncStore({
         status: "idle",
         lastSyncAt: new Date().toISOString(),
-        pendingChanges: await this.deps.queue.countPending(),
+        pendingChanges: await this.deps.queue.countPending(sucursalId),
       });
       this.emit({ type: "done", durationMs: Date.now() - start });
     } catch (err) {
@@ -199,10 +222,14 @@ export class SyncEngine {
       throw syncErr;
     } finally {
       this.running = false;
+      setSyncRunning(false);
     }
   }
 
-  private async applyPull(changes: SyncPullChange[]): Promise<void> {
+  private async applyPull(
+    changes: SyncPullChange[],
+    sucursalId: string,
+  ): Promise<void> {
     if (changes.length === 0) return;
     setSyncApplying(true);
     try {
@@ -231,33 +258,67 @@ export class SyncEngine {
         if (change.op === "delete") {
           group.deleteIds.push(change.id);
         } else {
-          const localRow = withCurrentSucursalScope(
+          const localRow = withSucursalScope(
             toLocalRow(
               change.entity,
               change.payload as Record<string, unknown>,
             ),
+            sucursalId,
           );
+          // Guardamos la versión del server para la próxima mutación local
+          // (concurrencia optimista) sin enviarla de vuelta en el payload.
+          (localRow as Record<string, unknown>).row_version =
+            change.serverRowVersion || null;
           group.upserts.push(localRow);
         }
       }
 
-      for (const { table, upserts, deleteIds } of byTable.values()) {
-        if (upserts.length > 0) await table.bulkPut(upserts);
-        if (deleteIds.length === 0) continue;
+      // Aplicar el lote en una sola transacción Dexie: si algo falla a mitad,
+      // no quedan tablas a medio actualizar.
+      const tables = [...byTable.values()].map((g) => g.table);
+      await this.deps.db.transaction(
+        "rw",
+        tables as never[],
+        async () => {
+          for (const { table, upserts, deleteIds } of byTable.values()) {
+            let rowsToPut = upserts;
+            if (upserts.length > 0) {
+              const existingRows = await table.bulkGet(
+                upserts.map((row) => String((row as { id: unknown }).id)),
+              );
+              rowsToPut = upserts.flatMap((row, index) => {
+                const existing = existingRows[index];
+                if (
+                  existing?.sucursal_id &&
+                  existing.sucursal_id !== sucursalId
+                ) {
+                  return [];
+                }
+                return [{ ...existing, ...row }];
+              });
+            }
+            if (rowsToPut.length > 0) await table.bulkPut(rowsToPut);
+            if (deleteIds.length === 0) continue;
 
-        // Preserve local rows for recoverable soft-deletes. Missing rows are
-        // intentionally ignored because the server delete is idempotent.
-        const existingRows = await table.bulkGet(deleteIds);
-        const deletedAt = new Date().toISOString();
-        const softDeletedRows = existingRows
-          .filter((row): row is Record<string, unknown> => row !== undefined)
-          .map((row) => ({
-            ...row,
-            deleted_at: deletedAt,
-            updated_at: deletedAt,
-          }));
-        if (softDeletedRows.length > 0) await table.bulkPut(softDeletedRows);
-      }
+            // Preserve local rows for recoverable soft-deletes. Missing rows
+            // are intentionally ignored because the server delete is idempotent.
+            const existingRows = await table.bulkGet(deleteIds);
+            const deletedAt = new Date().toISOString();
+            const softDeletedRows = existingRows
+              .filter(
+                (row): row is Record<string, unknown> =>
+                  row !== undefined && row.sucursal_id === sucursalId,
+              )
+              .map((row) => ({
+                ...row,
+                deleted_at: deletedAt,
+                updated_at: deletedAt,
+              }));
+            if (softDeletedRows.length > 0)
+              await table.bulkPut(softDeletedRows);
+          }
+        },
+      );
     } finally {
       setSyncApplying(false);
     }
@@ -271,9 +332,13 @@ export class SyncEngine {
   }> {
     // Limpieza automática de items con entityId malformado ([object)
     // que quedaron de versiones anteriores del enqueuer.
-    await this.deps.queue.clearStale();
+    await this.deps.queue.clearStale(sucursalId);
 
-    const pending = await this.deps.queue.listPending();
+    // Items atascados en syncing (tab cerrado a mitad de un push) vuelven
+    // a pending para reintentarse en este ciclo.
+    await this.deps.queue.requeueStaleSyncing(sucursalId);
+
+    const pending = await this.deps.queue.listPending(sucursalId);
     if (pending.length === 0) {
       return { sent: 0, applied: 0, conflicts: 0, errors: 0 };
     }
@@ -295,14 +360,24 @@ export class SyncEngine {
       await this.deps.queue.markSyncing(item.id);
     }
 
-    const response = await withRetry(
-      () => this.deps.api!.push({ sucursalId, operations }),
-      {
-        maxAttempts: MAX_PUSH_RETRIES,
-        shouldRetry: (err) => isTransient(err),
-        sleep: () => Promise.resolve(),
-      },
-    );
+    let response;
+    try {
+      response = await withRetry(
+        () => this.deps.api!.push({ sucursalId, operations }),
+        {
+          maxAttempts: MAX_PUSH_RETRIES,
+          shouldRetry: (err) => isTransient(err),
+          // sin sleep custom: backoff exponencial real (1s, 2s, 4s + jitter)
+          sleep: this.deps.retrySleep,
+        },
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      for (const item of batch) {
+        await this.deps.queue.markError(item.id, message);
+      }
+      throw error;
+    }
 
     for (let i = 0; i < batch.length; i++) {
       const item = batch[i]!;
@@ -319,6 +394,7 @@ export class SyncEngine {
         await this.deps.queue.markConflict(
           item.id,
           result.error ?? "row_version mismatch",
+          result.serverRowVersion,
         );
         conflicts++;
       } else if (result.status === "skipped") {
@@ -336,7 +412,7 @@ export class SyncEngine {
       }
     }
 
-    await this.deps.queue.clearApplied();
+    await this.deps.queue.clearApplied(sucursalId);
     return { sent: batch.length, applied, conflicts, errors };
   }
 

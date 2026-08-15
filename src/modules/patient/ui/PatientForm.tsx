@@ -14,11 +14,12 @@ import {
   Heart,
   Tags,
   IdCard,
+  AlertTriangle,
 } from "lucide-react";
-import { toast } from "sonner";
 import {
   PatientFormSchema,
   patientFormDefaultValues,
+  parseBirthDateForPersistence,
   type PatientFormValues,
 } from "@modules/patient/application/patientFormSchema";
 import type { Sex } from "@modules/patient/domain/Sex";
@@ -59,6 +60,7 @@ export function PatientForm({
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState<string | null>(null);
   // Ref-based lock: protege contra dos `onSubmit` consecutivos dentro del
   // mismo tick (doble-click o Enter repetido) antes de que React procese
   // el `setSubmitting(true)` y deshabilite el botón. Sin este ref, dos
@@ -120,8 +122,12 @@ export function PatientForm({
   const onSubmit = async (values: PatientFormValues) => {
     if (submitLockRef.current) return;
     submitLockRef.current = true;
+    setSubmitError(null);
     setSubmitting(true);
     try {
+      const birthDate = parseBirthDateForPersistence(values.birthDate);
+      if (!birthDate) throw new Error("Invalid date-only birth date");
+
       const parseStr = (v: string | undefined): string | null =>
         v && v.trim() ? v.trim() : null;
       const parseTags = (v: string | undefined): string[] =>
@@ -136,7 +142,7 @@ export function PatientForm({
         firstName: values.firstName,
         lastName: values.lastName,
         secondLastName: parseStr(values.secondLastName),
-        birthDate: new Date(values.birthDate),
+        birthDate,
         sex: values.sex as Sex,
         gender: values.gender ?? null,
         maritalStatus: values.maritalStatus ?? null,
@@ -171,9 +177,6 @@ export function PatientForm({
 
       if (mode === "create") {
         const created = await patientService.create.execute(payload);
-        toast.success(t("patient.created_success"), {
-          description: created.fullName,
-        });
         if (onCreated) {
           onCreated(created);
         } else {
@@ -181,22 +184,12 @@ export function PatientForm({
         }
       } else if (patientId) {
         const updated = await patientService.update.execute(patientId, payload);
-        toast.success(t("patient.updated_success"), {
-          description: updated.fullName,
-        });
         navigate(`/pacientes/${updated.id.toString()}`);
       }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : t("common.unexpected_error");
-      toast.error(
-        mode === "create"
-          ? t("patient.create_error")
-          : t("patient.update_error"),
-        {
-          description: message,
-        },
-      );
+      setSubmitError(message);
     } finally {
       setSubmitting(false);
       submitLockRef.current = false;
@@ -205,6 +198,36 @@ export function PatientForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+      {submitError ? (
+        <div
+          className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50/80 p-4 text-red-950 dark:border-red-400/20 dark:bg-red-400/10 dark:text-red-100"
+          role="alert"
+        >
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-red-100 text-red-600 dark:bg-red-400/10 dark:text-red-300">
+            <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <strong className="text-sm font-semibold">
+              {t(
+                mode === "create"
+                  ? "patient.create_error"
+                  : "patient.update_error",
+              )}
+            </strong>
+            <p className="mt-1 text-xs leading-relaxed text-red-800 dark:text-red-200">
+              {submitError}
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-md p-1 text-red-700 transition hover:bg-red-100 dark:text-red-200 dark:hover:bg-red-400/10"
+            aria-label={t("common.close")}
+            onClick={() => setSubmitError(null)}
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -13,7 +13,7 @@ export interface ChatMessage {
 }
 
 interface UseRealtimeChatOptions {
-  wsUrl: string;
+  getWsUrl: () => Promise<string>;
   fetchMessages: (signal?: AbortSignal) => Promise<ChatMessage[]>;
   sendMessage: (content: string) => Promise<void>;
   markAsRead: (messageId: string) => Promise<void>;
@@ -59,10 +59,18 @@ export function useRealtimeChat(options: UseRealtimeChatOptions) {
     let ws: WebSocket | null = null;
     let reconnectDelay = 1000;
 
-    function connect() {
+    async function connect() {
       if (!mountedRef.current) return;
+      let wsUrl: string;
       try {
-        ws = new WebSocket(options.wsUrl);
+        wsUrl = await options.getWsUrl();
+      } catch {
+        setIsRealtime(false);
+        startPolling();
+        return;
+      }
+      try {
+        ws = new WebSocket(wsUrl);
       } catch {
         setIsRealtime(false);
         startPolling();
@@ -103,7 +111,7 @@ export function useRealtimeChat(options: UseRealtimeChatOptions) {
           setIsRealtime(false);
           startPolling();
           reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-          reconnectTimerRef.current = setTimeout(connect, reconnectDelay);
+          reconnectTimerRef.current = setTimeout(() => void connect(), reconnectDelay);
         }
       };
 
@@ -134,7 +142,7 @@ export function useRealtimeChat(options: UseRealtimeChatOptions) {
     void loadMessages();
 
     // Try WebSocket
-    connect();
+    void connect();
 
     return () => {
       if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
@@ -146,7 +154,7 @@ export function useRealtimeChat(options: UseRealtimeChatOptions) {
       wsRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.wsUrl, options.pollInterval]);
+  }, [options.getWsUrl, options.pollInterval]);
 
   const send = React.useCallback(async (content: string) => {
     await options.sendMessage(content);

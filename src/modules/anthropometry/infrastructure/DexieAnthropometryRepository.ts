@@ -6,24 +6,40 @@ import type {
 } from "../domain/AnthropometryRepository";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { AnthropometryRow } from "./anthropometryMapper";
-import { anthropometryRowToDomain, anthropometryDomainToRow } from "./anthropometryMapper";
+import {
+  anthropometryRowToDomain,
+  anthropometryDomainToRow,
+} from "./anthropometryMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import type { Collection } from "dexie";
+import {
+  requireActiveSucursalId,
+  rowMatchesSucursal,
+  withSucursalScope,
+} from "@services/tenancy/sucursalScope";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 
 export class DexieAnthropometryRepository implements AnthropometryRepository {
-  constructor(private readonly dbInstance: NutriClinicaDB = new NutriClinicaDB()) {}
+  constructor(
+    private readonly dbInstance: NutriClinicaDB = new NutriClinicaDB(),
+  ) {}
 
   async save(measurement: Anthropometry): Promise<void> {
     const row = anthropometryDomainToRow(measurement);
-    await this.dbInstance.anthropometry.put(row);
+    const sucursalId = requireActiveSucursalId();
+    const existing = await this.dbInstance.anthropometry
+      .get(row.id)
+      .catch(() => null);
+    assertOwnedBySucursal(existing, sucursalId);
+    await this.dbInstance.anthropometry.put(withSucursalScope(row, sucursalId));
   }
 
   async findById(id: AnthropometryId): Promise<Anthropometry | null> {
     const row = await this.dbInstance.anthropometry.get(id.toString());
-    if (!row) return null;
+    if (!row || !rowMatchesSucursal(row, requireActiveSucursalId()))
+      return null;
     return anthropometryRowToDomain(row);
   }
 
@@ -32,7 +48,9 @@ export class DexieAnthropometryRepository implements AnthropometryRepository {
     const offset = query.offset ?? 0;
 
     const rows = await this.applyFilters(
-      this.dbInstance.anthropometry.orderBy("[patient_id+measured_at]").reverse(),
+      this.dbInstance.anthropometry
+        .orderBy("[patient_id+measured_at]")
+        .reverse(),
       query,
     )
       .filter((row: AnthropometryRow) => row.deleted_at === null)
@@ -44,7 +62,10 @@ export class DexieAnthropometryRepository implements AnthropometryRepository {
   }
 
   async count(query: AnthropometryQuery = {}): Promise<number> {
-    return this.applyFilters(this.dbInstance.anthropometry.toCollection(), query)
+    return this.applyFilters(
+      this.dbInstance.anthropometry.toCollection(),
+      query,
+    )
       .filter((row: AnthropometryRow) => row.deleted_at === null)
       .count();
   }
@@ -53,11 +74,18 @@ export class DexieAnthropometryRepository implements AnthropometryRepository {
     if (soft) {
       const existing = await this.dbInstance.anthropometry.get(id.toString());
       if (!existing) return;
+      const sucursalId = requireActiveSucursalId();
+      if (!rowMatchesSucursal(existing, sucursalId)) return;
       const domain = anthropometryRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.anthropometry.put(anthropometryDomainToRow(deleted));
+      await this.dbInstance.anthropometry.put(
+        withSucursalScope(anthropometryDomainToRow(deleted), sucursalId),
+      );
     } else {
-      await this.dbInstance.anthropometry.delete(id.toString());
+      const existing = await this.dbInstance.anthropometry.get(id.toString());
+      if (existing && rowMatchesSucursal(existing, requireActiveSucursalId())) {
+        await this.dbInstance.anthropometry.delete(id.toString());
+      }
     }
   }
 
@@ -66,19 +94,38 @@ export class DexieAnthropometryRepository implements AnthropometryRepository {
     query: AnthropometryQuery,
   ): Collection<AnthropometryRow, string> {
     let collection: Collection<AnthropometryRow, string> = source;
+    const sucursalId = requireActiveSucursalId();
+    collection = collection.filter((row) =>
+      rowMatchesSucursal(row, sucursalId),
+    );
     if (query.patientId) {
       const pid = query.patientId.toString();
-      collection = source.filter((row: AnthropometryRow) => row.patient_id === pid);
+      collection = collection.filter(
+        (row: AnthropometryRow) => row.patient_id === pid,
+      );
     }
     if (query.from) {
       const fromIso = query.from.toISOString();
-      collection = source.filter((row: AnthropometryRow) => row.measured_at >= fromIso);
+      collection = collection.filter(
+        (row: AnthropometryRow) => row.measured_at >= fromIso,
+      );
     }
     if (query.to) {
       const toIso = query.to.toISOString();
-      collection = source.filter((row: AnthropometryRow) => row.measured_at <= toIso);
+      collection = collection.filter(
+        (row: AnthropometryRow) => row.measured_at <= toIso,
+      );
     }
     return collection;
+  }
+}
+
+function assertOwnedBySucursal(
+  row: AnthropometryRow | null | undefined,
+  sucursalId: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error("La medición pertenece a otra sucursal");
   }
 }
 

@@ -1,7 +1,11 @@
 import { type Request, type Response, type NextFunction } from "express";
 
 export class HttpError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly details?: unknown,
+  ) {
     super(message);
     this.name = "HttpError";
   }
@@ -29,9 +33,17 @@ const DOMAIN_ERROR_STATUS: Record<string, number> = {
   WeakPasswordError: 400,
 };
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
+export function errorHandler(
+  err: unknown,
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+): void {
   if (err instanceof HttpError) {
-    res.status(err.status).json({ error: err.message });
+    res.status(err.status).json({
+      error: err.message,
+      ...(err.details === undefined ? {} : { details: err.details }),
+    });
     return;
   }
   if (err instanceof Error) {
@@ -41,7 +53,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       return;
     }
   }
-  console.error("[nutriclinica-api] unhandled error:", err instanceof Error ? err.message : err);
+  console.error(
+    "[nutriclinica-api] unhandled error:",
+    err instanceof Error ? err.message : err,
+  );
   if (err instanceof Error && err.stack) {
     console.error(err.stack);
   }

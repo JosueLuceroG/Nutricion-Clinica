@@ -13,6 +13,7 @@ export type NotificationType =
   | "system";
 export type NotificationTone = "teal" | "blue" | "aqua" | "slate";
 export type NotificationHydrationStatus = "idle" | "loading" | "ready";
+export type NotificationSource = "clinical-alert";
 
 export interface NotificationScope {
   userId: string;
@@ -35,6 +36,10 @@ export interface DashboardNotification {
   archived: boolean;
   requiresAction?: boolean;
   actions?: NotificationAction[];
+  source?: NotificationSource;
+  targetRoute?: string;
+  createdAt?: string;
+  occursAt?: string;
 }
 
 export interface NotificationStorage {
@@ -58,6 +63,7 @@ export interface NotificationState {
   archive: (id: string) => void;
   archiveVisible: (tab: NotificationTab) => void;
   resolveAction: (id: string, action: NotificationAction) => void;
+  syncClinicalAlerts: (notifications: DashboardNotification[]) => void;
   resetMockData: () => void;
   clear: () => void;
 }
@@ -236,6 +242,57 @@ function isNotificationTab(value: unknown): value is NotificationTab {
   return value === "inbox" || value === "general" || value === "archived";
 }
 
+function isNotificationType(value: unknown): value is NotificationType {
+  return value === "patient_message" ||
+    value === "consultation" ||
+    value === "nutrition_plan" ||
+    value === "document" ||
+    value === "clinical_record" ||
+    value === "payment" ||
+    value === "system";
+}
+
+function isNotificationTone(value: unknown): value is NotificationTone {
+  return value === "teal" || value === "blue" || value === "aqua" || value === "slate";
+}
+
+function parseClinicalAlertNotification(value: unknown): DashboardNotification | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Record<string, unknown>;
+  if (
+    candidate.source !== "clinical-alert" ||
+    typeof candidate.id !== "string" ||
+    !isNotificationType(candidate.type) ||
+    typeof candidate.initials !== "string" ||
+    !isNotificationTone(candidate.tone) ||
+    typeof candidate.message !== "string" ||
+    typeof candidate.category !== "string" ||
+    typeof candidate.timeAgo !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    id: candidate.id,
+    type: candidate.type,
+    initials: candidate.initials,
+    tone: candidate.tone,
+    personName: typeof candidate.personName === "string" ? candidate.personName : undefined,
+    patientName: typeof candidate.patientName === "string" ? candidate.patientName : undefined,
+    message: candidate.message,
+    subject: typeof candidate.subject === "string" ? candidate.subject : undefined,
+    suffix: typeof candidate.suffix === "string" ? candidate.suffix : undefined,
+    category: candidate.category,
+    timeAgo: candidate.timeAgo,
+    read: candidate.read === true,
+    archived: candidate.archived === true,
+    source: "clinical-alert",
+    targetRoute: typeof candidate.targetRoute === "string" ? candidate.targetRoute : undefined,
+    createdAt: typeof candidate.createdAt === "string" ? candidate.createdAt : undefined,
+    occursAt: typeof candidate.occursAt === "string" ? candidate.occursAt : undefined,
+  };
+}
+
 function getBrowserStorage(): NotificationStorage | null {
   if (typeof window === "undefined") return null;
   try {
@@ -276,7 +333,7 @@ function mergePersistedItems(value: unknown): DashboardNotification[] {
     }
   });
 
-  return defaults.map((notification) => {
+  const previewItems = defaults.map((notification) => {
     const persistedNotification = persistedState.get(notification.id);
     if (!persistedNotification) return notification;
     return {
@@ -285,6 +342,14 @@ function mergePersistedItems(value: unknown): DashboardNotification[] {
       archived: persistedNotification.archived === true,
     };
   });
+  const previewIds = new Set(previewItems.map((notification) => notification.id));
+  const clinicalAlerts = value
+    .map(parseClinicalAlertNotification)
+    .filter((notification): notification is DashboardNotification =>
+      Boolean(notification && !previewIds.has(notification.id)),
+    );
+
+  return [...clinicalAlerts, ...previewItems];
 }
 
 function parseScopedSnapshot(raw: string): NotificationSnapshot {
@@ -347,11 +412,15 @@ function saveScopedSnapshot(
     storage.setItem(
       scopeKey,
       JSON.stringify({
-        items: snapshot.items.map(({ id, read, archived }) => ({
-          id,
-          read,
-          archived,
-        })),
+        items: snapshot.items.map((notification) =>
+          notification.source === "clinical-alert"
+            ? notification
+            : {
+                id: notification.id,
+                read: notification.read,
+                archived: notification.archived,
+              },
+        ),
         activeTab: snapshot.activeTab,
       }),
     );
@@ -614,6 +683,29 @@ function createNotificationState(
               : notification,
           ),
         );
+      },
+      syncClinicalAlerts: (notifications) => {
+        const validAlerts = notifications
+          .map((notification) => parseClinicalAlertNotification({
+            ...notification,
+            source: "clinical-alert",
+          }))
+          .filter((notification): notification is DashboardNotification => notification !== null);
+        updateItems((items) => {
+          const previousById = new Map(items.map((notification) => [notification.id, notification]));
+          const syncedAlerts = validAlerts.map((notification) => {
+            const previous = previousById.get(notification.id);
+            return {
+              ...notification,
+              read: previous?.read ?? false,
+              archived: previous?.archived ?? false,
+            };
+          });
+          return [
+            ...syncedAlerts,
+            ...items.filter((notification) => notification.source !== "clinical-alert"),
+          ];
+        });
       },
       resetMockData: () => {
         const state = get();

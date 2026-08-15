@@ -1,5 +1,6 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { isBillingReportRole } from "@modules/auth/authRoles";
+import { patientRowToDomain } from "@modules/patient/infrastructure/patientMapper";
 import { db } from "@services/db/dexieSchema";
 import { useAuthStore } from "@store/authStore";
 import type {
@@ -12,6 +13,59 @@ const ACTIVE_APPOINTMENT_STATUSES = new Set([
   "confirmed",
   "in_progress",
 ]);
+
+type AlertCandidate = PatientClinicalSummaryAlert & {
+  deduplicationKey: string;
+};
+
+const ALERT_SEVERITY_RANK: Record<
+  PatientClinicalSummaryAlert["severity"],
+  number
+> = {
+  critical: 0,
+  warning: 1,
+  info: 2,
+};
+
+const normalizeAlertSubject = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-MX")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+const mergeAlerts = (
+  candidates: readonly AlertCandidate[],
+): PatientClinicalSummaryAlert[] => {
+  const alertsByKey = new Map<string, PatientClinicalSummaryAlert>();
+
+  for (const { deduplicationKey, ...candidate } of candidates) {
+    const current = alertsByKey.get(deduplicationKey);
+    if (!current) {
+      alertsByKey.set(deduplicationKey, candidate);
+      continue;
+    }
+
+    alertsByKey.set(deduplicationKey, {
+      ...current,
+      severity:
+        ALERT_SEVERITY_RANK[current.severity] <=
+        ALERT_SEVERITY_RANK[candidate.severity]
+          ? current.severity
+          : candidate.severity,
+      message:
+        candidate.message.length > current.message.length
+          ? candidate.message
+          : current.message,
+    });
+  }
+
+  return Array.from(alertsByKey.values()).sort(
+    (left, right) =>
+      ALERT_SEVERITY_RANK[left.severity] - ALERT_SEVERITY_RANK[right.severity],
+  );
+};
 
 const goalPriority = (value: string): number => {
   if (value === "alta") return 0;
@@ -35,6 +89,8 @@ export function usePatientClinicalSummary(patientId: string | null) {
         allergies,
         intolerances,
         appointments,
+        patientRow,
+        measurements,
       ] = await Promise.all([
         db.consultations
           .where("patient_id")
@@ -59,6 +115,12 @@ export function usePatientClinicalSummary(patientId: string | null) {
         db.allergies.where("patient_id").equals(patientId).toArray(),
         db.intolerances.where("patient_id").equals(patientId).toArray(),
         db.appointments.where("patient_id").equals(patientId).toArray(),
+        db.patients.get(patientId),
+        db.anthropometry
+          .where("patient_id")
+          .equals(patientId)
+          .filter((row) => row.deleted_at === null)
+          .toArray(),
       ]);
 
       consultations.sort(
@@ -82,9 +144,28 @@ export function usePatientClinicalSummary(patientId: string | null) {
         consultations.find((row) => row.status === "completed") ?? null;
       const activePlan = plans[0] ?? null;
       const activeGoal = goals.find((row) => row.status === "activo") ?? null;
-      const alerts: PatientClinicalSummaryAlert[] = [
+      measurements.sort((left, right) =>
+        left.measured_at.localeCompare(right.measured_at),
+      );
+      const latestMeasurement = measurements.at(-1) ?? null;
+      const measurementHistory = measurements.slice(-6).map((row) => ({
+        measuredAt: row.measured_at,
+        weightKg: row.weight_kg,
+      }));
+      const latestBia = (() => {
+        if (!latestMeasurement?.bia_json) return null;
+        try {
+          return JSON.parse(latestMeasurement.bia_json) as {
+            bodyFatPct?: unknown;
+          };
+        } catch {
+          return null;
+        }
+      })();
+      const alertCandidates: AlertCandidate[] = [
         ...allergies.map((row) => ({
           id: `allergy:${row.id}`,
+          deduplicationKey: `allergy:${normalizeAlertSubject(row.allergen)}`,
           severity:
             row.severity === "severa" || row.severity === "anafilaxia"
               ? ("critical" as const)
@@ -93,23 +174,70 @@ export function usePatientClinicalSummary(patientId: string | null) {
         })),
         ...intolerances.map((row) => ({
           id: `intolerance:${row.id}`,
+          deduplicationKey: `intolerance:${normalizeAlertSubject(row.food)}`,
           severity:
             row.severity === "severa"
               ? ("critical" as const)
               : ("warning" as const),
           message: `Intolerancia a ${row.food}`,
         })),
-      ].sort((left, right) => {
-        const rank = { critical: 0, warning: 1, info: 2 };
-        return rank[left.severity] - rank[right.severity];
-      });
+      ];
 
-      const pendingConsultations = consultations.filter(
-        (row) =>
-          row.cost > 0 &&
-          (row.payment_status === "pending" ||
-            row.payment_status === "partial"),
-      );
+      if (patientRow) {
+        try {
+          const intake = patientRowToDomain(patientRow).medicalIntake;
+          alertCandidates.push(
+            ...intake.medicationAllergyDetails.map((detail, index) => ({
+              id: `intake-allergy:${index}`,
+              deduplicationKey: `allergy:${normalizeAlertSubject(detail.medication)}`,
+              severity:
+                detail.severity === "severe" || detail.requiredMedicalAttention
+                  ? ("critical" as const)
+                  : ("warning" as const),
+              message: `Alergia a ${detail.medication}: ${detail.reaction}${
+                detail.requiredMedicalAttention
+                  ? "; requirió atención médica"
+                  : ""
+              }`,
+            })),
+            ...intake.intoleranceDetails.map((detail, index) => ({
+              id: `intake-intolerance:${index}`,
+              deduplicationKey: `intolerance:${normalizeAlertSubject(detail.substance)}`,
+              severity:
+                detail.severity === "severe"
+                  ? ("critical" as const)
+                  : ("warning" as const),
+              message: `Intolerancia a ${detail.substance}: ${detail.reaction}`,
+            })),
+          );
+
+          if (intake.adverseMedicationOrSupplementEffects) {
+            alertCandidates.push({
+              id: "intake-adverse-effect",
+              deduplicationKey: `adverse-effect:${normalizeAlertSubject(
+                intake.adverseEffectDetails ?? "reported",
+              )}`,
+              severity: "warning",
+              message: `Efecto adverso a medicamento o suplemento reportado${
+                intake.adverseEffectDetails
+                  ? `: ${intake.adverseEffectDetails}`
+                  : ""
+              }`,
+            });
+          }
+        } catch {
+          // A malformed patient row must not hide normalized clinical alerts.
+        }
+      }
+
+      const alerts = mergeAlerts(alertCandidates);
+
+      const pendingConsultations = consultations.filter((row) => {
+        if (!(row.cost > 0)) return false;
+        // fallback para filas legacy sin payment_status
+        const ps = row.payment_status ?? (row.paid ? "paid" : "pending");
+        return ps === "pending" || ps === "partial";
+      });
       const today = new Date().toISOString().slice(0, 10);
       const nextAppointment = appointments
         .filter(
@@ -121,6 +249,33 @@ export function usePatientClinicalSummary(patientId: string | null) {
             `${right.date}T${right.start_time}`,
           ),
         )[0];
+      const attendanceAppointments = appointments.filter((row) =>
+        ["completed", "no_show"].includes(row.status),
+      );
+      const macroCalories = activePlan
+        ? activePlan.protein_target_g * 4 +
+          activePlan.carbs_target_g * 4 +
+          activePlan.fat_target_g * 9
+        : 0;
+      const activePlanMeals = activePlan
+        ? (() => {
+            try {
+              const meals = JSON.parse(activePlan.meals_json) as unknown;
+              return Array.isArray(meals)
+                ? meals.filter(
+                    (meal) =>
+                      meal &&
+                      typeof meal === "object" &&
+                      "exchanges" in meal &&
+                      Array.isArray(meal.exchanges) &&
+                      meal.exchanges.length > 0,
+                  ).length
+                : 0;
+            } catch {
+              return 0;
+            }
+          })()
+        : 0;
 
       const summary: PatientClinicalSummary = {
         latestConsultation: latestConsultation
@@ -128,6 +283,12 @@ export function usePatientClinicalSummary(patientId: string | null) {
               id: latestConsultation.id,
               date: latestConsultation.consultation_date,
               reason: latestConsultation.reason,
+              note:
+                latestConsultation.plan ??
+                latestConsultation.assessment ??
+                latestConsultation.objective ??
+                latestConsultation.subjective ??
+                null,
             }
           : null,
         activeGoal: activeGoal
@@ -142,8 +303,54 @@ export function usePatientClinicalSummary(patientId: string | null) {
               id: activePlan.id,
               name: activePlan.name,
               startDate: activePlan.start_date,
+              endDate: activePlan.end_date,
+              kcalTarget: activePlan.kcal_target,
+              mealCount: activePlanMeals,
+              macroPercentages:
+                macroCalories > 0
+                  ? {
+                      protein: Math.round(
+                        (activePlan.protein_target_g * 4 * 100) / macroCalories,
+                      ),
+                      carbs: Math.round(
+                        (activePlan.carbs_target_g * 4 * 100) / macroCalories,
+                      ),
+                      fat: Math.round(
+                        (activePlan.fat_target_g * 9 * 100) / macroCalories,
+                      ),
+                    }
+                  : null,
             }
           : null,
+        anthropometry: {
+          latest: latestMeasurement
+            ? {
+                measuredAt: latestMeasurement.measured_at,
+                weightKg: latestMeasurement.weight_kg,
+                bmi:
+                  latestMeasurement.height_m > 0
+                    ? latestMeasurement.weight_kg /
+                      latestMeasurement.height_m ** 2
+                    : 0,
+                bodyFatPct:
+                  typeof latestBia?.bodyFatPct === "number" &&
+                  Number.isFinite(latestBia.bodyFatPct)
+                    ? latestBia.bodyFatPct
+                    : null,
+                waistCm:
+                  typeof latestMeasurement.circumferences?.waist === "number"
+                    ? latestMeasurement.circumferences.waist
+                    : null,
+              }
+            : null,
+          history: measurementHistory,
+        },
+        attendance: {
+          attended: attendanceAppointments.filter(
+            (row) => row.status === "completed",
+          ).length,
+          total: attendanceAppointments.length,
+        },
         alerts,
         financial: canViewFinancial
           ? {

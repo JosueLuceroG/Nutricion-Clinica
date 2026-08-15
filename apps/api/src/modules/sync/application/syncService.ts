@@ -2,8 +2,10 @@ import sql from "mssql";
 import { getPool } from "../../../db/connection.js";
 import {
   SYNCABLE_ENTITIES,
+  SYNC_SCHEMA_VERSION,
   type SyncableEntity,
   type SyncPullChange,
+  type SyncPullCursors,
   type SyncPullResponse,
   type SyncPushBatch,
   type SyncPushResponse,
@@ -14,7 +16,13 @@ import { dbRowToClient, prepareColumnsForWrite } from "./entityColumnMaps.js";
 import {
   assertConsultaInSucursal,
   assertPacienteInSucursal,
+  type DbSession,
 } from "../../tenancy/application/tenantGuards.js";
+import {
+  authorizeAndNormalizeSyncBatch,
+  type SyncActor,
+} from "./syncAuthorization.js";
+import { HttpError } from "../../../middleware/errorHandler.js";
 
 const MAX_BATCH_SIZE = 500;
 const PULL_PAGE_SIZE = 1000;
@@ -28,6 +36,28 @@ const ENTITY_TABLES: Record<SyncableEntity, string> = {
   adherence_records: "adherence_records",
 };
 
+/**
+ * Cursor de pull por entidad. Cada entidad pagina de forma independiente
+ * con su propio `since`; el cursor es `ISO@id` para que filas con el mismo
+ * updated_at no se salten entre páginas (la query usa > since OR (= since AND id > lastId)).
+ */
+function parseCursor(raw: string | undefined): { since: Date; lastId: string } {
+  if (raw) {
+    const at = raw.lastIndexOf("@");
+    if (at > 0) {
+      const t = new Date(raw.slice(0, at));
+      if (!isNaN(t.getTime())) {
+        return { since: t, lastId: raw.slice(at + 1) };
+      }
+    }
+  }
+  return { since: new Date(0), lastId: "" };
+}
+
+function cursorFromRow(updatedAt: Date, id: string): string {
+  return `${updatedAt.toISOString()}@${id}`;
+}
+
 export async function getManifest(): Promise<SyncManifest> {
   const pool = await getPool();
   const timeResult = await pool
@@ -35,7 +65,7 @@ export async function getManifest(): Promise<SyncManifest> {
     .query<{ t: Date }>("SELECT SYSUTCDATETIME() AS t");
   return {
     apiVersion: "v1",
-    syncSchemaVersion: 1,
+    syncSchemaVersion: SYNC_SCHEMA_VERSION,
     serverTime: (timeResult.recordset[0]?.t ?? new Date()).toISOString(),
     entities: [...SYNCABLE_ENTITIES],
     maxBatchSize: MAX_BATCH_SIZE,
@@ -45,7 +75,7 @@ export async function getManifest(): Promise<SyncManifest> {
 
 export async function pullChanges(
   sucursalId: string,
-  since: Date,
+  since: SyncPullCursors | null,
   entityFilter: SyncableEntity[] | null,
 ): Promise<SyncPullResponse> {
   const pool = await getPool();
@@ -54,15 +84,17 @@ export async function pullChanges(
       ? entityFilter
       : [...SYNCABLE_ENTITIES];
   const allChanges: SyncPullChange[] = [];
+  const cursors: SyncPullCursors = {};
   let hasMore = false;
-  let nextSince = since;
 
   for (const entity of entities) {
     const table = ENTITY_TABLES[entity];
+    const { since: entitySince, lastId } = parseCursor(since?.[entity]);
     const result = await pool
       .request()
       .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
-      .input("since", sql.DateTime2(), since)
+      .input("since", sql.DateTime2(), entitySince)
+      .input("last_id", sql.UniqueIdentifier(), lastId)
       .query<{
         id: string;
         updated_at: Date;
@@ -71,8 +103,9 @@ export async function pullChanges(
       }>(
         `SELECT id, updated_at, deleted_at, row_version
            FROM ${table} WITH (NOLOCK)
-          WHERE sucursal_id = @sucursal_id AND updated_at > @since
-          ORDER BY updated_at ASC
+          WHERE sucursal_id = @sucursal_id
+            AND (updated_at > @since OR (updated_at = @since AND id > @last_id))
+          ORDER BY updated_at ASC, id ASC
           OFFSET 0 ROWS FETCH NEXT ${PULL_PAGE_SIZE + 1} ROWS ONLY`,
       );
     const rows = result.recordset;
@@ -98,7 +131,10 @@ export async function pullChanges(
           ? Buffer.from(r.row_version).toString("base64")
           : "",
       });
-      if (r.updated_at > nextSince) nextSince = r.updated_at;
+    }
+    if (limited.length > 0) {
+      const last = limited[limited.length - 1]!;
+      cursors[entity] = cursorFromRow(last.updated_at, last.id);
     }
     if (truncated) hasMore = true;
   }
@@ -110,27 +146,44 @@ export async function pullChanges(
     serverTime: (serverTimeResult.recordset[0]?.t ?? new Date()).toISOString(),
     changes: allChanges,
     hasMore,
-    nextSince: nextSince.toISOString(),
+    cursors,
   };
 }
 
 export async function pushBatch(
   batch: SyncPushBatch,
-  profesionalId: string,
+  actor: SyncActor,
 ): Promise<SyncPushResponse> {
+  if (batch.operations.length < 1 || batch.operations.length > MAX_BATCH_SIZE) {
+    throw new HttpError(
+      400,
+      `El batch debe contener entre 1 y ${MAX_BATCH_SIZE} operaciones`,
+    );
+  }
+  const authorizedBatch = authorizeAndNormalizeSyncBatch(batch, actor);
   const pool = await getPool();
   const results: SyncPushResultItem[] = [];
 
-  for (const op of batch.operations) {
+  for (const op of authorizedBatch.operations) {
+    // Cada operación corre en su propia transacción: si algo falla a mitad,
+    // se hace rollback y la operación queda como "error" sin efectos parciales.
+    const tx = pool.transaction();
     try {
+      await tx.begin();
       const result = await applyOperation(
-        pool,
-        batch.sucursalId,
-        profesionalId,
+        tx,
+        authorizedBatch.sucursalId,
+        actor.id,
         op,
       );
+      await tx.commit();
       results.push(result);
     } catch (err) {
+      try {
+        await tx.rollback();
+      } catch {
+        // la transacción ya no está activa; el error original es el importante
+      }
       results.push({
         entity: op.entity,
         id: op.id,
@@ -179,7 +232,7 @@ const SERVER_INJECTED_COLUMNS: Record<
 };
 
 async function applyOperation(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   sucursalId: string,
   profesionalId: string,
   op: {
@@ -194,7 +247,33 @@ async function applyOperation(
   const table = ENTITY_TABLES[op.entity];
 
   if (op.op === "delete") {
-    await pool
+    if (op.expectedRowVersion) {
+      const existing = await session
+        .request()
+        .input("id", sql.UniqueIdentifier(), op.id)
+        .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+        .query<{
+          row_version: Buffer;
+          updated_at: Date;
+        }>(`SELECT row_version, updated_at FROM ${table} WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`);
+      const current = existing.recordset[0];
+      if (current) {
+        const currentVersion = Buffer.from(current.row_version).toString(
+          "base64",
+        );
+        if (currentVersion !== op.expectedRowVersion) {
+          return {
+            entity: op.entity,
+            id: op.id,
+            status: "conflict",
+            serverUpdatedAt: current.updated_at.toISOString(),
+            serverRowVersion: currentVersion,
+            error: "row_version mismatch — server has newer changes",
+          };
+        }
+      }
+    }
+    await session
       .request()
       .input("id", sql.UniqueIdentifier(), op.id)
       .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
@@ -205,14 +284,14 @@ async function applyOperation(
   }
 
   if (op.op === "create") {
-    return applyCreate(pool, sucursalId, profesionalId, op);
+    return applyCreate(session, sucursalId, profesionalId, op);
   }
 
-  return applyUpdate(pool, sucursalId, profesionalId, op);
+  return applyUpdate(session, sucursalId, profesionalId, op);
 }
 
 async function applyCreate(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   sucursalId: string,
   profesionalId: string,
   op: { entity: SyncableEntity; id: string; payload: unknown },
@@ -220,7 +299,7 @@ async function applyCreate(
   const table = ENTITY_TABLES[op.entity];
   const prepared = prepareColumnsForWrite(op.entity, op.payload);
 
-  const exists = await pool
+  const exists = await session
     .request()
     .input("id", sql.UniqueIdentifier(), op.id)
     .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
@@ -248,11 +327,11 @@ async function applyCreate(
     }
   }
 
-  await assertSyncReferencesInSucursal(pool, op.entity, sucursalId, op.payload);
+  await assertSyncReferencesInSucursal(session, op.entity, sucursalId, op.payload);
 
   const cols: string[] = ["id", "sucursal_id"];
   const values: string[] = ["@id", "@sucursal_id"];
-  const req = pool
+  const req = session
     .request()
     .input("id", sql.UniqueIdentifier(), op.id)
     .input("sucursal_id", sql.UniqueIdentifier(), sucursalId);
@@ -268,11 +347,18 @@ async function applyCreate(
     values.push(`@${paramName}`);
   }
 
-  // Inyectar columnas server-side (profesional_id, etc.) si el cliente no las mandó.
+  if (op.entity === "consultas") {
+    cols.push("[consultation_number]");
+    values.push(
+      `(SELECT ISNULL(MAX(consultation_number), 0) + 1
+          FROM consultas WITH (UPDLOCK, HOLDLOCK)
+         WHERE paciente_id = @c_paciente_id AND sucursal_id = @sucursal_id)`,
+    );
+  }
+
+  // Inyectar columnas server-side desde el actor autenticado.
   const injected = SERVER_INJECTED_COLUMNS[op.entity] ?? {};
   for (const [colName, getValue] of Object.entries(injected)) {
-    const alreadySent = prepared.some((c) => c.dbColumn === colName);
-    if (alreadySent) continue;
     const paramName = `c_${colName}`;
     req.input(
       paramName,
@@ -290,7 +376,7 @@ async function applyCreate(
 }
 
 async function applyUpdate(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   sucursalId: string,
   _profesionalId: string,
   op: {
@@ -304,7 +390,7 @@ async function applyUpdate(
   const prepared = prepareColumnsForWrite(op.entity, op.payload);
 
   if (op.expectedRowVersion) {
-    const existing = await pool
+    const existing = await session
       .request()
       .input("id", sql.UniqueIdentifier(), op.id)
       .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
@@ -334,7 +420,7 @@ async function applyUpdate(
   // puesto, esto es una operación de RESTAURAR (cliente revive un
   // paciente/consulta/etc. eliminado) — la revivimos seteando
   // `deleted_at = NULL` y aplicando los valores del payload.
-  const exists = await pool
+  const exists = await session
     .request()
     .input("id", sql.UniqueIdentifier(), op.id)
     .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
@@ -355,13 +441,13 @@ async function applyUpdate(
 
   const isReviving = exists.recordset[0]!.deleted_at !== null;
 
-  await assertSyncReferencesInSucursal(pool, op.entity, sucursalId, op.payload);
+  await assertSyncReferencesInSucursal(session, op.entity, sucursalId, op.payload);
 
   if (prepared.length === 0 && !isReviving) {
     return { entity: op.entity, id: op.id, status: "applied" };
   }
 
-  const req = pool
+  const req = session
     .request()
     .input("id", sql.UniqueIdentifier(), op.id)
     .input("sucursal_id", sql.UniqueIdentifier(), sucursalId);
@@ -397,7 +483,7 @@ function readString(payload: unknown, key: string): string | undefined {
 }
 
 async function assertSyncReferencesInSucursal(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   entity: SyncableEntity,
   sucursalId: string,
   payload: unknown,
@@ -417,13 +503,13 @@ async function assertSyncReferencesInSucursal(
       "adherence_records",
     ].includes(entity)
   ) {
-    await assertPacienteInSucursal(pool, patientId, sucursalId);
+    await assertPacienteInSucursal(session, patientId, sucursalId);
   }
 
   if (
     consultaId &&
     ["planes_alimenticios", "adherence_records"].includes(entity)
   ) {
-    await assertConsultaInSucursal(pool, consultaId, sucursalId, patientId);
+    await assertConsultaInSucursal(session, consultaId, sucursalId, patientId);
   }
 }

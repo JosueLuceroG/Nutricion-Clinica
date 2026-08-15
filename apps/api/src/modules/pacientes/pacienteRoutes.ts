@@ -407,6 +407,117 @@ const NutritionIntakeSchema = z
   })
   .strict();
 
+const PhysicalActivityTypeSchema = z.enum([
+  "walking",
+  "running",
+  "gym",
+  "cycling",
+  "swimming",
+  "yoga",
+  "dance",
+  "sport",
+  "other",
+]);
+
+const PhysicalActivityProfileSchema = z
+  .object({
+    level: z.enum(["sedentary", "light", "moderate", "intense"]),
+    daysPerWeek: z.number().int().min(0).max(7),
+    sessionDurationMinutes: z.number().int().min(1).max(600).nullable(),
+    activityTypes: z
+      .array(PhysicalActivityTypeSchema)
+      .max(9)
+      .refine((types) => new Set(types).size === types.length, {
+        message: "Activity types must be unique",
+      }),
+    primaryGoal: z
+      .enum([
+        "weightManagement",
+        "health",
+        "performance",
+        "muscleGain",
+        "stressManagement",
+        "mobility",
+        "other",
+      ])
+      .nullable(),
+    hasPhysicalLimitation: z.boolean(),
+    physicalLimitationDetails: z.string().max(500).nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.daysPerWeek > 0 && value.sessionDurationMinutes === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sessionDurationMinutes"],
+        message: "Required when physical activity is reported",
+      });
+    }
+    if (value.daysPerWeek > 0 && value.activityTypes.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activityTypes"],
+        message: "Select at least one physical activity type",
+      });
+    }
+    if (value.daysPerWeek === 0 && value.sessionDurationMinutes !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sessionDurationMinutes"],
+        message: "Must be null when no physical activity is reported",
+      });
+    }
+    if (value.daysPerWeek === 0 && value.activityTypes.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activityTypes"],
+        message: "Must be empty when no physical activity is reported",
+      });
+    }
+    if (
+      value.hasPhysicalLimitation &&
+      !value.physicalLimitationDetails?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["physicalLimitationDetails"],
+        message: "Required when a physical limitation is reported",
+      });
+    }
+  });
+
+const DailyActivitySchema = z
+  .object({
+    sedentaryTime: z.enum([
+      "lessThan4",
+      "fourToSix",
+      "sixToEight",
+      "moreThan8",
+      "varies",
+    ]),
+    usualTransportation: z.enum([
+      "walking",
+      "car",
+      "publicTransport",
+      "bicycle",
+      "motorcycle",
+      "mixed",
+    ]),
+    usesStairsFrequently: z.boolean(),
+    activeBreakFrequency: z.enum(["frequently", "sometimes", "almostNever"]),
+    routineType: z.enum(["seated", "standing", "mixed", "moving"]),
+    notes: z.string().trim().max(1000).nullable(),
+  })
+  .strict();
+
+const PhysicalActivityIntakeSchema = z
+  .object({
+    activity: PhysicalActivityProfileSchema.nullable(),
+    dailyActivity: DailyActivitySchema.nullable(),
+  })
+  .strict();
+
 export const MedicalIntakeSchema = z
   .object({
     diagnosedConditions: z.boolean().nullable().optional(),
@@ -448,6 +559,7 @@ export const MedicalIntakeSchema = z
     adverseEffectDetails: z.string().max(1000).nullable().optional(),
     nutritionIntake: NutritionIntakeSchema.nullable().optional(),
     physicalActivity: z.boolean().nullable().optional(),
+    physicalActivityIntake: PhysicalActivityIntakeSchema.nullable().optional(),
   })
   .strict();
 

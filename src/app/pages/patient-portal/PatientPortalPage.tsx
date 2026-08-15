@@ -47,6 +47,7 @@ import {
   getDocumentDownloadUrl,
   getDocumentPreviewUrl,
   getMealPhotoImageUrl,
+  getPatientPortalChatWsTicket,
   getPatientPortalPayloadWithCache,
   getPendingPortalAdherenceSubmissions,
   getPortalNotificationsWithCache,
@@ -1264,13 +1265,14 @@ function MessagingCard({ token }: { token: string }) {
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
-  const getChatWsUrl = React.useCallback(() => {
+  const getChatWsUrl = React.useCallback(async () => {
     const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
-    return `${apiUrl.replace(/^http/, "ws")}/ws/chat?portalToken=${encodeURIComponent(token)}`;
+    const { ticket } = await getPatientPortalChatWsTicket(token);
+    return `${apiUrl.replace(/^http/, "ws")}/ws/chat?ticket=${encodeURIComponent(ticket)}`;
   }, [token]);
 
   const { messages, send, loading, isRealtime } = useRealtimeChat({
-    wsUrl: getChatWsUrl(),
+    getWsUrl: getChatWsUrl,
     fetchMessages: React.useCallback(
       (signal) => listPatientPortalMessages(token, signal),
       [token],

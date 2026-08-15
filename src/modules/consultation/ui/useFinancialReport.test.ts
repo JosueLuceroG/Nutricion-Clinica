@@ -103,6 +103,51 @@ describe("useFinancialReport", () => {
     expect(result.current!.activePatients).toBe(2);
   });
 
+  it("refunded/cancelled NO suman ingresos ni pendientes", async () => {
+    const p = makePatient({ firstName: "Gaby" });
+    await patientRepo.save(p);
+    const now = new Date();
+    const refunded = await schedule.execute({
+      patientId: p.id,
+      consultationDate: now,
+      consultationNumber: 1,
+      reason: "Reembolsada",
+      cost: 900,
+    });
+    const cancelled = await schedule.execute({
+      patientId: p.id,
+      consultationDate: now,
+      consultationNumber: 2,
+      reason: "Cancelada",
+      cost: 400,
+    });
+    await registerPayment.execute(refunded.id, {
+      paid: true,
+      paymentStatus: "refunded",
+      paymentMethod: "cash",
+      paidAt: new Date(),
+    });
+    await registerPayment.execute(cancelled.id, {
+      paid: false,
+      paymentStatus: "cancelled",
+      paymentMethod: null,
+      paidAt: null,
+    });
+
+    const to = new Date();
+    const from = new Date(to);
+    from.setMonth(from.getMonth() - 6);
+    const { result } = renderHook(() => useFinancialReport(from, to, 5, db));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current!.totalIncome).toBe(0);
+    expect(result.current!.totalPending).toBe(0);
+    expect(result.current!.paidCount).toBe(0);
+    expect(result.current!.pendingCount).toBe(0);
+    expect(result.current!.conceptBreakdown).toHaveLength(0);
+    expect(result.current!.methodBreakdown).toHaveLength(0);
+    expect(result.current!.activePatients).toBe(1);
+  });
+
   it("top patients ordenado por totalPaid desc, limitado a topN", async () => {
     const a = makePatient({ firstName: "Ana" });
     const b = makePatient({ firstName: "Bea" });

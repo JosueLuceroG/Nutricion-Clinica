@@ -257,4 +257,43 @@ describe("notificationStore", () => {
       unread: 0,
     });
   });
+
+  it("persists, rehydrates, and resolves dynamic clinical alerts", () => {
+    const storage = new MemoryStorage();
+    const firstStore = createNotificationStore(storage);
+    firstStore.getState().activateScope(firstScope);
+    firstStore.getState().syncClinicalAlerts([{
+      id: "clinical-alert:upcoming:appointment-1",
+      type: "consultation",
+      initials: "ML",
+      tone: "blue",
+      personName: "Próxima consulta",
+      patientName: "María López",
+      message: "María López tiene consulta a las 10:00.",
+      category: "Agenda",
+      timeAgo: "En 10 min",
+      read: false,
+      archived: false,
+      source: "clinical-alert",
+      targetRoute: "/agenda?appointmentId=appointment-1",
+      occursAt: "2026-08-01T10:00:00.000Z",
+    }]);
+
+    expect(firstStore.getState().unread).toBe(9);
+    firstStore.getState().markRead("clinical-alert:upcoming:appointment-1");
+
+    const restoredStore = createNotificationStore(storage);
+    restoredStore.getState().activateScope(firstScope);
+    expect(
+      restoredStore.getState().items.find((item) => item.id === "clinical-alert:upcoming:appointment-1"),
+    ).toMatchObject({
+      read: true,
+      source: "clinical-alert",
+      targetRoute: "/agenda?appointmentId=appointment-1",
+    });
+
+    restoredStore.getState().syncClinicalAlerts([]);
+    expect(restoredStore.getState().items.some((item) => item.source === "clinical-alert")).toBe(false);
+    expect(readScopedPayload(storage, firstScope).items).toHaveLength(10);
+  });
 });

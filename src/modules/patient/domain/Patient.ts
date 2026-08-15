@@ -277,6 +277,83 @@ export interface PatientNutritionIntake {
   readonly digestive: PatientDigestiveHealth | null;
 }
 
+export type PatientPhysicalActivityLevel =
+  | "sedentary"
+  | "light"
+  | "moderate"
+  | "intense";
+
+export type PatientPhysicalActivityType =
+  | "walking"
+  | "running"
+  | "gym"
+  | "cycling"
+  | "swimming"
+  | "yoga"
+  | "dance"
+  | "sport"
+  | "other";
+
+export type PatientPhysicalActivityGoal =
+  | "weightManagement"
+  | "health"
+  | "performance"
+  | "muscleGain"
+  | "stressManagement"
+  | "mobility"
+  | "other";
+
+export type PatientSedentaryTime =
+  | "lessThan4"
+  | "fourToSix"
+  | "sixToEight"
+  | "moreThan8"
+  | "varies";
+
+export type PatientUsualTransportation =
+  | "walking"
+  | "car"
+  | "publicTransport"
+  | "bicycle"
+  | "motorcycle"
+  | "mixed";
+
+export type PatientActiveBreakFrequency =
+  | "frequently"
+  | "sometimes"
+  | "almostNever";
+
+export type PatientDailyRoutineType =
+  | "seated"
+  | "standing"
+  | "mixed"
+  | "moving";
+
+export interface PatientActivityProfile {
+  readonly level: PatientPhysicalActivityLevel;
+  readonly daysPerWeek: number;
+  readonly sessionDurationMinutes: number | null;
+  readonly activityTypes: readonly PatientPhysicalActivityType[];
+  readonly primaryGoal: PatientPhysicalActivityGoal | null;
+  readonly hasPhysicalLimitation: boolean;
+  readonly physicalLimitationDetails: string | null;
+  readonly notes: string | null;
+}
+
+export interface PatientDailyActivity {
+  readonly sedentaryTime: PatientSedentaryTime;
+  readonly usualTransportation: PatientUsualTransportation;
+  readonly usesStairsFrequently: boolean;
+  readonly activeBreakFrequency: PatientActiveBreakFrequency;
+  readonly routineType: PatientDailyRoutineType;
+  readonly notes: string | null;
+}
+
+export interface PatientPhysicalActivityIntake {
+  readonly activity: PatientActivityProfile | null;
+  readonly dailyActivity: PatientDailyActivity | null;
+}
+
 export interface PatientMedicalIntake {
   readonly diagnosedConditions: boolean | null;
   readonly previousSurgeries: boolean | null;
@@ -299,14 +376,16 @@ export interface PatientMedicalIntake {
   readonly adverseEffectDetails: string | null;
   readonly nutritionIntake: PatientNutritionIntake | null;
   readonly physicalActivity: boolean | null;
+  readonly physicalActivityIntake: PatientPhysicalActivityIntake | null;
 }
 
 type PatientMedicalIntakeInput = Omit<
   Partial<PatientMedicalIntake>,
-  "familyHistoryDetails" | "nutritionIntake"
+  "familyHistoryDetails" | "nutritionIntake" | "physicalActivityIntake"
 > & {
   familyHistoryDetails?: Partial<PatientFamilyHistoryDetails> | null;
   nutritionIntake?: PatientNutritionIntakeInput | null;
+  physicalActivityIntake?: PatientPhysicalActivityIntakeInput | null;
 };
 
 interface PatientNutritionIntakeInput {
@@ -315,6 +394,11 @@ interface PatientNutritionIntakeInput {
   readonly preferences?: Partial<PatientFoodPreferences> | null;
   readonly hydration?: Partial<PatientHydrationHabits> | null;
   readonly digestive?: Partial<PatientDigestiveHealth> | null;
+}
+
+interface PatientPhysicalActivityIntakeInput {
+  readonly activity?: Partial<PatientActivityProfile> | null;
+  readonly dailyActivity?: Partial<PatientDailyActivity> | null;
 }
 
 export class Patient {
@@ -725,6 +809,13 @@ export type PatientUpdate = Omit<Partial<PatientCreate>, "id">;
 function normalizeMedicalIntake(
   value?: PatientMedicalIntakeInput | null,
 ): PatientMedicalIntake {
+  const physicalActivityIntake = normalizePhysicalActivityIntake(
+    value?.physicalActivityIntake,
+  );
+  const legacyPhysicalActivity =
+    typeof value?.physicalActivity === "boolean"
+      ? value.physicalActivity
+      : null;
   return Object.freeze({
     diagnosedConditions: value?.diagnosedConditions ?? null,
     previousSurgeries: value?.previousSurgeries ?? null,
@@ -759,7 +850,10 @@ function normalizeMedicalIntake(
     ),
     adverseEffectDetails: normalizeOptionalText(value?.adverseEffectDetails),
     nutritionIntake: normalizeNutritionIntake(value?.nutritionIntake),
-    physicalActivity: value?.physicalActivity ?? null,
+    physicalActivity: physicalActivityIntake?.activity
+      ? physicalActivityIntake.activity.daysPerWeek > 0
+      : legacyPhysicalActivity,
+    physicalActivityIntake,
   });
 }
 
@@ -912,6 +1006,65 @@ const PATIENT_SYMPTOM_TIMINGS = new Set<PatientSymptomTiming>([
   "variable",
 ]);
 
+const PATIENT_PHYSICAL_ACTIVITY_LEVELS = new Set<PatientPhysicalActivityLevel>([
+  "sedentary",
+  "light",
+  "moderate",
+  "intense",
+]);
+
+const PATIENT_PHYSICAL_ACTIVITY_TYPES = new Set<PatientPhysicalActivityType>([
+  "walking",
+  "running",
+  "gym",
+  "cycling",
+  "swimming",
+  "yoga",
+  "dance",
+  "sport",
+  "other",
+]);
+
+const PATIENT_PHYSICAL_ACTIVITY_GOALS = new Set<PatientPhysicalActivityGoal>([
+  "weightManagement",
+  "health",
+  "performance",
+  "muscleGain",
+  "stressManagement",
+  "mobility",
+  "other",
+]);
+
+const PATIENT_SEDENTARY_TIMES = new Set<PatientSedentaryTime>([
+  "lessThan4",
+  "fourToSix",
+  "sixToEight",
+  "moreThan8",
+  "varies",
+]);
+
+const PATIENT_USUAL_TRANSPORTATION = new Set<PatientUsualTransportation>([
+  "walking",
+  "car",
+  "publicTransport",
+  "bicycle",
+  "motorcycle",
+  "mixed",
+]);
+
+const PATIENT_ACTIVE_BREAK_FREQUENCIES = new Set<PatientActiveBreakFrequency>([
+  "frequently",
+  "sometimes",
+  "almostNever",
+]);
+
+const PATIENT_DAILY_ROUTINE_TYPES = new Set<PatientDailyRoutineType>([
+  "seated",
+  "standing",
+  "mixed",
+  "moving",
+]);
+
 function normalizeNutritionIntake(
   value?: PatientNutritionIntakeInput | null,
 ): PatientNutritionIntake | null {
@@ -923,6 +1076,129 @@ function normalizeNutritionIntake(
     hydration: normalizeHydrationHabits(value.hydration),
     digestive: normalizeDigestiveHealth(value.digestive),
   });
+}
+
+function normalizePhysicalActivityIntake(
+  value?: PatientPhysicalActivityIntakeInput | null,
+): PatientPhysicalActivityIntake | null {
+  if (!isRecord(value)) return null;
+  return Object.freeze({
+    activity: normalizeActivityProfile(
+      value.activity as Partial<PatientActivityProfile> | null | undefined,
+    ),
+    dailyActivity: normalizeDailyActivity(
+      value.dailyActivity as Partial<PatientDailyActivity> | null | undefined,
+    ),
+  });
+}
+
+function normalizeActivityProfile(
+  value?: Partial<PatientActivityProfile> | null,
+): PatientActivityProfile | null {
+  if (!isRecord(value)) return null;
+  const level = PATIENT_PHYSICAL_ACTIVITY_LEVELS.has(
+    value.level as PatientPhysicalActivityLevel,
+  )
+    ? (value.level as PatientPhysicalActivityLevel)
+    : null;
+  const daysPerWeek = value.daysPerWeek;
+  if (
+    !level ||
+    !Number.isInteger(daysPerWeek) ||
+    daysPerWeek === undefined ||
+    daysPerWeek < 0 ||
+    daysPerWeek > 7 ||
+    typeof value.hasPhysicalLimitation !== "boolean"
+  ) {
+    return null;
+  }
+
+  const sessionDurationMinutes =
+    Number.isInteger(value.sessionDurationMinutes) &&
+    value.sessionDurationMinutes !== null &&
+    value.sessionDurationMinutes !== undefined &&
+    value.sessionDurationMinutes >= 1 &&
+    value.sessionDurationMinutes <= 600
+      ? value.sessionDurationMinutes
+      : null;
+  const activityTypes = Array.isArray(value.activityTypes)
+    ? Array.from(
+        new Set(
+          value.activityTypes.filter(
+            (type): type is PatientPhysicalActivityType =>
+              PATIENT_PHYSICAL_ACTIVITY_TYPES.has(
+                type as PatientPhysicalActivityType,
+              ),
+          ),
+        ),
+      )
+    : [];
+  const primaryGoal = PATIENT_PHYSICAL_ACTIVITY_GOALS.has(
+    value.primaryGoal as PatientPhysicalActivityGoal,
+  )
+    ? (value.primaryGoal as PatientPhysicalActivityGoal)
+    : null;
+
+  return Object.freeze({
+    level,
+    daysPerWeek,
+    sessionDurationMinutes: daysPerWeek === 0 ? null : sessionDurationMinutes,
+    activityTypes: Object.freeze(daysPerWeek === 0 ? [] : activityTypes),
+    primaryGoal,
+    hasPhysicalLimitation: value.hasPhysicalLimitation,
+    physicalLimitationDetails: value.hasPhysicalLimitation
+      ? normalizeOptionalText(value.physicalLimitationDetails)
+      : null,
+    notes: normalizeOptionalText(value.notes),
+  });
+}
+
+function normalizeDailyActivity(
+  value?: Partial<PatientDailyActivity> | null,
+): PatientDailyActivity | null {
+  if (!isRecord(value)) return null;
+  const sedentaryTime = PATIENT_SEDENTARY_TIMES.has(
+    value.sedentaryTime as PatientSedentaryTime,
+  )
+    ? (value.sedentaryTime as PatientSedentaryTime)
+    : null;
+  const usualTransportation = PATIENT_USUAL_TRANSPORTATION.has(
+    value.usualTransportation as PatientUsualTransportation,
+  )
+    ? (value.usualTransportation as PatientUsualTransportation)
+    : null;
+  const activeBreakFrequency = PATIENT_ACTIVE_BREAK_FREQUENCIES.has(
+    value.activeBreakFrequency as PatientActiveBreakFrequency,
+  )
+    ? (value.activeBreakFrequency as PatientActiveBreakFrequency)
+    : null;
+  const routineType = PATIENT_DAILY_ROUTINE_TYPES.has(
+    value.routineType as PatientDailyRoutineType,
+  )
+    ? (value.routineType as PatientDailyRoutineType)
+    : null;
+  if (
+    !sedentaryTime ||
+    !usualTransportation ||
+    typeof value.usesStairsFrequently !== "boolean" ||
+    !activeBreakFrequency ||
+    !routineType
+  ) {
+    return null;
+  }
+
+  return Object.freeze({
+    sedentaryTime,
+    usualTransportation,
+    usesStairsFrequently: value.usesStairsFrequently,
+    activeBreakFrequency,
+    routineType,
+    notes: normalizeOptionalText(value.notes),
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function normalizeMealRoutine(
@@ -1223,8 +1499,8 @@ function normalizeFamilyRelationships(
   return Object.freeze(normalized);
 }
 
-function normalizeOptionalText(value?: string | null): string | null {
-  const normalized = value?.trim();
+function normalizeOptionalText(value?: unknown): string | null {
+  const normalized = typeof value === "string" ? value.trim() : "";
   return normalized || null;
 }
 

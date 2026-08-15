@@ -1,5 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
+import {
+  configureDefaultPatientRecordNumber,
+  loginAsAdmin,
+  hashUrl,
+  uniqueEmail,
+} from "./helpers";
 
 /**
  * E2E de pacientes.
@@ -80,6 +85,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     page,
   }) => {
     await loginAsAdmin(page);
+    await configureDefaultPatientRecordNumber(page);
     const email = uniqueEmail("crear");
 
     // 1) Ir al formulario de nuevo paciente
@@ -92,7 +98,7 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     await page.locator('input[name="firstName"]').fill(PATIENT_FIRST);
     await page.locator('input[name="lastName"]').fill(PATIENT_LAST);
     await page.locator('input[name="lastName"]').press("Tab"); // blur para validar
-    await page.locator('input[name="age"]').fill("36");
+    await page.locator('input[name="birthDate"]').fill("1990-04-09");
     // Sexo
     await page.locator('select[name="sex"]').selectOption("male");
     await page
@@ -112,15 +118,15 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
       .locator('select[name="emergencyContactRelationship"]')
       .selectOption("Madre");
     await page
-      .locator('input[name="emergencyContactPhone"]')
-      .fill("+52 55 2468 1357");
-    await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
-    await page
-      .locator('input[name="externalRecordNumber"]')
-      .fill(`EXP-${Date.now()}`);
+    await expect(
+      page.locator('input[name="externalRecordNumber"]'),
+    ).toHaveValue(/^EXP-\d{2}-E2S\d{4,}$/);
+    await expect(
+      page.locator('input[name="externalRecordNumber"]'),
+    ).toHaveAttribute("readonly", "");
     await page
       .locator('textarea[name="admissionReason"]')
       .fill("Registro de prueba E2E");
@@ -236,8 +242,34 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
       .last()
       .click();
     await page
-      .locator('input[name="physicalActivity"][value="no"]')
-      .check({ force: true });
+      .locator('input[name="activityLevel"][value="sedentary"]')
+      .check();
+    await page.locator('select[name="activityDaysPerWeek"]').selectOption("0");
+    await page
+      .locator('select[name="physicalActivityGoal"]')
+      .selectOption("health");
+    await page
+      .locator('input[name="hasPhysicalLimitation"][value="no"]')
+      .check();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="sedentaryTime"][value="moreThan8"]')
+      .check();
+    await page
+      .locator('input[name="usualTransportation"][value="car"]')
+      .check();
+    await page
+      .locator('input[name="usesStairsFrequently"][value="no"]')
+      .check();
+    await page
+      .locator('input[name="activeBreakFrequency"][value="almostNever"]')
+      .check();
+    await page
+      .locator('input[name="dailyRoutineType"][value="seated"]')
+      .check();
     await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()
@@ -245,13 +277,29 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
 
     // 3) Submit
     const submit = page
-      .getByRole("button", { name: /crear expediente|create record/i })
+      .getByRole("button", {
+        name: /finalizar registro|finish registration/i,
+      })
       .last();
     await submit.click();
+    const finalReviewDialog = page.getByTestId(
+      "final-registration-review-dialog",
+    );
+    await expect(finalReviewDialog).toBeVisible();
+    await expect(
+      finalReviewDialog.locator('[data-review-section="required"]'),
+    ).toHaveCount(0);
+    await finalReviewDialog
+      .getByRole("button", {
+        name: /guardar de todos modos|save anyway/i,
+      })
+      .click();
 
     // Tras crear, redirige al detalle del paciente
     await page.waitForURL(/\/pacientes\/[a-f0-9-]{36}$/, { timeout: 15_000 });
     const detailUrl = page.url();
+    await expect(page.getByText("Tamizaje inicial", { exact: true })).toBeVisible();
+    await expect(page.getByText("3 comidas", { exact: true })).toBeVisible();
     const patientId = detailUrl.match(/\/pacientes\/([a-f0-9-]{36})/)?.[1];
     expect(patientId).toBeTruthy();
 

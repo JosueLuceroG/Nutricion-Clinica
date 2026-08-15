@@ -18,6 +18,7 @@
     "core:resources:default",
     "core:menu:default",
     "core:tray:default",
-    "log:default"
+    "log:default",
+    "notification:default"
   ]
 }

@@ -1,8 +1,17 @@
 import * as React from "react";
-import { ChefHat, ClipboardList, FileText, FlaskConical, UserRound } from "lucide-react";
+import {
+  ChefHat,
+  ClipboardList,
+  FileText,
+  FlaskConical,
+  UserRound,
+} from "lucide-react";
 import { db } from "@services/db";
 import { recipeService } from "@services/recipeService";
+import { smaeService } from "@services/smaeService";
 import type { Recipe } from "@modules/recipes/domain/Recipe";
+import type { Food } from "@modules/smae/domain/Food";
+import { FoodGroupLabel } from "@modules/smae/domain/FoodGroup";
 import { LAB_TEST_DEFINITIONS } from "@modules/laboratory/domain/LabTest";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
@@ -20,6 +29,8 @@ import {
 import { normalizeSearchPhone, toCalendarDateKey } from "./globalSearchEngine";
 import type {
   GlobalSearchAccess,
+  GlobalSearchMealSlot,
+  GlobalSearchPlanFood,
   GlobalSearchResult,
 } from "./globalSearchTypes";
 
@@ -44,6 +55,16 @@ interface RecipeSearchLoad {
   nutritionAvailable: boolean;
 }
 
+interface SearchPlanMeal {
+  slot: GlobalSearchMealSlot;
+  exchanges: Array<{ foodId: string }>;
+}
+
+interface DecodedSearchPlanMeals {
+  meals: SearchPlanMeal[];
+  valid: boolean;
+}
+
 const SEARCH_SOURCE_IDS = [
   "patients",
   "consultations",
@@ -51,6 +72,7 @@ const SEARCH_SOURCE_IDS = [
   "laboratory",
   "agenda",
   "recipes",
+  "foods",
 ] as const;
 
 const EMPTY_STATE: GlobalSearchDataState = {
@@ -164,6 +186,72 @@ const APPOINTMENT_TYPE_EN: Record<string, string> = {
   cierre: "Closing visit",
 };
 
+const SEARCH_MEAL_SLOT_LABELS: Record<GlobalSearchMealSlot, string> = {
+  breakfast: "desayuno breakfast",
+  "morning-snack": "colación matutina morning snack",
+  lunch: "comida almuerzo lunch",
+  "afternoon-snack": "colación vespertina afternoon snack",
+  dinner: "cena dinner",
+};
+
+function isSearchMealSlot(value: unknown): value is GlobalSearchMealSlot {
+  return [
+    "breakfast",
+    "morning-snack",
+    "lunch",
+    "afternoon-snack",
+    "dinner",
+  ].includes(String(value));
+}
+
+function decodeSearchPlanMeals(value: unknown): DecodedSearchPlanMeals {
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    if (!Array.isArray(parsed)) return { meals: [], valid: false };
+    const meals: SearchPlanMeal[] = [];
+    for (const rawMeal of parsed) {
+      if (
+        !rawMeal ||
+        typeof rawMeal !== "object" ||
+        !isSearchMealSlot(Reflect.get(rawMeal, "slot")) ||
+        !Array.isArray(Reflect.get(rawMeal, "exchanges"))
+      ) {
+        return { meals: [], valid: false };
+      }
+      const exchanges: Array<{ foodId: string }> = [];
+      for (const rawExchange of Reflect.get(rawMeal, "exchanges")) {
+        const foodId =
+          rawExchange && typeof rawExchange === "object"
+            ? Reflect.get(rawExchange, "foodId")
+            : null;
+        if (typeof foodId !== "string" || !foodId) {
+          return { meals: [], valid: false };
+        }
+        exchanges.push({ foodId });
+      }
+      meals.push({ slot: Reflect.get(rawMeal, "slot"), exchanges });
+    }
+    return { meals, valid: true };
+  } catch {
+    return { meals: [], valid: false };
+  }
+}
+
+function planFoodSearchText(
+  food: Food,
+  mealSlot: GlobalSearchMealSlot,
+): string {
+  return [
+    food.id,
+    food.name,
+    food.shortName,
+    food.group,
+    FoodGroupLabel[food.group],
+    ...food.keywords,
+    SEARCH_MEAL_SLOT_LABELS[mealSlot],
+  ].join(" ");
+}
+
 async function loadRecipesForSearch(): Promise<RecipeSearchLoad> {
   try {
     const recipes = await recipeService.listWithNutrition();
@@ -239,6 +327,13 @@ function scopeKey(
   ].join(":");
 }
 
+function belongsToBranch(
+  row: { sucursal_id?: string | null },
+  activeSucursalId: string,
+): boolean {
+  return !row.sucursal_id || row.sucursal_id === activeSucursalId;
+}
+
 export function useGlobalSearchData(
   open: boolean,
   activeSucursalId: string | null,
@@ -265,23 +360,29 @@ export function useGlobalSearchData(
     void Promise.allSettled([
       shouldLoadPatients
         ? db.patients
-            .where("sucursal_id")
-            .equals(activeSucursalId)
-            .filter((row) => row.deleted_at === null)
+            .filter(
+              (row) =>
+                belongsToBranch(row, activeSucursalId) &&
+                row.deleted_at === null,
+            )
             .toArray()
         : Promise.resolve([]),
       access.consultations
         ? db.consultations
-            .where("sucursal_id")
-            .equals(activeSucursalId)
-            .filter((row) => row.deleted_at === null)
+            .filter(
+              (row) =>
+                belongsToBranch(row, activeSucursalId) &&
+                row.deleted_at === null,
+            )
             .toArray()
         : Promise.resolve([]),
       access.plans
         ? db.meal_plans
-            .where("sucursal_id")
-            .equals(activeSucursalId)
-            .filter((row) => row.deleted_at === null)
+            .filter(
+              (row) =>
+                belongsToBranch(row, activeSucursalId) &&
+                row.deleted_at === null,
+            )
             .toArray()
         : Promise.resolve([]),
       access.laboratory
@@ -289,33 +390,42 @@ export function useGlobalSearchData(
         : Promise.resolve([]),
       access.agenda
         ? db.appointments
-            .filter((row) => row.office_id === activeSucursalId)
+            .filter(
+              (row) => !row.office_id || row.office_id === activeSucursalId,
+            )
             .toArray()
         : Promise.resolve([]),
       access.recipes
         ? loadRecipesForSearch()
         : Promise.resolve({ items: [], nutritionAvailable: true }),
+      access.plans ? smaeService.search({}) : Promise.resolve([]),
     ]).then((outcomes) => {
       if (cancelled) return;
 
-      const patients = (outcomes[0]?.status === "fulfilled"
-        ? outcomes[0].value
-        : []) as PatientRow[];
-      const consultations = (outcomes[1]?.status === "fulfilled"
-        ? outcomes[1].value
-        : []) as ConsultationRow[];
-      const plans = (outcomes[2]?.status === "fulfilled"
-        ? outcomes[2].value
-        : []) as MealPlanRow[];
-      const labPanels = (outcomes[3]?.status === "fulfilled"
-        ? outcomes[3].value
-        : []) as LabPanelRow[];
-      const appointments = (outcomes[4]?.status === "fulfilled"
-        ? outcomes[4].value
-        : []) as AppointmentRow[];
-      const recipeLoad = (outcomes[5]?.status === "fulfilled"
-        ? outcomes[5].value
-        : { items: [], nutritionAvailable: true }) as RecipeSearchLoad;
+      const patients = (
+        outcomes[0]?.status === "fulfilled" ? outcomes[0].value : []
+      ) as PatientRow[];
+      const consultations = (
+        outcomes[1]?.status === "fulfilled" ? outcomes[1].value : []
+      ) as ConsultationRow[];
+      const plans = (
+        outcomes[2]?.status === "fulfilled" ? outcomes[2].value : []
+      ) as MealPlanRow[];
+      const labPanels = (
+        outcomes[3]?.status === "fulfilled" ? outcomes[3].value : []
+      ) as LabPanelRow[];
+      const appointments = (
+        outcomes[4]?.status === "fulfilled" ? outcomes[4].value : []
+      ) as AppointmentRow[];
+      const recipeLoad = (
+        outcomes[5]?.status === "fulfilled"
+          ? outcomes[5].value
+          : { items: [], nutritionAvailable: true }
+      ) as RecipeSearchLoad;
+      const foods = (
+        outcomes[6]?.status === "fulfilled" ? outcomes[6].value : []
+      ) as Food[];
+      const foodById = new Map(foods.map((food) => [food.id, food]));
       const patientIds = new Set(patients.map((patient) => patient.id));
       const patientNames = new Map(
         patients.map((patient) => [patient.id, fullName(patient)]),
@@ -324,7 +434,9 @@ export function useGlobalSearchData(
 
       const patientResults: GlobalSearchResult[] = access.patients
         ? patients
-            .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+            .sort((a, b) =>
+              String(b.updated_at).localeCompare(String(a.updated_at)),
+            )
             .map((patient) => {
               const name = fullName(patient);
               const status = labelFor(
@@ -334,7 +446,9 @@ export function useGlobalSearchData(
                 PATIENT_STATUS_ES,
               );
               const contact = patient.phone || patient.email;
-              const subtitle = [...new Set([contact, status].filter(Boolean))].join(" · ");
+              const subtitle = [
+                ...new Set([contact, status].filter(Boolean)),
+              ].join(" · ");
               return {
                 id: `patient-${patient.id}`,
                 kind: "patient",
@@ -345,12 +459,18 @@ export function useGlobalSearchData(
                   name,
                   patient.phone,
                   patient.secondary_phone,
-                  normalizeSearchPhone(`${patient.phone ?? ""}${patient.secondary_phone ?? ""}`),
+                  normalizeSearchPhone(
+                    `${patient.phone ?? ""}${patient.secondary_phone ?? ""}`,
+                  ),
                   patient.email,
                   patient.status,
                   status,
                   patient.clave_interna,
                   patient.external_record_number,
+                  patient.occupation,
+                  patient.admission_reason,
+                  patient.general_notes,
+                  patient.clinical_tags,
                 ]
                   .filter(Boolean)
                   .join(" "),
@@ -373,9 +493,14 @@ export function useGlobalSearchData(
 
       const consultationResults: GlobalSearchResult[] = consultations
         .filter((consultation) => patientIds.has(consultation.patient_id))
-        .sort((a, b) => String(b.consultation_date).localeCompare(String(a.consultation_date)))
+        .sort((a, b) =>
+          String(b.consultation_date).localeCompare(
+            String(a.consultation_date),
+          ),
+        )
         .map((consultation) => {
-          const patientName = patientNames.get(consultation.patient_id) ?? genericPatient;
+          const patientName =
+            patientNames.get(consultation.patient_id) ?? genericPatient;
           const date = dateParts(consultation.consultation_date, locale);
           const status = labelFor(
             consultation.status,
@@ -386,7 +511,9 @@ export function useGlobalSearchData(
           const defaultReason = locale.startsWith("en")
             ? "Nutrition consultation"
             : "Consulta nutricional";
-          const titlePrefix = locale.startsWith("en") ? "Consultation" : "Consulta";
+          const titlePrefix = locale.startsWith("en")
+            ? "Consultation"
+            : "Consulta";
           return {
             id: `consultation-${consultation.id}`,
             kind: "consultation",
@@ -396,7 +523,10 @@ export function useGlobalSearchData(
             searchableText: [
               patientName,
               consultation.reason,
+              consultation.subjective,
+              consultation.objective,
               consultation.assessment,
+              consultation.plan,
               consultation.consultation_number,
               consultation.status,
               status,
@@ -409,17 +539,26 @@ export function useGlobalSearchData(
             path: `/consultas/${consultation.id}`,
             patientId: consultation.patient_id,
             date: date.key,
-            fields: { date: date.key, status: consultation.status, patient: patientName },
+            fields: {
+              date: date.key,
+              status: consultation.status,
+              patient: patientName,
+            },
           };
         });
 
       const planResults: GlobalSearchResult[] = plans
         .filter((plan) => patientIds.has(plan.patient_id))
-        .sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))
+        .sort((a, b) =>
+          String(b.updated_at).localeCompare(String(a.updated_at)),
+        )
         .map((plan) => {
-          const patientName = patientNames.get(plan.patient_id) ?? genericPatient;
+          const patientName =
+            patientNames.get(plan.patient_id) ?? genericPatient;
           const startDate = dateParts(plan.start_date, locale);
-          const endDate = plan.end_date ? dateParts(plan.end_date, locale) : null;
+          const endDate = plan.end_date
+            ? dateParts(plan.end_date, locale)
+            : null;
           const status = labelFor(
             plan.status,
             locale,
@@ -429,6 +568,26 @@ export function useGlobalSearchData(
           const dateRange = endDate
             ? `${startDate.display} - ${endDate.display}`
             : startDate.display;
+          const decodedMeals = decodeSearchPlanMeals(plan.meals_json);
+          const planFoods: GlobalSearchPlanFood[] = [];
+          let completeFoodIndex = decodedMeals.valid;
+          for (const meal of decodedMeals.meals) {
+            for (const exchange of meal.exchanges) {
+              const food = foodById.get(exchange.foodId);
+              if (!food) {
+                completeFoodIndex = false;
+                continue;
+              }
+              planFoods.push({
+                id: food.id,
+                mealSlot: meal.slot,
+                searchText: planFoodSearchText(food, meal.slot),
+              });
+            }
+          }
+          const freeText = [plan.name, plan.description, plan.notes]
+            .filter(Boolean)
+            .join(" ");
           return {
             id: `plan-${plan.id}`,
             kind: "plan",
@@ -442,6 +601,11 @@ export function useGlobalSearchData(
               patientName,
               plan.status,
               status,
+              `${plan.kcal_target} kcal calorías`,
+              `${plan.protein_target_g} g proteína`,
+              `${plan.carbs_target_g} g carbohidratos`,
+              `${plan.fat_target_g} g grasas`,
+              ...planFoods.map((food) => food.searchText),
               startDate.searchable,
               endDate?.searchable,
             ]
@@ -457,6 +621,15 @@ export function useGlobalSearchData(
               status: plan.status,
               patient: patientName,
             },
+            planMetadata: {
+              kcalTarget: plan.kcal_target,
+              proteinTargetG: plan.protein_target_g,
+              carbsTargetG: plan.carbs_target_g,
+              fatTargetG: plan.fat_target_g,
+              foods: planFoods,
+              freeText,
+              completeFoodIndex,
+            },
           };
         });
 
@@ -464,9 +637,12 @@ export function useGlobalSearchData(
         .filter((panel) => patientIds.has(panel.patient_id))
         .sort((a, b) => String(b.taken_at).localeCompare(String(a.taken_at)))
         .map((panel) => {
-          const patientName = patientNames.get(panel.patient_id) ?? genericPatient;
+          const patientName =
+            patientNames.get(panel.patient_id) ?? genericPatient;
           const date = dateParts(panel.taken_at, locale);
-          const testDefinitions = (Array.isArray(panel.results) ? panel.results : [])
+          const testDefinitions = (
+            Array.isArray(panel.results) ? panel.results : []
+          )
             .map((result) => LAB_TEST_DEFINITIONS[result.test])
             .filter(Boolean);
           const testSummary = testDefinitions
@@ -481,7 +657,9 @@ export function useGlobalSearchData(
             kind: "laboratory",
             category: "laboratory",
             title: panel.lab_name || labResults,
-            subtitle: [patientName, date.display, testSummary].filter(Boolean).join(" · "),
+            subtitle: [patientName, date.display, testSummary]
+              .filter(Boolean)
+              .join(" · "),
             searchableText: [
               patientName,
               panel.lab_name,
@@ -492,6 +670,9 @@ export function useGlobalSearchData(
                 definition.shortName,
                 definition.category,
               ]),
+              ...(Array.isArray(panel.results)
+                ? panel.results.map((result) => String(result.value))
+                : []),
               date.searchable,
             ]
               .filter(Boolean)
@@ -508,12 +689,17 @@ export function useGlobalSearchData(
       const appointmentResults: GlobalSearchResult[] = appointments
         .filter((appointment) => patientIds.has(appointment.patient_id))
         .sort((a, b) =>
-          `${b.date}T${b.start_time}`.localeCompare(`${a.date}T${a.start_time}`),
+          `${b.date}T${b.start_time}`.localeCompare(
+            `${a.date}T${a.start_time}`,
+          ),
         )
         .map((appointment) => {
-          const patientName = patientNames.get(appointment.patient_id) ?? genericPatient;
+          const patientName =
+            patientNames.get(appointment.patient_id) ?? genericPatient;
           const date = dateParts(appointment.date, locale);
-          const parsedStatus = AppointmentStatusSchema.safeParse(appointment.status);
+          const parsedStatus = AppointmentStatusSchema.safeParse(
+            appointment.status,
+          );
           const parsedType = AppointmentTypeSchema.safeParse(appointment.type);
           const status = parsedStatus.success
             ? locale.startsWith("en")
@@ -525,7 +711,9 @@ export function useGlobalSearchData(
               ? APPOINTMENT_TYPE_EN[parsedType.data]
               : AppointmentTypeLabel[parsedType.data]
             : appointment.type;
-          const appointmentTitle = locale.startsWith("en") ? "Appointment" : "Cita";
+          const appointmentTitle = locale.startsWith("en")
+            ? "Appointment"
+            : "Cita";
           return {
             id: `appointment-${appointment.id}`,
             kind: "appointment",
@@ -550,7 +738,11 @@ export function useGlobalSearchData(
             path: `/agenda?date=${encodeURIComponent(appointment.date)}&appointmentId=${encodeURIComponent(appointment.id)}`,
             patientId: appointment.patient_id,
             date: date.key,
-            fields: { date: date.key, status: appointment.status, patient: patientName },
+            fields: {
+              date: date.key,
+              status: appointment.status,
+              patient: patientName,
+            },
           };
         });
 
@@ -571,9 +763,10 @@ export function useGlobalSearchData(
             RECIPE_CATEGORY_ES,
           );
           const kcalTotal = record.kcal;
-          const kcalPerServing = kcalTotal !== null && recipe.servings > 0
-            ? kcalTotal / recipe.servings
-            : null;
+          const kcalPerServing =
+            kcalTotal !== null && recipe.servings > 0
+              ? kcalTotal / recipe.servings
+              : null;
           const totalLabel = locale.startsWith("en")
             ? "total kcal"
             : "kcal totales";
@@ -585,9 +778,10 @@ export function useGlobalSearchData(
             kind: "recipe",
             category: "recipes",
             title: recipe.name,
-            subtitle: kcalTotal !== null && kcalPerServing !== null
-              ? `${category} · ${status} · ${Math.round(kcalTotal)} ${totalLabel} · ${Math.round(kcalPerServing)} ${servingLabel}`
-              : `${category} · ${status}`,
+            subtitle:
+              kcalTotal !== null && kcalPerServing !== null
+                ? `${category} · ${status} · ${Math.round(kcalTotal)} ${totalLabel} · ${Math.round(kcalPerServing)} ${servingLabel}`
+                : `${category} · ${status}`,
             searchableText: [
               recipe.name,
               recipe.description,
@@ -609,9 +803,7 @@ export function useGlobalSearchData(
             path: `/recetas?recipeId=${encodeURIComponent(recipe.id)}`,
             fields: {
               status: recipe.status,
-              ...(kcalTotal !== null
-                ? { kcalTotal: String(kcalTotal) }
-                : {}),
+              ...(kcalTotal !== null ? { kcalTotal: String(kcalTotal) } : {}),
               ...(kcalPerServing !== null
                 ? { kcalPerServing: String(kcalPerServing) }
                 : {}),
@@ -622,7 +814,10 @@ export function useGlobalSearchData(
       const failedSources: string[] = outcomes.flatMap((outcome, index) => {
         if (outcome.status !== "rejected") return [];
         const source = SEARCH_SOURCE_IDS[index];
-        console.warn(`[global-search] Failed to load ${source}.`, outcome.reason);
+        console.warn(
+          `[global-search] Failed to load ${source}.`,
+          outcome.reason,
+        );
         return source ? [source] : [];
       });
       if (access.recipes && !recipeLoad.nutritionAvailable) {

@@ -4,12 +4,22 @@ import { DexieAnthropometryRepository } from "./DexieAnthropometryRepository";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { Anthropometry } from "../domain/Anthropometry";
 import { PatientId } from "@modules/patient/domain/PatientId";
-import { Weight, Height, Circumference, Skinfold } from "../domain/Measurements";
+import {
+  Weight,
+  Height,
+  Circumference,
+  Skinfold,
+} from "../domain/Measurements";
 import { AnthropometryId } from "../domain/AnthropometryId";
+import { useSyncStore } from "@store/syncStore";
 
 const makeMeasurement = (
   patientId: PatientId,
-  overrides: Partial<{ daysAgo: number; weight: number; heightCm: number }> = {},
+  overrides: Partial<{
+    daysAgo: number;
+    weight: number;
+    heightCm: number;
+  }> = {},
 ) => {
   const date = new Date();
   date.setDate(date.getDate() - (overrides.daysAgo ?? 0));
@@ -37,6 +47,7 @@ describe("DexieAnthropometryRepository", () => {
   beforeEach(async () => {
     db = new NutriClinicaDB(`test-anth-${Math.random().toString(36).slice(2)}`);
     await db.open();
+    useSyncStore.getState().setSucursalId("suc-A");
     repo = new DexieAnthropometryRepository(db);
   });
 
@@ -68,8 +79,12 @@ describe("DexieAnthropometryRepository", () => {
 
     const items = await repo.findAll({ patientId: pid });
     expect(items).toHaveLength(3);
-    expect(items[0]?.measuredAt.getTime()).toBeGreaterThan(items[1]?.measuredAt.getTime() ?? 0);
-    expect(items[1]?.measuredAt.getTime()).toBeGreaterThan(items[2]?.measuredAt.getTime() ?? 0);
+    expect(items[0]?.measuredAt.getTime()).toBeGreaterThan(
+      items[1]?.measuredAt.getTime() ?? 0,
+    );
+    expect(items[1]?.measuredAt.getTime()).toBeGreaterThan(
+      items[2]?.measuredAt.getTime() ?? 0,
+    );
   });
 
   it("excluye soft-deleted", async () => {
@@ -95,7 +110,9 @@ describe("DexieAnthropometryRepository", () => {
 
     const items = await repo.findAll({ patientId: pid, from, to });
     expect(items).toHaveLength(1);
-    expect(items[0]?.measuredAt.getTime()).toBeGreaterThanOrEqual(from.getTime());
+    expect(items[0]?.measuredAt.getTime()).toBeGreaterThanOrEqual(
+      from.getTime(),
+    );
   });
 
   it("preserva circunferencias y pliegues en roundtrip", async () => {
@@ -164,6 +181,33 @@ describe("DexieAnthropometryRepository", () => {
   });
 
   it("delete en id inexistente (soft) no lanza error", async () => {
-    await expect(repo.delete(AnthropometryId.generate(), true)).resolves.not.toThrow();
+    await expect(
+      repo.delete(AnthropometryId.generate(), true),
+    ).resolves.not.toThrow();
+  });
+
+  it("preserva ownership y oculta mediciones de otra sucursal", async () => {
+    const own = makeMeasurement(pid);
+    await repo.save(own);
+    const stored = await db.anthropometry.get(own.id.toString());
+    expect(stored?.sucursal_id).toBe("suc-A");
+
+    useSyncStore.getState().setSucursalId("suc-B");
+    expect(await repo.findById(own.id)).toBeNull();
+    expect(await repo.findAll({ patientId: pid })).toEqual([]);
+    expect(await repo.count({ patientId: pid })).toBe(0);
+    await repo.delete(own.id, false);
+    expect(await db.anthropometry.get(own.id.toString())).toBeDefined();
+  });
+
+  it("no permite sobrescribir una medición propiedad de otra sucursal", async () => {
+    const measurement = makeMeasurement(pid);
+    await repo.save(measurement);
+    useSyncStore.getState().setSucursalId("suc-B");
+
+    await expect(repo.save(measurement)).rejects.toThrow("otra sucursal");
+    expect(
+      (await db.anthropometry.get(measurement.id.toString()))?.sucursal_id,
+    ).toBe("suc-A");
   });
 });

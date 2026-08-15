@@ -22,6 +22,7 @@ export interface PatientClinicalSummary {
     id: string;
     date: string;
     reason: string;
+    note: string | null;
   } | null;
   activeGoal: {
     id: string;
@@ -32,7 +33,32 @@ export interface PatientClinicalSummary {
     id: string;
     name: string;
     startDate: string;
+    endDate: string | null;
+    kcalTarget: number;
+    mealCount: number;
+    macroPercentages: {
+      protein: number;
+      carbs: number;
+      fat: number;
+    } | null;
   } | null;
+  anthropometry: {
+    latest: {
+      measuredAt: string;
+      weightKg: number;
+      bmi: number;
+      bodyFatPct: number | null;
+      waistCm: number | null;
+    } | null;
+    history: Array<{
+      measuredAt: string;
+      weightKg: number;
+    }>;
+  };
+  attendance: {
+    attended: number;
+    total: number;
+  };
   alerts: PatientClinicalSummaryAlert[];
   financial: {
     pendingCount: number;

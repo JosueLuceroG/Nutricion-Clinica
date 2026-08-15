@@ -331,7 +331,11 @@ export function DashboardQuickAccessSettingsCard() {
     : Zap;
 
   return (
-    <Card className="md:col-span-2">
+    <Card
+      data-settings-section="dashboard-quick-access"
+      tabIndex={-1}
+      className="scroll-mt-6 focus:outline-none focus:ring-2 focus:ring-primary/40 md:col-span-2"
+    >
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Zap className="h-5 w-5" />

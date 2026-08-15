@@ -1,7 +1,20 @@
 import * as React from "react";
-import { AlertTriangle, CheckCircle2, Server, HardDrive, X } from "lucide-react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Server,
+  HardDrive,
+  X,
+} from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@components/ui/dialog";
 import { Button } from "@components/ui/button";
 import { Badge } from "@components/ui/badge";
 import { ScrollArea } from "@components/ui/scroll-area";
@@ -16,24 +29,30 @@ interface ConflictResolutionModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ConflictResolutionModal({ open, onOpenChange }: ConflictResolutionModalProps) {
+export function ConflictResolutionModal({
+  open,
+  onOpenChange,
+}: ConflictResolutionModalProps) {
   const { t } = useTranslation();
   const [conflicts, setConflicts] = React.useState<SyncQueueItem[]>([]);
   const [resolving, setResolving] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const setStatus = useSyncStore((s) => s.setStatus);
+  const sucursalId = useSyncStore((s) => s.sucursalId);
 
   const queue = React.useMemo(() => new SyncQueueRepository(db.sync_queue), []);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     try {
-      const items = await db.sync_queue.where("status").equals("conflict").toArray();
+      const items = sucursalId
+        ? await queue.listByStatus("conflict", sucursalId)
+        : [];
       setConflicts(items);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queue, sucursalId]);
 
   React.useEffect(() => {
     if (open) {
@@ -42,6 +61,7 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
   }, [open, refresh]);
 
   const resolve = async (item: SyncQueueItem, side: "local" | "remote") => {
+    if (!sucursalId || item.sucursalId !== sucursalId) return;
     setResolving(item.id);
     try {
       await queue.resolveConflict(item.id, side);
@@ -51,7 +71,11 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
         setStatus("syncing");
       }
       await refresh();
-      toast.success(side === "local" ? t("sync.local_reapplied") : t("sync.remote_accepted"));
+      toast.success(
+        side === "local"
+          ? t("sync.local_reapplied")
+          : t("sync.remote_accepted"),
+      );
     } catch (err) {
       toast.error(t("sync.resolve_error"), {
         description: err instanceof Error ? err.message : String(err),
@@ -69,13 +93,13 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
             <AlertTriangle className="h-5 w-5 text-warning" aria-hidden />
             {t("sync.conflicts_title")}
           </DialogTitle>
-          <DialogDescription>
-            {t("sync.conflicts_desc")}
-          </DialogDescription>
+          <DialogDescription>{t("sync.conflicts_desc")}</DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">{t("sync.loading_conflicts")}</div>
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            {t("sync.loading_conflicts")}
+          </div>
         ) : conflicts.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-8 text-sm text-muted-foreground">
             <CheckCircle2 className="h-8 w-8 text-success" aria-hidden />
@@ -93,14 +117,19 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
                     <div className="flex-1 space-y-1">
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{item.entity}</Badge>
-                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{item.entityId}</code>
+                        <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                          {item.entityId}
+                        </code>
                         <Badge variant="secondary">{item.op}</Badge>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {t("sync.queued")}: {new Date(item.enqueuedAt).toLocaleString("es-MX")}
+                        {t("sync.queued")}:{" "}
+                        {new Date(item.enqueuedAt).toLocaleString("es-MX")}
                       </p>
                       {item.lastError && (
-                        <p className="text-xs text-warning">{t("sync.reason")}: {item.lastError}</p>
+                        <p className="text-xs text-warning">
+                          {t("sync.reason")}: {item.lastError}
+                        </p>
                       )}
                     </div>
                     <div className="flex flex-col gap-2">
@@ -133,7 +162,12 @@ export function ConflictResolutionModal({ open, onOpenChange }: ConflictResoluti
         )}
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="gap-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+            className="gap-1.5"
+          >
             <X className="h-3.5 w-3.5" aria-hidden />
             {t("common.close")}
           </Button>

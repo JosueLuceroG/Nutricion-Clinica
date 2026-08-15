@@ -3,9 +3,13 @@ import type {
   GlobalSearchResult,
   ParsedGlobalSearch,
 } from "./globalSearchTypes";
+import {
+  matchesNaturalDietFilters,
+  parseNaturalDietSearch,
+} from "./globalDietSearch";
 
 const OPERATOR_PATTERN =
-  /(?:^|\s)(paciente|patient|tel|phone|correo|email|fecha|date|estado|status|consulta|consultation|plan|lab|laboratorio|laboratory|receta|recipe|calor[ií]as|calories|kcal|tipo|type):(?:"([^"]+)"|(\S+))/gi;
+  /(?:^|\s)(paciente|patient|tel|phone|correo|email|fecha|date|estado|status|consulta|consultation|cita|appointment|plan|lab|laboratorio|laboratory|receta|recipe|calor[ií]as|calories|kcal|tipo|type):(?:"([^"]+)"|(\S+))/gi;
 
 const OPERATOR_ALIASES: Record<string, string> = {
   patient: "paciente",
@@ -14,10 +18,11 @@ const OPERATOR_ALIASES: Record<string, string> = {
   date: "fecha",
   status: "estado",
   consultation: "consulta",
+  appointment: "cita",
   laboratorio: "lab",
   laboratory: "lab",
   recipe: "receta",
-  "calorías": "calorias",
+  calorías: "calorias",
   calories: "calorias",
   kcal: "calorias",
   type: "tipo",
@@ -61,6 +66,38 @@ const STATUS_ALIASES: Record<string, string> = {
   draft: "draft",
 };
 
+const VALID_STATUSES = new Set(Object.values(STATUS_ALIASES));
+
+const NATURAL_CATEGORY_PATTERNS: Array<{
+  category: Exclude<GlobalSearchCategory, "all">;
+  pattern: RegExp;
+  textGroups: number[];
+}> = [
+  {
+    category: "patients",
+    pattern: /^(?:pacientes?|patients?)(?: (?:de|con|with|named))?(?: (.+))?$/,
+    textGroups: [1],
+  },
+  {
+    category: "consultations",
+    pattern:
+      /^(?:consultas?|consultations?|citas?|appointments?)(?:(?: de| for) (.+)|(?: con| with)? (.+))?$/,
+    textGroups: [1, 2],
+  },
+  {
+    category: "plans",
+    pattern:
+      /^(?:planes?(?: alimentarios?)?|meal plans?)(?:(?: de| for) (.+)|(?: con| with)? (.+))?$/,
+    textGroups: [1, 2],
+  },
+  {
+    category: "laboratory",
+    pattern:
+      /^(?:laboratorios?|laboratory|labs?|resultados?)(?:(?: de| for) (.+)|(?: con| with)? (.+))?$/,
+    textGroups: [1, 2],
+  },
+];
+
 export function normalizeSearchText(value: string): string {
   return value
     .toLocaleLowerCase("es-MX")
@@ -69,6 +106,12 @@ export function normalizeSearchText(value: string): string {
     .replace(/[^a-z0-9@.+\-\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function searchWords(value: string): string[] {
+  return normalizeSearchText(value)
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
 }
 
 export function normalizeSearchPhone(value: string): string {
@@ -80,6 +123,7 @@ function categoryFromOperator(
   value: string,
 ): GlobalSearchCategory | null {
   if (operator === "consulta") return "consultations";
+  if (operator === "cita") return "consultations";
   if (operator === "plan") return "plans";
   if (operator === "lab") return "laboratory";
   if (operator === "receta") return "recipes";
@@ -88,6 +132,8 @@ function categoryFromOperator(
   const normalized = normalizeSearchText(value);
   if (normalized.startsWith("pacient")) return "patients";
   if (normalized.startsWith("consult")) return "consultations";
+  if (normalized.startsWith("cit") || normalized.startsWith("appoint"))
+    return "consultations";
   if (normalized.startsWith("plan")) return "plans";
   if (normalized.startsWith("lab")) return "laboratory";
   if (normalized.startsWith("recet") || normalized.startsWith("recipe"))
@@ -104,26 +150,36 @@ function categoryFromOperator(
 
 export function parseGlobalSearch(rawQuery: string): ParsedGlobalSearch {
   const normalizedQuery = normalizeSearchText(rawQuery);
-  if (/^consultas? de hoy$/.test(normalizedQuery)) {
+  const operatorMatches = [...rawQuery.matchAll(OPERATOR_PATTERN)];
+  const spanishRelativeDate = normalizedQuery.match(
+    /^(?:consultas?|citas?) de (hoy|ayer)$/,
+  );
+  if (spanishRelativeDate?.[1]) {
     return {
       text: "",
       category: "consultations",
-      filters: { date: "hoy" },
+      filters: { date: spanishRelativeDate[1] },
       errors: [],
     };
   }
-  if (/^today s consultations?$/.test(normalizedQuery)) {
+  const englishRelativeDate = normalizedQuery.match(
+    /^(today|yesterday) s (?:consultations?|appointments?)$/,
+  );
+  if (englishRelativeDate?.[1]) {
     return {
       text: "",
       category: "consultations",
-      filters: { date: "today" },
+      filters: { date: englishRelativeDate[1] },
       errors: [],
     };
   }
 
-  const naturalRecipeCalories = normalizedQuery.match(
-    /^(?:recetas?|recipes?)(?: de| with)? (\d+) (?:kcal|calorias|kalorias|calories)(?: (?:totales?|total))?(?: (por porcion|per serving))?$/,
-  );
+  const naturalRecipeCalories =
+    operatorMatches.length === 0
+      ? normalizedQuery.match(
+          /^(?:recetas?|recipes?)(?: de| con| with)? (\d+) (?:kcal|calorias|kalorias|calories)(?: (?:totales?|total))?(?: (por porcion|per serving))?$/,
+        )
+      : null;
   if (naturalRecipeCalories?.[1]) {
     const perServing = Boolean(naturalRecipeCalories[2]);
     return {
@@ -136,13 +192,50 @@ export function parseGlobalSearch(rawQuery: string): ParsedGlobalSearch {
     };
   }
 
-  const naturalRecipeSearch = normalizedQuery.match(
-    /^(?:recetas?|recipes?)(?: de| with)?(?: (.+))?$/,
-  );
+  const naturalRecipeSearch =
+    operatorMatches.length === 0
+      ? normalizedQuery.match(
+          /^(?:recetas?|recipes?)(?: de| con| with)?(?: (.+))?$/,
+        )
+      : null;
   if (naturalRecipeSearch) {
     return {
       text: naturalRecipeSearch[1] ?? "",
       category: "recipes",
+      filters: {},
+      errors: [],
+    };
+  }
+
+  const naturalEnglishRecipeSuffix =
+    operatorMatches.length === 0
+      ? normalizedQuery.match(/^(.+) recipes?$/)
+      : null;
+  if (naturalEnglishRecipeSuffix?.[1]) {
+    return {
+      text: naturalEnglishRecipeSuffix[1],
+      category: "recipes",
+      filters: {},
+      errors: [],
+    };
+  }
+
+  const naturalDietSearch =
+    operatorMatches.length === 0
+      ? parseNaturalDietSearch(rawQuery, normalizeSearchText)
+      : null;
+  if (naturalDietSearch) return naturalDietSearch;
+
+  for (const candidate of operatorMatches.length === 0
+    ? NATURAL_CATEGORY_PATTERNS
+    : []) {
+    const match = normalizedQuery.match(candidate.pattern);
+    if (!match) continue;
+    const text =
+      candidate.textGroups.map((index) => match[index]).find(Boolean) ?? "";
+    return {
+      text,
+      category: candidate.category,
       filters: {},
       errors: [],
     };
@@ -154,7 +247,7 @@ export function parseGlobalSearch(rawQuery: string): ParsedGlobalSearch {
   let freeText = rawQuery;
   const extraText: string[] = [];
 
-  for (const match of rawQuery.matchAll(OPERATOR_PATTERN)) {
+  for (const match of operatorMatches) {
     const fullMatch = match[0];
     const rawOperator = normalizeSearchText(match[1] ?? "");
     const operator = OPERATOR_ALIASES[rawOperator] ?? rawOperator;
@@ -170,8 +263,8 @@ export function parseGlobalSearch(rawQuery: string): ParsedGlobalSearch {
       const phone = normalizeSearchPhone(value);
       if (phone) filters.phone = phone;
       else errors.push(`${rawOperator}:${value}`);
-    }
-    else if (operator === "correo") filters.email = normalizeSearchText(value);
+    } else if (operator === "correo")
+      filters.email = normalizeSearchText(value);
     else if (operator === "fecha") {
       const normalizedDate = normalizeSearchText(value);
       if (["hoy", "today", "ayer", "yesterday"].includes(normalizedDate)) {
@@ -183,19 +276,19 @@ export function parseGlobalSearch(rawQuery: string): ParsedGlobalSearch {
         if (calendarDate) filters.date = calendarDate;
         else errors.push(`${rawOperator}:${value}`);
       }
-    }
-    else if (operator === "estado") {
+    } else if (operator === "estado") {
       const normalizedStatus = normalizeSearchText(value);
-      filters.status = STATUS_ALIASES[normalizedStatus] ?? normalizedStatus;
-    }
-    else if (operator === "paciente")
+      const status = STATUS_ALIASES[normalizedStatus];
+      if (status && VALID_STATUSES.has(status)) filters.status = status;
+      else errors.push(`${rawOperator}:${value}`);
+    } else if (operator === "paciente")
       filters.patient = normalizeSearchText(value);
     else if (operator === "calorias") {
       if (/^\d+$/.test(value)) filters.kcalTotal = value;
       else errors.push(`${rawOperator}:${value}`);
-    }
-    else if (
+    } else if (
       operator === "consulta" ||
+      operator === "cita" ||
       operator === "plan" ||
       operator === "lab" ||
       operator === "receta"
@@ -227,7 +320,8 @@ export function toCalendarDateKey(value: string): string | null {
     probe.getUTCFullYear() !== year ||
     probe.getUTCMonth() !== month - 1 ||
     probe.getUTCDate() !== day
-  ) return null;
+  )
+    return null;
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
@@ -261,6 +355,17 @@ function matchesDateFilter(
   return normalizedValue.includes(filter);
 }
 
+function matchesSearchText(value: string, query: string): boolean {
+  const normalizedValue = normalizeSearchText(value);
+  const normalizedQuery = normalizeSearchText(query);
+  if (normalizedValue.includes(normalizedQuery)) return true;
+
+  const valueWords = searchWords(normalizedValue);
+  return searchWords(normalizedQuery).every((token) =>
+    valueWords.some((word) => word.startsWith(token)),
+  );
+}
+
 function matchesFilters(
   result: GlobalSearchResult,
   parsed: ParsedGlobalSearch,
@@ -280,15 +385,17 @@ function matchesFilters(
     parsed.filters.status &&
     !(fields.status ?? "")
       .split("|")
-      .map((status) => STATUS_ALIASES[normalizeSearchText(status)] ?? normalizeSearchText(status))
+      .map(
+        (status) =>
+          STATUS_ALIASES[normalizeSearchText(status)] ??
+          normalizeSearchText(status),
+      )
       .includes(parsed.filters.status)
   )
     return false;
   if (
     parsed.filters.patient &&
-    !normalizeSearchText(fields.patient ?? result.title).includes(
-      parsed.filters.patient,
-    )
+    !matchesSearchText(fields.patient ?? result.title, parsed.filters.patient)
   )
     return false;
   if (
@@ -299,12 +406,16 @@ function matchesFilters(
   if (
     parsed.filters.kcalTotal &&
     Math.round(Number(fields.kcalTotal)) !== Number(parsed.filters.kcalTotal)
-  ) return false;
+  )
+    return false;
   if (
     parsed.filters.kcalPerServing &&
     Math.round(Number(fields.kcalPerServing)) !==
       Number(parsed.filters.kcalPerServing)
-  ) return false;
+  )
+    return false;
+  if (!matchesNaturalDietFilters(result, parsed.filters, normalizeSearchText))
+    return false;
   return true;
 }
 
@@ -320,20 +431,22 @@ export function scoreGlobalSearchResult(
   const searchable = normalizeSearchText(
     `${result.searchableText} ${result.title} ${result.subtitle}`,
   );
+  const titleWords = searchWords(title);
+  const searchableWords = searchWords(searchable);
   if (title === normalizedQuery) return 120;
   if (title.startsWith(normalizedQuery)) return 100;
-  if (title.split(" ").some((word) => word.startsWith(normalizedQuery)))
-    return 82;
+  if (titleWords.some((word) => word.startsWith(normalizedQuery))) return 82;
   if (title.includes(normalizedQuery)) return 70;
-  if (searchable.split(" ").some((word) => word.startsWith(normalizedQuery)))
+  if (searchableWords.some((word) => word.startsWith(normalizedQuery)))
     return 55;
   if (searchable.includes(normalizedQuery)) return 40;
   if (subtitle.includes(normalizedQuery)) return 30;
-  const tokens = normalizedQuery.split(" ").filter(Boolean);
+  const tokens = searchWords(normalizedQuery);
   let tokenScore = 0;
   for (const token of tokens) {
-    if (title.split(" ").some((word) => word.startsWith(token))) tokenScore += 24;
-    else if (searchable.split(" ").some((word) => word.startsWith(token))) tokenScore += 14;
+    if (titleWords.some((word) => word.startsWith(token))) tokenScore += 24;
+    else if (searchableWords.some((word) => word.startsWith(token)))
+      tokenScore += 14;
     else return 0;
   }
   return tokenScore;
@@ -347,7 +460,10 @@ export function filterAndRankGlobalSearch(
 ): GlobalSearchResult[] {
   const parsed = parseGlobalSearch(rawQuery);
   if (parsed.errors.length > 0) return [];
-  const category = parsed.category ?? selectedCategory;
+  const category =
+    selectedCategory === "all"
+      ? (parsed.category ?? selectedCategory)
+      : selectedCategory;
 
   return results
     .filter((result) => category === "all" || result.category === category)

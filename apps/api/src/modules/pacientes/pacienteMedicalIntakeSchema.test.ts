@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { MedicalIntakeSchema } from "./pacienteRoutes.js";
 
+const validPhysicalActivityProfile = {
+  level: "moderate",
+  daysPerWeek: 4,
+  sessionDurationMinutes: 60,
+  activityTypes: ["walking", "gym"],
+  primaryGoal: "health",
+  hasPhysicalLimitation: true,
+  physicalLimitationDetails: "Molestia leve de rodilla",
+  notes: "Entrena por la mañana",
+} as const;
+
+const validDailyActivity = {
+  sedentaryTime: "sixToEight",
+  usualTransportation: "publicTransport",
+  usesStairsFrequently: false,
+  activeBreakFrequency: "sometimes",
+  routineType: "seated",
+  notes: "Trabajo de oficina",
+} as const;
+
 describe("MedicalIntakeSchema", () => {
   it("accepts structured pathological history details", () => {
     const result = MedicalIntakeSchema.safeParse({
@@ -106,6 +126,107 @@ describe("MedicalIntakeSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it("accepts a nested physical activity intake and legacy boolean-only data", () => {
+    const result = MedicalIntakeSchema.safeParse({
+      physicalActivity: true,
+      physicalActivityIntake: {
+        activity: validPhysicalActivityProfile,
+        dailyActivity: {
+          ...validDailyActivity,
+          notes: "  Trabajo de oficina  ",
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.physicalActivityIntake?.dailyActivity?.notes).toBe(
+        "Trabajo de oficina",
+      );
+    }
+    expect(
+      MedicalIntakeSchema.safeParse({
+        physicalActivity: false,
+        physicalActivityIntake: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects invalid activity ranges and conditional combinations", () => {
+    const invalidProfiles = [
+      { ...validPhysicalActivityProfile, level: "extreme" },
+      { ...validPhysicalActivityProfile, daysPerWeek: 8 },
+      { ...validPhysicalActivityProfile, sessionDurationMinutes: 0 },
+      {
+        ...validPhysicalActivityProfile,
+        activityTypes: ["walking", "walking"],
+      },
+      { ...validPhysicalActivityProfile, sessionDurationMinutes: null },
+      { ...validPhysicalActivityProfile, activityTypes: [] },
+      {
+        ...validPhysicalActivityProfile,
+        daysPerWeek: 0,
+        sessionDurationMinutes: 60,
+        activityTypes: [],
+      },
+      {
+        ...validPhysicalActivityProfile,
+        daysPerWeek: 0,
+        sessionDurationMinutes: null,
+        activityTypes: ["walking"],
+      },
+      {
+        ...validPhysicalActivityProfile,
+        physicalLimitationDetails: "   ",
+      },
+      { ...validPhysicalActivityProfile, unexpected: true },
+    ];
+
+    for (const activity of invalidProfiles) {
+      expect(
+        MedicalIntakeSchema.safeParse({
+          physicalActivityIntake: { activity, dailyActivity: null },
+        }).success,
+      ).toBe(false);
+    }
+
+    const invalidDailyActivities = [
+      { ...validDailyActivity, sedentaryTime: "invalid" },
+      { ...validDailyActivity, usualTransportation: "plane" },
+      { ...validDailyActivity, activeBreakFrequency: "always" },
+      { ...validDailyActivity, routineType: "sleeping" },
+      {
+        sedentaryTime: "sixToEight",
+        usualTransportation: "publicTransport",
+        activeBreakFrequency: "sometimes",
+        routineType: "seated",
+        notes: null,
+      },
+      { ...validDailyActivity, notes: "x".repeat(1001) },
+    ];
+
+    for (const dailyActivity of invalidDailyActivities) {
+      expect(
+        MedicalIntakeSchema.safeParse({
+          physicalActivityIntake: {
+            activity: validPhysicalActivityProfile,
+            dailyActivity,
+          },
+        }).success,
+      ).toBe(false);
+    }
+
+    expect(
+      MedicalIntakeSchema.safeParse({
+        physicalActivityIntake: {
+          activity: validPhysicalActivityProfile,
+          dailyActivity: null,
+          unexpected: true,
+        },
+      }).success,
+    ).toBe(false);
   });
 
   it("rejects invalid years and incomplete structured records", () => {

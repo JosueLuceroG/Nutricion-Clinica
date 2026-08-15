@@ -287,6 +287,26 @@ describe("DexiePatientRepository", () => {
           },
         },
         physicalActivity: true,
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 4,
+            sessionDurationMinutes: 60,
+            activityTypes: ["walking", "gym"],
+            primaryGoal: "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "Molestia de rodilla",
+            notes: "Entrena por la mañana",
+          },
+          dailyActivity: {
+            sedentaryTime: "sixToEight",
+            usualTransportation: "publicTransport",
+            usesStairsFrequently: false,
+            activeBreakFrequency: "sometimes",
+            routineType: "seated",
+            notes: "Trabajo de oficina",
+          },
+        },
       },
     });
     await repo.save(p);
@@ -342,6 +362,26 @@ describe("DexiePatientRepository", () => {
       prescribedByProfessional: true,
     });
     expect(found?.medicalIntake.physicalActivity).toBe(true);
+    expect(found?.medicalIntake.physicalActivityIntake).toEqual({
+      activity: {
+        level: "moderate",
+        daysPerWeek: 4,
+        sessionDurationMinutes: 60,
+        activityTypes: ["walking", "gym"],
+        primaryGoal: "health",
+        hasPhysicalLimitation: true,
+        physicalLimitationDetails: "Molestia de rodilla",
+        notes: "Entrena por la mañana",
+      },
+      dailyActivity: {
+        sedentaryTime: "sixToEight",
+        usualTransportation: "publicTransport",
+        usesStairsFrequently: false,
+        activeBreakFrequency: "sometimes",
+        routineType: "seated",
+        notes: "Trabajo de oficina",
+      },
+    });
     expect(found?.medicalIntake.familyHistoryDetails?.diabetes).toEqual([
       "mother",
       "siblings",

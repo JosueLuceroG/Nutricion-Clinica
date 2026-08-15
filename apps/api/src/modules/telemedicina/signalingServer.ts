@@ -1,9 +1,8 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import type { Server } from 'node:http';
+import { WebSocket } from 'ws';
 import sql from 'mssql';
 import { getPool } from '../../db/connection.js';
-import { verifyToken } from '../auth/application/authService.js';
 import type { JwtPayload } from '@nutriclinica/shared';
+import type { WsTicketInfo } from '../ws/websocketGateway.js';
 
 interface SignalingMessage {
   type: 'join-room' | 'leave-room' | 'offer' | 'answer' | 'ice-candidate' | 'peer-joined' | 'peer-left';
@@ -58,36 +57,17 @@ export async function canJoinSala(salaId: string, payload: JwtPayload): Promise<
   return payload.rol === 'admin' || payload.sucursalIds.includes(sala.sucursal_id);
 }
 
-export function createSignalingServer(httpServer: Server): WebSocketServer {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/telemedicina' });
+export function registerTelemedicinaChannel(ws: WebSocket, info: WsTicketInfo): void {
+  const clientInfo: ClientInfo = {
+    ws,
+    userId: info.sub,
+    email: '',
+    salaId: null,
+  };
+  clients.set(ws, clientInfo);
 
-  wss.on('connection', async (ws, req) => {
-    const url = new URL(req.url ?? '', 'http://localhost');
-    const token = url.searchParams.get('token');
-
-    if (!token) {
-      ws.close(4001, 'Token requerido');
-      return;
-    }
-
-    let payload: JwtPayload;
-    try {
-      payload = await verifyToken(token);
-    } catch {
-      ws.close(4001, 'Token inválido');
-      return;
-    }
-
-    const clientInfo: ClientInfo = {
-      ws,
-      userId: payload.sub,
-      email: payload.email,
-      salaId: null,
-    };
-    clients.set(ws, clientInfo);
-
-    ws.on('message', (raw) => {
-      void (async () => {
+  ws.on('message', (raw) => {
+    void (async () => {
       let msg: SignalingMessage;
       try {
         msg = JSON.parse(raw.toString()) as SignalingMessage;
@@ -97,44 +77,48 @@ export function createSignalingServer(httpServer: Server): WebSocketServer {
 
       switch (msg.type) {
         case 'join-room': {
-          if (!(await canJoinSala(msg.salaId, payload))) {
+          if (!UUID_REGEX.test(msg.salaId) || msg.salaId !== info.resourceId) {
             ws.close(4003, 'Sin acceso a la sala');
             return;
           }
+          const pool = await getPool();
+          const emailResult = await pool
+            .request()
+            .input('userId', sql.UniqueIdentifier(), info.sub)
+            .query<{ email: string }>(`SELECT TOP 1 email FROM usuarios WHERE id = @userId AND deleted_at IS NULL`);
+          const row = emailResult.recordset[0];
+          clientInfo.email = row?.email ?? '';
           clientInfo.salaId = msg.salaId;
-          broadcastToRoom(msg.salaId, { type: 'peer-joined', salaId: msg.salaId, targetId: payload.sub, payload: { userId: payload.sub, email: payload.email } }, ws);
-          const peers = getPeersInRoom(msg.salaId).filter((p) => p.userId !== payload.sub);
+          broadcastToRoom(msg.salaId, { type: 'peer-joined', salaId: msg.salaId, targetId: info.sub, payload: { userId: info.sub, email: clientInfo.email } }, ws);
+          const peers = getPeersInRoom(msg.salaId).filter((p) => p.userId !== info.sub);
           send(ws, { type: 'join-room', salaId: msg.salaId, payload: { peers } });
           break;
         }
         case 'leave-room': {
           if (clientInfo.salaId !== msg.salaId) return;
           clientInfo.salaId = null;
-          broadcastToRoom(msg.salaId, { type: 'peer-left', salaId: msg.salaId, targetId: payload.sub }, ws);
+          broadcastToRoom(msg.salaId, { type: 'peer-left', salaId: msg.salaId, targetId: info.sub }, ws);
           break;
         }
         case 'offer':
         case 'answer':
         case 'ice-candidate': {
           if (clientInfo.salaId !== msg.salaId) return;
-          broadcastToRoom(msg.salaId, { ...msg, targetId: payload.sub }, ws);
+          broadcastToRoom(msg.salaId, { ...msg, targetId: info.sub }, ws);
           break;
         }
       }
-      })().catch(() => ws.close(1011, 'Error de señalización'));
-    });
-
-    ws.on('close', () => {
-      if (clientInfo.salaId) {
-        broadcastToRoom(clientInfo.salaId, { type: 'peer-left', salaId: clientInfo.salaId, targetId: payload.sub }, ws);
-      }
-      clients.delete(ws);
-    });
-
-    ws.on('error', () => {
-      clients.delete(ws);
-    });
+    })().catch(() => ws.close(1011, 'Error de señalización'));
   });
 
-  return wss;
+  ws.on('close', () => {
+    if (clientInfo.salaId) {
+      broadcastToRoom(clientInfo.salaId, { type: 'peer-left', salaId: clientInfo.salaId, targetId: info.sub }, ws);
+    }
+    clients.delete(ws);
+  });
+
+  ws.on('error', () => {
+    clients.delete(ws);
+  });
 }

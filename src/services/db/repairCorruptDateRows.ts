@@ -27,11 +27,26 @@
  */
 
 import { db } from "@services/db/dexieSchema";
-import { patientRowToDomain, patientDomainToRow } from "@modules/patient/infrastructure/patientMapper";
-import { consultationRowToDomain, consultationDomainToRow } from "@modules/consultation/infrastructure/consultationMapper";
-import { anthropometryRowToDomain, anthropometryDomainToRow } from "@modules/anthropometry/infrastructure/anthropometryMapper";
-import { labPanelRowToDomain, labPanelDomainToRow } from "@modules/laboratory/infrastructure/labPanelMapper";
-import { mealPlanRowToDomain, mealPlanDomainToRow } from "@modules/mealplan/infrastructure/mealPlanMapper";
+import {
+  patientRowToDomain,
+  patientDomainToRow,
+} from "@modules/patient/infrastructure/patientMapper";
+import {
+  consultationRowToDomain,
+  consultationDomainToRow,
+} from "@modules/consultation/infrastructure/consultationMapper";
+import {
+  anthropometryRowToDomain,
+  anthropometryDomainToRow,
+} from "@modules/anthropometry/infrastructure/anthropometryMapper";
+import {
+  labPanelRowToDomain,
+  labPanelDomainToRow,
+} from "@modules/laboratory/infrastructure/labPanelMapper";
+import {
+  mealPlanRowToDomain,
+  mealPlanDomainToRow,
+} from "@modules/mealplan/infrastructure/mealPlanMapper";
 import { isInvalidDateValue } from "./safeDate";
 
 export interface RepairResult {
@@ -56,7 +71,9 @@ const DATE_FIELD_KEYS = [
 ];
 
 function rowHasInvalidDate(row: Record<string, unknown>): boolean {
-  return DATE_FIELD_KEYS.some((k) => k in row && isInvalidDateValue((row as Record<string, unknown>)[k]));
+  return DATE_FIELD_KEYS.some(
+    (k) => k in row && isInvalidDateValue((row as Record<string, unknown>)[k]),
+  );
 }
 
 /**
@@ -75,7 +92,8 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
         let repaired = 0;
         for (const row of rows) {
           scanned++;
-          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>)) continue;
+          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>))
+            continue;
           const domain = patientRowToDomain(row);
           await db.patients.put(patientDomainToRow(domain));
           repaired++;
@@ -93,7 +111,8 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
         let repaired = 0;
         for (const row of rows) {
           scanned++;
-          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>)) continue;
+          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>))
+            continue;
           const domain = consultationRowToDomain(row);
           await db.consultations.put(consultationDomainToRow(domain));
           repaired++;
@@ -111,9 +130,12 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
         let repaired = 0;
         for (const row of rows) {
           scanned++;
-          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>)) continue;
+          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>))
+            continue;
           const domain = anthropometryRowToDomain(row);
-          await db.anthropometry.put(anthropometryDomainToRow(domain));
+          await db.anthropometry.put(
+            anthropometryDomainToRow(domain, row.sucursal_id),
+          );
           repaired++;
         }
         result.byTable.anthropometry = { scanned, repaired };
@@ -129,9 +151,10 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
         let repaired = 0;
         for (const row of rows) {
           scanned++;
-          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>)) continue;
+          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>))
+            continue;
           const domain = labPanelRowToDomain(row);
-          await db.lab_panels.put(labPanelDomainToRow(domain));
+          await db.lab_panels.put(labPanelDomainToRow(domain, row.sucursal_id));
           repaired++;
         }
         result.byTable.lab_panels = { scanned, repaired };
@@ -147,7 +170,8 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
         let repaired = 0;
         for (const row of rows) {
           scanned++;
-          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>)) continue;
+          if (!rowHasInvalidDate(row as unknown as Record<string, unknown>))
+            continue;
           const domain = mealPlanRowToDomain(row);
           await db.meal_plans.put(mealPlanDomainToRow(domain));
           repaired++;
@@ -165,7 +189,7 @@ export async function repairCorruptDateRows(): Promise<RepairResult> {
     } catch (err) {
       // Si una tabla falla, seguimos con las demás para que el usuario
       // pueda reparar lo que sí se pueda.
-       
+
       console.error(`[repair] tabla ${t.name} falló:`, err);
       result.byTable[t.name] = {
         scanned: 0,

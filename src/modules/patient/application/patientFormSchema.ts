@@ -12,6 +12,23 @@ const optionalPhone = z
   .transform((v) => v || "")
   .pipe(z.union([z.literal(""), PhoneSchema]));
 
+export const BirthDateFormSchema = z
+  .string()
+  .trim()
+  .min(1, "Requerido")
+  .refine(
+    (value) => parseDateOnlyAtLocalNoon(value) !== null,
+    "Ingresa una fecha válida",
+  )
+  .refine((value) => {
+    const date = parseDateOnlyAtLocalNoon(value);
+    return date === null || date <= localTodayAtNoon();
+  }, "La fecha de nacimiento no puede estar en el futuro")
+  .refine((value) => {
+    const date = parseDateOnlyAtLocalNoon(value);
+    return date === null || date >= new Date(1900, 0, 1, 12);
+  }, "La fecha de nacimiento no puede ser anterior a 1900");
+
 export const PatientFormSchema = z
   .object({
     firstName: z
@@ -25,18 +42,7 @@ export const PatientFormSchema = z
       .min(2, "Mínimo 2 caracteres")
       .max(100, "Máximo 100 caracteres"),
     secondLastName: z.string().trim().max(100).optional().or(z.literal("")),
-    birthDate: z
-      .string()
-      .min(1, "Requerido")
-      .refine((v) => !Number.isNaN(new Date(v).getTime()), "Fecha inválida")
-      .refine(
-        (v) => new Date(v).getTime() <= Date.now(),
-        "No puede estar en el futuro",
-      )
-      .refine(
-        (v) => new Date(v).getTime() >= new Date(1900, 0, 1).getTime(),
-        "No anterior a 1900",
-      ),
+    birthDate: BirthDateFormSchema,
     sex: SexSchema,
     gender: GenderSchema.optional(),
     maritalStatus: MaritalStatusSchema.optional(),
@@ -125,3 +131,39 @@ export const patientFormDefaultValues: PatientFormValues = {
   admissionReason: "",
   photoUrl: "",
 };
+
+export function parseDateOnlyAtLocalNoon(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day, 12, 0, 0, 0);
+
+  return date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+    ? date
+    : null;
+}
+
+export function parseBirthDateForPersistence(
+  value: string,
+  now: Date = new Date(),
+): Date | null {
+  const date = parseDateOnlyAtLocalNoon(value);
+  if (!date) return null;
+
+  const isToday =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+  return isToday && date > now ? new Date(now) : date;
+}
+
+function localTodayAtNoon(): Date {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return today;
+}

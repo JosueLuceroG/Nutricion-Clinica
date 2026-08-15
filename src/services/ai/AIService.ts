@@ -126,7 +126,6 @@ class AIService {
 
     const store = usePreferencesStore.getState();
     const provider = store.aiProvider;
-    const apiKey = provider === "openai" ? store.openAiApiKey : undefined;
 
     try {
       const response = await aiClient.complete(
@@ -137,7 +136,6 @@ class AIService {
           temperature: def.temperature,
           maxTokens: def.maxTokens,
           provider,
-          apiKey,
           responseFormat: capability === "generateDashboardKpi" ? "json" : undefined,
         },
         { signal: options?.signal },

@@ -9,6 +9,7 @@ import { ContextPanel } from "./ContextPanel";
 import { NotificationScopeController } from "./NotificationScopeController";
 import { QuickNotesProvider } from "@modules/quick-notes/ui";
 import { DashboardQuickAccessScopeController } from "@modules/dashboard-quick-access/ui";
+import { ClinicalAlertController } from "@modules/clinical-alerts";
 import { DashboardShell } from "@app/pages/dashboard/DashboardShell";
 import { useDashboardLayoutStore } from "@store/dashboardLayoutStore";
 import { useUIStore } from "@store/uiStore";
@@ -88,6 +89,7 @@ export function AppLayout() {
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">
       <NotificationScopeController />
+      <ClinicalAlertController />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:ring-2 focus:ring-ring focus:rounded-md"
@@ -118,20 +120,22 @@ export function AppLayout() {
             tabIndex={-1}
             aria-label={t("layout.main_content")}
           >
-            <React.Suspense fallback={<PageFallback />}>
-              {usesDashboardShell ? (
-                <DashboardShell
-                  onCustomizeKpis={() => navigate("/?customize=1")}
-                  dashboardEditing={dashboardEditing}
-                  mainLabel={location.pathname === "/" ? "Dashboard NutriClinica" : "Área de trabajo NutriClinica"}
-                  onUseLegacyLayout={canUseLegacyLayout ? () => changeLayoutMode(true) : undefined}
-                >
+            {usesDashboardShell ? (
+              <DashboardShell
+                onCustomizeKpis={() => navigate("/?customize=1")}
+                dashboardEditing={dashboardEditing}
+                mainLabel={location.pathname === "/" ? "Dashboard NutriClinica" : "Área de trabajo NutriClinica"}
+                onUseLegacyLayout={canUseLegacyLayout ? () => changeLayoutMode(true) : undefined}
+              >
+                <React.Suspense fallback={<PageFallback />}>
                   <Outlet />
-                </DashboardShell>
-              ) : (
+                </React.Suspense>
+              </DashboardShell>
+            ) : (
+              <React.Suspense fallback={<PageFallback />}>
                 <Outlet />
-              )}
-            </React.Suspense>
+              </React.Suspense>
+            )}
           </main>
 
           <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" />

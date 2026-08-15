@@ -4,6 +4,7 @@ import type { Vitals } from "@modules/consultation/domain/Vitals";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import { AnthropometryId } from "@modules/anthropometry/domain/AnthropometryId";
 import { LabPanelId } from "@modules/laboratory/domain/LabPanelId";
+import { toPatientClinicalContext } from "@modules/patient/application/patientClinicalContext";
 import { patientService } from "./patientService";
 import { anthropometryService } from "./anthropometryService";
 import { labPanelService } from "./labPanelService";
@@ -31,17 +32,24 @@ export interface SuggestionBundle {
 export const clinicalSuggestionService = {
   engine: new ClinicalSuggestionEngine(),
 
-  async gather(patientId: PatientId, opts: {
-    anthropometryId: string | null;
-    labPanelId: string | null;
-    vitals: Vitals;
-  }): Promise<SuggestionBundle> {
+  async gather(
+    patientId: PatientId,
+    opts: {
+      anthropometryId: string | null;
+      labPanelId: string | null;
+      vitals: Vitals;
+    },
+  ): Promise<SuggestionBundle> {
     const patient = await patientService.get.execute(patientId);
     const anthropometry = opts.anthropometryId
-      ? await anthropometryService.get.execute(AnthropometryId.fromUnsafe(opts.anthropometryId))
+      ? await anthropometryService.get.execute(
+          AnthropometryId.fromUnsafe(opts.anthropometryId),
+        )
       : null;
     const labPanel = opts.labPanelId
-      ? await labPanelService.get.execute(LabPanelId.fromUnsafe(opts.labPanelId))
+      ? await labPanelService.get.execute(
+          LabPanelId.fromUnsafe(opts.labPanelId),
+        )
       : null;
 
     const diagnostics = this.engine.suggestDiagnoses({
@@ -50,12 +58,18 @@ export const clinicalSuggestionService = {
       labPanel,
       vitals: opts.vitals,
     });
-    const plan = this.engine.suggestMealPlanTargets({
-      patient,
-      anthropometry,
-      labPanel,
-      vitals: opts.vitals,
-    });
+    const activityLevel =
+      toPatientClinicalContext(patient).physicalActivity.activityLevelKey ??
+      "sedentary";
+    const plan = this.engine.suggestMealPlanTargets(
+      {
+        patient,
+        anthropometry,
+        labPanel,
+        vitals: opts.vitals,
+      },
+      activityLevel,
+    );
     return { diagnostics, plan };
   },
 };

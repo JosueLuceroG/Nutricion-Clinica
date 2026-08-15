@@ -10,6 +10,7 @@ import {
   listProfessionalMessages,
   sendProfessionalMessage,
   markMessageAsRead,
+  getProfessionalChatWsTicket,
 } from "@services/api/patientPortalApi";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
 
@@ -19,31 +20,19 @@ function getChatWsUrl(): string {
   return `${base}/ws/chat`;
 }
 
-function getAuthToken(): string | null {
-  try {
-    const raw = localStorage.getItem("auth-store");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { state?: { token?: string } };
-    return parsed.state?.token ?? null;
-  } catch {
-    return null;
-  }
-}
-
 export function PatientMessagingCard({ patientId }: { patientId: string }) {
   const { t, i18n } = useTranslation();
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
-  const token = getAuthToken();
 
-  const buildWsUrl = React.useCallback(() => {
-    if (!token) return "";
-    return `${getChatWsUrl()}?token=${encodeURIComponent(token)}&pacienteId=${encodeURIComponent(patientId)}`;
-  }, [patientId, token]);
+  const buildWsUrl = React.useCallback(async () => {
+    const { ticket } = await getProfessionalChatWsTicket(patientId);
+    return `${getChatWsUrl()}?ticket=${encodeURIComponent(ticket)}`;
+  }, [patientId]);
 
   const { messages, send, markAsRead, loading, isRealtime } = useRealtimeChat({
-    wsUrl: buildWsUrl(),
+    getWsUrl: buildWsUrl,
     fetchMessages: React.useCallback(
       (signal) => listProfessionalMessages(patientId, signal),
       [patientId],

@@ -17,5 +17,8 @@ describe('syncRoutes', () => {
     expect(pushRoute).toBeDefined();
     expect(middlewareNames).toContain('requireAuth');
     expect(middlewareNames).toContain('requireSucursalAccess');
+    expect(middlewareNames).toContain('auditMiddleware');
+    expect(middlewareNames.indexOf('requireAuth')).toBeLessThan(middlewareNames.indexOf('requireSucursalAccess'));
+    expect(middlewareNames.indexOf('requireSucursalAccess')).toBeLessThan(middlewareNames.indexOf('auditMiddleware'));
   });
 });

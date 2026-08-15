@@ -6,14 +6,17 @@ import {
 } from "@services/sync/syncEnqueuerBootstrap";
 import { db } from "@services/db";
 import { SyncEnqueuer } from "@services/sync/syncEnqueuer";
+import { useSyncStore } from "@store/syncStore";
 
 describe("syncEnqueuerBootstrap", () => {
   beforeEach(() => {
     __resetSyncEnqueuerForTests();
+    useSyncStore.getState().setSucursalId("suc-1");
   });
 
   afterEach(() => {
     __resetSyncEnqueuerForTests();
+    useSyncStore.getState().setSucursalId(null);
   });
 
   it("retorna la misma instancia en llamadas sucesivas (singleton)", () => {

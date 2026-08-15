@@ -26,7 +26,7 @@ const PERMISSION_MATRIX: Record<string, string[]> = {
     "agenda",
     "reports:read",
   ],
-  soporte_tecnico: ["*:read", "backup", "sync"],
+  soporte_tecnico: ["*:read", "sync"],
   auditor: ["*:read", "audit"],
   facturacion: ["consultations:read", "billing", "reports:read"],
 };
@@ -44,20 +44,30 @@ export function hasModuleAccess(
   const permissions = PERMISSION_MATRIX[role];
   if (!permissions) return false;
   if (permissions.includes("*")) return true;
+  if (module === "backup") {
+    return action
+      ? permissions.includes(`backup:${action}`)
+      : permissions.includes("backup");
+  }
   if (permissions.includes(module)) return true;
   if (action) {
     if (permissions.includes(`${module}:${action}`)) return true;
     if (
       action === "read" &&
       (permissions.includes(`${module}:read`) || permissions.includes("*:read"))
-    ) return true;
+    )
+      return true;
     return false;
   }
-  if (permissions.includes(`${module}:read`) || permissions.includes("*:read")) return true;
+  if (permissions.includes(`${module}:read`) || permissions.includes("*:read"))
+    return true;
   return false;
 }
 
-export function checkPermission(module: string, action: string = "read"): boolean {
+export function checkPermission(
+  module: string,
+  action: string = "read",
+): boolean {
   const role = getCurrentRole();
   if (!role) return false;
   return hasModuleAccess(module, role, action);

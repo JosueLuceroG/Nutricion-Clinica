@@ -1,40 +1,54 @@
 import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  Activity,
   Apple,
+  Armchair,
   ArrowLeft,
   ArrowRight,
   AlertTriangle,
   Bandage,
+  BusFront,
   BriefcaseBusiness,
   CalendarDays,
+  Car,
   ChevronDown,
   CircleCheck,
   CircleEllipsis,
   Clock3,
+  Cloud,
   CloudUpload,
   createLucideIcon,
+  Bike,
   Droplet,
+  Dumbbell,
   FolderOpen,
   Flame,
+  FileText,
+  Footprints,
   Frown,
+  Goal,
   Heart,
   HeartPulse,
   Info,
+  LoaderCircle,
   Mail,
   MessageCircle,
   MessageCircleOff,
+  Music2,
+  PersonStanding,
   Pill,
   PillBottle,
   Phone,
   Plus,
   Salad,
-  Save,
   ShieldCheck,
+  Shuffle,
   Stethoscope,
-  Tags,
+  Timer,
   Toilet,
   Trash2,
+  Trophy,
   UserRound,
   UsersRound,
   Utensils,
@@ -55,7 +69,6 @@ import {
 } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
 import { z } from "zod";
 import { PageContent, PageHeader } from "@app/layout/AppLayout";
 import { ConfirmDialog } from "@components/layout/ConfirmDialog";
@@ -85,6 +98,8 @@ import type {
   PatientCoffeeTeaFrequency,
   PatientConditionStatus,
   PatientCravingTime,
+  PatientActiveBreakFrequency,
+  PatientDailyRoutineType,
   PatientDigestiveSymptom,
   PatientEatingOutFrequency,
   PatientMealLocation,
@@ -94,16 +109,34 @@ import type {
   PatientMealDuration,
   PatientMealScheduleVariation,
   PatientOtherBeverage,
+  PatientPhysicalActivityGoal,
+  PatientPhysicalActivityLevel,
+  PatientPhysicalActivityType,
+  PatientSedentaryTime,
   PatientSkippedMeal,
   PatientSpecialEatingPreference,
   PatientSugaryDrinkFrequency,
   PatientSymptomTiming,
+  PatientUsualTransportation,
   PatientUsualDietType,
   PatientWaterIntake,
 } from "@modules/patient/domain/Patient";
-import { SexSchema, type Sex } from "@modules/patient/domain/Sex";
+import type { Sex } from "@modules/patient/domain/Sex";
+import {
+  BirthDateFormSchema,
+  parseBirthDateForPersistence,
+  parseDateOnlyAtLocalNoon,
+} from "@modules/patient/application/patientFormSchema";
+import { formatPatientRecordNumber } from "@modules/patient/application/patientRecordNumber";
+import {
+  clearPatientRegistrationDraft,
+  readPatientRegistrationDraft,
+  savePatientRegistrationDraft,
+  type PatientRegistrationDraft,
+} from "@modules/patient/application/patientRegistrationDraft";
 import { patientService } from "@services/patientService";
 import { useAuthStore } from "@store/authStore";
+import { usePreferencesStore } from "@store/preferencesStore";
 import "./NewPatientWizard.css";
 
 const MedicalClipboardIcon = createLucideIcon("MedicalClipboard", [
@@ -125,11 +158,39 @@ const FamilyGroupIcon = createLucideIcon("FamilyGroup", [
 ]);
 
 const RunningIcon = createLucideIcon("Running", [
-  ["circle", { cx: "14", cy: "4", r: "2", key: "head" }],
-  ["path", { d: "m13 7-3 4 3 2 2 4 3 4", key: "body" }],
-  ["path", { d: "m10 11-3 3-3-1", key: "back-arm" }],
-  ["path", { d: "m12 8 4 3 4-1", key: "front-arm" }],
-  ["path", { d: "m13 13-4 3-2 5", key: "back-leg" }],
+  ["circle", { cx: "13", cy: "5", r: "2", key: "head" }],
+  ["path", { d: "M15 21v-4l-4-3 1-6", key: "body" }],
+  ["path", { d: "M7 12V9l5-1 3 3 3 1", key: "arms" }],
+  ["path", { d: "m4 17 5 1 .75-1.5", key: "back-leg" }],
+]);
+
+const HydrationDropIcon = createLucideIcon("HydrationDrop", [
+  [
+    "path",
+    {
+      d: "M12 2.5c-2.4 3.3-6.5 7.6-6.5 12.1a6.5 6.5 0 0 0 13 0C18.5 10.1 14.4 5.8 12 2.5Z",
+      key: "drop",
+    },
+  ],
+  [
+    "path",
+    {
+      d: "M8.5 14.7c.9 1 2.1 1.5 3.5 1.5s2.6-.5 3.5-1.5",
+      key: "water-level",
+    },
+  ],
+]);
+
+const DailyActivityChairIcon = createLucideIcon("DailyActivityChair", [
+  ["path", { d: "M6 3v9a4 4 0 0 0 4 4h10", key: "back" }],
+  ["path", { d: "M9 8v5h8a3 3 0 0 1 3 3v1H10", key: "seat" }],
+  ["path", { d: "M10 17v4m8-4 2 4", key: "legs" }],
+]);
+
+const MotorcycleIcon = createLucideIcon("Motorcycle", [
+  ["circle", { cx: "6", cy: "17", r: "3", key: "back-wheel" }],
+  ["circle", { cx: "18", cy: "17", r: "3", key: "front-wheel" }],
+  ["path", { d: "m6 17 4-6h4l4 6m-8-6L8 8h3m3 3h3l2 3", key: "frame" }],
 ]);
 
 const DigestiveStomachIcon = createLucideIcon("DigestiveStomach", [
@@ -329,6 +390,73 @@ const FAMILY_RELATIONSHIP_VALUES = [
   "siblings",
 ] as const;
 
+const PHYSICAL_ACTIVITY_LEVELS = [
+  "sedentary",
+  "light",
+  "moderate",
+  "intense",
+] as const;
+const PHYSICAL_ACTIVITY_TYPES = [
+  "walking",
+  "running",
+  "gym",
+  "cycling",
+  "swimming",
+  "yoga",
+  "dance",
+  "sport",
+  "other",
+] as const;
+const PHYSICAL_ACTIVITY_GOALS = [
+  "weightManagement",
+  "health",
+  "performance",
+  "muscleGain",
+  "stressManagement",
+  "mobility",
+  "other",
+] as const;
+const SEDENTARY_TIME_OPTIONS = [
+  "lessThan4",
+  "fourToSix",
+  "sixToEight",
+  "moreThan8",
+  "varies",
+] as const;
+const USUAL_TRANSPORTATION_OPTIONS = [
+  "walking",
+  "car",
+  "publicTransport",
+  "bicycle",
+  "motorcycle",
+  "mixed",
+] as const;
+const ACTIVE_BREAK_FREQUENCIES = [
+  "frequently",
+  "sometimes",
+  "almostNever",
+] as const;
+const DAILY_ROUTINE_TYPES = ["seated", "standing", "mixed", "moving"] as const;
+const NEW_PATIENT_SEX_OPTIONS = ["female", "male"] as const;
+const PHYSICAL_ACTIVITY_DAYS = [
+  "0",
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+] as const;
+const PHYSICAL_ACTIVITY_DURATIONS = [
+  "15",
+  "30",
+  "45",
+  "60",
+  "90",
+  "120",
+] as const;
+
 type FamilyRelationship = (typeof FAMILY_RELATIONSHIP_VALUES)[number];
 
 const familySelectionSchema = z.array(z.enum(FAMILY_RELATIONSHIP_VALUES));
@@ -419,14 +547,9 @@ const NewPatientWizardSchema = z
       .min(2, "Mínimo 2 caracteres")
       .max(100, "Máximo 100 caracteres"),
     secondLastName: z.string().trim().max(100).optional().or(z.literal("")),
-    age: z
-      .string()
-      .trim()
-      .min(1, "Requerido")
-      .refine((value) => /^\d{1,3}$/.test(value), "Ingresa una edad válida")
-      .refine((value) => Number(value) <= 125, "La edad máxima es 125 años"),
+    birthDate: BirthDateFormSchema,
     sex: z
-      .union([SexSchema, z.literal("")])
+      .union([z.enum(NEW_PATIENT_SEX_OPTIONS), z.literal("")])
       .refine((value): boolean => value !== "", "Requerido"),
     occupation: z
       .string()
@@ -448,7 +571,7 @@ const NewPatientWizardSchema = z
       .trim()
       .min(1, "Requerido")
       .max(100, "Máximo 100 caracteres"),
-    emergencyContactPhone: requiredContact(PhoneSchema, "Teléfono inválido"),
+    emergencyContactPhone: optionalContact(PhoneSchema, "Teléfono inválido"),
     externalRecordNumber: z
       .string()
       .trim()
@@ -683,7 +806,40 @@ const NewPatientWizardSchema = z
       "variable",
     ]),
     digestiveNotes: z.string().trim().max(1000, "Máximo 1000 caracteres"),
-    physicalActivity: requiredBinaryAnswer,
+    activityLevel: z
+      .enum(["", ...PHYSICAL_ACTIVITY_LEVELS])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    activityDaysPerWeek: z
+      .enum(["", ...PHYSICAL_ACTIVITY_DAYS])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    activitySessionDuration: z.enum(["", ...PHYSICAL_ACTIVITY_DURATIONS]),
+    activityTypes: z.array(z.enum(PHYSICAL_ACTIVITY_TYPES)).max(9),
+    physicalActivityGoal: z
+      .enum(["", ...PHYSICAL_ACTIVITY_GOALS])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    hasPhysicalLimitation: requiredBinaryAnswer,
+    physicalLimitationDetails: z
+      .string()
+      .trim()
+      .max(500, "Máximo 500 caracteres"),
+    physicalActivityNotes: z
+      .string()
+      .trim()
+      .max(1000, "Máximo 1000 caracteres"),
+    sedentaryTime: z
+      .enum(["", ...SEDENTARY_TIME_OPTIONS])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    usualTransportation: z
+      .enum(["", ...USUAL_TRANSPORTATION_OPTIONS])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    usesStairsFrequently: requiredBinaryAnswer,
+    activeBreakFrequency: z
+      .enum(["", ...ACTIVE_BREAK_FREQUENCIES])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    dailyRoutineType: z
+      .enum(["", ...DAILY_ROUTINE_TYPES])
+      .refine((value): boolean => value !== "", "Selecciona una opción"),
+    dailyActivityNotes: z.string().trim().max(1000, "Máximo 1000 caracteres"),
     clinicalTags: z
       .string()
       .trim()
@@ -912,6 +1068,23 @@ const NewPatientWizardSchema = z
       }
       requireDetail(values.symptomTiming, ["symptomTiming"]);
     }
+    if (values.activityDaysPerWeek && Number(values.activityDaysPerWeek) > 0) {
+      requireDetail(values.activitySessionDuration, [
+        "activitySessionDuration",
+      ]);
+      if (values.activityTypes.length === 0) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["activityTypes"],
+          message: "Selecciona al menos una actividad",
+        });
+      }
+    }
+    if (values.hasPhysicalLimitation === "yes") {
+      requireDetail(values.physicalLimitationDetails, [
+        "physicalLimitationDetails",
+      ]);
+    }
   });
 
 type NewPatientWizardValues = z.infer<typeof NewPatientWizardSchema>;
@@ -933,7 +1106,7 @@ const DEFAULT_VALUES: NewPatientWizardValues = {
   firstName: "",
   lastName: "",
   secondLastName: "",
-  age: "",
+  birthDate: "",
   sex: "",
   occupation: "",
   email: "",
@@ -1035,7 +1208,20 @@ const DEFAULT_VALUES: NewPatientWizardValues = {
   otherDigestiveSymptom: "",
   symptomTiming: "",
   digestiveNotes: "",
-  physicalActivity: "",
+  activityLevel: "",
+  activityDaysPerWeek: "",
+  activitySessionDuration: "",
+  activityTypes: [],
+  physicalActivityGoal: "",
+  hasPhysicalLimitation: "",
+  physicalLimitationDetails: "",
+  physicalActivityNotes: "",
+  sedentaryTime: "",
+  usualTransportation: "",
+  usesStairsFrequently: "",
+  activeBreakFrequency: "",
+  dailyRoutineType: "",
+  dailyActivityNotes: "",
   clinicalTags: "",
   generalNotes: "",
 };
@@ -1167,6 +1353,217 @@ const NUTRITION_SECTION_FIELDS = {
   hydration: NUTRITION_HYDRATION_FIELDS,
   digestive: NUTRITION_DIGESTIVE_FIELDS,
 } satisfies Record<NutritionSection, Path<NewPatientWizardValues>[]>;
+
+const PHYSICAL_ACTIVITY_SECTION_FIELDS = {
+  activity: [
+    "activityLevel",
+    "activityDaysPerWeek",
+    "activitySessionDuration",
+    "activityTypes",
+    "physicalActivityGoal",
+    "hasPhysicalLimitation",
+    "physicalLimitationDetails",
+    "physicalActivityNotes",
+  ],
+  daily: [
+    "sedentaryTime",
+    "usualTransportation",
+    "usesStairsFrequently",
+    "activeBreakFrequency",
+    "dailyRoutineType",
+    "dailyActivityNotes",
+  ],
+} satisfies Record<string, Path<NewPatientWizardValues>[]>;
+
+type PhysicalActivitySection = keyof typeof PHYSICAL_ACTIVITY_SECTION_FIELDS;
+type PatientRegistrationDraftValues = Omit<
+  NewPatientWizardValues,
+  "externalRecordNumber" | "photoUrl"
+>;
+
+function clampWizardStep(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value)
+    ? Math.min(Math.max(value, 0), 7)
+    : 0;
+}
+
+function restoreMedicalSection(value: unknown): MedicalSection {
+  return typeof value === "string" && value in MEDICAL_SECTION_FIELDS
+    ? (value as MedicalSection)
+    : "personal";
+}
+
+function restoreNutritionSection(value: unknown): NutritionSection {
+  return typeof value === "string" && value in NUTRITION_SECTION_FIELDS
+    ? (value as NutritionSection)
+    : "routine";
+}
+
+function restorePhysicalActivitySection(
+  value: unknown,
+): PhysicalActivitySection {
+  return typeof value === "string" && value in PHYSICAL_ACTIVITY_SECTION_FIELDS
+    ? (value as PhysicalActivitySection)
+    : "activity";
+}
+
+function sanitizePatientRegistrationDraftValues(
+  values: NewPatientWizardValues,
+): PatientRegistrationDraftValues {
+  const draftValues: Partial<NewPatientWizardValues> = { ...values };
+  delete draftValues.externalRecordNumber;
+  delete draftValues.photoUrl;
+  return draftValues as PatientRegistrationDraftValues;
+}
+
+function restorePatientRegistrationDraftValues(
+  values: Record<string, unknown> | undefined,
+): Partial<NewPatientWizardValues> {
+  if (!values) return {};
+  const restoredValues = { ...values };
+  delete restoredValues.age;
+  delete restoredValues.externalRecordNumber;
+  delete restoredValues.photoUrl;
+  return restoredValues as Partial<NewPatientWizardValues>;
+}
+
+function isLegacyAgeOnlyDraft(
+  values: Record<string, unknown> | undefined,
+): boolean {
+  return Boolean(
+    values &&
+    typeof values.age === "string" &&
+    values.age.trim() &&
+    !(typeof values.birthDate === "string" && values.birthDate.trim()),
+  );
+}
+
+const FINAL_REVIEW_FIELD_LABEL_KEYS: Record<string, string> = {
+  firstName: "patient.names",
+  lastName: "patient.first_surname",
+  birthDate: "patient.birth_date",
+  sex: "patient.sex",
+  email: "patient.email",
+  phone: "patient.primary_phone",
+  whatsappEnabled: "patient.wizard.whatsapp_question",
+  emergencyContactName: "patient.full_name",
+  emergencyContactRelationship: "patient.relationship",
+  emergencyContactPhone: "patient.wizard.emergency_phone_optional",
+  externalRecordNumber: "patient.wizard.clinical_record_number",
+  admissionReason: "patient.wizard.admission_reason",
+  diagnosedConditions: "patient.wizard.question_diagnosed_conditions",
+  previousSurgeries: "patient.wizard.question_previous_surgeries",
+  currentTreatments: "patient.wizard.question_current_treatments",
+  intolerances: "patient.wizard.question_intolerances",
+  "diagnosedConditionDetails.*.diagnosis":
+    "patient.wizard.condition_diagnosis_label",
+  "diagnosedConditionDetails.*.diagnosisYear":
+    "patient.wizard.condition_year_label",
+  "diagnosedConditionDetails.*.status": "patient.wizard.condition_status_label",
+  "diagnosedConditionDetails.*.treatment":
+    "patient.wizard.condition_treatment_label",
+  "previousSurgeryDetails.*.procedure":
+    "patient.wizard.surgery_procedure_label",
+  "previousSurgeryDetails.*.year": "patient.wizard.surgery_year_label",
+  "previousSurgeryDetails.*.reason": "patient.wizard.surgery_reason_label",
+  "currentTreatmentDetails.*.name": "patient.wizard.treatment_name_label",
+  "currentTreatmentDetails.*.reason": "patient.wizard.treatment_reason_label",
+  "currentTreatmentDetails.*.frequency":
+    "patient.wizard.treatment_frequency_label",
+  "currentTreatmentDetails.*.professional":
+    "patient.wizard.treatment_professional_label",
+  "intoleranceDetails.*.substance":
+    "patient.wizard.intolerance_substance_label",
+  "intoleranceDetails.*.reaction": "patient.wizard.intolerance_reaction_label",
+  "intoleranceDetails.*.severity": "patient.wizard.intolerance_severity_label",
+  familyHistoryMode: "patient.wizard.family_mode_question",
+  familyDiabetes: "patient.wizard.family_diabetes",
+  familyHypertension: "patient.wizard.family_hypertension",
+  familyObesity: "patient.wizard.family_obesity",
+  familyCardiovascular: "patient.wizard.family_cardiovascular",
+  familyDyslipidemia: "patient.wizard.family_dyslipidemia",
+  familyKidneyDisease: "patient.wizard.family_kidney_disease",
+  familyThyroidDisease: "patient.wizard.family_thyroid_disease",
+  medications: "patient.wizard.question_medications",
+  supplements: "patient.wizard.question_supplements",
+  medicationAllergies: "patient.wizard.question_medication_allergies",
+  adverseMedicationOrSupplementEffects:
+    "patient.wizard.question_adverse_medication_effects",
+  "supplementDetails.*.name": "patient.wizard.supplement_name_label",
+  "supplementDetails.*.dose": "patient.wizard.medication_dose_label",
+  "supplementDetails.*.frequency": "patient.wizard.medication_frequency_label",
+  "supplementDetails.*.objective": "patient.wizard.supplement_objective_label",
+  "medicationAllergyDetails.*.medication":
+    "patient.wizard.allergy_medication_label",
+  "medicationAllergyDetails.*.reaction":
+    "patient.wizard.allergy_reaction_label",
+  "medicationAllergyDetails.*.severity":
+    "patient.wizard.allergy_severity_label",
+  "medicationAllergyDetails.*.requiredMedicalAttention":
+    "patient.wizard.allergy_attention_label",
+  "dailyMedicationDetails.*.name": "patient.wizard.medication_name_label",
+  "dailyMedicationDetails.*.dose": "patient.wizard.medication_dose_label",
+  "dailyMedicationDetails.*.frequency":
+    "patient.wizard.medication_frequency_label",
+  "dailyMedicationDetails.*.schedule":
+    "patient.wizard.medication_schedule_label",
+  "dailyMedicationDetails.*.reason": "patient.wizard.medication_reason_label",
+  "dailyMedicationDetails.*.prescribedByProfessional":
+    "patient.wizard.medication_prescribed_label",
+  adverseEffectDetails: "patient.wizard.adverse_effect_label",
+  breakfastTime: "patient.wizard.nutrition_breakfast",
+  mainMealTime: "patient.wizard.nutrition_main_meal",
+  dinnerTime: "patient.wizard.nutrition_dinner",
+  mealsPerDay: "patient.wizard.nutrition_meals_per_day",
+  skipsMeals: "patient.wizard.nutrition_skips_meals",
+  mostSkippedMeal: "patient.wizard.nutrition_most_skipped_meal",
+  scheduleVaries: "patient.wizard.nutrition_schedule_varies",
+  scheduleVariation: "patient.wizard.nutrition_schedule_variation",
+  mealDuration: "patient.wizard.nutrition_meal_duration",
+  eatingOutFrequency: "patient.wizard.nutrition_eating_out",
+  snacksBetweenMeals: "patient.wizard.nutrition_snacks_between_meals",
+  eatsLateAtNight: "patient.wizard.nutrition_eats_late_at_night",
+  frequentCravings: "patient.wizard.nutrition_frequent_cravings",
+  cravingTime: "patient.wizard.nutrition_craving_time",
+  mealPreparer: "patient.wizard.nutrition_meal_preparer",
+  usualDietType: "patient.wizard.nutrition_usual_diet_type",
+  otherDietDescription: "patient.wizard.nutrition_other_diet_label",
+  avoidsFoods: "patient.wizard.nutrition_avoids_foods",
+  avoidedFoods: "patient.wizard.nutrition_avoided_foods_label",
+  followsFoodRestrictions: "patient.wizard.nutrition_food_restrictions",
+  foodRestrictionDetails:
+    "patient.wizard.nutrition_food_restriction_details_label",
+  hasFoodDiscomfort: "patient.wizard.nutrition_food_discomfort",
+  discomfortFoods: "patient.wizard.nutrition_discomfort_foods_label",
+  specialEatingPreference: "patient.wizard.nutrition_special_preference",
+  waterIntake: "patient.wizard.nutrition_water_intake",
+  drinksWaterThroughoutDay: "patient.wizard.nutrition_water_throughout_day",
+  carriesWaterBottle: "patient.wizard.nutrition_carries_bottle",
+  coffeeTeaFrequency: "patient.wizard.nutrition_coffee_tea_frequency",
+  sugaryDrinkFrequency: "patient.wizard.nutrition_sugary_drink_frequency",
+  consumesEnergyDrinks: "patient.wizard.nutrition_energy_drinks",
+  otherBeverage: "patient.wizard.nutrition_other_beverage",
+  appetiteLevel: "patient.wizard.nutrition_appetite_level",
+  earlySatiety: "patient.wizard.nutrition_early_satiety",
+  hasDigestiveDiscomfort: "patient.wizard.nutrition_has_digestive_discomfort",
+  digestiveSymptoms: "patient.wizard.nutrition_select_symptoms",
+  otherDigestiveSymptom: "patient.wizard.nutrition_other_symptom_label",
+  symptomTiming: "patient.wizard.nutrition_symptom_timing",
+  activityLevel: "patient.wizard.physical_activity_level_question",
+  activityDaysPerWeek: "patient.wizard.physical_activity_days_question",
+  activitySessionDuration: "patient.wizard.physical_activity_duration_question",
+  activityTypes: "patient.wizard.physical_activity_type_question",
+  physicalActivityGoal: "patient.wizard.physical_activity_goal_question",
+  hasPhysicalLimitation: "patient.wizard.physical_activity_limitation_question",
+  physicalLimitationDetails:
+    "patient.wizard.physical_activity_limitation_details",
+  sedentaryTime: "patient.wizard.daily_activity_sedentary_question",
+  usualTransportation: "patient.wizard.daily_activity_transport_question",
+  usesStairsFrequently: "patient.wizard.daily_activity_stairs_question",
+  activeBreakFrequency: "patient.wizard.daily_activity_breaks_question",
+  dailyRoutineType: "patient.wizard.daily_activity_routine_question",
+};
+
 type FamilyHistoryField =
   | "familyDiabetes"
   | "familyHypertension"
@@ -1183,8 +1580,7 @@ type BinaryQuestionField =
   | "medications"
   | "supplements"
   | "medicationAllergies"
-  | "adverseMedicationOrSupplementEffects"
-  | "physicalActivity";
+  | "adverseMedicationOrSupplementEffects";
 type CollapsibleMedicalField =
   | "diagnosedConditions"
   | "previousSurgeries"
@@ -1203,16 +1599,68 @@ interface MissingOptionalMedicalInfo {
   card?: CollapsibleMedicalField;
 }
 
+interface WizardReviewItem {
+  id: string;
+  label: string;
+  field: Path<NewPatientWizardValues>;
+  step: number;
+  medicalSection?: MedicalSection;
+  nutritionSection?: NutritionSection;
+  physicalActivitySection?: PhysicalActivitySection;
+  card?: CollapsibleMedicalField;
+}
+
 export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const allowsPreviewNavigation = import.meta.env.DEV;
   const user = useAuthStore((state) => state.user);
-  const [step, setStep] = React.useState(0);
-  const [medicalSection, setMedicalSection] =
-    React.useState<MedicalSection>("personal");
+  const sucursalActivaId = useAuthStore((state) => state.sucursalActivaId);
+  const patientRecordNumberConfig = usePreferencesStore(
+    (state) => state.patientRecordNumberConfig,
+  );
+  const patientRecordNumberNextSequence = usePreferencesStore(
+    (state) => state.patientRecordNumberNextSequence,
+  );
+  const advancePatientRecordNumberSequence = usePreferencesStore(
+    (state) => state.advancePatientRecordNumberSequence,
+  );
+  const draftScope = React.useMemo(
+    () => ({
+      userId: user?.id ?? null,
+      sucursalId: sucursalActivaId ?? null,
+    }),
+    [sucursalActivaId, user?.id],
+  );
+  const [initialDraft] = React.useState(() =>
+    readPatientRegistrationDraft<Record<string, unknown>>(draftScope),
+  );
+  const [hasLegacyAgeDraft] = React.useState(() =>
+    isLegacyAgeOnlyDraft(initialDraft?.values),
+  );
+  const [initialFormValues] = React.useState<NewPatientWizardValues>(() => ({
+    ...DEFAULT_VALUES,
+    ...restorePatientRegistrationDraftValues(initialDraft?.values),
+    externalRecordNumber: "",
+    photoUrl: "",
+  }));
+  const [registrationStartedAt] = React.useState(() => new Date());
+  const [step, setStep] = React.useState(() =>
+    hasLegacyAgeDraft ? 0 : clampWizardStep(initialDraft?.navigation.step),
+  );
+  const [medicalSection, setMedicalSection] = React.useState<MedicalSection>(
+    () => restoreMedicalSection(initialDraft?.navigation.medicalSection),
+  );
   const [nutritionSection, setNutritionSection] =
-    React.useState<NutritionSection>("routine");
+    React.useState<NutritionSection>(() =>
+      restoreNutritionSection(initialDraft?.navigation.nutritionSection),
+    );
+  const [physicalActivitySection, setPhysicalActivitySection] =
+    React.useState<PhysicalActivitySection>(() =>
+      restorePhysicalActivitySection(
+        initialDraft?.navigation.physicalActivitySection,
+      ),
+    );
   const [collapsedMedicalDetails, setCollapsedMedicalDetails] = React.useState<
     Record<CollapsibleMedicalField, boolean>
   >({
@@ -1232,12 +1680,54 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
     React.useState(false);
   const [optionalMedicalInfoSkipped, setOptionalMedicalInfoSkipped] =
     React.useState(false);
+  const [finalReviewOpen, setFinalReviewOpen] = React.useState(false);
+  const [requiredReviewItems, setRequiredReviewItems] = React.useState<
+    WizardReviewItem[]
+  >([]);
+  const [optionalReviewItems, setOptionalReviewItems] = React.useState<
+    WizardReviewItem[]
+  >([]);
   const [showContactNotice, setShowContactNotice] = React.useState(true);
   const [showClinicalNotice, setShowClinicalNotice] = React.useState(true);
   const [photoError, setPhotoError] = React.useState<string | null>(null);
   const [draggingPhoto, setDraggingPhoto] = React.useState(false);
   const photoInputRef = React.useRef<HTMLInputElement>(null);
+  const recordConfigAlertRef = React.useRef<HTMLDivElement>(null);
+  const responsibleErrorRef = React.useRef<HTMLParagraphElement>(null);
   const submitLockRef = React.useRef(false);
+  const draftTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const successNavigationTimerRef = React.useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+  const draftCompletedRef = React.useRef(false);
+  const shouldFlushDraftRef = React.useRef(false);
+  const draftStartedRef = React.useRef(Boolean(initialDraft));
+  const latestDraftRef = React.useRef<Omit<
+    PatientRegistrationDraft<PatientRegistrationDraftValues>,
+    "version" | "updatedAt"
+  > | null>(null);
+  const [draftStatus, setDraftStatus] = React.useState<
+    "idle" | "unsaved" | "saving" | "saved" | "error"
+  >(() => (initialDraft ? "saved" : "idle"));
+  const [draftSavedAt, setDraftSavedAt] = React.useState<Date | null>(() => {
+    if (!initialDraft) return null;
+    const restoredDate = new Date(initialDraft.updatedAt);
+    return Number.isNaN(restoredDate.getTime()) ? null : restoredDate;
+  });
+  const [draftWasResumed, setDraftWasResumed] = React.useState(
+    Boolean(initialDraft),
+  );
+  const [draftRecoveryOpen, setDraftRecoveryOpen] = React.useState(
+    Boolean(initialDraft),
+  );
+  const [discardDraftConfirmationOpen, setDiscardDraftConfirmationOpen] =
+    React.useState(false);
+  const [createdPatient, setCreatedPatient] = React.useState<Patient | null>(
+    null,
+  );
+  const [creationError, setCreationError] = React.useState<string | null>(null);
   const medicalSections: Array<{
     id: MedicalSection;
     title: string;
@@ -1310,7 +1800,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       title: t("patient.wizard.nutrition_hydration_title"),
       menuDescription: t("patient.wizard.nutrition_hydration_description"),
       cardDescription: t("patient.wizard.nutrition_hydration_description"),
-      icon: Droplet,
+      icon: HydrationDropIcon,
       implemented: true,
     },
     {
@@ -1322,12 +1812,40 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       implemented: true,
     },
   ];
+  const physicalActivitySections: Array<{
+    id: PhysicalActivitySection;
+    title: string;
+    menuDescription: string;
+    cardDescription: string;
+    icon: LucideIcon;
+  }> = [
+    {
+      id: "activity",
+      title: t("patient.wizard.physical_activity_section_title"),
+      menuDescription: t(
+        "patient.wizard.physical_activity_section_description",
+      ),
+      cardDescription: t("patient.wizard.physical_activity_description"),
+      icon: RunningIcon,
+    },
+    {
+      id: "daily",
+      title: t("patient.wizard.daily_activity_section_title"),
+      menuDescription: t("patient.wizard.daily_activity_section_description"),
+      cardDescription: t("patient.wizard.daily_activity_card_description"),
+      icon: DailyActivityChairIcon,
+    },
+  ];
   const activeMedicalSection =
     medicalSections.find((section) => section.id === medicalSection) ??
     medicalSections[0]!;
   const activeNutritionSection =
     nutritionSections.find((section) => section.id === nutritionSection) ??
     nutritionSections[0]!;
+  const activePhysicalActivitySection =
+    physicalActivitySections.find(
+      (section) => section.id === physicalActivitySection,
+    ) ?? physicalActivitySections[0]!;
   const steps: WizardStep[] = [
     {
       title: t("patient.wizard.personal_short"),
@@ -1338,7 +1856,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
         "firstName",
         "lastName",
         "secondLastName",
-        "age",
+        "birthDate",
         "sex",
         "occupation",
       ],
@@ -1416,14 +1934,14 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       description: t("patient.wizard.physical_activity_menu_description"),
       cardDescription: t("patient.wizard.physical_activity_description"),
       icon: RunningIcon,
-      fields: ["physicalActivity"],
+      fields: Object.values(PHYSICAL_ACTIVITY_SECTION_FIELDS).flat(),
     },
     {
       title: t("patient.wizard.notes_short"),
       description: t("patient.wizard.notes_menu_description"),
       cardDescription: t("patient.wizard.notes_menu_description"),
-      icon: Tags,
-      fields: ["clinicalTags", "generalNotes"],
+      icon: FileText,
+      fields: ["generalNotes"],
     },
   ];
 
@@ -1440,7 +1958,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
     formState: { errors, isDirty },
   } = useForm<NewPatientWizardValues>({
     resolver: zodResolver(NewPatientWizardSchema),
-    defaultValues: DEFAULT_VALUES,
+    defaultValues: initialFormValues,
   });
   const {
     fields: diagnosedConditionFields,
@@ -1482,12 +2000,12 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
     append: appendSnackTime,
     remove: removeSnackTime,
   } = useFieldArray({ control, name: "snackTimes" });
-  const navigationBlocker = useUnsavedChangesGuard(
-    isDirty && !submitting,
-    t("common.unsaved_changes_warning"),
-    { useNativeNavigationConfirm: false },
-  );
+  const allFormValues = watch();
   const whatsappEnabled = watch("whatsappEnabled");
+  const firstName = watch("firstName");
+  const lastName = watch("lastName");
+  const secondLastName = watch("secondLastName");
+  const birthDateValue = watch("birthDate");
   const photoUrl = watch("photoUrl");
   const diagnosedConditions = watch("diagnosedConditions");
   const previousSurgeries = watch("previousSurgeries");
@@ -1517,6 +2035,143 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
   const hasFoodDiscomfort = watch("hasFoodDiscomfort");
   const hasDigestiveDiscomfort = watch("hasDigestiveDiscomfort");
   const digestiveSymptoms = watch("digestiveSymptoms");
+  const activityDaysPerWeek = watch("activityDaysPerWeek");
+  const hasPhysicalLimitation = watch("hasPhysicalLimitation");
+  const derivedAge = ageFromDateOnly(birthDateValue);
+  const maxBirthDate = toLocalDateOnly(new Date());
+  const draftValues = sanitizePatientRegistrationDraftValues(allFormValues);
+  const draftNavigation = {
+    step,
+    medicalSection,
+    nutritionSection,
+    physicalActivitySection,
+  };
+  const draftSignature = JSON.stringify({
+    values: draftValues,
+    navigation: draftNavigation,
+    photoNeedsReselection: Boolean(photoUrl),
+  });
+  latestDraftRef.current = {
+    scope: draftScope,
+    values: draftValues,
+    navigation: draftNavigation,
+    photoNeedsReselection: Boolean(photoUrl),
+  };
+
+  const flushPatientRegistrationDraft = React.useCallback(
+    (updateStatus = true): boolean => {
+      if (draftCompletedRef.current || !shouldFlushDraftRef.current)
+        return true;
+      if (draftTimerRef.current) {
+        clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
+      const draft = latestDraftRef.current;
+      if (!draft) return true;
+      if (updateStatus) setDraftStatus("saving");
+      const saved = savePatientRegistrationDraft(draft);
+      if (saved) {
+        shouldFlushDraftRef.current = false;
+        if (updateStatus) {
+          setDraftSavedAt(new Date());
+          setDraftWasResumed(false);
+        }
+      }
+      if (updateStatus) setDraftStatus(saved ? "saved" : "error");
+      return saved;
+    },
+    [],
+  );
+
+  React.useEffect(() => {
+    if (isDirty) draftStartedRef.current = true;
+    if (
+      !draftStartedRef.current ||
+      submitting ||
+      draftCompletedRef.current ||
+      draftRecoveryOpen ||
+      discardDraftConfirmationOpen
+    ) {
+      return;
+    }
+    shouldFlushDraftRef.current = true;
+    setDraftStatus("unsaved");
+    if (draftTimerRef.current) clearTimeout(draftTimerRef.current);
+    draftTimerRef.current = setTimeout(
+      () => flushPatientRegistrationDraft(),
+      600,
+    );
+    return () => {
+      if (draftTimerRef.current) {
+        clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
+    };
+  }, [
+    discardDraftConfirmationOpen,
+    draftRecoveryOpen,
+    draftSignature,
+    flushPatientRegistrationDraft,
+    isDirty,
+    submitting,
+  ]);
+
+  React.useEffect(() => {
+    const flushWithoutStatus = () => {
+      flushPatientRegistrationDraft(false);
+    };
+    window.addEventListener("pagehide", flushWithoutStatus);
+    return () => {
+      window.removeEventListener("pagehide", flushWithoutStatus);
+      flushWithoutStatus();
+    };
+  }, [flushPatientRegistrationDraft]);
+
+  React.useEffect(
+    () => () => {
+      if (successNavigationTimerRef.current) {
+        clearTimeout(successNavigationTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const navigationBlocker = useUnsavedChangesGuard(
+    isDirty && !submitting && (draftStatus === "error" || Boolean(photoUrl)),
+    t("patient.wizard.cancel_description"),
+    { useNativeNavigationConfirm: false },
+  );
+
+  React.useEffect(() => {
+    const externalRecordNumber =
+      patientRecordNumberConfig && firstName.trim() && lastName.trim()
+        ? formatPatientRecordNumber(patientRecordNumberConfig, {
+            firstName,
+            lastName,
+            secondLastName,
+            sequence: patientRecordNumberNextSequence,
+            date: registrationStartedAt,
+          })
+        : "";
+    setValue("externalRecordNumber", externalRecordNumber, {
+      shouldDirty: false,
+      shouldValidate: Boolean(externalRecordNumber),
+    });
+  }, [
+    firstName,
+    lastName,
+    patientRecordNumberConfig,
+    patientRecordNumberNextSequence,
+    registrationStartedAt,
+    secondLastName,
+    setValue,
+  ]);
+
+  React.useEffect(() => {
+    if (activityDaysPerWeek !== "0") return;
+    setValue("activitySessionDuration", "");
+    setValue("activityTypes", []);
+  }, [activityDaysPerWeek, setValue]);
   const diagnosedConditionDetailsComplete =
     diagnosedConditionDetailValues.length > 0 &&
     diagnosedConditionDetailValues.every(
@@ -1675,9 +2330,184 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
     return missing;
   };
 
+  const createReviewItem = (
+    field: Path<NewPatientWizardValues>,
+    label: string,
+    overrides: Partial<WizardReviewItem> = {},
+  ): WizardReviewItem => {
+    const rootField = field.split(".")[0] as Path<NewPatientWizardValues>;
+    const stepIndex = steps.findIndex((wizardStep) =>
+      wizardStep.fields.some((candidate) => candidate === rootField),
+    );
+    const medicalEntry = (
+      Object.entries(MEDICAL_SECTION_FIELDS) as Array<
+        [MedicalSection, Path<NewPatientWizardValues>[]]
+      >
+    ).find(([, fields]) => fields.includes(rootField));
+    const nutritionEntry = (
+      Object.entries(NUTRITION_SECTION_FIELDS) as Array<
+        [NutritionSection, Path<NewPatientWizardValues>[]]
+      >
+    ).find(([, fields]) => fields.includes(rootField));
+    const physicalActivityEntry = (
+      Object.entries(PHYSICAL_ACTIVITY_SECTION_FIELDS) as Array<
+        [PhysicalActivitySection, Path<NewPatientWizardValues>[]]
+      >
+    ).find(([, fields]) => fields.includes(rootField));
+
+    return {
+      id: field,
+      label,
+      field,
+      step: stepIndex >= 0 ? stepIndex : 7,
+      medicalSection: medicalEntry?.[0],
+      nutritionSection: nutritionEntry?.[0],
+      physicalActivitySection: physicalActivityEntry?.[0],
+      ...overrides,
+    };
+  };
+
+  const collectRequiredReviewItems = (
+    values: NewPatientWizardValues,
+  ): WizardReviewItem[] => {
+    const result = NewPatientWizardSchema.safeParse(values);
+    if (result.success) return [];
+    const seen = new Set<string>();
+
+    return result.error.issues.flatMap((issue) => {
+      const field = issue.path.join(".") as Path<NewPatientWizardValues>;
+      if (!field || seen.has(field)) return [];
+      seen.add(field);
+      const normalizedPath = issue.path
+        .map((part) => (typeof part === "number" ? "*" : String(part)))
+        .join(".");
+      const rootPath = String(issue.path[0] ?? "");
+      const labelKey =
+        FINAL_REVIEW_FIELD_LABEL_KEYS[normalizedPath] ??
+        FINAL_REVIEW_FIELD_LABEL_KEYS[rootPath];
+      const itemNumber = issue.path.find(
+        (part): part is number => typeof part === "number",
+      );
+      const label = labelKey
+        ? t(labelKey, { number: (itemNumber ?? 0) + 1 })
+        : `${t("patient.wizard.final_review_unknown_field")}: ${issue.message}`;
+      return [createReviewItem(field, label)];
+    });
+  };
+
+  const collectOptionalReviewItems = (
+    values: NewPatientWizardValues,
+  ): WizardReviewItem[] => {
+    const missing: WizardReviewItem[] = [];
+    const addIfBlank = (
+      field: Path<NewPatientWizardValues>,
+      value: unknown,
+      labelKey: string,
+    ) => {
+      const isBlank =
+        value == null ||
+        (typeof value === "string" && !value.trim()) ||
+        (Array.isArray(value) && value.length === 0);
+      if (isBlank) missing.push(createReviewItem(field, t(labelKey)));
+    };
+
+    addIfBlank(
+      "secondLastName",
+      values.secondLastName,
+      "patient.second_surname",
+    );
+    addIfBlank("occupation", values.occupation, "patient.occupation");
+    addIfBlank(
+      "secondaryPhone",
+      values.secondaryPhone,
+      "patient.wizard.secondary_phone_optional",
+    );
+    addIfBlank(
+      "emergencyContactPhone",
+      values.emergencyContactPhone,
+      "patient.wizard.emergency_phone_optional",
+    );
+    addIfBlank(
+      "photoUrl",
+      values.photoUrl,
+      "patient.wizard.patient_photo_optional",
+    );
+
+    collectMissingOptionalMedicalInfo(values).forEach((item) => {
+      missing.push(
+        createReviewItem(item.field, item.label, {
+          medicalSection: item.section,
+          card: item.card,
+        }),
+      );
+    });
+
+    if (!values.snackTimes.some((snack) => snack.time)) {
+      addIfBlank("snackTimes.0.time", "", "patient.wizard.nutrition_snacks");
+    }
+    addIfBlank(
+      "primaryMealLocation",
+      values.primaryMealLocation,
+      "patient.wizard.nutrition_meal_location",
+    );
+    addIfBlank(
+      "foodPreferenceNotes",
+      values.foodPreferenceNotes,
+      "patient.wizard.nutrition_preference_notes",
+    );
+    addIfBlank(
+      "alcoholFrequency",
+      values.alcoholFrequency,
+      "patient.wizard.nutrition_alcohol_frequency",
+    );
+    addIfBlank(
+      "hydrationNotes",
+      values.hydrationNotes,
+      "patient.wizard.nutrition_hydration_notes",
+    );
+    addIfBlank(
+      "digestiveNotes",
+      values.digestiveNotes,
+      "patient.wizard.nutrition_digestive_notes",
+    );
+    addIfBlank(
+      "physicalActivityNotes",
+      values.physicalActivityNotes,
+      "patient.wizard.physical_activity_notes",
+    );
+    addIfBlank(
+      "dailyActivityNotes",
+      values.dailyActivityNotes,
+      "patient.wizard.daily_activity_notes",
+    );
+    addIfBlank(
+      "generalNotes",
+      values.generalNotes,
+      "patient.wizard.notes_observations_title",
+    );
+
+    return missing;
+  };
+
+  const goToReviewItem = (item: WizardReviewItem) => {
+    setFinalReviewOpen(false);
+    setStep(item.step);
+    if (item.medicalSection) setMedicalSection(item.medicalSection);
+    if (item.nutritionSection) setNutritionSection(item.nutritionSection);
+    if (item.physicalActivitySection) {
+      setPhysicalActivitySection(item.physicalActivitySection);
+    }
+    if (item.card) setMedicalDetailCollapsed(item.card, false);
+    window.setTimeout(() => setFocus(item.field), 0);
+  };
+
   const goToNextStep = async () => {
     if (step === 3 && !user) {
-      toast.error(t("patient.wizard.responsible_unavailable"));
+      responsibleErrorRef.current?.focus();
+      return;
+    }
+    if (step === 3 && !patientRecordNumberConfig) {
+      recordConfigAlertRef.current?.focus();
       return;
     }
     if (step === 4) {
@@ -1735,7 +2565,36 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
           return;
         }
       }
+      setPhysicalActivitySection("activity");
       setStep(6);
+      return;
+    }
+    if (step === 6) {
+      const isSectionValid = await trigger(
+        PHYSICAL_ACTIVITY_SECTION_FIELDS[physicalActivitySection],
+        { shouldFocus: true },
+      );
+      if (!isSectionValid) return;
+      const sectionIndex = physicalActivitySections.findIndex(
+        (section) => section.id === physicalActivitySection,
+      );
+      if (sectionIndex < physicalActivitySections.length - 1) {
+        setPhysicalActivitySection(
+          physicalActivitySections[sectionIndex + 1]!.id,
+        );
+        return;
+      }
+      for (const section of physicalActivitySections) {
+        const isValid = await trigger(
+          PHYSICAL_ACTIVITY_SECTION_FIELDS[section.id],
+          { shouldFocus: true },
+        );
+        if (!isValid) {
+          setPhysicalActivitySection(section.id);
+          return;
+        }
+      }
+      setStep(7);
       return;
     }
     const isValid = await trigger(steps[step].fields, { shouldFocus: true });
@@ -1763,20 +2622,36 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       }
       setMedicalSection("medications");
     }
+    if (step === 6) {
+      const sectionIndex = physicalActivitySections.findIndex(
+        (section) => section.id === physicalActivitySection,
+      );
+      if (sectionIndex > 0) {
+        setPhysicalActivitySection(
+          physicalActivitySections[sectionIndex - 1]!.id,
+        );
+        return;
+      }
+      setNutritionSection("digestive");
+    }
     setStep((current) => Math.max(current - 1, 0));
   };
 
   const onSubmit = async (formValues: NewPatientWizardValues) => {
     if (submitLockRef.current) return;
     submitLockRef.current = true;
+    setCreationError(null);
     setSubmitting(true);
     try {
       if (!user) throw new Error(t("patient.wizard.responsible_unavailable"));
+      const birthDate = parseBirthDateForPersistence(formValues.birthDate);
+      if (!birthDate) throw new Error("Invalid date-only birth date");
+
       const created = await patientService.create.execute({
         firstName: formValues.firstName.trim(),
         lastName: formValues.lastName.trim(),
         secondLastName: optionalString(formValues.secondLastName),
-        birthDate: birthDateFromAge(Number(formValues.age)),
+        birthDate,
         sex: formValues.sex as Sex,
         occupation: optionalString(formValues.occupation),
         email: Email.from(formValues.email),
@@ -2001,26 +2876,88 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
               notes: optionalString(formValues.digestiveNotes),
             },
           },
-          physicalActivity: formValues.physicalActivity === "yes",
+          physicalActivity: Number(formValues.activityDaysPerWeek) > 0,
+          physicalActivityIntake: {
+            activity: {
+              level: formValues.activityLevel as PatientPhysicalActivityLevel,
+              daysPerWeek: Number(formValues.activityDaysPerWeek),
+              sessionDurationMinutes:
+                Number(formValues.activityDaysPerWeek) > 0
+                  ? Number(formValues.activitySessionDuration)
+                  : null,
+              activityTypes:
+                Number(formValues.activityDaysPerWeek) > 0
+                  ? (formValues.activityTypes as PatientPhysicalActivityType[])
+                  : [],
+              primaryGoal:
+                formValues.physicalActivityGoal as PatientPhysicalActivityGoal,
+              hasPhysicalLimitation: formValues.hasPhysicalLimitation === "yes",
+              physicalLimitationDetails:
+                formValues.hasPhysicalLimitation === "yes"
+                  ? optionalString(formValues.physicalLimitationDetails)
+                  : null,
+              notes: optionalString(formValues.physicalActivityNotes),
+            },
+            dailyActivity: {
+              sedentaryTime: formValues.sedentaryTime as PatientSedentaryTime,
+              usualTransportation:
+                formValues.usualTransportation as PatientUsualTransportation,
+              usesStairsFrequently: formValues.usesStairsFrequently === "yes",
+              activeBreakFrequency:
+                formValues.activeBreakFrequency as PatientActiveBreakFrequency,
+              routineType:
+                formValues.dailyRoutineType as PatientDailyRoutineType,
+              notes: optionalString(formValues.dailyActivityNotes),
+            },
+          },
         },
         clinicalTags: parseTags(formValues.clinicalTags),
         generalNotes: optionalString(formValues.generalNotes),
       });
+      draftCompletedRef.current = true;
+      shouldFlushDraftRef.current = false;
+      if (draftTimerRef.current) {
+        clearTimeout(draftTimerRef.current);
+        draftTimerRef.current = null;
+      }
+      clearPatientRegistrationDraft();
+      setDraftStatus("idle");
+      advancePatientRecordNumberSequence();
       reset(formValues);
-      toast.success(t("patient.created_success"), {
-        description: created.fullName,
-      });
-      if (onCreated) onCreated(created);
-      else navigate(`/pacientes/${created.id.toString()}`);
+      setCreatedPatient(created);
+      successNavigationTimerRef.current = setTimeout(() => {
+        if (onCreated) onCreated(created);
+        else navigate(`/pacientes/${created.id.toString()}`);
+      }, 1_300);
     } catch (error) {
-      toast.error(t("patient.create_error"), {
-        description:
-          error instanceof Error ? error.message : t("common.unexpected_error"),
-      });
+      setCreationError(
+        error instanceof Error ? error.message : t("common.unexpected_error"),
+      );
     } finally {
       setSubmitting(false);
       submitLockRef.current = false;
     }
+  };
+
+  const reviewAndSubmit = async () => {
+    if (submitting || submitLockRef.current) return;
+    await trigger(undefined, { shouldFocus: false });
+    const values = getValues();
+    const required = collectRequiredReviewItems(values);
+    const optional = collectOptionalReviewItems(values);
+    setRequiredReviewItems(required);
+    setOptionalReviewItems(optional);
+
+    if (required.length > 0 || optional.length > 0) {
+      setFinalReviewOpen(true);
+      return;
+    }
+    void handleSubmit(onSubmit)();
+  };
+
+  const saveAfterOptionalReview = () => {
+    setFinalReviewOpen(false);
+    void handleSubmit(onSubmit)();
   };
 
   const currentStep = steps[step];
@@ -2029,21 +2966,74 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
       ? activeMedicalSection.icon
       : step === 5
         ? activeNutritionSection.icon
-        : currentStep.icon;
+        : step === 6
+          ? activePhysicalActivitySection.icon
+          : currentStep.icon;
   const displayStepTitle =
     step === 4
       ? activeMedicalSection.title
       : step === 5
         ? activeNutritionSection.title
-        : (currentStep.cardTitle ?? currentStep.title);
+        : step === 6
+          ? activePhysicalActivitySection.title
+          : (currentStep.cardTitle ?? currentStep.title);
   const displayStepDescription =
     step === 4
       ? activeMedicalSection.cardDescription
       : step === 5
         ? activeNutritionSection.cardDescription
-        : currentStep.cardDescription;
+        : step === 6
+          ? activePhysicalActivitySection.cardDescription
+          : currentStep.cardDescription;
   const isLastStep = step === steps.length - 1;
   const responsibleInitials = getInitials(user?.nombreCompleto ?? "");
+  const notesRegistrationDate = new Intl.DateTimeFormat(
+    i18n.resolvedLanguage?.startsWith("en") ? "en-US" : "es-MX",
+    {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    },
+  ).format(registrationStartedAt);
+  const draftSavedTime = draftSavedAt
+    ? new Intl.DateTimeFormat(
+        i18n.resolvedLanguage?.startsWith("en") ? "en-US" : "es-MX",
+        { hour: "numeric", minute: "2-digit" },
+      ).format(draftSavedAt)
+    : null;
+  const draftRecoverySavedAt = initialDraft
+    ? new Date(initialDraft.updatedAt)
+    : null;
+  const hasDraftRecoverySavedAt =
+    draftRecoverySavedAt !== null &&
+    !Number.isNaN(draftRecoverySavedAt.getTime());
+  const draftRecoverySavedText = hasDraftRecoverySavedAt
+    ? (() => {
+        const locale = i18n.resolvedLanguage?.startsWith("en")
+          ? "en-US"
+          : "es-MX";
+        const now = new Date();
+        const isToday =
+          draftRecoverySavedAt.toDateString() === now.toDateString();
+        if (isToday) {
+          return t("patient.wizard.draft_found_today", {
+            time: new Intl.DateTimeFormat(locale, {
+              hour: "numeric",
+              minute: "2-digit",
+            }).format(draftRecoverySavedAt),
+          });
+        }
+        return new Intl.DateTimeFormat(locale, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(draftRecoverySavedAt);
+      })()
+    : t("patient.wizard.draft_found_unknown_time");
+  const draftRecoveryStep = initialDraft
+    ? clampWizardStep(initialDraft.navigation.step) + 1
+    : 1;
 
   const selectPatientPhoto = async (file?: File) => {
     if (!file) return;
@@ -2073,13 +3063,100 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
         title={t("patient.wizard.registration_title")}
         description={t("patient.wizard.registration_subtitle")}
         className="nc-new-patient__pageHeader"
+        actions={
+          draftStatus !== "idle" ? (
+            <div
+              className="nc-new-patient__draftStatus"
+              data-status={draftStatus}
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className="nc-new-patient__draftStatusIcon"
+                aria-hidden="true"
+              >
+                {draftStatus === "error" ? (
+                  <AlertTriangle />
+                ) : draftStatus === "saving" ? (
+                  <LoaderCircle className="nc-new-patient__draftStatusSpinner" />
+                ) : draftStatus === "saved" ? (
+                  <Cloud />
+                ) : (
+                  <CloudUpload />
+                )}
+              </span>
+              <span className="nc-new-patient__draftStatusCopy">
+                <strong>
+                  {draftStatus === "error"
+                    ? t("patient.wizard.draft_save_error")
+                    : draftStatus === "saving"
+                      ? t("patient.wizard.draft_saving")
+                      : draftWasResumed
+                        ? t("patient.wizard.draft_restored")
+                        : draftStatus === "saved"
+                          ? t("patient.wizard.draft_saved")
+                          : t("patient.wizard.draft_pending")}
+                </strong>
+                <small className="nc-new-patient__draftStatusLabel">
+                  <span>{t("patient.wizard.draft_autosave_label")}</span>
+                  {draftStatus === "saved" && draftSavedTime && (
+                    <>
+                      <span
+                        className="nc-new-patient__draftStatusSeparator"
+                        aria-hidden="true"
+                      />
+                      <time dateTime={draftSavedAt?.toISOString()}>
+                        {draftSavedTime}
+                      </time>
+                    </>
+                  )}
+                </small>
+              </span>
+            </div>
+          ) : undefined
+        }
       />
+
+      {createdPatient && (
+        <div
+          className="nc-new-patient__successTransition"
+          role="status"
+          aria-live="assertive"
+          data-testid="patient-created-transition"
+        >
+          <div className="nc-new-patient__successTransitionContent">
+            <span
+              className="nc-new-patient__successTransitionMark"
+              aria-hidden="true"
+            >
+              <CircleCheck />
+            </span>
+            <h2>{t("patient.wizard.creation_success_title")}</h2>
+            <p>
+              {t("patient.wizard.creation_success_description", {
+                name: createdPatient.fullName,
+              })}
+            </p>
+            <span className="nc-new-patient__successTransitionRedirect">
+              {t("patient.wizard.creation_success_redirect")}
+              <ArrowRight aria-hidden="true" />
+            </span>
+            <span
+              className="nc-new-patient__successTransitionProgress"
+              aria-hidden="true"
+            >
+              <span />
+            </span>
+          </div>
+        </div>
+      )}
 
       <PageContent className="nc-new-patient-page">
         <div
           className="nc-new-patient"
           data-medical-history={step === 4 || undefined}
           data-nutrition={step === 5 || undefined}
+          data-physical-activity={step === 6 || undefined}
         >
           <aside className="nc-new-patient__sidebar">
             <nav aria-label={t("patient.wizard.progress_label")}>
@@ -2126,51 +3203,62 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
             </nav>
           </aside>
 
-          {(step === 4 || step === 5) && (
+          {(step === 4 || step === 5 || step === 6) && (
             <aside className="nc-new-patient__medicalNav">
               <nav
                 aria-label={t(
                   step === 4
                     ? "patient.wizard.medical_sections_label"
-                    : "patient.wizard.nutrition_sections_label",
+                    : step === 5
+                      ? "patient.wizard.nutrition_sections_label"
+                      : "patient.wizard.physical_activity_sections_label",
                 )}
               >
-                {(step === 4 ? medicalSections : nutritionSections).map(
-                  (section) => {
-                    const SectionIcon = section.icon;
-                    const current =
-                      step === 4
-                        ? section.id === medicalSection
-                        : section.id === nutritionSection;
-                    const disabled =
-                      "implemented" in section && !section.implemented;
-                    return (
-                      <button
-                        key={section.id}
-                        type="button"
-                        data-section={section.id}
-                        data-current={current || undefined}
-                        aria-current={current ? "page" : undefined}
-                        disabled={disabled}
-                        onClick={() => {
-                          if (step === 4) {
-                            setMedicalSection(section.id as MedicalSection);
-                          } else {
-                            setNutritionSection(section.id as NutritionSection);
-                          }
-                        }}
-                      >
-                        <span aria-hidden="true">
-                          <SectionIcon />
-                        </span>
-                        <span>
-                          <strong>{section.title}</strong>
-                          <small>{section.menuDescription}</small>
-                        </span>
-                      </button>
-                    );
-                  },
-                )}
+                {(step === 4
+                  ? medicalSections
+                  : step === 5
+                    ? nutritionSections
+                    : physicalActivitySections
+                ).map((section) => {
+                  const SectionIcon = section.icon;
+                  const current =
+                    step === 4
+                      ? section.id === medicalSection
+                      : step === 5
+                        ? section.id === nutritionSection
+                        : section.id === physicalActivitySection;
+                  const disabled =
+                    "implemented" in section && !section.implemented;
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      data-section={section.id}
+                      data-current={current || undefined}
+                      aria-current={current ? "page" : undefined}
+                      disabled={disabled}
+                      onClick={() => {
+                        if (step === 4) {
+                          setMedicalSection(section.id as MedicalSection);
+                        } else if (step === 5) {
+                          setNutritionSection(section.id as NutritionSection);
+                        } else {
+                          setPhysicalActivitySection(
+                            section.id as PhysicalActivitySection,
+                          );
+                        }
+                      }}
+                    >
+                      <span aria-hidden="true">
+                        <SectionIcon />
+                      </span>
+                      <span>
+                        <strong>{section.title}</strong>
+                        <small>{section.menuDescription}</small>
+                      </span>
+                    </button>
+                  );
+                })}
               </nav>
             </aside>
           )}
@@ -2180,12 +3268,12 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
               id="new-patient-wizard-form"
               noValidate
               onSubmit={(event) => {
+                event.preventDefault();
                 if (!isLastStep) {
-                  event.preventDefault();
                   void goToNextStep();
                   return;
                 }
-                void handleSubmit(onSubmit)(event);
+                void reviewAndSubmit();
               }}
             >
               <section
@@ -2194,8 +3282,23 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                 data-nutrition-section={
                   step === 5 ? nutritionSection : undefined
                 }
+                data-physical-activity-section={
+                  step === 6 ? physicalActivitySection : undefined
+                }
                 aria-labelledby="new-patient-step-title"
               >
+                {submitting && (
+                  <div
+                    className="nc-new-patient__savingOverlay"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <span>
+                      <LoaderCircle aria-hidden="true" />
+                      {t("patient.wizard.saving_patient")}
+                    </span>
+                  </div>
+                )}
                 <header className="nc-new-patient__formHeader">
                   <span
                     className="nc-new-patient__formHeaderIcon"
@@ -2221,6 +3324,7 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                   data-medical-section={step === 4 ? medicalSection : undefined}
                   data-nutrition={step === 5 || undefined}
                   data-physical-activity={step === 6 || undefined}
+                  data-notes={step === 7 || undefined}
                 >
                   {step === 0 && (
                     <>
@@ -2270,24 +3374,32 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                         </IconInput>
                       </WizardField>
                       <WizardField
-                        label={t("patient.age")}
-                        htmlFor="field-new-patient-age"
-                        error={errors.age}
+                        label={t("patient.birth_date")}
+                        htmlFor="field-new-patient-birth-date"
+                        error={errors.birthDate}
                         required
                       >
                         <IconInput icon={CalendarDays}>
                           <Input
-                            id="field-new-patient-age"
-                            type="number"
-                            min="0"
-                            max="125"
-                            inputMode="numeric"
-                            placeholder={t(
-                              "patient.wizard.age_input_placeholder",
-                            )}
-                            {...register("age")}
+                            id="field-new-patient-birth-date"
+                            type="date"
+                            min="1900-01-01"
+                            max={maxBirthDate}
+                            autoComplete="bday"
+                            aria-invalid={Boolean(errors.birthDate)}
+                            aria-describedby={
+                              errors.birthDate
+                                ? "field-new-patient-birth-date-error"
+                                : undefined
+                            }
+                            {...register("birthDate")}
                           />
                         </IconInput>
+                        {derivedAge !== null && (
+                          <span className="nc-new-patient__fieldHint">
+                            {t("patient.age_value", { age: derivedAge })}
+                          </span>
+                        )}
                       </WizardField>
                       <WizardField
                         label={t("patient.sex")}
@@ -2303,18 +3415,13 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                             <option value="" disabled>
                               {t("patient.wizard.select_option")}
                             </option>
-                            {(
-                              [
-                                "female",
-                                "male",
-                                "intersex",
-                                "undisclosed",
-                              ] as Sex[]
-                            ).map((sex) => (
-                              <option key={sex} value={sex}>
-                                {t(`patient.sex_${sex}`)}
-                              </option>
-                            ))}
+                            {(NEW_PATIENT_SEX_OPTIONS as readonly Sex[]).map(
+                              (sex) => (
+                                <option key={sex} value={sex}>
+                                  {t(`patient.sex_${sex}`)}
+                                </option>
+                              ),
+                            )}
                           </select>
                         </IconInput>
                       </WizardField>
@@ -2486,10 +3593,9 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                         </IconInput>
                       </WizardField>
                       <WizardField
-                        label={t("patient.phone")}
+                        label={t("patient.wizard.emergency_phone_optional")}
                         htmlFor="field-new-patient-emergency-phone"
                         error={errors.emergencyContactPhone}
-                        required
                       >
                         <IconInput icon={Phone}>
                           <Input
@@ -2507,22 +3613,62 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                     <>
                       <div className="nc-new-patient__clinicalTop">
                         <div className="nc-new-patient__clinicalDetails">
-                          <WizardField
-                            label={t("patient.wizard.clinical_record_number")}
-                            htmlFor="field-new-patient-record"
-                            error={errors.externalRecordNumber}
-                            required
-                          >
-                            <IconInput icon={FolderOpen}>
-                              <Input
-                                id="field-new-patient-record"
-                                placeholder={t(
-                                  "patient.wizard.clinical_record_number_placeholder",
+                          {patientRecordNumberConfig ? (
+                            <WizardField
+                              label={t("patient.wizard.clinical_record_number")}
+                              htmlFor="field-new-patient-record"
+                              error={errors.externalRecordNumber}
+                              required
+                            >
+                              <IconInput icon={FolderOpen}>
+                                <Input
+                                  id="field-new-patient-record"
+                                  readOnly
+                                  aria-readonly="true"
+                                  {...register("externalRecordNumber")}
+                                />
+                              </IconInput>
+                              <span className="nc-new-patient__fieldHint">
+                                {t(
+                                  "patient.wizard.clinical_record_number_generated",
                                 )}
-                                {...register("externalRecordNumber")}
-                              />
-                            </IconInput>
-                          </WizardField>
+                              </span>
+                            </WizardField>
+                          ) : (
+                            <div
+                              ref={recordConfigAlertRef}
+                              className="nc-new-patient__recordConfigAlert"
+                              role="alert"
+                              tabIndex={-1}
+                            >
+                              <AlertTriangle aria-hidden="true" />
+                              <div>
+                                <strong>
+                                  {t(
+                                    "patient.wizard.record_number_configuration_required",
+                                  )}
+                                </strong>
+                                <p>
+                                  {t(
+                                    "patient.wizard.record_number_configuration_help",
+                                  )}
+                                </p>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() =>
+                                    navigate(
+                                      "/configuracion?section=patient-record-number",
+                                    )
+                                  }
+                                >
+                                  {t(
+                                    "patient.wizard.record_number_configuration_action",
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
 
                           <div className="nc-new-patient__responsibleField">
                             <Label>
@@ -2552,8 +3698,10 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                               </div>
                             ) : (
                               <p
+                                ref={responsibleErrorRef}
                                 className="nc-new-patient__responsibleError"
                                 role="alert"
+                                tabIndex={-1}
                               >
                                 {t("patient.wizard.responsible_unavailable")}
                               </p>
@@ -5095,50 +6243,562 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                     </section>
                   )}
 
-                  {step === 6 && (
-                    <BinaryQuestion
-                      field="physicalActivity"
-                      question={t("patient.wizard.question_physical_activity")}
-                      icon={RunningIcon}
-                      register={register}
-                      error={errors.physicalActivity}
-                      wide
-                    />
+                  {step === 6 && physicalActivitySection === "activity" && (
+                    <section className="nc-new-patient__nutritionRoutine nc-new-patient__physicalActivity">
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          {t("patient.wizard.physical_activity_level_panel")}
+                        </legend>
+                        <div className="nc-new-patient__physicalLevelLayout">
+                          <div className="nc-new-patient__physicalLevelField">
+                            <span>
+                              {t(
+                                "patient.wizard.physical_activity_level_question",
+                              )}
+                            </span>
+                            <div
+                              className="nc-new-patient__physicalLevelOptions"
+                              role="radiogroup"
+                              aria-label={t(
+                                "patient.wizard.physical_activity_level_question",
+                              )}
+                            >
+                              {(
+                                [
+                                  {
+                                    value: "sedentary",
+                                    icon: Armchair,
+                                  },
+                                  { value: "light", icon: PersonStanding },
+                                  { value: "moderate", icon: RunningIcon },
+                                  { value: "intense", icon: Dumbbell },
+                                ] as const
+                              ).map((option) => {
+                                const LevelIcon = option.icon;
+                                return (
+                                  <label key={option.value}>
+                                    <input
+                                      type="radio"
+                                      value={option.value}
+                                      {...register("activityLevel")}
+                                    />
+                                    <span aria-hidden="true">
+                                      <LevelIcon />
+                                    </span>
+                                    <strong>
+                                      {t(
+                                        `patient.wizard.physical_activity_level_${option.value}`,
+                                      )}
+                                    </strong>
+                                    <small>
+                                      {t(
+                                        `patient.wizard.physical_activity_level_${option.value}_description`,
+                                      )}
+                                    </small>
+                                    <small>
+                                      {t(
+                                        `patient.wizard.physical_activity_level_${option.value}_frequency`,
+                                      )}
+                                    </small>
+                                    <i aria-hidden="true" />
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {errors.activityLevel?.message && (
+                              <small role="alert">
+                                {errors.activityLevel.message}
+                              </small>
+                            )}
+                          </div>
+                          <div className="nc-new-patient__physicalFrequencyFields">
+                            <NutritionField
+                              label={t(
+                                "patient.wizard.physical_activity_days_question",
+                              )}
+                              htmlFor="field-new-patient-activity-days"
+                              error={errors.activityDaysPerWeek}
+                              icon={CalendarDays}
+                            >
+                              <div className="nc-new-patient__nutritionSelectControl">
+                                <select
+                                  id="field-new-patient-activity-days"
+                                  {...register("activityDaysPerWeek")}
+                                >
+                                  <option value="" disabled>
+                                    {t(
+                                      "patient.wizard.physical_activity_select_days",
+                                    )}
+                                  </option>
+                                  {PHYSICAL_ACTIVITY_DAYS.map((days) => (
+                                    <option key={days} value={days}>
+                                      {t(
+                                        "patient.wizard.physical_activity_days_option",
+                                        { count: Number(days) },
+                                      )}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown aria-hidden="true" />
+                              </div>
+                            </NutritionField>
+                            <NutritionField
+                              label={t(
+                                "patient.wizard.physical_activity_duration_question",
+                              )}
+                              htmlFor="field-new-patient-activity-duration"
+                              error={errors.activitySessionDuration}
+                              icon={Timer}
+                            >
+                              <div className="nc-new-patient__nutritionSelectControl">
+                                <select
+                                  id="field-new-patient-activity-duration"
+                                  disabled={
+                                    !activityDaysPerWeek ||
+                                    activityDaysPerWeek === "0"
+                                  }
+                                  {...register("activitySessionDuration")}
+                                >
+                                  <option value="">
+                                    {t(
+                                      "patient.wizard.physical_activity_select_duration",
+                                    )}
+                                  </option>
+                                  {PHYSICAL_ACTIVITY_DURATIONS.map(
+                                    (duration) => (
+                                      <option key={duration} value={duration}>
+                                        {t(
+                                          "patient.wizard.physical_activity_duration_option",
+                                          { count: Number(duration) },
+                                        )}
+                                      </option>
+                                    ),
+                                  )}
+                                </select>
+                                <ChevronDown aria-hidden="true" />
+                              </div>
+                            </NutritionField>
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          {t("patient.wizard.physical_activity_type_panel")}
+                        </legend>
+                        <div className="nc-new-patient__physicalTypeLayout">
+                          <div className="nc-new-patient__physicalTypeField">
+                            <span>
+                              {t(
+                                "patient.wizard.physical_activity_type_question",
+                              )}
+                            </span>
+                            <div className="nc-new-patient__physicalTypeOptions">
+                              {(
+                                [
+                                  { value: "walking", icon: Footprints },
+                                  { value: "running", icon: RunningIcon },
+                                  { value: "gym", icon: Dumbbell },
+                                  { value: "cycling", icon: Bike },
+                                  { value: "swimming", icon: Waves },
+                                  { value: "yoga", icon: PersonStanding },
+                                  { value: "dance", icon: Music2 },
+                                  { value: "sport", icon: Trophy },
+                                  { value: "other", icon: CircleEllipsis },
+                                ] as const
+                              ).map((option) => {
+                                const TypeIcon = option.icon;
+                                return (
+                                  <label key={option.value}>
+                                    <input
+                                      type="checkbox"
+                                      value={option.value}
+                                      disabled={
+                                        !activityDaysPerWeek ||
+                                        activityDaysPerWeek === "0"
+                                      }
+                                      {...register("activityTypes")}
+                                    />
+                                    <TypeIcon aria-hidden="true" />
+                                    <span>
+                                      {t(
+                                        `patient.wizard.physical_activity_type_${option.value}`,
+                                      )}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {errors.activityTypes?.message && (
+                              <small role="alert">
+                                {errors.activityTypes.message}
+                              </small>
+                            )}
+                          </div>
+                          <NutritionField
+                            label={t(
+                              "patient.wizard.physical_activity_goal_question",
+                            )}
+                            htmlFor="field-new-patient-activity-goal"
+                            error={errors.physicalActivityGoal}
+                            icon={Goal}
+                          >
+                            <div className="nc-new-patient__nutritionSelectControl">
+                              <select
+                                id="field-new-patient-activity-goal"
+                                {...register("physicalActivityGoal")}
+                              >
+                                <option value="" disabled>
+                                  {t(
+                                    "patient.wizard.physical_activity_select_goal",
+                                  )}
+                                </option>
+                                {PHYSICAL_ACTIVITY_GOALS.map((goal) => (
+                                  <option key={goal} value={goal}>
+                                    {t(
+                                      `patient.wizard.physical_activity_goal_${goal}`,
+                                    )}
+                                  </option>
+                                ))}
+                              </select>
+                              <ChevronDown aria-hidden="true" />
+                            </div>
+                          </NutritionField>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          {t(
+                            "patient.wizard.physical_activity_limitations_panel",
+                          )}
+                        </legend>
+                        <div className="nc-new-patient__physicalLimitationsLayout">
+                          <NutritionBinaryField
+                            label={t(
+                              "patient.wizard.physical_activity_limitation_question",
+                            )}
+                            field="hasPhysicalLimitation"
+                            register={register}
+                            error={errors.hasPhysicalLimitation}
+                          />
+                          <NutritionField
+                            label={t("patient.wizard.physical_activity_notes")}
+                            optionalLabel={t("common.optional")}
+                            htmlFor="field-new-patient-activity-notes"
+                            error={errors.physicalActivityNotes}
+                            className="nc-new-patient__nutritionField--notes"
+                            icon={Activity}
+                          >
+                            <Textarea
+                              id="field-new-patient-activity-notes"
+                              rows={3}
+                              placeholder={t(
+                                "patient.wizard.physical_activity_notes_placeholder",
+                              )}
+                              {...register("physicalActivityNotes")}
+                            />
+                          </NutritionField>
+                          {hasPhysicalLimitation === "yes" && (
+                            <NutritionField
+                              label={t(
+                                "patient.wizard.physical_activity_limitation_details",
+                              )}
+                              htmlFor="field-new-patient-activity-limitation-details"
+                              error={errors.physicalLimitationDetails}
+                              className="nc-new-patient__nutritionField--full nc-new-patient__nutritionField--conditional nc-new-patient__physicalLimitationDetails"
+                            >
+                              <Textarea
+                                id="field-new-patient-activity-limitation-details"
+                                rows={2}
+                                placeholder={t(
+                                  "patient.wizard.physical_activity_limitation_placeholder",
+                                )}
+                                {...register("physicalLimitationDetails")}
+                              />
+                            </NutritionField>
+                          )}
+                        </div>
+                      </fieldset>
+                    </section>
+                  )}
+
+                  {step === 6 && physicalActivitySection === "daily" && (
+                    <section className="nc-new-patient__nutritionRoutine nc-new-patient__physicalDailyActivity">
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          <Clock3 aria-hidden="true" />
+                          {t("patient.wizard.daily_activity_sedentary_panel")}
+                        </legend>
+                        <div className="nc-new-patient__physicalDailyChoiceField">
+                          <span>
+                            {t(
+                              "patient.wizard.daily_activity_sedentary_question",
+                            )}
+                          </span>
+                          <div
+                            className="nc-new-patient__dailySedentaryOptions"
+                            role="radiogroup"
+                            aria-label={t(
+                              "patient.wizard.daily_activity_sedentary_question",
+                            )}
+                          >
+                            {SEDENTARY_TIME_OPTIONS.map((time) => (
+                              <label key={time}>
+                                <input
+                                  type="radio"
+                                  value={time}
+                                  {...register("sedentaryTime")}
+                                />
+                                {time === "varies" ? (
+                                  <Activity aria-hidden="true" />
+                                ) : (
+                                  <Clock3 aria-hidden="true" />
+                                )}
+                                <span>
+                                  {t(
+                                    `patient.wizard.daily_activity_sedentary_${time}`,
+                                  )}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                          {errors.sedentaryTime?.message && (
+                            <small role="alert">
+                              {errors.sedentaryTime.message}
+                            </small>
+                          )}
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          <PersonStanding aria-hidden="true" />
+                          {t("patient.wizard.daily_activity_movement_panel")}
+                        </legend>
+                        <div className="nc-new-patient__dailyMovementLayout">
+                          <div className="nc-new-patient__physicalDailyChoiceField nc-new-patient__dailyTransportField">
+                            <span>
+                              {t(
+                                "patient.wizard.daily_activity_transport_question",
+                              )}
+                            </span>
+                            <div className="nc-new-patient__dailyTransportOptions">
+                              {(
+                                [
+                                  { value: "walking", icon: Footprints },
+                                  { value: "car", icon: Car },
+                                  { value: "publicTransport", icon: BusFront },
+                                  { value: "bicycle", icon: Bike },
+                                  { value: "motorcycle", icon: MotorcycleIcon },
+                                  { value: "mixed", icon: Shuffle },
+                                ] as const
+                              ).map((option) => {
+                                const TransportIcon = option.icon;
+                                return (
+                                  <label key={option.value}>
+                                    <input
+                                      type="radio"
+                                      value={option.value}
+                                      {...register("usualTransportation")}
+                                    />
+                                    <TransportIcon aria-hidden="true" />
+                                    <span>
+                                      {t(
+                                        `patient.wizard.daily_activity_transport_${option.value}`,
+                                      )}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {errors.usualTransportation?.message && (
+                              <small role="alert">
+                                {errors.usualTransportation.message}
+                              </small>
+                            )}
+                          </div>
+                          <NutritionBinaryField
+                            label={t(
+                              "patient.wizard.daily_activity_stairs_question",
+                            )}
+                            field="usesStairsFrequently"
+                            register={register}
+                            error={errors.usesStairsFrequently}
+                          />
+                          <div className="nc-new-patient__physicalDailyChoiceField">
+                            <span>
+                              {t(
+                                "patient.wizard.daily_activity_breaks_question",
+                              )}
+                            </span>
+                            <div
+                              className="nc-new-patient__dailyBreakOptions"
+                              role="radiogroup"
+                              aria-label={t(
+                                "patient.wizard.daily_activity_breaks_question",
+                              )}
+                            >
+                              {ACTIVE_BREAK_FREQUENCIES.map((frequency) => (
+                                <label key={frequency}>
+                                  <input
+                                    type="radio"
+                                    value={frequency}
+                                    {...register("activeBreakFrequency")}
+                                  />
+                                  <span>
+                                    {t(
+                                      `patient.wizard.daily_activity_breaks_${frequency}`,
+                                    )}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                            {errors.activeBreakFrequency?.message && (
+                              <small role="alert">
+                                {errors.activeBreakFrequency.message}
+                              </small>
+                            )}
+                          </div>
+                        </div>
+                      </fieldset>
+
+                      <fieldset className="nc-new-patient__nutritionPanel">
+                        <legend>
+                          <CalendarDays aria-hidden="true" />
+                          {t("patient.wizard.daily_activity_routine_panel")}
+                        </legend>
+                        <div className="nc-new-patient__dailyRoutineLayout">
+                          <div className="nc-new-patient__physicalDailyChoiceField">
+                            <span>
+                              {t(
+                                "patient.wizard.daily_activity_routine_question",
+                              )}
+                            </span>
+                            <div className="nc-new-patient__dailyRoutineOptions">
+                              {(
+                                [
+                                  {
+                                    value: "seated",
+                                    icon: DailyActivityChairIcon,
+                                  },
+                                  { value: "standing", icon: PersonStanding },
+                                  { value: "mixed", icon: UsersRound },
+                                  { value: "moving", icon: RunningIcon },
+                                ] as const
+                              ).map((option) => {
+                                const RoutineIcon = option.icon;
+                                return (
+                                  <label key={option.value}>
+                                    <input
+                                      type="radio"
+                                      value={option.value}
+                                      {...register("dailyRoutineType")}
+                                    />
+                                    <RoutineIcon aria-hidden="true" />
+                                    <span>
+                                      {t(
+                                        `patient.wizard.daily_activity_routine_${option.value}`,
+                                      )}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            {errors.dailyRoutineType?.message && (
+                              <small role="alert">
+                                {errors.dailyRoutineType.message}
+                              </small>
+                            )}
+                          </div>
+                          <NutritionField
+                            label={t("patient.wizard.daily_activity_notes")}
+                            optionalLabel={t("common.optional")}
+                            htmlFor="field-new-patient-daily-activity-notes"
+                            error={errors.dailyActivityNotes}
+                            className="nc-new-patient__nutritionField--notes"
+                          >
+                            <Textarea
+                              id="field-new-patient-daily-activity-notes"
+                              rows={3}
+                              placeholder={t(
+                                "patient.wizard.daily_activity_notes_placeholder",
+                              )}
+                              {...register("dailyActivityNotes")}
+                            />
+                          </NutritionField>
+                        </div>
+                      </fieldset>
+                    </section>
                   )}
 
                   {step === 7 && (
-                    <>
-                      <WizardField
-                        label={t("patient.clinical_tags")}
-                        htmlFor="field-new-patient-tags"
-                        error={errors.clinicalTags}
-                        className="nc-new-patient__field--full"
-                      >
-                        <IconInput icon={Tags}>
-                          <Input
-                            id="field-new-patient-tags"
-                            placeholder={t("patient.clinical_tags_placeholder")}
-                            {...register("clinicalTags")}
-                          />
-                        </IconInput>
-                        <small className="nc-new-patient__fieldHint">
-                          {t("patient.comma_separated")}
-                        </small>
-                      </WizardField>
-                      <WizardField
-                        label={t("patient.general_notes")}
-                        htmlFor="field-new-patient-notes"
-                        error={errors.generalNotes}
-                        className="nc-new-patient__field--full"
-                      >
+                    <section className="nc-new-patient__notesLayout">
+                      <div className="nc-new-patient__notesEditor">
+                        <label
+                          className="nc-new-patient__notesTitle"
+                          htmlFor="field-new-patient-notes"
+                        >
+                          <span>
+                            {t("patient.wizard.notes_observations_title")}
+                          </span>
+                          <small>{t("common.optional")}</small>
+                        </label>
                         <Textarea
                           id="field-new-patient-notes"
-                          rows={7}
+                          rows={12}
+                          aria-invalid={Boolean(errors.generalNotes)}
                           placeholder={t("patient.wizard.notes_placeholder")}
                           {...register("generalNotes")}
                         />
-                      </WizardField>
-                    </>
+                        {errors.generalNotes?.message && (
+                          <p
+                            className="nc-new-patient__notesError"
+                            role="alert"
+                          >
+                            {errors.generalNotes.message}
+                          </p>
+                        )}
+                        <div className="nc-new-patient__notesMetadata">
+                          <UserRound aria-hidden="true" />
+                          <span>
+                            {t("patient.wizard.notes_registered_by")}{" "}
+                            <strong>
+                              {user?.nombreCompleto ??
+                                t("patient.wizard.notes_unknown_author")}
+                            </strong>{" "}
+                            · {notesRegistrationDate}
+                          </span>
+                        </div>
+                      </div>
+
+                      <aside
+                        className="nc-new-patient__notesGuide"
+                        aria-labelledby="new-patient-notes-guide-title"
+                      >
+                        <div className="nc-new-patient__notesGuideTitle">
+                          <Info aria-hidden="true" />
+                          <strong id="new-patient-notes-guide-title">
+                            {t("patient.wizard.notes_guide_title")}
+                          </strong>
+                        </div>
+                        <ul>
+                          {(
+                            [
+                              "circumstances",
+                              "barriers",
+                              "alerts",
+                              "pending",
+                              "other",
+                            ] as const
+                          ).map((item) => (
+                            <li key={item}>
+                              {t(`patient.wizard.notes_guide_${item}`)}
+                            </li>
+                          ))}
+                        </ul>
+                      </aside>
+                    </section>
                   )}
                 </div>
 
@@ -5264,8 +6924,11 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
                           ? t("common.saving")
                           : t("patient.wizard.create_action")
                         : t("common.next")}
-                      {isLastStep ? (
-                        <Save aria-hidden="true" />
+                      {submitting ? (
+                        <LoaderCircle
+                          className="nc-new-patient__savingSpinner"
+                          aria-hidden="true"
+                        />
                       ) : (
                         <ArrowRight aria-hidden="true" />
                       )}
@@ -5276,6 +6939,170 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
             </form>
           </main>
         </div>
+
+        <Dialog
+          open={Boolean(creationError)}
+          onOpenChange={(open) => {
+            if (!open) setCreationError(null);
+          }}
+        >
+          <DialogContent
+            className="nc-new-patient__creationErrorDialog"
+            showClose={false}
+          >
+            <DialogHeader className="nc-new-patient__creationErrorHeader">
+              <span
+                className="nc-new-patient__creationErrorIcon"
+                aria-hidden="true"
+              >
+                <AlertTriangle />
+              </span>
+              <div>
+                <DialogTitle>{t("patient.create_error")}</DialogTitle>
+                <DialogDescription>
+                  {t("patient.wizard.creation_error_description")}
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+            <p className="nc-new-patient__creationErrorDetail" role="alert">
+              {creationError}
+            </p>
+            <DialogFooter>
+              <Button
+                type="button"
+                className="nc-new-patient__creationErrorAction"
+                autoFocus
+                onClick={() => setCreationError(null)}
+              >
+                {t("patient.wizard.creation_error_return")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={draftRecoveryOpen}>
+          <DialogContent
+            className="nc-new-patient__draftRecoveryDialog"
+            showClose={false}
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            onInteractOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader className="nc-new-patient__draftRecoveryHeader">
+              <span
+                className="nc-new-patient__draftRecoveryIcon"
+                aria-hidden="true"
+              >
+                <Cloud />
+              </span>
+              <div>
+                <DialogTitle>
+                  {t("patient.wizard.draft_found_title")}
+                </DialogTitle>
+                <DialogDescription>
+                  {t("patient.wizard.draft_found_description")}
+                </DialogDescription>
+              </div>
+            </DialogHeader>
+
+            <dl className="nc-new-patient__draftRecoveryDetails">
+              <div>
+                <dt>
+                  <Clock3 aria-hidden="true" />
+                  {t("patient.wizard.draft_found_last_saved")}
+                </dt>
+                <dd>
+                  <time
+                    dateTime={
+                      hasDraftRecoverySavedAt
+                        ? draftRecoverySavedAt.toISOString()
+                        : undefined
+                    }
+                  >
+                    {draftRecoverySavedText}
+                  </time>
+                </dd>
+              </div>
+              <div>
+                <dt>
+                  <CircleEllipsis aria-hidden="true" />
+                  {t("patient.wizard.draft_found_progress")}
+                </dt>
+                <dd>
+                  {t("patient.wizard.draft_found_step", {
+                    current: draftRecoveryStep,
+                    total: steps.length,
+                  })}
+                </dd>
+              </div>
+            </dl>
+
+            {initialDraft?.photoNeedsReselection && (
+              <p className="nc-new-patient__draftRecoveryPhotoNote">
+                <Info aria-hidden="true" />
+                {t("patient.wizard.draft_photo_reselection")}
+              </p>
+            )}
+
+            <DialogFooter className="nc-new-patient__draftRecoveryActions">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setDraftRecoveryOpen(false);
+                  setDiscardDraftConfirmationOpen(true);
+                }}
+              >
+                {t("patient.wizard.draft_start_new")}
+              </Button>
+              <Button
+                type="button"
+                className="nc-new-patient__primaryButton"
+                autoFocus
+                onClick={() => setDraftRecoveryOpen(false)}
+              >
+                {t("patient.wizard.draft_continue")}
+                <ArrowRight aria-hidden="true" />
+              </Button>
+            </DialogFooter>
+
+            <p className="nc-new-patient__draftRecoveryDisclaimer">
+              {t("patient.wizard.draft_start_new_disclaimer")}
+            </p>
+          </DialogContent>
+        </Dialog>
+
+        <ConfirmDialog
+          open={discardDraftConfirmationOpen}
+          onOpenChange={(open) => {
+            setDiscardDraftConfirmationOpen(open);
+            if (!open) setDraftRecoveryOpen(true);
+          }}
+          title={t("patient.wizard.draft_discard_title")}
+          description={t("patient.wizard.draft_discard_description")}
+          confirmLabel={t("patient.wizard.draft_discard_confirm")}
+          cancelLabel={t("patient.wizard.draft_discard_cancel")}
+          tone="danger"
+          onConfirm={() => {
+            draftStartedRef.current = false;
+            shouldFlushDraftRef.current = false;
+            if (draftTimerRef.current) {
+              clearTimeout(draftTimerRef.current);
+              draftTimerRef.current = null;
+            }
+            clearPatientRegistrationDraft();
+            reset(DEFAULT_VALUES);
+            setStep(0);
+            setMedicalSection("personal");
+            setNutritionSection("routine");
+            setPhysicalActivitySection("activity");
+            setPhotoError(null);
+            setDraggingPhoto(false);
+            setDraftStatus("idle");
+            setDraftSavedAt(null);
+            setDraftWasResumed(false);
+            setDiscardDraftConfirmationOpen(false);
+          }}
+        />
 
         <ConfirmDialog
           open={navigationBlocker.state === "blocked"}
@@ -5357,6 +7184,116 @@ export function NewPatientWizard({ onCreated }: NewPatientWizardProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        <Dialog open={finalReviewOpen} onOpenChange={setFinalReviewOpen}>
+          <DialogContent
+            className="sm:max-w-xl"
+            data-testid="final-registration-review-dialog"
+          >
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {requiredReviewItems.length > 0 ? (
+                  <AlertTriangle
+                    className="h-5 w-5 text-amber-500"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <CircleCheck
+                    className="h-5 w-5 text-emerald-500"
+                    aria-hidden="true"
+                  />
+                )}
+                {t("patient.wizard.final_review_title")}
+              </DialogTitle>
+              <DialogDescription>
+                {requiredReviewItems.length > 0
+                  ? t("patient.wizard.final_review_required_description")
+                  : t("patient.wizard.final_review_optional_description")}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="nc-new-patient__finalReviewLists">
+              {requiredReviewItems.length > 0 && (
+                <section data-review-section="required">
+                  <header>
+                    <strong>
+                      {t("patient.wizard.final_review_required_title")}
+                    </strong>
+                    <span>{requiredReviewItems.length}</span>
+                  </header>
+                  <ul>
+                    {requiredReviewItems.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => goToReviewItem(item)}
+                        >
+                          <AlertTriangle aria-hidden="true" />
+                          <span>{item.label}</span>
+                          <ArrowRight aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+
+              {optionalReviewItems.length > 0 && (
+                <section data-review-section="optional">
+                  <header>
+                    <strong>
+                      {t("patient.wizard.final_review_optional_title")}
+                    </strong>
+                    <span>{optionalReviewItems.length}</span>
+                  </header>
+                  <ul>
+                    {optionalReviewItems.map((item) => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => goToReviewItem(item)}
+                        >
+                          <CircleEllipsis aria-hidden="true" />
+                          <span>{item.label}</span>
+                          <ArrowRight aria-hidden="true" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-2">
+              {requiredReviewItems.length > 0 ? (
+                <Button
+                  type="button"
+                  onClick={() => {
+                    const firstRequired = requiredReviewItems[0];
+                    if (firstRequired) goToReviewItem(firstRequired);
+                  }}
+                >
+                  {t("patient.wizard.final_review_fix_required")}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      const firstOptional = optionalReviewItems[0];
+                      if (firstOptional) goToReviewItem(firstOptional);
+                    }}
+                  >
+                    {t("patient.wizard.final_review_complete_optional")}
+                  </Button>
+                  <Button type="button" onClick={saveAfterOptionalReview}>
+                    {t("patient.wizard.final_review_save_anyway")}
+                  </Button>
+                </>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </PageContent>
     </>
   );
@@ -5409,6 +7346,7 @@ function NutritionField({
   htmlFor,
   error,
   className,
+  icon: Icon,
   children,
 }: {
   label: string;
@@ -5416,12 +7354,16 @@ function NutritionField({
   htmlFor: string;
   error?: FieldError;
   className?: string;
+  icon?: LucideIcon;
   children: React.ReactNode;
 }) {
   return (
     <div className={`nc-new-patient__nutritionField ${className ?? ""}`.trim()}>
       <label htmlFor={htmlFor}>
-        <span>{label}</span>
+        <span>
+          {Icon && <Icon aria-hidden="true" />}
+          {label}
+        </span>
         {optionalLabel && <small>{optionalLabel}</small>}
       </label>
       {children}
@@ -5450,7 +7392,9 @@ function NutritionBinaryField({
     | "carriesWaterBottle"
     | "consumesEnergyDrinks"
     | "earlySatiety"
-    | "hasDigestiveDiscomfort";
+    | "hasDigestiveDiscomfort"
+    | "hasPhysicalLimitation"
+    | "usesStairsFrequently";
   register: UseFormRegister<NewPatientWizardValues>;
   error?: FieldError;
 }) {
@@ -5875,11 +7819,32 @@ function parseTags(value?: string): string[] {
     : [];
 }
 
-function birthDateFromAge(age: number, today: Date = new Date()): Date {
-  return new Date(
-    today.getFullYear() - age,
-    today.getMonth(),
-    today.getDate(),
-    12,
-  );
+function toLocalDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function ageFromDateOnly(
+  value: string,
+  today: Date = new Date(),
+): number | null {
+  const birthDate = parseDateOnlyAtLocalNoon(value);
+  if (!birthDate) return null;
+  const todayAtNoon = new Date(today);
+  todayAtNoon.setHours(12, 0, 0, 0);
+  if (birthDate > todayAtNoon || birthDate < new Date(1900, 0, 1, 12)) {
+    return null;
+  }
+
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDifference = today.getMonth() - birthDate.getMonth();
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age -= 1;
+  }
+  return age;
 }

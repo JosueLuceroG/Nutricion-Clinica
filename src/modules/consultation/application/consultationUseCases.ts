@@ -120,3 +120,29 @@ export class RegisterPaymentUseCase {
     return updated;
   }
 }
+
+/**
+ * Registro de pagos en lote (bulk-pay de BillingPage).
+ *
+ * Se ejecuta dentro de UNA transacción Dexie (ver consultationService):
+ * o se aplican todos los pagos o ninguno. Validaciones de dominio
+ * (método/fecha obligatorios, consulta no eliminada) aplican por item.
+ */
+export class RegisterPaymentsBulkUseCase {
+  constructor(private readonly repo: ConsultationRepository) {}
+
+  async execute(
+    entries: Array<{ id: ConsultationId; input: RegisterPaymentInput }>,
+  ): Promise<Consultation[]> {
+    if (entries.length === 0) return [];
+    const updated: Consultation[] = [];
+    for (const { id, input } of entries) {
+      const existing = await this.repo.findById(id);
+      if (!existing) throw new ConsultationNotFoundError(id);
+      const consultation = existing.withPayment(input);
+      await this.repo.save(consultation);
+      updated.push(consultation);
+    }
+    return updated;
+  }
+}

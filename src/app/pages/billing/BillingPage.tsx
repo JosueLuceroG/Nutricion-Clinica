@@ -109,16 +109,19 @@ export const BillingPage = () => {
     if (selected.length === 0) return;
     setBulkPaying(true);
     try {
-      await Promise.all(
-        selected.map((it) =>
-          consultationService.payment.register(it.consultation.id, {
+      // Atómico (una transacción) e idempotente: un doble click reutiliza
+      // la misma ejecución en curso.
+      await consultationService.payment.registerMany(
+        selected.map((it) => ({
+          id: it.consultation.id,
+          input: {
             paid: true,
             paymentStatus: "paid",
             paymentMethod: "cash",
             paidAt: new Date(),
             amountPaid: it.consultation.cost,
-          }),
-        ),
+          },
+        })),
       );
       toast.success(t("billing.bulk_paid", { count: selected.length }));
       setSelectedIds(new Set());

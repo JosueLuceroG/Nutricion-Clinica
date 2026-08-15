@@ -9,7 +9,6 @@ export interface AIRequest {
   temperature?: number;
   maxTokens?: number;
   provider?: AIProviderId;
-  apiKey?: string;
   responseFormat?: "json";
 }
 

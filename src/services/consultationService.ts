@@ -8,10 +8,12 @@ import {
   ListConsultationsUseCase,
   DeleteConsultationUseCase,
   RegisterPaymentUseCase,
+  RegisterPaymentsBulkUseCase,
   type RegisterPaymentInput,
 } from "@modules/consultation/application/consultationUseCases";
 import type { ConsultationRepository } from "@modules/consultation/domain/ConsultationRepository";
 import type { ConsultationId } from "@modules/consultation/domain/ConsultationId";
+import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 import { clinicalRecordService } from "@services/clinicalRecordService";
 import { recordClinicalAudit } from "@services/audit/clinicalAudit";
@@ -22,6 +24,7 @@ const originalTransition = new TransitionConsultationStatusUseCase(repository);
 const updateConsultationNotes = new UpdateConsultationNotesUseCase(repository);
 const deleteConsultation = new DeleteConsultationUseCase(repository);
 const registerPayment = new RegisterPaymentUseCase(repository);
+const registerPaymentsBulk = new RegisterPaymentsBulkUseCase(repository);
 
 export const consultationService = {
   schedule: {
@@ -101,7 +104,7 @@ export const consultationService = {
       });
     },
   },
-  payment: {
+payment: {
     register: async (id: ConsultationId, input: RegisterPaymentInput) => {
       const consultation = await registerPayment.execute(id, input);
       await recordClinicalAudit({
@@ -114,6 +117,48 @@ export const consultationService = {
       });
       return consultation;
     },
+    /**
+     * Bulk-pay atómico e idempotente: una sola transacción Dexie para todo
+     * el lote y guard concurrente (doble click) reutiliza la misma promesa.
+     */
+    registerMany: (() => {
+      let inFlight: Promise<Consultation[]> | null = null;
+      return (
+        entries: Array<{ id: ConsultationId; input: RegisterPaymentInput }>,
+      ): Promise<Consultation[]> => {
+        if (inFlight) return inFlight;
+        const run = (async () => {
+          const results = await db.transaction(
+            "rw",
+            db.consultations,
+            () => registerPaymentsBulk.execute(entries),
+          );
+          for (const consultation of results) {
+            await recordClinicalAudit({
+              module: "billing",
+              action: "update",
+              resourceType: "consultation",
+              resourceId: consultation.id.toString(),
+              patientId: consultation.patientId.toString(),
+              justification: "bulk_payment",
+            });
+          }
+          return results;
+        })();
+        inFlight = run;
+        // `.then` con ambos callbacks (no `.finally().catch()`): limpia el
+        // guard sin crear una promesa nueva que rechace sin handler.
+        run.then(
+          () => {
+            inFlight = null;
+          },
+          () => {
+            inFlight = null;
+          },
+        );
+        return run;
+      };
+    })(),
   },
 };
 

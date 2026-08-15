@@ -32,6 +32,41 @@ test.describe("acceso rápido configurable del dashboard", () => {
     await expect(access).toBeDisabled();
   });
 
+  test("permite cambiar la función con una pulsación larga", async ({
+    page,
+  }) => {
+    await openDashboard(page);
+
+    const access = page.getByRole("button", {
+      name: "Personalizar KPIs",
+      exact: true,
+    });
+    await access.dispatchEvent("pointerdown", {
+      pointerId: 1,
+      pointerType: "mouse",
+      button: 0,
+      clientX: 100,
+      clientY: 100,
+    });
+    await page.waitForTimeout(850);
+
+    await expect(
+      page.getByRole("heading", { name: "Cambiar función del botón" }),
+    ).toBeVisible();
+    await page.getByRole("combobox", { name: "Función principal" }).click();
+    await page
+      .getByRole("option", { name: "Nuevo paciente", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Guardar función" }).click();
+
+    await expect(
+      page.getByRole("heading", { name: "Cambiar función del botón" }),
+    ).not.toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Nuevo paciente", exact: true }),
+    ).toBeVisible();
+  });
+
   test("abre el menú configurado y navega a una calculadora específica", async ({
     page,
   }) => {

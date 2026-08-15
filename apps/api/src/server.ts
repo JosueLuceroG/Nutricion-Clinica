@@ -20,8 +20,19 @@ import patientPortalRouter from "./modules/patientPortal/patientPortalRoutes.js"
 import syncRouter from "./modules/sync/syncRoutes.js";
 import dashboardRouter from "./modules/dashboard/dashboardRoutes.js";
 import aiRouter from "./modules/ai/aiRoutes.js";
-import { createSignalingServer } from "./modules/telemedicina/signalingServer.js";
-import { createChatServer } from "./modules/patientPortal/chatServer.js";
+import aiToolsRouter from "./modules/ai/tools/toolRoutes.js";
+import aiExpertRouter from "./modules/ai/expert/expertRoutes.js";
+import aiMemoryRouter from "./modules/ai/memory/memoryRoutes.js";
+import aiRagRouter from "./modules/ai/rag/ragRoutes.js";
+import copilotRouter from "./modules/ai/copilots/copilotRoutes.js";
+import patientAiRouter from "./modules/ai/patientAi/patientRoutes.js";
+import actionRouter from "./modules/ai/actions/actionRoutes.js";
+import agentRouter from "./modules/ai/agents/agentRoutes.js";
+import specializationRouter from "./modules/ai/specialization/specializationRoutes.js";
+import analyticsRouter from "./modules/dwh/analyticsRoutes.js";
+import { registerTelemedicinaChannel } from "./modules/telemedicina/signalingServer.js";
+import { registerChatChannel } from "./modules/patientPortal/chatServer.js";
+import { setupWebsocketGateway } from "./modules/ws/websocketGateway.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import {
   runRetentionCleanup,
@@ -79,14 +90,26 @@ app.use("/patient-portal", patientPortalRouter);
 app.use("/sync", syncRouter);
 app.use("/dashboard", dashboardRouter);
 app.use("/ai", aiRouter);
+app.use("/ai/tools", aiToolsRouter);
+app.use("/ai/expert", aiExpertRouter);
+app.use("/ai/memory", aiMemoryRouter);
+app.use("/ai/rag", aiRagRouter);
+app.use("/ai/copilots", copilotRouter);
+app.use("/ai/patient", patientAiRouter);
+app.use("/ai/actions", actionRouter);
+app.use("/ai/agents", agentRouter);
+app.use("/ai/specialization", specializationRouter);
+app.use("/dwh", analyticsRouter);
 
 app.use(errorHandler);
 
 const port = Number(process.env.PORT ?? 3000);
 const httpServer = createServer(app);
 
-createSignalingServer(httpServer);
-createChatServer(httpServer);
+setupWebsocketGateway(httpServer, {
+  telemedicina: registerTelemedicinaChannel,
+  chat: registerChatChannel,
+});
 
 httpServer.listen(port, () => {
   console.log(`[nutriclinica-api] listening on http://localhost:${port}`);

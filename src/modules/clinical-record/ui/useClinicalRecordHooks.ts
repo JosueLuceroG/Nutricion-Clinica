@@ -6,17 +6,38 @@ function useList<T>(patientId: string | null, listFn: (pid: string) => Promise<T
   const [data, setData] = React.useState<T[]>([]);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<Error | null>(null);
+  const listFnRef = React.useRef(listFn);
+  const requestIdRef = React.useRef(0);
+  listFnRef.current = listFn;
 
   const reload = React.useCallback(async () => {
-    if (!patientId) return;
+    const requestId = ++requestIdRef.current;
+    if (!patientId) {
+      setData([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
-    try { setData(await listFn(patientId)); }
-    catch (err) { setError(err instanceof Error ? err : new Error(String(err))); }
-    finally { setLoading(false); }
-  }, [patientId, listFn]);
+    try {
+      const items = await listFnRef.current(patientId);
+      if (requestId === requestIdRef.current) setData(items);
+    } catch (err) {
+      if (requestId === requestIdRef.current) {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
+    } finally {
+      if (requestId === requestIdRef.current) setLoading(false);
+    }
+  }, [patientId]);
 
-  React.useEffect(() => { reload(); }, [reload]);
+  React.useEffect(() => {
+    void reload();
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [reload]);
 
   return { data, loading, error, reload };
 }
@@ -112,7 +133,12 @@ export function useDietHistory(patientId: string | null) {
   const [error, setError] = React.useState<Error | null>(null);
 
   const reload = React.useCallback(async () => {
-    if (!patientId) return;
+    if (!patientId) {
+      setData(null);
+      setLoading(false);
+      setError(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     try { setData(await clinicalRecordService.dietHistory.get.execute(patientId)); }

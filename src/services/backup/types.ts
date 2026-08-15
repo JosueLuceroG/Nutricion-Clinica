@@ -1,7 +1,11 @@
+import type { SensitiveAction } from "@nutriclinica/shared";
+
 export interface BackupData {
-  version: 1;
+  version: 1 | 2;
   exportedAt: string;
   appVersion: string;
+  schemaVersion?: number;
+  syncState?: "clean";
   tables: BackupTable[];
 }
 
@@ -22,4 +26,9 @@ export interface ImportResult {
   tablesImported: string[];
   rowCount: number;
   errors: string[];
+}
+
+export interface BackupAuthorization {
+  action: SensitiveAction;
+  grant: string;
 }

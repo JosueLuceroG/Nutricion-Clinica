@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, CalendarDays } from "lucide-react";
+import { preloadDashboardRoute } from "@app/dashboardRoutePreloaders";
 import { DashboardSectionCard } from "./DashboardSectionCard";
 import type { UpcomingConsultationItem } from "./dashboardMockData";
 
@@ -14,7 +15,13 @@ export function UpcomingConsultationsCard({ items, title = "Próximas consultas"
       title={title}
       icon={<CalendarDays size={20} strokeWidth={1.9} />}
       action={
-        <Link className="nc-dashboard-card-action" to="/agenda">
+        <Link
+          className="nc-dashboard-card-action"
+          to="/agenda"
+          onPointerEnter={() => preloadDashboardRoute("/agenda")}
+          onPointerDown={() => preloadDashboardRoute("/agenda")}
+          onFocus={() => preloadDashboardRoute("/agenda")}
+        >
           Ver agenda
         </Link>
       }
@@ -46,7 +53,13 @@ export function UpcomingConsultationsCard({ items, title = "Próximas consultas"
         </div>
       )}
 
-      <Link className="nc-dashboard-card-link" to="/consultas">
+      <Link
+        className="nc-dashboard-card-link"
+        to="/consultas"
+        onPointerEnter={() => preloadDashboardRoute("/consultas")}
+        onPointerDown={() => preloadDashboardRoute("/consultas")}
+        onFocus={() => preloadDashboardRoute("/consultas")}
+      >
         Ver todas las consultas
         <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
       </Link>

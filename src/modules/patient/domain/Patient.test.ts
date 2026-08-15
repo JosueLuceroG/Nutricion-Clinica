@@ -67,6 +67,7 @@ describe("Patient.create", () => {
       adverseEffectDetails: null,
       nutritionIntake: null,
       physicalActivity: null,
+      physicalActivityIntake: null,
     });
   });
 
@@ -238,6 +239,26 @@ describe("Patient.create", () => {
           },
         },
         physicalActivity: true,
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 4,
+            sessionDurationMinutes: 55,
+            activityTypes: ["walking", "cycling", "walking"],
+            primaryGoal: "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "  Molestia leve de rodilla  ",
+            notes: "  Prefiere entrenar por la mañana  ",
+          },
+          dailyActivity: {
+            sedentaryTime: "sixToEight",
+            usualTransportation: "mixed",
+            usesStairsFrequently: true,
+            activeBreakFrequency: "sometimes",
+            routineType: "moving",
+            notes: "  Camina durante sus traslados  ",
+          },
+        },
       },
     });
     expect(patient.gender).toBe("woman");
@@ -319,6 +340,42 @@ describe("Patient.create", () => {
       },
     ]);
     expect(patient.medicalIntake.physicalActivity).toBe(true);
+    expect(patient.medicalIntake.physicalActivityIntake).toEqual({
+      activity: {
+        level: "moderate",
+        daysPerWeek: 4,
+        sessionDurationMinutes: 55,
+        activityTypes: ["walking", "cycling"],
+        primaryGoal: "health",
+        hasPhysicalLimitation: true,
+        physicalLimitationDetails: "Molestia leve de rodilla",
+        notes: "Prefiere entrenar por la mañana",
+      },
+      dailyActivity: {
+        sedentaryTime: "sixToEight",
+        usualTransportation: "mixed",
+        usesStairsFrequently: true,
+        activeBreakFrequency: "sometimes",
+        routineType: "moving",
+        notes: "Camina durante sus traslados",
+      },
+    });
+    expect(Object.isFrozen(patient.medicalIntake.physicalActivityIntake)).toBe(
+      true,
+    );
+    expect(
+      Object.isFrozen(patient.medicalIntake.physicalActivityIntake?.activity),
+    ).toBe(true);
+    expect(
+      Object.isFrozen(
+        patient.medicalIntake.physicalActivityIntake?.activity?.activityTypes,
+      ),
+    ).toBe(true);
+    expect(
+      Object.isFrozen(
+        patient.medicalIntake.physicalActivityIntake?.dailyActivity,
+      ),
+    ).toBe(true);
     expect(patient.medicalIntake.familyHistoryDetails).toEqual({
       diabetes: ["mother"],
       hypertension: ["father"],
@@ -393,6 +450,154 @@ describe("Patient.create", () => {
       symptomTiming: "afterMeals",
       notes: "Después de comidas abundantes",
     });
+  });
+
+  it("preserva el booleano heredado sin inferir un perfil", () => {
+    const active = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivity: true,
+        physicalActivityIntake: null,
+      },
+    });
+    const inactive = Patient.create({
+      ...baseProps,
+      medicalIntake: { physicalActivity: false },
+    });
+
+    expect(active.medicalIntake.physicalActivity).toBe(true);
+    expect(active.medicalIntake.physicalActivityIntake).toBeNull();
+    expect(inactive.medicalIntake.physicalActivity).toBe(false);
+    expect(inactive.medicalIntake.physicalActivityIntake).toBeNull();
+  });
+
+  it("normaliza y limpia campos condicionales de actividad física", () => {
+    const patient = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivityIntake: {
+          activity: {
+            level: "light",
+            daysPerWeek: 0,
+            sessionDurationMinutes: 45,
+            activityTypes: ["running"],
+            primaryGoal: "mobility",
+            hasPhysicalLimitation: false,
+            physicalLimitationDetails: "  Dolor lumbar  ",
+            notes: "  Desea comenzar pronto  ",
+          },
+          dailyActivity: {},
+        },
+      },
+    });
+
+    expect(patient.medicalIntake.physicalActivity).toBe(false);
+    expect(patient.medicalIntake.physicalActivityIntake).toEqual({
+      activity: {
+        level: "light",
+        daysPerWeek: 0,
+        sessionDurationMinutes: null,
+        activityTypes: [],
+        primaryGoal: "mobility",
+        hasPhysicalLimitation: false,
+        physicalLimitationDetails: null,
+        notes: "Desea comenzar pronto",
+      },
+      dailyActivity: null,
+    });
+  });
+
+  it("descarta enums, rangos y núcleos de perfil inválidos", () => {
+    const normalized = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivityIntake: {
+          activity: {
+            level: "intense",
+            daysPerWeek: 3,
+            sessionDurationMinutes: 601,
+            activityTypes: ["walking", "walking", "invalid" as "walking"],
+            primaryGoal: "invalid" as "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "   ",
+            notes: null,
+          },
+          dailyActivity: {
+            sedentaryTime: "invalid" as "sixToEight",
+            usualTransportation: "car",
+            usesStairsFrequently: true,
+            activeBreakFrequency: "sometimes",
+            routineType: "seated",
+            notes: "  Trabajo de oficina  ",
+          },
+        },
+      },
+    });
+    const missingCore = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivity: true,
+        physicalActivityIntake: {
+          activity: { level: "moderate", daysPerWeek: 4 },
+          dailyActivity: null,
+        },
+      },
+    });
+    const invalidRange = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 8,
+            hasPhysicalLimitation: false,
+          },
+          dailyActivity: [] as never,
+        },
+      },
+    });
+    const missingDailyBoolean = Patient.create({
+      ...baseProps,
+      medicalIntake: {
+        physicalActivityIntake: {
+          activity: null,
+          dailyActivity: {
+            sedentaryTime: "lessThan4",
+            usualTransportation: "walking",
+            activeBreakFrequency: "frequently",
+            routineType: "moving",
+            notes: null,
+          },
+        },
+      },
+    });
+
+    expect(normalized.medicalIntake.physicalActivityIntake).toEqual({
+      activity: {
+        level: "intense",
+        daysPerWeek: 3,
+        sessionDurationMinutes: null,
+        activityTypes: ["walking"],
+        primaryGoal: null,
+        hasPhysicalLimitation: true,
+        physicalLimitationDetails: null,
+        notes: null,
+      },
+      dailyActivity: null,
+    });
+    expect(missingCore.medicalIntake.physicalActivity).toBe(true);
+    expect(
+      missingCore.medicalIntake.physicalActivityIntake?.activity,
+    ).toBeNull();
+    expect(
+      invalidRange.medicalIntake.physicalActivityIntake?.activity,
+    ).toBeNull();
+    expect(
+      invalidRange.medicalIntake.physicalActivityIntake?.dailyActivity,
+    ).toBeNull();
+    expect(
+      missingDailyBoolean.medicalIntake.physicalActivityIntake?.dailyActivity,
+    ).toBeNull();
   });
 
   it("calcula edad correcta", () => {

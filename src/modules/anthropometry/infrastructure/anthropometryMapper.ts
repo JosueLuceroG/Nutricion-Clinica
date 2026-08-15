@@ -1,13 +1,24 @@
-import type { Anthropometry, AnthropometryProps, CircumferenceSet, SkinfoldSet } from "../domain/Anthropometry";
+import type {
+  Anthropometry,
+  AnthropometryProps,
+  CircumferenceSet,
+  SkinfoldSet,
+} from "../domain/Anthropometry";
 import { Anthropometry as AnthropometryEntity } from "../domain/Anthropometry";
 import { AnthropometryId } from "../domain/AnthropometryId";
 import { PatientId } from "@modules/patient/domain/PatientId";
-import { Weight, Height, Circumference, Skinfold } from "../domain/Measurements";
+import {
+  Weight,
+  Height,
+  Circumference,
+  Skinfold,
+} from "../domain/Measurements";
 import type { BiaReading } from "../domain/BiaReading";
 import { safeDate, toIsoStringSafe } from "@services/db/safeDate";
 
 export interface AnthropometryRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   measured_at: string;
   weight_kg: number;
@@ -21,7 +32,9 @@ export interface AnthropometryRow {
   deleted_at: string | null;
 }
 
-const deserializeCircumferences = (raw: Record<string, number> | null): CircumferenceSet => {
+const deserializeCircumferences = (
+  raw: Record<string, number> | null,
+): CircumferenceSet => {
   if (!raw) return {};
   const out: Record<string, Circumference> = {};
   for (const [k, v] of Object.entries(raw)) {
@@ -36,7 +49,9 @@ const deserializeCircumferences = (raw: Record<string, number> | null): Circumfe
   return out as CircumferenceSet;
 };
 
-const deserializeSkinfolds = (raw: Record<string, number> | null): SkinfoldSet => {
+const deserializeSkinfolds = (
+  raw: Record<string, number> | null,
+): SkinfoldSet => {
   if (!raw) return {};
   const out: Record<string, Skinfold> = {};
   for (const [k, v] of Object.entries(raw)) {
@@ -51,7 +66,9 @@ const deserializeSkinfolds = (raw: Record<string, number> | null): SkinfoldSet =
   return out as SkinfoldSet;
 };
 
-const serializeCircumferences = (set: CircumferenceSet): Record<string, number> | null => {
+const serializeCircumferences = (
+  set: CircumferenceSet,
+): Record<string, number> | null => {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(set)) {
     if (v) out[k] = v.toCm();
@@ -59,7 +76,9 @@ const serializeCircumferences = (set: CircumferenceSet): Record<string, number> 
   return Object.keys(out).length > 0 ? out : null;
 };
 
-const serializeSkinfolds = (set: SkinfoldSet): Record<string, number> | null => {
+const serializeSkinfolds = (
+  set: SkinfoldSet,
+): Record<string, number> | null => {
   const out: Record<string, number> = {};
   for (const [k, v] of Object.entries(set)) {
     if (v) out[k] = v.toMm();
@@ -67,11 +86,17 @@ const serializeSkinfolds = (set: SkinfoldSet): Record<string, number> | null => 
   return Object.keys(out).length > 0 ? out : null;
 };
 
-export const anthropometryRowToDomain = (row: AnthropometryRow): Anthropometry => {
+export const anthropometryRowToDomain = (
+  row: AnthropometryRow,
+): Anthropometry => {
   return AnthropometryEntity.reconstitute({
     id: AnthropometryId.fromUnsafe(row.id),
     patientId: PatientId.fromUnsafe(row.patient_id),
-    measuredAt: safeDate(row.measured_at, undefined, "anthropometry.measured_at")!,
+    measuredAt: safeDate(
+      row.measured_at,
+      undefined,
+      "anthropometry.measured_at",
+    )!,
     weight: Weight.fromKg(row.weight_kg),
     height: Height.fromMeters(row.height_m),
     circumferences: deserializeCircumferences(row.circumferences),
@@ -84,19 +109,35 @@ export const anthropometryRowToDomain = (row: AnthropometryRow): Anthropometry =
   });
 };
 
-export const anthropometryDomainToRow = (a: Anthropometry): AnthropometryRow => {
+export const anthropometryDomainToRow = (
+  a: Anthropometry,
+  sucursalId?: string | null,
+): AnthropometryRow => {
   return {
     id: a.id.toString(),
+    sucursal_id: sucursalId,
     patient_id: a.patientId.toString(),
-    measured_at: toIsoStringSafe(a.measuredAt, new Date().toISOString(), "anthropometry.measured_at")!,
+    measured_at: toIsoStringSafe(
+      a.measuredAt,
+      new Date().toISOString(),
+      "anthropometry.measured_at",
+    )!,
     weight_kg: a.weight.toKg(),
     height_m: a.height.toMeters(),
     circumferences: serializeCircumferences(a.circumferences),
     skinfolds: serializeSkinfolds(a.skinfolds),
     bia_json: a.bia ? JSON.stringify(a.bia) : null,
     notes: a.notes,
-    created_at: toIsoStringSafe(a.createdAt, new Date().toISOString(), "anthropometry.created_at")!,
-    updated_at: toIsoStringSafe(a.updatedAt, new Date().toISOString(), "anthropometry.updated_at")!,
+    created_at: toIsoStringSafe(
+      a.createdAt,
+      new Date().toISOString(),
+      "anthropometry.created_at",
+    )!,
+    updated_at: toIsoStringSafe(
+      a.updatedAt,
+      new Date().toISOString(),
+      "anthropometry.updated_at",
+    )!,
     deleted_at: toIsoStringSafe(a.deletedAt, null, "anthropometry.deleted_at"),
   };
 };

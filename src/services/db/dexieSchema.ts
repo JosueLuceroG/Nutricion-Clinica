@@ -147,6 +147,7 @@ const PATIENT_STORES = [
 
 const ANTHROPOMETRY_STORES = [
   "id",
+  "sucursal_id",
   "patient_id",
   "measured_at",
   "[patient_id+measured_at]",
@@ -157,6 +158,7 @@ const ANTHROPOMETRY_STORES = [
 
 const LAB_PANELS_STORES = [
   "id",
+  "sucursal_id",
   "patient_id",
   "taken_at",
   "[patient_id+taken_at]",
@@ -237,7 +239,15 @@ const SNAPSHOT_EXPEDIENTES_STORES =
   "id, consulta_id, patient_id, fecha_snapshot, created_at";
 const AUDIT_EVENTS_STORES =
   "id, patient_id, user_id, module, action, resource_type, resource_id, created_at";
-const SYNC_QUEUE_STORES = "id, entity, status, enqueued_at";
+const SYNC_QUEUE_STORES = [
+  "id",
+  "sucursalId",
+  "entity",
+  "status",
+  "[sucursalId+status]",
+  "[sucursalId+entity+entityId]",
+  "enqueuedAt",
+].join(", ");
 const APPOINTMENTS_STORES = [
   "id",
   "patient_id",
@@ -530,6 +540,92 @@ export class NutriClinicaDB extends Dexie {
     this.version(32).stores({
       patients: PATIENT_STORES,
     });
+
+    this.version(33)
+      .stores({
+        anthropometry: ANTHROPOMETRY_STORES,
+        lab_panels: LAB_PANELS_STORES,
+        sync_queue: SYNC_QUEUE_STORES,
+      })
+      .upgrade(async (transaction) => {
+        const patients = transaction.table("patients");
+        const anthropometry = transaction.table("anthropometry");
+        const labPanels = transaction.table("lab_panels");
+        const queue = transaction.table("sync_queue");
+
+        const patientSucursal = new Map<string, string>();
+        for (const patient of (await patients.toArray()) as Array<{
+          id: string;
+          sucursal_id?: string | null;
+        }>) {
+          if (patient.sucursal_id) {
+            patientSucursal.set(patient.id, patient.sucursal_id);
+          }
+        }
+
+        for (const table of [anthropometry, labPanels]) {
+          for (const row of (await table.toArray()) as Array<{
+            id: string;
+            patient_id?: string;
+            sucursal_id?: string | null;
+          }>) {
+            const sucursalId =
+              row.sucursal_id ??
+              (row.patient_id
+                ? patientSucursal.get(row.patient_id)
+                : undefined);
+            if (sucursalId)
+              await table.update(row.id, { sucursal_id: sucursalId });
+          }
+        }
+
+        const entityTables: Record<string, string> = {
+          pacientes: "patients",
+          consultas: "consultations",
+          antropometrias: "anthropometry",
+          lab_panels: "lab_panels",
+          planes_alimenticios: "meal_plans",
+          adherence_records: "adherence_records",
+        };
+        for (const item of (await queue.toArray()) as Array<{
+          id: string;
+          entity: string;
+          entityId: string;
+          payload?: string;
+          sucursalId?: string | null;
+        }>) {
+          if (item.sucursalId) continue;
+          let sucursalId = payloadSucursalId(item.payload);
+          const tableName = entityTables[item.entity];
+          if (!sucursalId && tableName) {
+            const row = (await transaction
+              .table(tableName)
+              .get(item.entityId)) as
+              | { sucursal_id?: string | null; patient_id?: string }
+              | undefined;
+            sucursalId =
+              row?.sucursal_id ??
+              (row?.patient_id
+                ? patientSucursal.get(row.patient_id)
+                : undefined);
+          }
+          await queue.update(item.id, {
+            sucursalId: sucursalId ?? "__unassigned__",
+          });
+        }
+      });
+  }
+}
+
+function payloadSucursalId(payload: string | undefined): string | undefined {
+  if (!payload) return undefined;
+  try {
+    const parsed = JSON.parse(payload) as { sucursal_id?: unknown };
+    return typeof parsed.sucursal_id === "string" && parsed.sucursal_id
+      ? parsed.sucursal_id
+      : undefined;
+  } catch {
+    return undefined;
   }
 }
 

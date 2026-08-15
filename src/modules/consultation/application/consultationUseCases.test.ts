@@ -8,11 +8,12 @@ import {
   ListConsultationsUseCase,
   DeleteConsultationUseCase,
   RegisterPaymentUseCase,
+  RegisterPaymentsBulkUseCase,
 } from "./consultationUseCases";
 import { DexieConsultationRepository } from "../infrastructure/DexieConsultationRepository";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { ConsultationId } from "../domain/ConsultationId";
-import { ConsultationNotFoundError } from "../domain/ConsultationRepository";
+import { ConsultationNotFoundError, type ConsultationRepository } from "../domain/ConsultationRepository";
 import { PatientId } from "@modules/patient/domain/PatientId";
 
 describe("consultationUseCases", () => {
@@ -25,6 +26,7 @@ describe("consultationUseCases", () => {
   let list: ListConsultationsUseCase;
   let del: DeleteConsultationUseCase;
   let registerPayment: RegisterPaymentUseCase;
+  let registerBulk: RegisterPaymentsBulkUseCase;
   const pid = PatientId.generate();
 
   beforeEach(async () => {
@@ -38,6 +40,7 @@ describe("consultationUseCases", () => {
     list = new ListConsultationsUseCase(repo);
     del = new DeleteConsultationUseCase(repo);
     registerPayment = new RegisterPaymentUseCase(repo);
+    registerBulk = new RegisterPaymentsBulkUseCase(repo);
   });
 
   it("Schedule asigna consultationNumber incremental y status=scheduled", async () => {
@@ -181,5 +184,49 @@ describe("consultationUseCases", () => {
     expect(updated.cost).toBe(1500);
     expect(updated.paid).toBe(false);
     expect(updated.isPendingPayment).toBe(true);
+  });
+
+  it("RegisterPaymentsBulk: paga todas las consultas del lote", async () => {
+    const c1 = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control A", cost: 100 });
+    const c2 = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 2, reason: "Control B", cost: 200 });
+    const results = await registerBulk.execute([
+      { id: c1.id, input: { paid: true, paymentStatus: "paid", paymentMethod: "cash", paidAt: new Date() } },
+      { id: c2.id, input: { paid: true, paymentStatus: "paid", paymentMethod: "cash", paidAt: new Date() } },
+    ]);
+    expect(results).toHaveLength(2);
+    expect(results[0]!.paid).toBe(true);
+    expect(results[1]!.paid).toBe(true);
+  });
+
+  it("RegisterPaymentsBulk: falla rápido (propaga el error) si un item del lote falla", async () => {
+    const c1 = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 1, reason: "Control A", cost: 100 });
+    const c2 = await schedule.execute({ patientId: pid, consultationDate: new Date(), consultationNumber: 2, reason: "Control B", cost: 200 });
+
+    // Repo que falla al SEGUNDO save (simula error a mitad de lote). Los
+// métodos se enlazan explícitamente (un spread de la instancia perdería
+// los métodos del prototipo).
+    const failingRepo: ConsultationRepository = {
+      findById: (id) => repo.findById(id),
+      findAll: (query) => repo.findAll(query),
+      count: (query) => repo.count(query),
+      delete: (id, soft) => repo.delete(id, soft),
+      nextConsultationNumber: (pid) => repo.nextConsultationNumber(pid),
+      save: (() => {
+        let calls = 0;
+        return async (c: Parameters<typeof repo.save>[0]) => {
+          calls += 1;
+          if (calls === 2) throw new Error("db boom");
+          await repo.save(c);
+        };
+      })(),
+    };
+    const bulk = new RegisterPaymentsBulkUseCase(failingRepo);
+
+    await expect(
+      bulk.execute([
+        { id: c1.id, input: { paid: true, paymentStatus: "paid", paymentMethod: "cash", paidAt: new Date() } },
+        { id: c2.id, input: { paid: true, paymentStatus: "paid", paymentMethod: "cash", paidAt: new Date() } },
+      ]),
+    ).rejects.toThrow("db boom");
   });
 });

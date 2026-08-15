@@ -146,6 +146,27 @@ describe("entityColumnMaps — pacientes", () => {
             notes: null,
           },
         },
+        physicalActivity: true,
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 4,
+            sessionDurationMinutes: 60,
+            activityTypes: ["walking", "gym"],
+            primaryGoal: "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "Molestia de rodilla",
+            notes: "Entrena por la mañana",
+          },
+          dailyActivity: {
+            sedentaryTime: "sixToEight",
+            usualTransportation: "publicTransport",
+            usesStairsFrequently: false,
+            activeBreakFrequency: "sometimes",
+            routineType: "seated",
+            notes: "Trabajo de oficina",
+          },
+        },
       },
     });
     expect(db.nombres).toBe("Ana");
@@ -289,7 +310,34 @@ describe("entityColumnMaps — pacientes", () => {
           notes: null,
         },
       },
+      physicalActivity: true,
+      physicalActivityIntake: {
+        activity: {
+          level: "moderate",
+          daysPerWeek: 4,
+          sessionDurationMinutes: 60,
+          activityTypes: ["walking", "gym"],
+          primaryGoal: "health",
+          hasPhysicalLimitation: true,
+          physicalLimitationDetails: "Molestia de rodilla",
+          notes: "Entrena por la mañana",
+        },
+        dailyActivity: {
+          sedentaryTime: "sixToEight",
+          usualTransportation: "publicTransport",
+          usesStairsFrequently: false,
+          activeBreakFrequency: "sometimes",
+          routineType: "seated",
+          notes: "Trabajo de oficina",
+        },
+      },
     });
+    const roundTrip = dbRowToClient("pacientes", {
+      tamizaje_medico_json: db.tamizaje_medico_json,
+    });
+    expect(roundTrip.medical_intake).toEqual(
+      JSON.parse(String(db.tamizaje_medico_json)),
+    );
   });
 
   it("ignora campos no mapeados (whitelist)", async () => {
@@ -401,12 +449,29 @@ describe("prepareColumnsForWrite — tipos SQL correctos", () => {
     expect(col?.value).toBe("open");
   });
 
-  it('pacientes: record_status "discharged" / "inactive" / "referred" → "closed"', () => {
-    for (const v of ["discharged", "inactive", "referred"]) {
+  it('pacientes: record_status "inactive" → "closed"', () => {
+    const cols = prepareColumnsForWrite("pacientes", {
+      record_status: "inactive",
+    });
+    const col = cols.find((c) => c.dbColumn === "record_status");
+    expect(col?.value).toBe("closed");
+  });
+
+  it('pacientes: record_status "discharged" / "referred" pasan tal cual (CHECK 027 ampliado)', () => {
+    for (const v of ["discharged", "referred"]) {
       const cols = prepareColumnsForWrite("pacientes", { record_status: v });
       const col = cols.find((c) => c.dbColumn === "record_status");
-      expect(col?.value).toBe("closed");
+      expect(col?.value).toBe(v);
     }
+  });
+
+  it("pacientes: persiste discharge_reason en record_closed_reason", () => {
+    const cols = prepareColumnsForWrite("pacientes", {
+      discharge_reason: "Alta por objetivos cumplidos",
+    });
+    const col = cols.find((item) => item.dbColumn === "record_closed_reason");
+
+    expect(col?.value).toBe("Alta por objetivos cumplidos");
   });
 
   it("planes_alimenticios: kcal_target, protein_target_g como Int", () => {
@@ -583,6 +648,17 @@ describe("entityColumnMaps — consultas: campos de pago (Sprint 14D)", () => {
 });
 
 describe("dbRowToClient — parse de columnas JSON (read direction)", () => {
+  it("pacientes: traduce estado y motivo de cierre al dominio del cliente", () => {
+    const client = dbRowToClient("pacientes", {
+      id: "p-closed",
+      record_status: "closed",
+      record_closed_reason: "Alta clínica",
+    });
+
+    expect(client.record_status).toBe("inactive");
+    expect(client.discharge_reason).toBe("Alta clínica");
+  });
+
   it("pacientes.clinical_tags: string JSON en DB → array en cliente", () => {
     const client = dbRowToClient("pacientes", {
       id: "p-1",

@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
+import { telemedicinaApi } from "@services/api/telemedicinaApi";
 
 const DEFAULT_STUN_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
 const TURN_CONFIG_CACHE_TTL = 300_000; // 5 min
@@ -32,7 +33,7 @@ interface UseWebRtcReturn {
   remoteStream: MediaStream | null;
   peers: PeerInfo[];
   connected: boolean;
-  startCall: (stream?: MediaStream) => void;
+  startCall: (stream?: MediaStream) => Promise<void>;
   endCall: () => void;
   error: string | null;
 }
@@ -227,7 +228,7 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
     }
   }, [salaId, assignRemoteStream]);
 
-  const startCall = React.useCallback((stream?: MediaStream) => {
+  const startCall = React.useCallback(async (stream?: MediaStream) => {
     if (!token) {
       setError("No autenticado");
       return;
@@ -240,7 +241,15 @@ export function useWebRTC({ salaId, localStream }: UseWebRtcOptions): UseWebRtcR
 
     localStreamRef.current = currentLocalStream;
     setError(null);
-    const ws = new WebSocket(`${getWsUrl()}?token=${encodeURIComponent(token)}`);
+    let wsUrl: string;
+    try {
+      const { ticket } = await telemedicinaApi.getWsTicket(salaId);
+      wsUrl = `${getWsUrl()}?ticket=${encodeURIComponent(ticket)}`;
+    } catch {
+      setError("No se pudo obtener el ticket de conexi\u00f3n");
+      return;
+    }
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {

@@ -4,6 +4,7 @@ import { ErrorBoundary } from "@app/ErrorBoundary";
 import { RequireRole } from "@modules/auth/RequireRole";
 import { BILLING_ROLES, BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
 import { useAuthStore } from "@store/authStore";
+import { dashboardRouteLoaders } from "@app/dashboardRoutePreloaders";
 
 function lazyPage(loader: () => Promise<unknown>, exportName: string) {
   return React.lazy(async () => {
@@ -31,8 +32,8 @@ function lazyPage(loader: () => Promise<unknown>, exportName: string) {
 const AppLayout = lazyPage(() => import("@app/layout/AppLayout"), "AppLayout");
 const LoginPage = lazyPage(() => import("@modules/auth/ui/LoginPage"), "LoginPage");
 const PatientPortalPage = lazyPage(() => import("@app/pages/patient-portal/PatientPortalPage"), "PatientPortalPage");
-const DashboardPage = lazyPage(() => import("@app/pages/dashboard/DashboardPage"), "DashboardPage");
-const PatientsListPage = lazyPage(() => import("@app/pages/patients/PatientsListPage"), "PatientsListPage");
+const DashboardPage = lazyPage(dashboardRouteLoaders["/"], "DashboardPage");
+const PatientsListPage = lazyPage(dashboardRouteLoaders["/pacientes"], "PatientsListPage");
 const NewPatientPage = lazyPage(() => import("@app/pages/patients/NewPatientPage"), "NewPatientPage");
 const PatientDetailPage = lazyPage(() => import("@app/pages/patients/PatientDetailPage"), "PatientDetailPage");
 const PatientMeasurementsPage = lazyPage(() => import("@app/pages/anthropometry/PatientMeasurementsPage"), "PatientMeasurementsPage");
@@ -45,30 +46,30 @@ const NewConsultationPage = lazyPage(() => import("@app/pages/consultations/NewC
 const PatientMealPlansPage = lazyPage(() => import("@app/pages/plans/PatientMealPlansPage"), "PatientMealPlansPage");
 const NewMealPlanPage = lazyPage(() => import("@app/pages/plans/NewMealPlanPage"), "NewMealPlanPage");
 const PatientAdherencePage = lazyPage(() => import("@app/pages/patients/PatientAdherencePage"), "PatientAdherencePage");
-const ConsultationsListPage = lazyPage(() => import("@app/pages/consultations/ConsultationsListPage"), "ConsultationsListPage");
+const ConsultationsListPage = lazyPage(dashboardRouteLoaders["/consultas"], "ConsultationsListPage");
 const ConsultationDetailPage = lazyPage(() => import("@app/pages/consultations/ConsultationDetailPage"), "ConsultationDetailPage");
 const LaboratoryPage = lazyPage(() => import("@app/pages/LaboratoryPage"), "LaboratoryPage");
-const BillingPage = lazyPage(() => import("@app/pages/billing/BillingPage"), "BillingPage");
+const BillingPage = lazyPage(dashboardRouteLoaders["/billing"], "BillingPage");
 const BillingReportPage = lazyPage(() => import("@app/pages/billing/BillingReportPage"), "BillingReportPage");
 const ReceiptPage = lazyPage(() => import("@app/pages/billing/ReceiptPage"), "ReceiptPage");
 const ExpensesPage = lazyPage(() => import("@app/pages/expenses/ExpensesPage"), "ExpensesPage");
 const PaymentsPage = lazyPage(() => import("@app/pages/payments/PaymentsPage"), "PaymentsPage");
 const CalculationsPage = lazyPage(() => import("@app/pages/CalculationsPage"), "CalculationsPage");
-const SmaeCatalogPage = lazyPage(() => import("@app/pages/SmaeCatalogPage"), "SmaeCatalogPage");
+const SmaeCatalogPage = lazyPage(dashboardRouteLoaders["/smae"], "SmaeCatalogPage");
 const RecipesPage = lazyPage(() => import("@app/pages/recipes/RecipesPage"), "RecipesPage");
 const GoalsPage = lazyPage(() => import("@app/pages/goals/GoalsPage"), "GoalsPage");
 const AdherencePage = lazyPage(() => import("@app/pages/adherence/AdherencePage"), "AdherencePage");
 const DocumentsPage = lazyPage(() => import("@app/pages/documents/DocumentsPage"), "DocumentsPage");
 const MealPlannerPage = lazyPage(() => import("@app/pages/meal-planner/MealPlannerPage"), "MealPlannerPage");
 const ImporterPage = lazyPage(() => import("@app/pages/ImporterPage"), "ImporterPage");
-const PlansListPage = lazyPage(() => import("@app/pages/plans/PlansListPage"), "PlansListPage");
+const PlansListPage = lazyPage(dashboardRouteLoaders["/planes"], "PlansListPage");
 const MealPlanDetailPage = lazyPage(() => import("@app/pages/plans/MealPlanDetailPage"), "MealPlanDetailPage");
 const MedicationsPage = lazyPage(() => import("@app/pages/medications/MedicationsPage"), "MedicationsPage");
 const ReportsPage = lazyPage(() => import("@app/pages/reports/ReportsPage"), "ReportsPage");
-const AgendaPage = lazyPage(() => import("@app/pages/agenda/AgendaPage"), "AgendaPage");
+const AgendaPage = lazyPage(dashboardRouteLoaders["/agenda"], "AgendaPage");
 const NotificationsPage = lazyPage(() => import("@app/pages/NotificationsPage"), "NotificationsPage");
 const ProfilePage = lazyPage(() => import("@app/pages/ProfilePage"), "ProfilePage");
-const SettingsPage = lazyPage(() => import("@app/pages/SettingsPage"), "SettingsPage");
+const SettingsPage = lazyPage(dashboardRouteLoaders["/configuracion"], "SettingsPage");
 const TwoFactorSetupPage = lazyPage(() => import("@modules/auth/ui/TwoFactorSetupPage"), "TwoFactorSetupPage");
 const TelemedicinaListPage = lazyPage(() => import("@app/pages/telemedicina/TelemedicinaListPage"), "TelemedicinaListPage");
 const NewTelemedicinaSalaPage = lazyPage(() => import("@app/pages/telemedicina/NewTelemedicinaSalaPage"), "NewTelemedicinaSalaPage");

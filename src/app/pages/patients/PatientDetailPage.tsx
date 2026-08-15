@@ -40,6 +40,11 @@ import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { usePatientPaymentSummary } from "@modules/consultation/ui/useBillingHooks";
 import { useCascadeDeletePatient } from "@modules/patient/ui/useCascadeDeletePatient";
 import { CascadeDeletePatientDialog } from "@modules/patient/ui/CascadeDeletePatientDialog";
+import { PatientMedicalIntakeCard } from "@modules/patient/ui/PatientMedicalIntakeCard";
+import type { Patient } from "@modules/patient/domain/Patient";
+import type { Gender } from "@modules/patient/domain/Gender";
+import type { MaritalStatus } from "@modules/patient/domain/MaritalStatus";
+import type { EducationLevel } from "@modules/patient/domain/EducationLevel";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import type { RecordStatus } from "@modules/patient/domain/RecordStatus";
 import type { PatientStatus } from "@modules/patient/domain/PatientStatus";
@@ -58,6 +63,16 @@ function recordStatusLabel(t: ReturnType<typeof useTranslation>["t"], status: Re
   return t(`common.${status}`);
 }
 
+const patientRoutePreloaders = {
+  directory: () => import("@app/pages/patients/PatientsListPage"),
+  edit: () => import("@app/pages/patients/NewPatientPage"),
+  consultations: () => import("@app/pages/consultations/PatientConsultationsPage"),
+  anthropometry: () => import("@app/pages/anthropometry/PatientMeasurementsPage"),
+  laboratory: () => import("@app/pages/laboratory/PatientLabPage"),
+  plans: () => import("@app/pages/plans/PatientMealPlansPage"),
+  adherence: () => import("@app/pages/patients/PatientAdherencePage"),
+};
+
 export function PatientDetailPage() {
   const { t } = useTranslation();
   const { patientId } = useParams();
@@ -67,7 +82,6 @@ export function PatientDetailPage() {
     [patientId],
   );
   const { data: patient, loading, error, reload, deleted } = usePatient(id);
-  const paymentSummary = usePatientPaymentSummary(patientId ?? null);
   const [busy, setBusy] = React.useState(false);
   const [archiveOpen, setArchiveOpen] = React.useState(false);
   const isBeginnerMode = usePreferencesStore((s) => s.usageMode === "beginner");
@@ -176,13 +190,23 @@ export function PatientDetailPage() {
         actions={
           <>
             <Button asChild variant="outline">
-              <Link to="/pacientes">
+              <Link
+                to="/pacientes"
+                onPointerEnter={() => void patientRoutePreloaders.directory()}
+                onPointerDown={() => void patientRoutePreloaders.directory()}
+                onFocus={() => void patientRoutePreloaders.directory()}
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 {t("common.back")}
               </Link>
             </Button>
             <Button asChild variant="outline">
-              <Link to={`/pacientes/${patient.id.toString()}/editar`}>
+              <Link
+                to={`/pacientes/${patient.id.toString()}/editar`}
+                onPointerEnter={() => void patientRoutePreloaders.edit()}
+                onPointerDown={() => void patientRoutePreloaders.edit()}
+                onFocus={() => void patientRoutePreloaders.edit()}
+              >
                 <Pencil className="mr-2 h-4 w-4" />
                 {t("common.edit")}
               </Link>
@@ -218,11 +242,50 @@ export function PatientDetailPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {patient.photoUrl && (
+                <div className="flex items-center gap-3 rounded-lg bg-muted/40 p-3">
+                  <img
+                    src={patient.photoUrl}
+                    alt={t("patient.profile_photo_alt", {
+                      name: patient.fullName,
+                    })}
+                    className="h-20 w-20 shrink-0 rounded-lg border object-cover"
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground">
+                      {t("patient.profile_photo")}
+                    </p>
+                    <p className="truncate text-sm font-medium">
+                      {patient.fullName}
+                    </p>
+                  </div>
+                </div>
+              )}
               <DetailRow label={t("patient.full_name")} value={patient.fullName} />
               <DetailRow label={t("patient.birth_date")} value={new Intl.DateTimeFormat("es-MX", { dateStyle: "long" }).format(patient.birthDate)} />
               <DetailRow label={t("patient.age")} value={t("patient.age_value", { age: patient.age })} />
               <DetailRow label={t("patient.sex")} value={t(`patient.sex_${patient.sex}`)} />
               {patient.occupation && <DetailRow label={t("patient.occupation")} value={patient.occupation} />}
+              {patient.externalRecordNumber && (
+                <DetailRow
+                  label={t("patient.external_record_number")}
+                  value={patient.externalRecordNumber}
+                />
+              )}
+              {patient.admissionReason && (
+                <DetailRow
+                  label={t("patient.wizard.admission_reason")}
+                  value={patient.admissionReason}
+                />
+              )}
+              {patient.whatsappEnabled !== null && (
+                <DetailRow
+                  label={t("patient.wizard.whatsapp_question")}
+                  value={t(
+                    patient.whatsappEnabled ? "common.yes" : "common.no",
+                  )}
+                />
+              )}
               <DetailRow
                 label={t("common.status")}
                 value={
@@ -271,39 +334,7 @@ export function PatientDetailPage() {
               </CardContent>
             </Card>
 
-            {paymentSummary && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    {t("billing.payments_title")}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("billing.total_transactions")}</span>
-                    <span className="font-medium">{paymentSummary.consultationCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("billing.income_total")}</span>
-                    <span className="font-medium text-green-600">{formatCurrency(paymentSummary.totalPaid)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{t("billing.pending_collection")}</span>
-                    <span className="font-medium text-amber-600">{formatCurrency(paymentSummary.totalPending)}</span>
-                  </div>
-                  <div className="border-t pt-2 text-xs text-muted-foreground flex justify-between">
-                    <span>{paymentSummary.paidCount} {t("billing.paid_consultations").toLowerCase()}</span>
-                    <span>{paymentSummary.pendingCount} {t("billing.pending_consultations").toLowerCase()}</span>
-                  </div>
-                  <Button asChild variant="outline" size="sm" className="mt-1 w-full">
-                    <Link to={`/billing/payments?patientId=${patient.id.toString()}`}>
-                      {t("common.view_details")}
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            <PatientPaymentSummaryCard patientId={patient.id.toString()} />
 
             {isBeginnerMode ? (
               <AdvancedPatientToolsToggle
@@ -379,6 +410,10 @@ export function PatientDetailPage() {
           </div>
         </div>
 
+        <PatientRecordDetailsCard patient={patient} />
+
+        <PatientMedicalIntakeCard intake={patient.medicalIntake} />
+
         <Card className="mt-4">
           <CardHeader>
             <CardTitle>{t("patient.clinical_modules")}</CardTitle>
@@ -390,30 +425,35 @@ export function PatientDetailPage() {
               icon={ClipboardList}
               label={t("consultation.title")}
               hint={t("patient.module_consultations_hint")}
+              preload={patientRoutePreloaders.consultations}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/antropometria`}
               icon={Activity}
               label={t("anthropometry.title")}
               hint={t("patient.module_anthropometry_hint")}
+              preload={patientRoutePreloaders.anthropometry}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/laboratorio`}
               icon={FlaskConical}
               label={t("lab.title")}
               hint={t("patient.module_lab_hint")}
+              preload={patientRoutePreloaders.laboratory}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/planes`}
               icon={UtensilsCrossed}
               label={t("mealplan.title")}
               hint={t("patient.module_meal_plans_hint")}
+              preload={patientRoutePreloaders.plans}
             />
             <ModuleLink
               to={`/pacientes/${patient.id.toString()}/adherencia`}
               icon={ClipboardCheck}
               label={t("adherence.title")}
               hint={t("adherence.record_desc")}
+              preload={patientRoutePreloaders.adherence}
             />
           </CardContent>
         </Card>
@@ -446,11 +486,217 @@ export function PatientDetailPage() {
   );
 }
 
+const GENDER_LABEL_KEYS: Record<Gender, string> = {
+  woman: "patient.gender_female",
+  man: "patient.gender_male",
+  non_binary: "patient.gender_non_binary",
+  undisclosed: "patient.gender_undisclosed",
+  other: "patient.gender_other",
+};
+
+const MARITAL_STATUS_LABEL_KEYS: Record<MaritalStatus, string> = {
+  single: "patient.marital_single",
+  married: "patient.marital_married",
+  divorced: "patient.marital_divorced",
+  widowed: "patient.marital_widowed",
+  cohabiting: "patient.marital_free_union",
+};
+
+const EDUCATION_LABEL_KEYS: Record<EducationLevel, string> = {
+  none: "patient.education_none",
+  primary: "patient.education_primary",
+  secondary: "patient.education_secondary",
+  high_school: "patient.education_high_school",
+  bachelor: "patient.education_bachelor",
+  postgraduate: "patient.education_postgraduate",
+};
+
+function PatientRecordDetailsCard({ patient }: { patient: Patient }) {
+  const { t } = useTranslation();
+  const hasDetails = Boolean(
+    patient.gender ||
+      patient.maritalStatus ||
+      patient.education ||
+      patient.claveInterna ||
+      patient.birthPlace ||
+      patient.address ||
+      patient.nationality ||
+      patient.idType ||
+      patient.idNumber ||
+      patient.dischargeReason ||
+      patient.responsibleProfessionalId ||
+      patient.consentimientoInformadoId ||
+      patient.fechaFirmaConsentimiento ||
+      patient.versionPoliticaPrivacidad,
+  );
+  if (!hasDetails) return null;
+
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <CardTitle>{t("patient.identification_and_record")}</CardTitle>
+        <CardDescription>
+          {t("patient.identification_and_record_desc")}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+        {patient.gender && (
+          <DetailRow
+            label={t("patient.gender")}
+            value={t(GENDER_LABEL_KEYS[patient.gender])}
+          />
+        )}
+        {patient.maritalStatus && (
+          <DetailRow
+            label={t("patient.marital_status")}
+            value={t(MARITAL_STATUS_LABEL_KEYS[patient.maritalStatus])}
+          />
+        )}
+        {patient.education && (
+          <DetailRow
+            label={t("patient.education")}
+            value={t(EDUCATION_LABEL_KEYS[patient.education])}
+          />
+        )}
+        {patient.claveInterna && (
+          <DetailRow
+            label={t("patient.clave_interna")}
+            value={patient.claveInterna}
+          />
+        )}
+        {patient.birthPlace && (
+          <DetailRow
+            label={t("patient.birth_place")}
+            value={patient.birthPlace}
+          />
+        )}
+        {patient.nationality && (
+          <DetailRow
+            label={t("patient.nationality")}
+            value={patient.nationality}
+          />
+        )}
+        {patient.address && (
+          <DetailRow
+            label={t("patient.address")}
+            value={patient.address}
+          />
+        )}
+        {patient.idType && (
+          <DetailRow
+            label={t("patient.id_type")}
+            value={patient.idType}
+          />
+        )}
+        {patient.idNumber && (
+          <DetailRow
+            label={t("patient.id_number")}
+            value={patient.idNumber}
+          />
+        )}
+        {patient.dischargeReason && (
+          <DetailRow
+            label={t("patient.discharge_reason")}
+            value={patient.dischargeReason}
+          />
+        )}
+        {patient.responsibleProfessionalId && (
+          <DetailRow
+            label={t("patient.responsible_professional_id")}
+            value={patient.responsibleProfessionalId}
+          />
+        )}
+        {patient.consentimientoInformadoId && (
+          <DetailRow
+            label={t("patient.informed_consent")}
+            value={patient.consentimientoInformadoId.toString()}
+          />
+        )}
+        {patient.fechaFirmaConsentimiento && (
+          <DetailRow
+            label={t("patient.consent_signed_at")}
+            value={new Intl.DateTimeFormat(undefined, {
+              dateStyle: "long",
+              timeStyle: "short",
+            }).format(patient.fechaFirmaConsentimiento)}
+          />
+        )}
+        {patient.versionPoliticaPrivacidad && (
+          <DetailRow
+            label={t("patient.privacy_policy_version")}
+            value={patient.versionPoliticaPrivacidad}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PatientPaymentSummaryCard({ patientId }: { patientId: string }) {
+  const { t } = useTranslation();
+  const paymentSummary = usePatientPaymentSummary(patientId);
+  if (!paymentSummary) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <DollarSign className="h-4 w-4" />
+          {t("billing.payments_title")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            {t("billing.total_transactions")}
+          </span>
+          <span className="font-medium">
+            {paymentSummary.consultationCount}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            {t("billing.income_total")}
+          </span>
+          <span className="font-medium text-green-600">
+            {formatCurrency(paymentSummary.totalPaid)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">
+            {t("billing.pending_collection")}
+          </span>
+          <span className="font-medium text-amber-600">
+            {formatCurrency(paymentSummary.totalPending)}
+          </span>
+        </div>
+        <div className="flex justify-between border-t pt-2 text-xs text-muted-foreground">
+          <span>
+            {paymentSummary.paidCount}{" "}
+            {t("billing.paid_consultations").toLowerCase()}
+          </span>
+          <span>
+            {paymentSummary.pendingCount}{" "}
+            {t("billing.pending_consultations").toLowerCase()}
+          </span>
+        </div>
+        <Button asChild variant="outline" size="sm" className="mt-1 w-full">
+          <Link to={`/billing/payments?patientId=${patientId}`}>
+            {t("common.view_details")}
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b pb-2 last:border-0 last:pb-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium">{value}</span>
+    <div className="flex items-start justify-between gap-4 border-b pb-2 last:border-0 last:pb-0">
+      <span className="shrink-0 text-sm text-muted-foreground">{label}</span>
+      <span className="min-w-0 break-words text-right text-sm font-medium whitespace-pre-wrap">
+        {value}
+      </span>
     </div>
   );
 }
@@ -495,16 +741,25 @@ function ModuleLink({
   icon: Icon,
   label,
   hint,
+  preload,
 }: {
   to: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   hint: string;
+  preload: () => Promise<unknown>;
 }) {
+  const preloadRoute = () => {
+    void preload();
+  };
+
   return (
     <Link
       to={to}
       className="group rounded-md border bg-card p-3 transition-colors hover:border-primary hover:bg-accent"
+      onPointerEnter={preloadRoute}
+      onPointerDown={preloadRoute}
+      onFocus={preloadRoute}
     >
       <div className="flex items-center gap-2">
         <Icon className="h-4 w-4 text-primary" aria-hidden />

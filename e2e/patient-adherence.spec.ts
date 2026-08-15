@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
+import {
+  configureDefaultPatientRecordNumber,
+  loginAsAdmin,
+  hashUrl,
+  uniqueEmail,
+} from "./helpers";
 
 /**
  * E2E de adherencia profesional (Sprint 25E).
@@ -19,6 +24,7 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
   }) => {
     await page.setViewportSize({ width: 1536, height: 862 });
     await loginAsAdmin(page);
+    await configureDefaultPatientRecordNumber(page);
 
     // 1) Crear un paciente para la prueba
     const email = uniqueEmail("adherence");
@@ -199,6 +205,22 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
     await expect(
       page.locator(".nc-new-patient__nutritionPanel legend > span"),
     ).toHaveCount(0);
+    const nutritionNavigationWidths = await page
+      .locator(".nc-new-patient")
+      .evaluate((element) => {
+        const sidebar = element.querySelector<HTMLElement>(
+          ".nc-new-patient__sidebar",
+        );
+        const sectionNav = element.querySelector<HTMLElement>(
+          ".nc-new-patient__medicalNav",
+        );
+        if (!sidebar || !sectionNav)
+          throw new Error("Nutrition navigation missing");
+        return {
+          sidebar: sidebar.getBoundingClientRect().width,
+          sectionNav: sectionNav.getBoundingClientRect().width,
+        };
+      });
     await wizardSteps.nth(0).click();
 
     await page.locator('input[name="firstName"]').fill("Adherencia");
@@ -230,9 +252,9 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
-    await page
-      .locator('input[name="externalRecordNumber"]')
-      .fill(`EXP-${Date.now()}`);
+    await expect(
+      page.locator('input[name="externalRecordNumber"]'),
+    ).toHaveValue(/^EXP-\d{2}-ADE\d{4,}$/);
     await page
       .locator('textarea[name="admissionReason"]')
       .fill("Seguimiento de adherencia");
@@ -318,8 +340,8 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       .locator('input[name="familyHistoryMode"][value="recorded"]')
       .check();
     await expect(
-      page.getByText(/^(Notas adicionales|Additional notes)$/i),
-    ).toBeVisible();
+      page.locator('label[for="field-new-patient-family-notes"]'),
+    ).toHaveText(/^(Notas adicionales|Additional notes)$/i);
     const familyLabelsFit = await page
       .locator(".nc-new-patient__familyHistoryGrid")
       .evaluate((grid) =>
@@ -657,7 +679,11 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
     await page.locator('[name="discomfortFoods"]').fill("Lácteos");
     await expectConditionalFieldBelow("hasFoodDiscomfort", "discomfortFoods");
     await expect(
-      page.getByText(/^(Notas adicionales|Additional notes)$/i),
+      page
+        .locator(
+          '.nc-new-patient__nutritionField--notes:has([name="foodPreferenceNotes"])',
+        )
+        .getByText(/^(Notas adicionales|Additional notes)$/i),
     ).toBeVisible();
     await page
       .locator('select[name="specialEatingPreference"]')
@@ -710,7 +736,11 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       2,
     );
     await expect(
-      page.getByText(/^(Notas adicionales|Additional notes)$/i),
+      page
+        .locator(
+          '.nc-new-patient__nutritionField--notes:has([name="hydrationNotes"])',
+        )
+        .getByText(/^(Notas adicionales|Additional notes)$/i),
     ).toBeVisible();
     await expectNutritionWithoutScroll();
     await page
@@ -773,7 +803,11 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       otherSymptomLayout.labelBottom,
     );
     await expect(
-      page.getByText(/^(Notas adicionales|Additional notes)$/i),
+      page
+        .locator(
+          '.nc-new-patient__nutritionField--notes:has([name="digestiveNotes"])',
+        )
+        .getByText(/^(Notas adicionales|Additional notes)$/i),
     ).toBeVisible();
     await expect(
       page
@@ -810,23 +844,185 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
+    await page.locator('input[name="activityLevel"][value="moderate"]').check();
+    await expect(
+      page.locator(".nc-new-patient__medicalNav button"),
+    ).toHaveCount(2);
+    await expect(
+      page.locator(".nc-new-patient__medicalNav button[data-current] svg"),
+    ).toHaveClass(/lucide-running/);
+    const physicalColumns = await page
+      .locator(".nc-new-patient")
+      .evaluate((element) => {
+        const sidebar = element.querySelector<HTMLElement>(
+          ".nc-new-patient__sidebar",
+        );
+        const sectionNav = element.querySelector<HTMLElement>(
+          ".nc-new-patient__medicalNav",
+        );
+        if (!sidebar || !sectionNav)
+          throw new Error("Activity navigation missing");
+        return {
+          columns: getComputedStyle(element).gridTemplateColumns.split(" "),
+          sidebar: sidebar.getBoundingClientRect().width,
+          sectionNav: sectionNav.getBoundingClientRect().width,
+        };
+      });
+    expect(physicalColumns.columns).toHaveLength(3);
+    expect(
+      Math.abs(physicalColumns.sidebar - nutritionNavigationWidths.sidebar),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(
+        physicalColumns.sectionNav - nutritionNavigationWidths.sectionNav,
+      ),
+    ).toBeLessThanOrEqual(1);
+    await page.locator('select[name="activityDaysPerWeek"]').selectOption("3");
     await page
-      .locator('input[name="physicalActivity"][value="no"]')
-      .check({ force: true });
+      .locator('select[name="activitySessionDuration"]')
+      .selectOption("45");
+    await page.locator('input[name="activityTypes"][value="walking"]').check();
+    await page.locator('input[name="activityTypes"][value="gym"]').check();
+    await page
+      .locator('select[name="physicalActivityGoal"]')
+      .selectOption("health");
+    await page
+      .locator('input[name="hasPhysicalLimitation"][value="yes"]')
+      .check();
+    const limitationDetailWidth = await page
+      .locator(".nc-new-patient__physicalLimitationDetails")
+      .evaluate((element) => ({
+        detail: element.getBoundingClientRect().width,
+        container: element.parentElement?.getBoundingClientRect().width ?? 0,
+      }));
+    expect(
+      Math.abs(limitationDetailWidth.detail - limitationDetailWidth.container),
+    ).toBeLessThanOrEqual(1);
+    await page
+      .locator('textarea[name="physicalLimitationDetails"]')
+      .fill("Dolor leve de rodilla");
+    await page
+      .locator('textarea[name="physicalActivityNotes"]')
+      .fill("Prefiere entrenar por la mañana");
     await page
       .getByRole("button", { name: /siguiente|next/i })
       .last()
       .click();
+    await expect(
+      page.locator(".nc-new-patient__medicalNav button[data-current] svg"),
+    ).toHaveClass(/lucide-daily-activity-chair/);
+    const overflowingDailyOptions = await page
+      .locator(
+        ":is(.nc-new-patient__dailySedentaryOptions, .nc-new-patient__dailyTransportOptions, .nc-new-patient__dailyBreakOptions, .nc-new-patient__dailyRoutineOptions) > label",
+      )
+      .evaluateAll((labels) =>
+        labels.flatMap((label) => {
+          const text = label.querySelector<HTMLElement>("span");
+          if (!text) throw new Error("Daily activity option text is missing");
+          const labelRect = label.getBoundingClientRect();
+          const textRect = text.getBoundingClientRect();
+          const overflows =
+            label.scrollWidth > label.clientWidth + 1 ||
+            text.scrollWidth > text.clientWidth + 1 ||
+            textRect.left < labelRect.left - 1 ||
+            textRect.right > labelRect.right + 1;
+          return overflows
+            ? [
+                {
+                  text: text.textContent?.trim() ?? "unknown option",
+                  labelWidth: label.clientWidth,
+                  labelScrollWidth: label.scrollWidth,
+                  textWidth: text.clientWidth,
+                  textScrollWidth: text.scrollWidth,
+                  textLeft: textRect.left,
+                  textRight: textRect.right,
+                  labelLeft: labelRect.left,
+                  labelRight: labelRect.right,
+                },
+              ]
+            : [];
+        }),
+      );
+    expect(overflowingDailyOptions).toEqual([]);
     await page
-      .getByRole("button", { name: /crear expediente|create record/i })
+      .locator('input[name="sedentaryTime"][value="sixToEight"]')
+      .check();
+    await page
+      .locator('input[name="usualTransportation"][value="walking"]')
+      .check();
+    await page
+      .locator('input[name="usesStairsFrequently"][value="yes"]')
+      .check();
+    await page
+      .locator('input[name="activeBreakFrequency"][value="frequently"]')
+      .check();
+    await page.locator('input[name="dailyRoutineType"][value="mixed"]').check();
+    await page
+      .locator('textarea[name="dailyActivityNotes"]')
+      .fill("Trabajo de oficina y caminata vespertina");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
       .last()
+      .click();
+    await expect(
+      page.getByText(
+        /1\. observaciones adicionales|1\. additional observations/i,
+      ),
+    ).toBeVisible();
+    await expect(page.locator(".nc-new-patient__notesGuide")).toContainText(
+      /barreras para seguir el plan|barriers to following the plan/i,
+    );
+    await expect(page.locator('input[name="clinicalTags"]')).toHaveCount(0);
+    const notesGeometry = await page
+      .locator(".nc-new-patient__notesLayout")
+      .evaluate((element) => {
+        const textarea = element.querySelector("textarea");
+        const guide = element.querySelector<HTMLElement>(
+          ".nc-new-patient__notesGuide",
+        );
+        if (!textarea || !guide) throw new Error("Notes layout is incomplete");
+        const textareaRect = textarea.getBoundingClientRect();
+        const guideRect = guide.getBoundingClientRect();
+        return {
+          columns: getComputedStyle(element).gridTemplateColumns.split(" "),
+          textareaHeight: textareaRect.height,
+          topDifference: Math.abs(textareaRect.top - guideRect.top),
+        };
+      });
+    expect(notesGeometry.columns).toHaveLength(2);
+    expect(notesGeometry.textareaHeight).toBeGreaterThanOrEqual(280);
+    expect(notesGeometry.topDifference).toBeLessThanOrEqual(10);
+    await page
+      .locator('textarea[name="generalNotes"]')
+      .fill("Paciente comprometido con el seguimiento nutricional");
+    await page
+      .getByRole("button", {
+        name: /finalizar registro|finish registration/i,
+      })
+      .last()
+      .click();
+    const finalReviewDialog = page.getByTestId(
+      "final-registration-review-dialog",
+    );
+    await expect(finalReviewDialog).toBeVisible();
+    await expect(
+      finalReviewDialog.locator('[data-review-section="required"]'),
+    ).toHaveCount(0);
+    await finalReviewDialog
+      .getByRole("button", {
+        name: /guardar de todos modos|save anyway/i,
+      })
       .click();
     await page.waitForURL(/\/pacientes\/[a-f0-9-]{36}$/, { timeout: 15_000 });
     const patientId = page.url().match(/\/pacientes\/([a-f0-9-]{36})/)?.[1];
     expect(patientId).toBeTruthy();
     if (!patientId) throw new Error("Patient id was not found in the URL");
-    const medicalIntake = await page.evaluate(async (id) => {
-      return new Promise<Record<string, unknown> | null>((resolve, reject) => {
+    const persistedPatient = await page.evaluate(async (id) => {
+      return new Promise<{
+        medicalIntake: Record<string, unknown> | null;
+        generalNotes: string | null;
+        clinicalTags: string | null;
+      } | null>((resolve, reject) => {
         const request = indexedDB.open("nutriclinica");
         request.onsuccess = () => {
           const transaction = request.result.transaction(
@@ -835,19 +1031,31 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
           );
           const getRequest = transaction.objectStore("patients").get(id);
           getRequest.onsuccess = () => {
-            const value = getRequest.result?.medical_intake;
-            resolve(
-              typeof value === "string"
-                ? (JSON.parse(value) as Record<string, unknown>)
-                : (value ?? null),
-            );
+            const row = getRequest.result;
+            if (!row) {
+              resolve(null);
+              return;
+            }
+            const value = row.medical_intake;
+            resolve({
+              medicalIntake:
+                typeof value === "string"
+                  ? (JSON.parse(value) as Record<string, unknown>)
+                  : (value ?? null),
+              generalNotes: row.general_notes ?? null,
+              clinicalTags: row.clinical_tags ?? null,
+            });
           };
           getRequest.onerror = () => reject(getRequest.error);
         };
         request.onerror = () => reject(request.error);
       });
     }, patientId);
-    expect(medicalIntake).toMatchObject({
+    expect(persistedPatient?.generalNotes).toBe(
+      "Paciente comprometido con el seguimiento nutricional",
+    );
+    expect(persistedPatient?.clinicalTags).toBe("[]");
+    expect(persistedPatient?.medicalIntake).toMatchObject({
       diagnosedConditions: true,
       diagnosedConditionDetails: [
         { diagnosis: "Diabetes mellitus tipo 2", status: "controlled" },
@@ -930,6 +1138,27 @@ test.describe.serial("Adherencia profesional — captura en consulta", () => {
           otherSymptomDescription: "Sensación de vacío",
           symptomTiming: "afterMeals",
           notes: null,
+        },
+      },
+      physicalActivity: true,
+      physicalActivityIntake: {
+        activity: {
+          level: "moderate",
+          daysPerWeek: 3,
+          sessionDurationMinutes: 45,
+          activityTypes: ["walking", "gym"],
+          primaryGoal: "health",
+          hasPhysicalLimitation: true,
+          physicalLimitationDetails: "Dolor leve de rodilla",
+          notes: "Prefiere entrenar por la mañana",
+        },
+        dailyActivity: {
+          sedentaryTime: "sixToEight",
+          usualTransportation: "walking",
+          usesStairsFrequently: true,
+          activeBreakFrequency: "frequently",
+          routineType: "mixed",
+          notes: "Trabajo de oficina y caminata vespertina",
         },
       },
     });

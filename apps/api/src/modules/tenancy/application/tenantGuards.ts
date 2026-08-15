@@ -1,16 +1,21 @@
 import sql from 'mssql';
 import { HttpError } from '../../../middleware/errorHandler.js';
 
+/** Sesión de DB: un pool o una transacción activa (ambos exponen request()). */
+export interface DbSession {
+  request(): sql.Request;
+}
+
 function notFound(message: string): never {
   throw new HttpError(404, message);
 }
 
 export async function assertPacienteInSucursal(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   pacienteId: string,
   sucursalId: string,
 ): Promise<void> {
-  const result = await pool
+  const result = await session
     .request()
     .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
     .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
@@ -28,12 +33,12 @@ export async function assertPacienteInSucursal(
 }
 
 export async function assertConsultaInSucursal(
-  pool: sql.ConnectionPool,
+  session: DbSession,
   consultaId: string,
   sucursalId: string,
   pacienteId?: string,
 ): Promise<void> {
-  const request = pool
+  const request = session
     .request()
     .input('consulta_id', sql.UniqueIdentifier(), consultaId)
     .input('sucursal_id', sql.UniqueIdentifier(), sucursalId);

@@ -892,3 +892,34 @@ async function flushPendingPortalAdherenceSubmissionsNow(
   savePendingPortalAdherenceSubmissions(token, remaining);
   return { submitted, failed, remaining: remaining.length };
 }
+
+const WsTicketResponseSchema = z.object({
+  ticket: z.string(),
+  expiresAt: z.string(),
+});
+
+export type WsTicketResponse = z.infer<typeof WsTicketResponseSchema>;
+
+export async function getProfessionalChatWsTicket(
+  pacienteId: string,
+): Promise<WsTicketResponse> {
+  const response = await httpRequest<unknown>("/patient-portal/ws-ticket", {
+    method: "POST",
+    body: { pacienteId },
+  });
+  return WsTicketResponseSchema.parse(response);
+}
+
+export async function getPatientPortalChatWsTicket(
+  token: string,
+): Promise<WsTicketResponse> {
+  const response = await httpRequest<unknown>(
+    `/patient-portal/${encodeURIComponent(token)}/ws-ticket`,
+    {
+      method: "POST",
+      skipAuth: true,
+      skipSucursalHeader: true,
+    },
+  );
+  return WsTicketResponseSchema.parse(response);
+}

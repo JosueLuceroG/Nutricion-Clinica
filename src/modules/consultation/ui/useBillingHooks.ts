@@ -217,9 +217,10 @@ export const usePatientPaymentSummary = (
     async () => {
       if (!patientId) return null;
       const rows = await dbInstance.consultations
+        .where("patient_id")
+        .equals(patientId)
         .filter((r) => {
           if (r.deleted_at) return false;
-          if (r.patient_id !== patientId) return false;
           if (!(r.cost > 0)) return false;
           return true;
         })
@@ -227,6 +228,7 @@ export const usePatientPaymentSummary = (
 
       let totalCost = 0;
       let totalPaid = 0;
+      let totalPending = 0;
       let paidCount = 0;
       let pendingCount = 0;
       let partialCount = 0;
@@ -240,17 +242,22 @@ export const usePatientPaymentSummary = (
           paidCount += 1;
         } else if (ps === "partial") {
           totalPaid += ap;
-          totalCost -= row.cost - ap;
+          totalPending += row.cost - ap;
           partialCount += 1;
-        } else {
+        } else if (ps === "pending") {
+          totalPending += row.cost;
           pendingCount += 1;
+        } else {
+          // refunded / cancelled: ni pagadas ni por cobrar — se excluyen
+          // del costo total, de lo pagado y de lo pendiente.
+          totalCost -= row.cost;
         }
       }
 
       return {
         totalCost,
         totalPaid,
-        totalPending: totalCost - totalPaid,
+        totalPending,
         consultationCount: rows.length,
         paidCount,
         pendingCount,

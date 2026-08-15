@@ -1,8 +1,10 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { Shield, ShieldOff, Smartphone, AlertCircle, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { twoFactorApi } from "@services/api/twoFactorApi";
+import { useAuthStore } from "@store/authStore";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Button } from "@components/ui/button";
@@ -13,6 +15,8 @@ import { cn } from "@utils/cn";
 
 export function TwoFactorSetupPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const logout = useAuthStore((state) => state.logout);
 
   const [enabled, setEnabled] = React.useState<boolean | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -58,7 +62,11 @@ export function TwoFactorSetupPage() {
       setEnabled(true);
       setSetupData(null);
       setTotpCode("");
-      toast.success(t("auth.2fa_enabled"));
+      toast.success(t("auth.2fa_enabled"), {
+        description: t("auth.2fa_reauth_required"),
+      });
+      logout();
+      navigate("/login", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "C\u00f3digo inv\u00e1lido");
     } finally {
@@ -74,7 +82,11 @@ export function TwoFactorSetupPage() {
       await twoFactorApi.disable(disableCode);
       setEnabled(false);
       setDisableCode("");
-      toast.success(t("auth.2fa_disabled"));
+      toast.success(t("auth.2fa_disabled"), {
+        description: t("auth.2fa_reauth_required"),
+      });
+      logout();
+      navigate("/login", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "C\u00f3digo inv\u00e1lido");
     } finally {

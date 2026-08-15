@@ -48,6 +48,10 @@ export const telemedicinaApi = {
     return httpRequest(`/telemedicina/${id}`);
   },
 
+  async getWsTicket(salaId: string): Promise<{ ticket: string; expiresAt: string }> {
+    return httpRequest(`/telemedicina/${salaId}/ws-ticket`, { method: 'POST' });
+  },
+
   async create(input: CreateSalaInput): Promise<{ id: string }> {
     return httpRequest('/telemedicina', { method: 'POST', body: input });
   },

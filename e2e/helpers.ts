@@ -80,6 +80,24 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   ).toBeVisible({ timeout: 10_000 });
 }
 
+export async function configureDefaultPatientRecordNumber(
+  page: Page,
+): Promise<void> {
+  await page.goto(hashUrl("/configuracion?section=patient-record-number"));
+  const card = page.getByTestId("patient-record-number-settings");
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await card
+    .getByRole("button", {
+      name: /usar formato predeterminado|use default format/i,
+    })
+    .click();
+  await card
+    .getByRole("button", {
+      name: /guardar configuraci[oó]n|save configuration/i,
+    })
+    .click();
+}
+
 /** Genera un email único para no chocar con datos existentes en la DB. */
 export function uniqueEmail(prefix: string): string {
   return `e2e-${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@nutriclinica.local`;

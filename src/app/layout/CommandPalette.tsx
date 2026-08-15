@@ -1,5 +1,4 @@
 import * as React from "react";
-import { useDeferredValue } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Command } from "cmdk";
@@ -55,6 +54,8 @@ import type {
   GlobalSearchResult,
 } from "./globalSearchTypes";
 import { useGlobalSearchData } from "./useGlobalSearchData";
+import { hasNaturalDietFilters } from "./globalDietSearch";
+import { buildSettingsSearchResults } from "./globalSettingsSearch";
 import "./CommandPalette.css";
 
 type PendingCreation = "consultation" | "plan" | null;
@@ -96,9 +97,11 @@ function buildIntelligentSuggestion(
   const normalized = normalizeSearchText(query);
   if (!normalized) return null;
 
-  const patientSearch = normalized.match(locale.startsWith("en")
-    ? /(?:find|search|open) patient (.+)$/
-    : /(?:buscar|encontrar|abrir) paciente (.+)$/);
+  const patientSearch = normalized.match(
+    locale.startsWith("en")
+      ? /(?:find|search|open) patient (.+)$/
+      : /(?:buscar|encontrar|abrir) paciente (.+)$/,
+  );
   if (patientSearch?.[1]) {
     return {
       id: "intent-search-patient",
@@ -113,59 +116,62 @@ function buildIntelligentSuggestion(
     };
   }
 
-  const intents: Array<{ pattern: RegExp; id: string; titleKey: string }> = locale.startsWith("en") ? [
-    {
-      pattern: /(?:create|add|new) patient/,
-      id: "new-patient",
-      titleKey: "command.create_patient",
-    },
-    {
-      pattern: /(?:new|create|schedule) consultation/,
-      id: "new-consultation",
-      titleKey: "command.new_consultation",
-    },
-    {
-      pattern: /(?:new|create) (?:meal )?plan/,
-      id: "new-plan",
-      titleKey: "command.new_plan",
-    },
-    {
-      pattern: /open today(?: s)? agenda/,
-      id: "agenda-today",
-      titleKey: "command.today_consultations",
-    },
-    {
-      pattern: /(?:results?|laboratory|labs?)/,
-      id: "laboratory",
-      titleKey: "command.go_laboratory",
-    },
-  ] : [
-    {
-      pattern: /(?:crear|agregar|nuevo) paciente/,
-      id: "new-patient",
-      titleKey: "command.create_patient",
-    },
-    {
-      pattern: /(?:nueva|crear|agendar) consulta/,
-      id: "new-consultation",
-      titleKey: "command.new_consultation",
-    },
-    {
-      pattern: /(?:nuevo|crear) plan/,
-      id: "new-plan",
-      titleKey: "command.new_plan",
-    },
-    {
-      pattern: /abrir agenda de hoy/,
-      id: "agenda-today",
-      titleKey: "command.today_consultations",
-    },
-    {
-      pattern: /(?:resultados?|laboratorio)/,
-      id: "laboratory",
-      titleKey: "command.go_laboratory",
-    },
-  ];
+  const intents: Array<{ pattern: RegExp; id: string; titleKey: string }> =
+    locale.startsWith("en")
+      ? [
+          {
+            pattern: /(?:create|add|new) patient/,
+            id: "new-patient",
+            titleKey: "command.create_patient",
+          },
+          {
+            pattern: /(?:new|create|schedule) consultation/,
+            id: "new-consultation",
+            titleKey: "command.new_consultation",
+          },
+          {
+            pattern: /(?:new|create) (?:meal )?plan/,
+            id: "new-plan",
+            titleKey: "command.new_plan",
+          },
+          {
+            pattern: /open today(?: s)? agenda/,
+            id: "agenda-today",
+            titleKey: "command.today_consultations",
+          },
+          {
+            pattern: /(?:results?|laboratory|labs?)/,
+            id: "laboratory",
+            titleKey: "command.go_laboratory",
+          },
+        ]
+      : [
+          {
+            pattern: /(?:crear|agregar|nuevo) paciente/,
+            id: "new-patient",
+            titleKey: "command.create_patient",
+          },
+          {
+            pattern: /(?:nueva|crear|agendar) consulta/,
+            id: "new-consultation",
+            titleKey: "command.new_consultation",
+          },
+          {
+            pattern: /(?:nuevo|crear) plan/,
+            id: "new-plan",
+            titleKey: "command.new_plan",
+          },
+          {
+            pattern: /abrir agenda de hoy/,
+            id: "agenda-today",
+            titleKey: "command.today_consultations",
+          },
+          {
+            pattern: /(?:resultados?|laboratorio)/,
+            id: "laboratory",
+            titleKey: "command.go_laboratory",
+          },
+        ];
   const intent = intents.find((candidate) =>
     candidate.pattern.test(normalized),
   );
@@ -188,7 +194,9 @@ export function CommandPalette() {
   const open = useCommandPaletteStore((state) => state.open);
   const setOpen = useCommandPaletteStore((state) => state.setOpen);
   const requestedIntent = useCommandPaletteStore((state) => state.intent);
-  const clearRequestedIntent = useCommandPaletteStore((state) => state.clearIntent);
+  const clearRequestedIntent = useCommandPaletteStore(
+    (state) => state.clearIntent,
+  );
   const historyEntries = useSearchHistoryStore((state) => state.entries);
   const registerRecent = useSearchHistoryStore((state) => state.register);
   const clearRecentScope = useSearchHistoryStore((state) => state.clearScope);
@@ -208,19 +216,26 @@ export function CommandPalette() {
     React.useState<PendingCreation>(null);
   const [browseAll, setBrowseAll] = React.useState(false);
   const [showHelp, setShowHelp] = React.useState(false);
-  const deferredQuery = useDeferredValue(query);
+  const deferredQuery = query;
   const locale = i18n.language || "es-MX";
   const scope = `${userId}:${activeSucursalId ?? "none"}`;
-  const access = React.useMemo<GlobalSearchAccess>(() => ({
-    patients: Boolean(role && hasModuleAccess("patients", role)),
-    consultations: Boolean(role && hasModuleAccess("consultations", role)),
-    plans: Boolean(role && hasModuleAccess("mealplan", role)),
-    laboratory: Boolean(role && hasModuleAccess("laboratory", role)),
-    agenda: Boolean(role && hasModuleAccess("agenda", role)),
-    recipes: Boolean(role && hasModuleAccess("recipes", role)),
-  }), [role]);
-  const canAccessDashboard = Boolean(role && hasModuleAccess("dashboard", role));
-  const canAccessCalculations = Boolean(role && hasModuleAccess("anthropometry", role));
+  const access = React.useMemo<GlobalSearchAccess>(
+    () => ({
+      patients: Boolean(role && hasModuleAccess("patients", role)),
+      consultations: Boolean(role && hasModuleAccess("consultations", role)),
+      plans: Boolean(role && hasModuleAccess("mealplan", role)),
+      laboratory: Boolean(role && hasModuleAccess("laboratory", role)),
+      agenda: Boolean(role && hasModuleAccess("agenda", role)),
+      recipes: Boolean(role && hasModuleAccess("recipes", role)),
+    }),
+    [role],
+  );
+  const canAccessDashboard = Boolean(
+    role && hasModuleAccess("dashboard", role),
+  );
+  const canAccessCalculations = Boolean(
+    role && hasModuleAccess("anthropometry", role),
+  );
   const canCreatePatients = Boolean(
     role && hasModuleAccess("patients", role, "write"),
   );
@@ -237,20 +252,21 @@ export function CommandPalette() {
   } = useGlobalSearchData(open, activeSucursalId, locale, access);
   const shortcutLabel = getGlobalSearchShortcutLabel();
   const availableCategories = React.useMemo(
-    () => CATEGORIES.filter((item) => {
-      if (item.id === "patients") return access.patients;
-      if (item.id === "consultations") return access.consultations || access.agenda;
-      if (item.id === "plans") return access.plans;
-      if (item.id === "laboratory") return access.laboratory;
-      if (item.id === "recipes") return access.recipes;
-      return true;
-    }),
+    () =>
+      CATEGORIES.filter((item) => {
+        if (item.id === "patients") return access.patients;
+        if (item.id === "consultations")
+          return access.consultations || access.agenda;
+        if (item.id === "plans") return access.plans;
+        if (item.id === "laboratory") return access.laboratory;
+        if (item.id === "recipes") return access.recipes;
+        return true;
+      }),
     [access],
   );
 
-  const staticResults = React.useMemo<GlobalSearchResult[]>(
-    () => {
-      const results = [
+  const staticResults = React.useMemo<GlobalSearchResult[]>(() => {
+    const results: GlobalSearchResult[] = [
       createActionResult({
         id: "action-dashboard",
         title: t("command.go_dashboard"),
@@ -387,78 +403,91 @@ export function CommandPalette() {
         tone: "slate",
         actionId: "toggle-language",
       }),
-      ];
-      const allowedById: Record<string, boolean> = {
-        "action-dashboard": canAccessDashboard,
-        "action-patients": access.patients,
-        "action-consultations": access.consultations,
-        "action-plans": access.plans,
-        "action-agenda": access.agenda,
-        "action-laboratory": access.laboratory,
-        "action-recipes": access.recipes,
-        "action-calculations": canAccessCalculations,
-        "action-new-patient": Boolean(activeSucursalId) && canCreatePatients,
-        "action-new-consultation": Boolean(activeSucursalId) && access.patients && canCreateConsultations,
-        "action-new-plan": Boolean(activeSucursalId) && access.patients && canCreatePlans,
-      };
-      return results.filter((result) => allowedById[result.id] ?? true);
-    },
-    [
-      access,
-      activeSucursalId,
-      canAccessCalculations,
-      canAccessDashboard,
-      canCreateConsultations,
-      canCreatePatients,
-      canCreatePlans,
-      locale,
-      t,
-    ],
-  );
+    ];
+    results.push(
+      ...buildSettingsSearchResults({
+        locale,
+        isAdmin: role === "admin",
+        translate: (key) => t(key),
+      }),
+    );
+    const allowedById: Record<string, boolean> = {
+      "action-dashboard": canAccessDashboard,
+      "action-patients": access.patients,
+      "action-consultations": access.consultations,
+      "action-plans": access.plans,
+      "action-agenda": access.agenda,
+      "action-laboratory": access.laboratory,
+      "action-recipes": access.recipes,
+      "action-calculations": canAccessCalculations,
+      "action-new-patient": Boolean(activeSucursalId) && canCreatePatients,
+      "action-new-consultation":
+        Boolean(activeSucursalId) && access.patients && canCreateConsultations,
+      "action-new-plan":
+        Boolean(activeSucursalId) && access.patients && canCreatePlans,
+    };
+    return results.filter((result) => allowedById[result.id] ?? true);
+  }, [
+    access,
+    activeSucursalId,
+    canAccessCalculations,
+    canAccessDashboard,
+    canCreateConsultations,
+    canCreatePatients,
+    canCreatePlans,
+    locale,
+    role,
+    t,
+  ]);
 
   const allResults = React.useMemo(
     () => [...staticResults, ...dataResults],
     [dataResults, staticResults],
   );
-  const intelligentSuggestion = React.useMemo(
-    () => {
-      const suggestion = buildIntelligentSuggestion(
-        deferredQuery,
-        (key) => t(key),
-        locale,
-      );
-      if (!suggestion) return null;
-      if (suggestion.actionId?.startsWith("intent-search-patient:")) {
-        return access.patients ? suggestion : null;
-      }
-      if (suggestion.actionId === "agenda-today") {
-        return access.agenda ? suggestion : null;
-      }
-      return (
-        staticResults.some(
-          (result) => result.actionId === suggestion.actionId,
-        ) ||
-        (suggestion.actionId === "laboratory" && access.laboratory)
-      )
-        ? suggestion
-        : null;
-    },
-    [access.agenda, access.laboratory, access.patients, deferredQuery, locale, staticResults, t],
-  );
+  const intelligentSuggestion = React.useMemo(() => {
+    const suggestion = buildIntelligentSuggestion(
+      deferredQuery,
+      (key) => t(key),
+      locale,
+    );
+    if (!suggestion) return null;
+    if (suggestion.actionId?.startsWith("intent-search-patient:")) {
+      return access.patients ? suggestion : null;
+    }
+    if (suggestion.actionId === "agenda-today") {
+      return access.agenda ? suggestion : null;
+    }
+    return staticResults.some(
+      (result) => result.actionId === suggestion.actionId,
+    ) ||
+      (suggestion.actionId === "laboratory" && access.laboratory)
+      ? suggestion
+      : null;
+  }, [
+    access.agenda,
+    access.laboratory,
+    access.patients,
+    deferredQuery,
+    locale,
+    staticResults,
+    t,
+  ]);
   const parsedQuery = React.useMemo(
     () => parseGlobalSearch(deferredQuery),
     [deferredQuery],
   );
-  const effectiveCategory = parsedQuery.category && availableCategories.some(
-    (item) => item.id === parsedQuery.category,
-  )
-    ? parsedQuery.category
-    : category;
+  const effectiveCategory =
+    category === "all" &&
+    parsedQuery.category &&
+    availableCategories.some((item) => item.id === parsedQuery.category)
+      ? parsedQuery.category
+      : category;
   const showAllStructuredResults =
     !parsedQuery.text &&
     (Boolean(parsedQuery.filters.date) ||
       Boolean(parsedQuery.filters.kcalTotal) ||
-      Boolean(parsedQuery.filters.kcalPerServing));
+      Boolean(parsedQuery.filters.kcalPerServing) ||
+      hasNaturalDietFilters(parsedQuery.filters));
   const rankedResults = React.useMemo(() => {
     if (pendingCreation) {
       return filterAndRankGlobalSearch(
@@ -467,14 +496,18 @@ export function CommandPalette() {
         ),
         deferredQuery,
         "patients",
-        browseAll || showAllStructuredResults ? dataResults.length + 1 : 20,
+        browseAll || showAllStructuredResults || category !== "all"
+          ? dataResults.length + 1
+          : 20,
       );
     }
     const ranked = filterAndRankGlobalSearch(
       allResults,
       deferredQuery,
       category,
-      browseAll || showAllStructuredResults ? allResults.length + 1 : 20,
+      browseAll || showAllStructuredResults || category !== "all"
+        ? allResults.length + 1
+        : 20,
     );
     if (
       !intelligentSuggestion ||
@@ -491,7 +524,9 @@ export function CommandPalette() {
       ...ranked.filter((result) => result.id !== intelligentSuggestion.id),
     ].slice(
       0,
-      browseAll || showAllStructuredResults ? allResults.length + 1 : 20,
+      browseAll || showAllStructuredResults || category !== "all"
+        ? allResults.length + 1
+        : 20,
     );
   }, [
     allResults,
@@ -618,7 +653,11 @@ export function CommandPalette() {
       };
       if (result.actionId && directActionPaths[result.actionId]) {
         if (result.kind !== "intent") {
-          registerRecent({ scope, resultId: result.id, selectedAt: Date.now() });
+          registerRecent({
+            scope,
+            resultId: result.id,
+            selectedAt: Date.now(),
+          });
         }
         handleOpenChange(false);
         navigate(directActionPaths[result.actionId]);
@@ -666,7 +705,11 @@ export function CommandPalette() {
     const handleShortcut = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "k")
         return;
-      if (event.target instanceof Element && event.target.closest("[data-quick-notes-editor]")) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest("[data-quick-notes-editor]")
+      )
+        return;
       event.preventDefault();
       if (open) {
         inputRef.current?.focus();
@@ -692,7 +735,11 @@ export function CommandPalette() {
   }, [availableCategories, category]);
 
   const showInitialState =
-    !query.trim() && category === "all" && !pendingCreation && !browseAll && !showHelp;
+    !query.trim() &&
+    category === "all" &&
+    !pendingCreation &&
+    !browseAll &&
+    !showHelp;
   const placeholder = pendingCreation
     ? t(
         pendingCreation === "consultation"
@@ -707,12 +754,15 @@ export function CommandPalette() {
   ) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
-    const nextIndex = event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? availableCategories.length - 1
-        : (index + (event.key === "ArrowRight" ? 1 : -1) + availableCategories.length) %
-          availableCategories.length;
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? availableCategories.length - 1
+          : (index +
+              (event.key === "ArrowRight" ? 1 : -1) +
+              availableCategories.length) %
+            availableCategories.length;
     setCategory(availableCategories[nextIndex]!.id);
     tabRefs.current[nextIndex]?.focus();
   };
@@ -851,10 +901,7 @@ export function CommandPalette() {
             </div>
           )}
 
-          <Command.List
-            className="nc-global-search__body"
-            aria-busy={loading}
-          >
+          <Command.List className="nc-global-search__body" aria-busy={loading}>
             <div className="sr-only" role="status" aria-live="polite">
               {!loading && !showHelp
                 ? t("command.result_count", { count: rankedResults.length })
@@ -868,7 +915,7 @@ export function CommandPalette() {
                 onClearRecent={() => clearRecentScope(scope)}
                 onOpenAiSettings={() => {
                   handleOpenChange(false);
-                  navigate("/configuracion");
+                  navigate("/configuracion?section=ai");
                 }}
               />
             ) : loading ? (
@@ -883,7 +930,9 @@ export function CommandPalette() {
                 <SmartSearchHint onOpenHelp={() => setShowHelp(true)} />
                 <QuickFilterPanel
                   locale={locale}
-                  availableCategories={availableCategories.map((item) => item.id)}
+                  availableCategories={availableCategories.map(
+                    (item) => item.id,
+                  )}
                   onApply={applyExample}
                 />
                 <SearchSectionHeading
@@ -1023,8 +1072,7 @@ function SmartSearchHint({ onOpenHelp }: { onOpenHelp: () => void }) {
         <Sparkles size={17} />
       </span>
       <p>
-        <strong>{t("command.hint_title")}</strong>{" "}
-        {t("command.hint_body")}
+        <strong>{t("command.hint_title")}</strong> {t("command.hint_body")}
       </p>
       <button type="button" onClick={onOpenHelp}>
         {t("command.how_it_works")}
@@ -1051,11 +1099,13 @@ function SearchHelpPanel({
     ? [
         "Maria Lopez",
         "today's consultations",
+        "diet 2300 kcal with chicken and without fish",
         "recipes with 2000 calories",
       ]
     : [
         "María López",
         "consultas de hoy",
+        "dieta de 2300 kcal con pollo y sin pescado",
         "recetas de 2000 calorías",
       ];
   const filterExample = locale.startsWith("en")
@@ -1065,7 +1115,9 @@ function SearchHelpPanel({
   return (
     <div className="nc-global-search__helpPanel">
       <div className="nc-global-search__helpHero">
-        <span aria-hidden="true"><LockKeyhole size={20} /></span>
+        <span aria-hidden="true">
+          <LockKeyhole size={20} />
+        </span>
         <div>
           <strong>{t("command.help_local_title")}</strong>
           <p>{t("command.help_local_body")}</p>
@@ -1073,11 +1125,18 @@ function SearchHelpPanel({
       </div>
 
       <section className="nc-global-search__helpSection">
-        <h3><Search size={16} aria-hidden="true" />{t("command.help_records_title")}</h3>
+        <h3>
+          <Search size={16} aria-hidden="true" />
+          {t("command.help_records_title")}
+        </h3>
         <p>{t("command.help_records_body")}</p>
         <div className="nc-global-search__exampleChips">
           {examples.map((example) => (
-            <button key={example} type="button" onClick={() => onApplyExample(example)}>
+            <button
+              key={example}
+              type="button"
+              onClick={() => onApplyExample(example)}
+            >
               {example}
             </button>
           ))}
@@ -1085,7 +1144,10 @@ function SearchHelpPanel({
       </section>
 
       <section className="nc-global-search__helpSection">
-        <h3><Sparkles size={16} aria-hidden="true" />{t("command.help_commands_title")}</h3>
+        <h3>
+          <Sparkles size={16} aria-hidden="true" />
+          {t("command.help_commands_title")}
+        </h3>
         <p>{t("command.help_commands_body")}</p>
         <div className="nc-global-search__helpNotice">
           <strong>{t("command.help_not_ai_title")}</strong>
@@ -1097,7 +1159,10 @@ function SearchHelpPanel({
       </section>
 
       <section className="nc-global-search__helpSection">
-        <h3><ListFilter size={16} aria-hidden="true" />{t("command.help_filters_title")}</h3>
+        <h3>
+          <ListFilter size={16} aria-hidden="true" />
+          {t("command.help_filters_title")}
+        </h3>
         <p>{t("command.help_filters_body")}</p>
         <QuickFilterPanel
           locale={locale}
@@ -1109,13 +1174,52 @@ function SearchHelpPanel({
           <summary>{t("command.advanced_filters")}</summary>
           <p>{t("command.advanced_filters_hint")}</p>
           <dl className="nc-global-search__operatorList">
-            <div><dt><code>{locale.startsWith("en") ? "type:" : "tipo:"}</code></dt><dd>{t("command.filter_type_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "patient:" : "paciente:"}</code></dt><dd>{t("command.filter_patient_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "phone:" : "tel:"}</code></dt><dd>{t("command.filter_phone_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "email:" : "correo:"}</code></dt><dd>{t("command.filter_email_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "date:" : "fecha:"}</code></dt><dd>{t("command.filter_date_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "status:" : "estado:"}</code></dt><dd>{t("command.filter_status_help")}</dd></div>
-            <div><dt><code>{locale.startsWith("en") ? "calories:" : "calorias:"}</code></dt><dd>{t("command.filter_calories_help")}</dd></div>
+            <div>
+              <dt>
+                <code>{locale.startsWith("en") ? "type:" : "tipo:"}</code>
+              </dt>
+              <dd>{t("command.filter_type_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>
+                  {locale.startsWith("en") ? "patient:" : "paciente:"}
+                </code>
+              </dt>
+              <dd>{t("command.filter_patient_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>{locale.startsWith("en") ? "phone:" : "tel:"}</code>
+              </dt>
+              <dd>{t("command.filter_phone_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>{locale.startsWith("en") ? "email:" : "correo:"}</code>
+              </dt>
+              <dd>{t("command.filter_email_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>{locale.startsWith("en") ? "date:" : "fecha:"}</code>
+              </dt>
+              <dd>{t("command.filter_date_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>{locale.startsWith("en") ? "status:" : "estado:"}</code>
+              </dt>
+              <dd>{t("command.filter_status_help")}</dd>
+            </div>
+            <div>
+              <dt>
+                <code>
+                  {locale.startsWith("en") ? "calories:" : "calorias:"}
+                </code>
+              </dt>
+              <dd>{t("command.filter_calories_help")}</dd>
+            </div>
           </dl>
           <button
             type="button"
@@ -1128,13 +1232,18 @@ function SearchHelpPanel({
       </section>
 
       <section className="nc-global-search__helpSection nc-global-search__helpSection--compact">
-        <h3><Keyboard size={16} aria-hidden="true" />{t("command.help_keyboard_title")}</h3>
+        <h3>
+          <Keyboard size={16} aria-hidden="true" />
+          {t("command.help_keyboard_title")}
+        </h3>
         <p>{t("command.help_keyboard_body")}</p>
       </section>
 
       <div className="nc-global-search__helpActions">
         <p>{t("command.help_recent_body")}</p>
-        <button type="button" onClick={onClearRecent}>{t("command.clear_recent")}</button>
+        <button type="button" onClick={onClearRecent}>
+          {t("command.clear_recent")}
+        </button>
       </div>
     </div>
   );

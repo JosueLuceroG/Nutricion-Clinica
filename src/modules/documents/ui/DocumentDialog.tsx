@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DocumentFormSchema, type DocumentFormInput } from "../application/documentFormSchema";
 import { DocumentTypeLabel } from "../domain/DocumentTypes";
 import { ScrollArea } from "@components/ui/scroll-area";
+import { sanitizeHtml } from "@utils/domSanitize";
 
 interface DocumentDialogProps {
   open: boolean;
@@ -42,7 +43,7 @@ export function DocumentDialog({ open, onOpenChange, onSubmit }: DocumentDialogP
   const handleSubmit = async (data: DocumentFormInput) => {
     setSubmitting(true);
     try {
-      await onSubmit(data);
+      await onSubmit({ ...data, contentHtml: sanitizeHtml(data.contentHtml) });
       onOpenChange(false);
     } finally {
       setSubmitting(false);
@@ -88,7 +89,9 @@ export function DocumentDialog({ open, onOpenChange, onSubmit }: DocumentDialogP
             <ScrollArea className="h-[200px] rounded-md border p-4">
               <div
                 className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: form.watch("contentHtml") || "<p class='text-muted-foreground'>Sin contenido</p>" }}
+                dangerouslySetInnerHTML={{
+                  __html: sanitizeHtml(form.watch("contentHtml")) || "<p class='text-muted-foreground'>Sin contenido</p>",
+                }}
               />
             </ScrollArea>
           )}

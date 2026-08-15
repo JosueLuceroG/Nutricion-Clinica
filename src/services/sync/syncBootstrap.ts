@@ -7,37 +7,67 @@
  * - start() arranca el ciclo peri\u00f3dico; stop() lo cancela.
  */
 
-import { type NutriClinicaDB } from '@services/db/dexieSchema';
-import { SyncQueueRepository } from './syncQueueRepository.js';
-import { SyncEngine, type SyncEngineDeps, type SyncEvent } from './syncEngine.js';
-import { syncApi } from './syncApiClient.js';
-import { useAuthStore } from '@store/authStore';
-import { useSyncStore } from '@store/syncStore';
-import { toast } from 'sonner';
-import type { SyncOp } from '@modules/sync/domain/SyncQueueItem';
-import type { SyncableEntity } from '@nutriclinica/shared';
+import { type NutriClinicaDB } from "@services/db/dexieSchema";
+import { SyncQueueRepository } from "./syncQueueRepository.js";
+import {
+  SyncEngine,
+  type SyncEngineDeps,
+  type SyncEvent,
+} from "./syncEngine.js";
+import { syncApi } from "./syncApiClient.js";
+import type { SyncOp } from "@modules/sync/domain/SyncQueueItem";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
+import { toast } from "sonner";
+import type { SyncableEntity, SyncPullCursors } from "@nutriclinica/shared";
+import { requireActiveSucursalId } from "@services/tenancy/sucursalScope";
 
 const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
-  patients: 'pacientes',
-  consultations: 'consultas',
-  anthropometry: 'antropometrias',
-  lab_panels: 'lab_panels',
-  meal_plans: 'planes_alimenticios',
-  adherence_records: 'adherence_records',
+  patients: "pacientes",
+  consultations: "consultas",
+  anthropometry: "antropometrias",
+  lab_panels: "lab_panels",
+  meal_plans: "planes_alimenticios",
+  adherence_records: "adherence_records",
 };
 
-const LAST_PULL_AT_PREFIX = 'lastPullAt:';
+const LAST_PULL_AT_PREFIX = "lastPullAt:";
 
 function lastPullAtKey(sucursalId: string): string {
   return `${LAST_PULL_AT_PREFIX}${sucursalId}`;
 }
 
-function getLastPullAt(db: NutriClinicaDB, sucursalId: string): Promise<string | null> {
-  return db.sync_meta.get(lastPullAtKey(sucursalId)).then((row) => row?.value ?? null).catch(() => null);
+function getLastPullAt(
+  db: NutriClinicaDB,
+  sucursalId: string,
+): Promise<SyncPullCursors | null> {
+  return db.sync_meta
+    .get(lastPullAtKey(sucursalId))
+    .then((row) => {
+      const value = row?.value;
+      if (typeof value !== "string") return null;
+      try {
+        const parsed: unknown = JSON.parse(value);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          return parsed as SyncPullCursors;
+        }
+      } catch {
+        // formato legacy (ISO único) o corrupto: primer pull completo
+      }
+      return null;
+    })
+    .catch(() => null);
 }
 
-function setLastPullAt(db: NutriClinicaDB, sucursalId: string, iso: string): Promise<void> {
-  return db.sync_meta.put({ key: lastPullAtKey(sucursalId), value: iso }).then(() => undefined).catch(() => undefined);
+function setLastPullAt(
+  db: NutriClinicaDB,
+  sucursalId: string,
+  cursors: SyncPullCursors,
+): Promise<void> {
+  return db.sync_meta
+    .put({ key: lastPullAtKey(sucursalId), value: JSON.stringify(cursors) })
+    .then(() => undefined)
+    .catch(() => undefined);
 }
 
 let engineInstance: SyncEngine | null = null;
@@ -51,7 +81,8 @@ export function getSyncEngine(db: NutriClinicaDB): SyncEngine {
     db,
     queue,
     getLastPullAt: (sucursalId: string) => getLastPullAt(db, sucursalId),
-    setLastPullAt: (sucursalId: string, iso: string) => setLastPullAt(db, sucursalId, iso),
+    setLastPullAt: (sucursalId: string, cursors: SyncPullCursors) =>
+      setLastPullAt(db, sucursalId, cursors),
     api: syncApi,
   };
   engineInstance = new SyncEngine(deps);
@@ -71,7 +102,10 @@ export interface StartOptions {
   onEvent?: (event: SyncEvent) => void;
 }
 
-export function startSync(db: NutriClinicaDB, options: StartOptions = {}): void {
+export function startSync(
+  db: NutriClinicaDB,
+  options: StartOptions = {},
+): void {
   const engine = getSyncEngine(db);
   const { intervalMs = 30_000, runOnStart = true, onEvent } = options;
 
@@ -106,11 +140,14 @@ export function startSync(db: NutriClinicaDB, options: StartOptions = {}): void 
         wasAuthenticated = true;
         void (async () => {
           try {
-            const result = await reconcileAllPendingChanges(db);
+            const result = await reconcileAllPendingChanges(
+              db,
+              requireActiveSucursalId(),
+            );
             if (result.enqueued > 0) {
               toast.info(
-                `${result.enqueued} cambio${result.enqueued === 1 ? '' : 's'} detectado${result.enqueued === 1 ? '' : 's'} offline`,
-                { description: 'Sincronizando con el servidor…' },
+                `${result.enqueued} cambio${result.enqueued === 1 ? "" : "s"} detectado${result.enqueued === 1 ? "" : "s"} offline`,
+                { description: "Sincronizando con el servidor…" },
               );
               await engine.sync();
             }
@@ -171,32 +208,43 @@ export interface ReconcileResult {
  *
  * Idempotente: se puede correr varias veces sin efecto extra.
  */
-export async function reconcileAllPendingChanges(db: NutriClinicaDB): Promise<ReconcileResult> {
+export async function reconcileAllPendingChanges(
+  db: NutriClinicaDB,
+  sucursalId = requireActiveSucursalId(),
+): Promise<ReconcileResult> {
   const queue = new SyncQueueRepository(db.sync_queue);
   const result: ReconcileResult = { scanned: 0, enqueued: 0, byEntity: {} };
 
   // 1) Indexar lo que ya está en sync_queue por (entity, entityId).
-  const allQueueItems = await queue.listAll();
+  const allQueueItems = await queue.listAll(sucursalId);
   const known = new Set(allQueueItems.map((i) => `${i.entity}::${i.entityId}`));
 
   // 2) Recorrer cada tabla sincronizable.
   for (const [tableName, entity] of Object.entries(TABLE_TO_ENTITY)) {
-    const table = (db as unknown as Record<string, { toArray: () => Promise<unknown[]> }>)[tableName];
+    const table = (
+      db as unknown as Record<string, { toArray: () => Promise<unknown[]> }>
+    )[tableName];
     if (!table) continue;
     const rows = await table.toArray();
     for (const row of rows) {
-      const r = row as { id: unknown; deleted_at?: string | null };
+      const r = row as {
+        id: unknown;
+        sucursal_id?: string | null;
+        deleted_at?: string | null;
+      };
       // Saltar filas soft-deleted: el usuario las borró localmente,
       // no tiene sentido empujar el create al server.
       if (r.deleted_at) continue;
+      if (r.sucursal_id !== sucursalId) continue;
       result.scanned++;
       const id = String(r.id);
       const key = `${entity}::${id}`;
       if (known.has(key)) continue;
       await queue.enqueue({
+        sucursalId,
         entity,
         entityId: id,
-        op: 'create' as SyncOp,
+        op: "create" as SyncOp,
         payload: row,
       });
       known.add(key);

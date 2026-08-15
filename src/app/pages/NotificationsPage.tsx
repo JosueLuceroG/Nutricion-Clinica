@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Archive, Bell, Check, Inbox } from "lucide-react";
+import { Archive, Bell, Check, ExternalLink, Inbox } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import {
@@ -299,6 +299,17 @@ export function NotificationsPage() {
 
                         {!notification.archived && (
                           <div className="flex flex-wrap gap-2 pt-1">
+                            {notification.targetRoute && (
+                              <Button asChild type="button" size="sm">
+                                <Link
+                                  to={notification.targetRoute}
+                                  onClick={() => markRead(notification.id)}
+                                >
+                                  <ExternalLink className="h-4 w-4" aria-hidden />
+                                  {t("clinicalAlerts.view")}
+                                </Link>
+                              </Button>
+                            )}
                             {!notification.read && (
                               <Button
                                 type="button"

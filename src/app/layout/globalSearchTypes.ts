@@ -11,6 +11,7 @@ export type GlobalSearchCategory =
 
 export type GlobalSearchResultKind =
   | "action"
+  | "setting"
   | "patient"
   | "consultation"
   | "appointment"
@@ -19,10 +20,62 @@ export type GlobalSearchResultKind =
   | "recipe"
   | "intent";
 
-export type GlobalSearchDataCategory =
-  Exclude<GlobalSearchCategory, "all">;
+export type GlobalSearchDataCategory = Exclude<GlobalSearchCategory, "all">;
 
 export type GlobalSearchTone = "blue" | "green" | "purple" | "cyan" | "slate";
+
+export type GlobalSearchMealSlot =
+  | "breakfast"
+  | "morning-snack"
+  | "lunch"
+  | "afternoon-snack"
+  | "dinner";
+
+export interface GlobalSearchNumericFilter {
+  min?: number;
+  max?: number;
+  minExclusive?: boolean;
+  maxExclusive?: boolean;
+}
+
+export interface GlobalSearchFoodConstraint {
+  term: string;
+  mealSlots?: GlobalSearchMealSlot[];
+  minMealSlots?: number;
+  period?: "day" | "week";
+}
+
+export interface GlobalSearchPlanFood {
+  id: string;
+  mealSlot: GlobalSearchMealSlot;
+  searchText: string;
+}
+
+export interface GlobalSearchPlanMetadata {
+  kcalTarget: number;
+  proteinTargetG: number;
+  carbsTargetG: number;
+  fatTargetG: number;
+  foods: GlobalSearchPlanFood[];
+  freeText: string;
+  completeFoodIndex: boolean;
+}
+
+export interface ParsedGlobalSearchFilters {
+  phone?: string;
+  email?: string;
+  date?: string;
+  status?: string;
+  patient?: string;
+  kcalTotal?: string;
+  kcalPerServing?: string;
+  planKcal?: GlobalSearchNumericFilter;
+  proteinG?: GlobalSearchNumericFilter;
+  carbsG?: GlobalSearchNumericFilter;
+  fatG?: GlobalSearchNumericFilter;
+  foodIncludes?: GlobalSearchFoodConstraint[];
+  foodExcludes?: GlobalSearchFoodConstraint[];
+}
 
 export interface GlobalSearchResult {
   id: string;
@@ -40,6 +93,7 @@ export interface GlobalSearchResult {
   avatar?: string;
   avatarUrl?: string | null;
   date?: string;
+  planMetadata?: GlobalSearchPlanMetadata;
   fields?: Partial<
     Record<
       | "phone"
@@ -57,18 +111,7 @@ export interface GlobalSearchResult {
 export interface ParsedGlobalSearch {
   text: string;
   category: GlobalSearchCategory | null;
-  filters: Partial<
-    Record<
-      | "phone"
-      | "email"
-      | "date"
-      | "status"
-      | "patient"
-      | "kcalTotal"
-      | "kcalPerServing",
-      string
-    >
-  >;
+  filters: ParsedGlobalSearchFilters;
   errors: string[];
 }
 

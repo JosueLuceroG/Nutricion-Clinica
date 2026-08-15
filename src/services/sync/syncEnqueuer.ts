@@ -14,23 +14,24 @@
  *    circulares porque queue es un repositorio Dexie vivo, no un closure).
  */
 
-import type { NutriClinicaDB } from '@services/db/dexieSchema';
-import { type SyncQueueRepository } from './syncQueueRepository.js';
-import type { SyncOp } from '@modules/sync/domain/SyncQueueItem';
-import type { SyncableEntity } from '@nutriclinica/shared';
+import type { NutriClinicaDB } from "@services/db/dexieSchema";
+import { type SyncQueueRepository } from "./syncQueueRepository.js";
+import type { SyncOp } from "@modules/sync/domain/SyncQueueItem";
+import type { SyncableEntity } from "@nutriclinica/shared";
+import { getActiveSucursalId } from "@services/tenancy/sucursalScope";
 
 const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
-  patients: 'pacientes',
-  consultations: 'consultas',
-  anthropometry: 'antropometrias',
-  lab_panels: 'lab_panels',
-  meal_plans: 'planes_alimenticios',
-  adherence_records: 'adherence_records',
+  patients: "pacientes",
+  consultations: "consultas",
+  anthropometry: "antropometrias",
+  lab_panels: "lab_panels",
+  meal_plans: "planes_alimenticios",
+  adherence_records: "adherence_records",
 };
 
 declare global {
-   
   var __syncApplying: boolean | undefined;
+  var __syncRunning: boolean | undefined;
 }
 
 export function setSyncApplying(value: boolean): void {
@@ -41,9 +42,17 @@ export function isSyncApplying(): boolean {
   return globalThis.__syncApplying === true;
 }
 
+export function setSyncRunning(value: boolean): void {
+  globalThis.__syncRunning = value;
+}
+
+export function isSyncRunning(): boolean {
+  return globalThis.__syncRunning === true;
+}
+
 interface HookableTable {
   hook: (
-    event: 'creating' | 'updating' | 'deleting',
+    event: "creating" | "updating" | "deleting",
     subscriber: (primKey: unknown, obj: unknown) => void,
   ) => void;
 }
@@ -61,7 +70,9 @@ export class SyncEnqueuer {
     this.active = true;
 
     for (const [tableName, entity] of Object.entries(TABLE_TO_ENTITY)) {
-      const table = (this.db as unknown as Record<string, HookableTable>)[tableName];
+      const table = (this.db as unknown as Record<string, HookableTable>)[
+        tableName
+      ];
       if (!table) {
         console.warn(`[sync] table ${tableName} not found, skipping enqueuer`);
         continue;
@@ -73,21 +84,57 @@ export class SyncEnqueuer {
       const enqueueCreate = (primKey: unknown, obj: unknown) => {
         if (!this.active || isSyncApplying()) return;
         const id = String(primKey);
-        doEnqueue(this.queue, entity, id, 'create', obj);
+        doEnqueue(
+          this.queue,
+          entity,
+          id,
+          "create",
+          obj,
+          resolveSucursalId(obj),
+        );
       };
-      const enqueueUpdate = (_modifications: unknown, primKey: unknown, obj: unknown) => {
+      const enqueueUpdate = (
+        modifications: unknown,
+        primKey: unknown,
+        obj: unknown,
+      ) => {
         if (!this.active || isSyncApplying()) return;
         const id = String(primKey);
-        doEnqueue(this.queue, entity, id, 'update', obj);
+        const payload =
+          isRecord(obj) && isRecord(modifications)
+            ? { ...obj, ...modifications }
+            : obj;
+        // obj es la fila ANTES de la mutación: la versión que estamos
+        // pisando es la base para la concurrencia optimista del push.
+        doEnqueue(
+          this.queue,
+          entity,
+          id,
+          "update",
+          payload,
+          resolveSucursalId(payload),
+          rowVersionOf(obj),
+        );
       };
-      const enqueueDelete = (primKey: unknown) => {
+      const enqueueDelete = (primKey: unknown, obj: unknown) => {
         if (!this.active || isSyncApplying()) return;
         const id = String(primKey);
-        doEnqueue(this.queue, entity, id, 'delete', null);
+        doEnqueue(
+          this.queue,
+          entity,
+          id,
+          "delete",
+          null,
+          resolveSucursalId(obj),
+          rowVersionOf(obj),
+        );
       };
-      table.hook('creating', enqueueCreate);
-      table.hook('updating', enqueueUpdate as unknown as (primKey: unknown, obj: unknown) => void);
-      table.hook('deleting', enqueueDelete);
+      table.hook("creating", enqueueCreate);
+      table.hook(
+        "updating",
+        enqueueUpdate as unknown as (primKey: unknown, obj: unknown) => void,
+      );
+      table.hook("deleting", enqueueDelete);
     }
   }
 
@@ -96,13 +143,27 @@ export class SyncEnqueuer {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function doEnqueue(
   queue: SyncQueueRepository,
   entity: SyncableEntity,
   id: string,
   op: SyncOp,
   payload: unknown,
+  sucursalId: string | null,
+  expectedRowVersion?: string | null,
 ): void {
+  if (!sucursalId) {
+    console.error("[sync] enqueue rejected: no active sucursal", {
+      entity,
+      id,
+      op,
+    });
+    return;
+  }
   // La transacción del hook sólo contiene la tabla mutada
   // (e.g. `patients`); `sync_queue` no está en su scope, por lo
   // que encolar dentro del hook tira NotFoundError. Diferimos
@@ -113,17 +174,51 @@ function doEnqueue(
     queueMicrotask(() => {
       // Deduplicación: si ya hay un item activo (pending/syncing)
       // para esta misma (entity, entityId, op), no encolamos otro.
+      // Los pendientes reciben el estado más reciente de la entidad.
       // Protege contra múltiples instancias del enqueuer enganchadas
       // a la misma tabla (HMR de Vite + React StrictMode en dev).
       queue
-        .findActiveByEntityId(entity, id, op)
-        .then((existing) => {
+        .findActiveByEntityId(sucursalId, entity, id, op)
+        .then(async (existing) => {
+          if (existing?.status === "pending") {
+            await queue.replacePendingPayload(existing.id, payload);
+            return;
+          }
           if (existing) return;
-          return queue.enqueue({ entity, entityId: id, op, payload });
+          await queue.enqueue({
+            sucursalId,
+            entity,
+            entityId: id,
+            op,
+            payload,
+            expectedRowVersion,
+          });
         })
         .catch((err: unknown) => {
-          console.error('[sync] enqueue failed', err);
+          console.error("[sync] enqueue failed", err);
         });
     });
   });
+}
+
+function rowVersionOf(value: unknown): string | null {
+  if (
+    isRecord(value) &&
+    typeof value.row_version === "string" &&
+    value.row_version
+  ) {
+    return value.row_version;
+  }
+  return null;
+}
+
+function resolveSucursalId(value: unknown): string | null {
+  if (
+    isRecord(value) &&
+    typeof value.sucursal_id === "string" &&
+    value.sucursal_id
+  ) {
+    return value.sucursal_id;
+  }
+  return getActiveSucursalId();
 }
