@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { mockHash, mockRequestInput, mockRequestQuery, mockRequestBatch, mockPoolRequest, mockGetPool, mockClosePool } = vi.hoisted(() => ({
   mockHash: vi.fn(async () => '$argon2id$v=19$m=19456,t=2,p=1$hash'),
@@ -48,6 +48,11 @@ beforeEach(() => {
     query: mockRequestQuery,
     batch: mockRequestBatch,
   }));
+  process.env.SEED_ADMIN_PASSWORD = 'StrongPassword123!';
+});
+
+afterEach(() => {
+  delete process.env.SEED_ADMIN_PASSWORD;
 });
 
 describe('seed — runSeed', () => {
@@ -89,5 +94,20 @@ describe('seed — runSeed', () => {
       if (origEmail === undefined) delete process.env.SEED_ADMIN_EMAIL;
       else process.env.SEED_ADMIN_EMAIL = origEmail;
     }
+  });
+
+  it('falla de forma fail-closed sin SEED_ADMIN_PASSWORD (sin fallback)', async () => {
+    delete process.env.SEED_ADMIN_PASSWORD;
+
+    await expect(runSeed()).rejects.toThrow('SEED_ADMIN_PASSWORD es obligatorio');
+    expect(mockHash).not.toHaveBeenCalled();
+    expect(mockPoolRequest).not.toHaveBeenCalled();
+  });
+
+  it('rechaza passwords de seed demasiado cortas', async () => {
+    process.env.SEED_ADMIN_PASSWORD = 'corta1';
+
+    await expect(runSeed()).rejects.toThrow('SEED_ADMIN_PASSWORD es obligatorio');
+    expect(mockHash).not.toHaveBeenCalled();
   });
 });

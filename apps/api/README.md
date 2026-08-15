@@ -22,7 +22,7 @@ Conectate a SQL Server Management Studio o `sqlcmd` como `sa` y ejecuta:
 CREATE DATABASE nutriclinica;
 GO
 
-CREATE LOGIN nutriclinica_app WITH PASSWORD = 'CambiaEstaPassword123!';
+CREATE LOGIN nutriclinica_app WITH PASSWORD = 'REEMPLAZA_POR_UNA_CONTRASENA_FUERTE';
 USE nutriclinica;
 CREATE USER nutriclinica_app FOR LOGIN nutriclinica_app;
 ALTER ROLE db_owner ADD MEMBER nutriclinica_app;

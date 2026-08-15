@@ -12,9 +12,15 @@ interface SeedConfig {
 }
 
 function readConfig(): SeedConfig {
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword || adminPassword.length < 12) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD es obligatorio (min 12 caracteres). Abortando seed (fail-closed): no se crea el admin sin password segura explicita.',
+    );
+  }
   return {
     adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@nutriclinica.local',
-    adminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'CambiaEstaPassword123!',
+    adminPassword,
     adminNombre: process.env.SEED_ADMIN_NOMBRE ?? 'Administrador',
     sucursalNombre: process.env.SEED_SUCURSAL_NOMBRE ?? 'Sucursal Centro',
   };
