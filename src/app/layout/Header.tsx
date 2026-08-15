@@ -17,6 +17,7 @@ import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
 import { useNotificationStore } from "@store/notificationStore";
+import { authApi } from "@services/api/authApi";
 import { getGlobalSearchShortcutLabel } from "./globalSearchEngine";
 
 const THEME_LONG_PRESS_MS = 1000;
@@ -246,7 +247,7 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                useAuthStore.getState().logout();
+                void authApi.logout().catch(() => undefined);
                 navigate("/login", { replace: true });
               }}
             >

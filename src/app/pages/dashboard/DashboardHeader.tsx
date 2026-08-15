@@ -44,6 +44,7 @@ import {
 import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
 import { DashboardQuickAccessButton } from "@modules/dashboard-quick-access/ui";
 import { NewConsultationQuickDialog } from "@modules/consultation/ui/quick-consultation";
+import { authApi } from "@services/api/authApi";
 import type {
   QuickConsultationAction,
   QuickConsultationPatient,
@@ -306,7 +307,6 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
   const openCommand = useCommandPaletteStore((state) => state.setOpen);
   const searchShortcutLabel = getGlobalSearchShortcutLabel();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const displayName = user?.nombreCompleto?.trim() || "Administrador";
   const firstName = getFirstName(displayName);
   const isDashboard = location.pathname === "/";
@@ -396,8 +396,7 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
     // Placeholder until the patient chat screen exists.
   };
   const openNotificationTarget = (notification: DashboardNotification) => {
-    void notification;
-    // Placeholder until detail screens are wired per notification type.
+    if (notification.targetRoute) navigate(notification.targetRoute);
   };
   const handleMarkAllNotifications = () => {
     if (markAllDisabled) return;
@@ -412,7 +411,9 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
       return;
     }
 
-    if (notification.type === "patient_message") {
+    if (notification.targetRoute) {
+      openNotificationTarget(notification);
+    } else if (notification.type === "patient_message") {
       openPatientConversation(notification);
     } else {
       openNotificationTarget(notification);
@@ -657,7 +658,7 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
                       type="button"
                       className="nc-dashboard-notification-menu__settings"
                       aria-label="Configurar notificaciones"
-                      onClick={() => navigate("/configuracion")}
+                      onClick={() => navigate("/configuracion?section=clinical-alerts")}
                     >
                       <Settings size={17} strokeWidth={2} aria-hidden="true" />
                     </button>
@@ -841,7 +842,7 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
                 <DropdownMenuItem
                   className="nc-dashboard-avatar-menu__item nc-dashboard-avatar-menu__item--danger"
                   onClick={() => {
-                    logout();
+                    void authApi.logout().catch(() => undefined);
                     navigate("/login", { replace: true });
                   }}
                 >
@@ -854,24 +855,26 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
         </div>
       </div>
     </header>
-    <NewConsultationQuickDialog
-      open={quickConsultationOpen}
-      initialPatientId={quickConsultationPatientId}
-      onOpenChange={(nextOpen) => {
-        setQuickConsultationOpen(nextOpen);
-        if (!nextOpen) {
-          setQuickConsultationPatientId(undefined);
-          window.requestAnimationFrame(() =>
-            quickConsultationTriggerRef.current?.focus(),
-          );
-        }
-      }}
-      onRegisterPatient={() => {
-        setQuickConsultationOpen(false);
-        navigate("/pacientes/nuevo?returnTo=quick-consultation");
-      }}
-      onContinue={handleQuickConsultationContinue}
-    />
+    {quickConsultationOpen && (
+      <NewConsultationQuickDialog
+        open
+        initialPatientId={quickConsultationPatientId}
+        onOpenChange={(nextOpen) => {
+          setQuickConsultationOpen(nextOpen);
+          if (!nextOpen) {
+            setQuickConsultationPatientId(undefined);
+            window.requestAnimationFrame(() =>
+              quickConsultationTriggerRef.current?.focus(),
+            );
+          }
+        }}
+        onRegisterPatient={() => {
+          setQuickConsultationOpen(false);
+          navigate("/pacientes/nuevo?returnTo=quick-consultation");
+        }}
+        onContinue={handleQuickConsultationContinue}
+      />
+    )}
     </>
   );
 }
