@@ -71,8 +71,12 @@ IF COL_LENGTH('dbo.antropometrias', 'bia_json') IS NULL
 BEGIN
   ALTER TABLE dbo.antropometrias ADD bia_json NVARCHAR(MAX) NULL;
 END;
+GO
 
 -- Backfill desde las columnas planas históricas (solo si hay datos)
+-- Nota: GO previo obligatorio: SQL Server compila por batch y no puede
+-- referenciar circumferences_json/skinfolds_json en el mismo batch que
+-- los crea.
 UPDATE dbo.antropometrias
 SET circumferences_json = (
   SELECT neck_cm AS neck, chest_cm AS chest, waist_cm AS waist,
@@ -114,7 +118,9 @@ WHERE cc.parent_object_id = OBJECT_ID('dbo.pacientes')
 
 IF @legacy_record_status_check IS NOT NULL AND @legacy_record_status_check <> N'CK_pacientes_record_status'
 BEGIN
-  EXEC(N'ALTER TABLE dbo.pacientes DROP CONSTRAINT ' + QUOTENAME(@legacy_record_status_check));
+  DECLARE @drop_record_status_check_sql NVARCHAR(4000);
+  SET @drop_record_status_check_sql = N'ALTER TABLE dbo.pacientes DROP CONSTRAINT ' + QUOTENAME(@legacy_record_status_check);
+  EXEC(@drop_record_status_check_sql);
 END;
 
 IF NOT EXISTS (

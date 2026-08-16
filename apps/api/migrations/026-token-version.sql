@@ -7,8 +7,10 @@
 -- version e invalida todas las sesiones anteriores.
 -- =====================================================================
 
-SET XACT_ABORT ON;
-BEGIN TRANSACTION;
+-- Nota: sin transaccion explicita. El driver mssql ejecuta cada batch
+-- via sp_executesql; un BEGIN/COMMIT que no cierre en el mismo batch
+-- dispara "Transaction count after EXECUTE". El ALTER es idempotente
+-- (guardado por IF NOT EXISTS) y el UPDATE no altera datos existentes.
 
 IF NOT EXISTS (
   SELECT 1 FROM sys.columns
@@ -19,8 +21,8 @@ BEGIN
   ALTER TABLE dbo.profesionales
     ADD token_version INT NOT NULL
       CONSTRAINT DF_profesionales_token_version DEFAULT 1;
-
-  UPDATE dbo.profesionales SET token_version = 1 WHERE token_version IS NULL;
 END;
+GO
 
-COMMIT TRANSACTION;
+UPDATE dbo.profesionales SET token_version = 1 WHERE token_version IS NULL;
+GO
