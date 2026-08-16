@@ -39,7 +39,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const pool = await getPool();
     const r = pool.request().input('sucursal_id', sql.UniqueIdentifier(), sucursalId);
     let query = `SELECT id, sucursal_id, paciente_id, profesional_id, consultation_number, consultation_date,
-                        status, reason, subjective, objective, assessment, plan, vitals_json, next_visit_date,
+                        status, reason, subjective, objective, assessment, [plan], vitals_json, next_visit_date,
                         created_at, updated_at
                    FROM consultas WHERE deleted_at IS NULL AND sucursal_id = @sucursal_id`;
     if (pacienteId && UUID_REGEX.test(pacienteId)) {
@@ -94,7 +94,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .query(
         `INSERT INTO consultas
            (id, sucursal_id, paciente_id, profesional_id, consultation_number, consultation_date, status,
-            reason, subjective, objective, assessment, plan, vitals_json, next_visit_date)
+            reason, subjective, objective, assessment, [plan], vitals_json, next_visit_date)
          VALUES
            (@id, @sucursal_id, @paciente_id, @profesional_id, @consultation_number, @consultation_date, @status,
             @reason, @subjective, @objective, @assessment, @plan, @vitals_json, @next_visit_date)`,

@@ -854,7 +854,7 @@ router.get(
           .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
           .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
           .query(
-            `SELECT id, fecha_consulta, subjective, objective, assessment, plan, created_at FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_consulta DESC`,
+            `SELECT id, fecha_consulta, subjective, objective, assessment, [plan], created_at FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_consulta DESC`,
           ),
         pool
           .request()

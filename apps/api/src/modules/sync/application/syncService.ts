@@ -94,7 +94,7 @@ export async function pullChanges(
       .request()
       .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
       .input("since", sql.DateTime2(), entitySince)
-      .input("last_id", sql.UniqueIdentifier(), lastId)
+      .input("last_id", sql.UniqueIdentifier(), lastId || "00000000-0000-0000-0000-000000000000")
       .query<{
         id: string;
         updated_at: Date;
