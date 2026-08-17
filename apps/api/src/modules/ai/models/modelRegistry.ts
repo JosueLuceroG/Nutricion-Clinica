@@ -4,6 +4,11 @@ export interface ModelInfo {
   id: string;
   provider: string;
   providerModelName: string;
+  /**
+   * Versión resuelta del modelo. UNKNOWN / PROVIDER_MANAGED cuando el provider no la expone:
+   * política conservadora (la certificación exige coincidencia exacta de versión).
+   */
+  version?: string;
   enabled: boolean;
   supportedCapabilities: AIModelCapability[];
   supportsStructuredOutput: boolean;
@@ -16,11 +21,16 @@ export interface ModelInfo {
   respectsRequestedModel: boolean;
 }
 
+export function resolvedModelVersion(info: ModelInfo | undefined): string {
+  return info?.version ?? 'UNKNOWN';
+}
+
 const DEFAULT_MODELS: ModelInfo[] = [
   {
     id: 'gpt-4o-mini',
     provider: 'openai',
     providerModelName: 'gpt-4o-mini',
+    version: 'gpt-4o-mini-2024-07-18',
     enabled: true,
     supportedCapabilities: ['chat_general', 'structured_json', 'nutrition_reasoning'],
     supportsStructuredOutput: true,
@@ -35,6 +45,7 @@ const DEFAULT_MODELS: ModelInfo[] = [
     id: 'llama3.2',
     provider: 'ollama',
     providerModelName: 'llama3.2',
+    version: '3.2',
     enabled: true,
     supportedCapabilities: ['chat_general', 'nutrition_reasoning'],
     supportsStructuredOutput: false,
@@ -49,6 +60,7 @@ const DEFAULT_MODELS: ModelInfo[] = [
     id: 'gpt-4o',
     provider: 'openai',
     providerModelName: 'gpt-4o',
+    version: 'gpt-4o-2024-08-06',
     enabled: true,
     supportedCapabilities: ['chat_general', 'structured_json'],
     supportsStructuredOutput: true,
@@ -101,6 +113,7 @@ export class ModelRegistry {
         id,
         provider,
         providerModelName: id,
+        version: 'PROVIDER_MANAGED',
         enabled: true,
         supportedCapabilities: [],
         supportsStructuredOutput: false,
