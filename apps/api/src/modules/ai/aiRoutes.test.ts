@@ -104,6 +104,17 @@ describe('aiRoutes', () => {
     expect(next).not.toHaveBeenCalled();
   });
 
+  it('rejects client overrides of risk/review/certification fields (spec 67: server authoritative)', async () => {
+    const controller = routeHandlers('/complete', 'post')[0]!;
+    for (const overrideKey of ['riskLevel', 'effectiveRisk', 'professionalReview', 'requiresProfessionalReview', 'claimType', 'confidence', 'certificationState', 'certificationId', 'promptVersion', 'toolsetVersion', 'policyVersion', 'outputSchemaVersion']) {
+      const res = makeResponse();
+      const next = vi.fn();
+      await controller({ body: { ...validBody, [overrideKey]: 'APPROVED_CLINICAL_SUPPORT' } } as Request, res, next);
+      expect(res.status, overrideKey).toHaveBeenCalledWith(400);
+      expect(next, overrideKey).not.toHaveBeenCalled();
+    }
+  });
+
   it('fails closed with 503 when the egress kill switch is off', async () => {
     vi.stubEnv('AI_EGRESS_ENABLED', 'false');
     const controller = routeHandlers('/complete', 'post')[0]!;

@@ -86,17 +86,35 @@ describe('AIGateway + egress (Build 03)', () => {
     const result = await gateway.complete(req, {
       preferredProvider: 'openai',
       egress: {
-        capability: 'patient_support',
-        patientId: '11111111-1111-1111-1111-111111111111',
-        sucursalId: '22222222-2222-2222-2222-222222222222',
+        capability: 'generic_assistant',
       },
     });
 
     expect(result.ok).toBe(true);
     const sentRequest = (openAi.complete as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
     expect(sentRequest.systemPrompt).not.toContain('ana@test.com');
-    expect(sentRequest.systemPrompt).not.toContain('Ana Gómez');
     expect(sentRequest.systemPrompt).toContain('[REDACTADO]');
+  });
+
+  it('fail-closed: patient_support exige APPROVED_PATIENT (nunca APPROVED_GENERAL)', async () => {
+    const req = {
+      model: 'gpt-4o-mini',
+      systemPrompt: 'Paciente Ana Gómez, email ana@test.com',
+      userPrompt: 'user',
+    };
+    const result = await gateway.complete(req, {
+      preferredProvider: 'openai',
+      egress: {
+        capability: 'patient_support',
+        patientId: '11111111-1111-1111-1111-111111111111',
+        sucursalId: '22222222-2222-2222-2222-222222222222',
+      },
+    });
+
+    if (result.ok) throw new Error('patient_support no debe ejecutarse sin APPROVED_PATIENT');
+    expect(result.status).toBe(403);
+    expect(openAi.complete).not.toHaveBeenCalled();
+    expect(ollama.complete).not.toHaveBeenCalled();
   });
 
   it('denegación total de la política nunca invoca el adapter', async () => {
@@ -133,7 +151,7 @@ describe('AIGateway + egress (Build 03)', () => {
     });
     const result = await localGateway.complete(
       { model: 'gpt-4o-mini', systemPrompt: 'sys', userPrompt: 'user' },
-      { preferredProvider: 'openai', egress: { capability: 'meal_plan_authoring' } },
+      { preferredProvider: 'openai', egress: { capability: 'generic_assistant' } },
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.provider).toBe('ollama');
