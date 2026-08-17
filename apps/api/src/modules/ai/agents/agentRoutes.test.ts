@@ -74,6 +74,8 @@ function completion(content: string): GatewayResult {
     model: 'gpt-4o-mini',
     result: { content, model: 'gpt-4o-mini', finishReason: 'stop', usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 } },
     attempts: [],
+    executionId: 'exec-1',
+    correlationId: 'corr-1',
   };
 }
 

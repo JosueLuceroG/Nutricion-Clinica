@@ -28,6 +28,8 @@ function okGateway(content: string): GatewayResult {
     model: 'llama3.2',
     result: { content, model: 'llama3.2', usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 }, finishReason: 'stop' },
     attempts: [],
+    executionId: 'exec-1',
+    correlationId: 'corr-1',
   };
 }
 
@@ -121,7 +123,7 @@ describe('PatientWorkflow', () => {
   });
 
   it('reports ai_unavailable when the gateway fails', async () => {
-    const completeAi = vi.fn(async (): Promise<GatewayResult> => ({ ok: false, status: 503, message: 'IA no configurada', attempts: [] }));
+    const completeAi = vi.fn(async (): Promise<GatewayResult> => ({ ok: false, status: 503, code: 'PROVIDER_UNAVAILABLE', message: 'IA no configurada', attempts: [], executionId: 'exec-1', correlationId: 'corr-1' }));
     const workflow = new PatientWorkflow({ completeAi, knowledgeStore: storeWith(educationalDoc()) });
 
     const result = await workflow.run({ query: 'que fruta comer?' }, { sucursalId: 'suc-1' });

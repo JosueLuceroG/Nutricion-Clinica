@@ -88,6 +88,8 @@ function adviceWorkflow(): PatientWorkflow {
       model: 'llama3.2',
       result: { content: `La fruta es una buena opcion en el desayuno [${DOC_ID}].`, model: 'llama3.2', finishReason: 'stop', usage: { promptTokens: 1, completionTokens: 2, totalTokens: 3 } },
       attempts: [],
+      executionId: 'exec-1',
+      correlationId: 'corr-1',
     }),
   });
 }
@@ -199,7 +201,7 @@ describe('patient AI routes', () => {
     const router = createPatientAiRouter({
       workflow: new PatientWorkflow({
         knowledgeStore: store,
-        completeAi: async (): Promise<GatewayResult> => ({ ok: false, status: 503, message: 'IA no configurada', attempts: [] }),
+        completeAi: async (): Promise<GatewayResult> => ({ ok: false, status: 503, code: 'PROVIDER_UNAVAILABLE', message: 'IA no configurada', attempts: [], executionId: 'exec-1', correlationId: 'corr-1' }),
       }),
       loadAccess: async () => portalAccess(),
       consentChecker: async () => true,

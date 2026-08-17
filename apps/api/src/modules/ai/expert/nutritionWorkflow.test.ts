@@ -32,13 +32,18 @@ const okAi = async (_req: AICompletionRequest): Promise<GatewayResult> => ({
     usage: { promptTokens: 10, completionTokens: 8, totalTokens: 18 },
   },
   attempts: [],
+  executionId: 'exec-1',
+  correlationId: 'corr-1',
 });
 
 const unavailableAi = async (): Promise<GatewayResult> => ({
   ok: false,
   status: 503,
+  code: 'PROVIDER_UNAVAILABLE',
   message: 'IA deshabilitada',
   attempts: [],
+  executionId: 'exec-1',
+  correlationId: 'corr-1',
 });
 
 function workflowWith(ai: (req: AICompletionRequest) => Promise<GatewayResult>, sources: ContextDataSources = fullSources, audit?: (e: unknown) => Promise<void>) {
@@ -94,6 +99,8 @@ describe('NutritionWorkflow', () => {
         usage: { promptTokens: 10, completionTokens: 8, totalTokens: 18 },
       },
       attempts: [],
+      executionId: 'exec-1',
+      correlationId: 'corr-1',
     });
     const workflow = workflowWith(fabricatingAi);
     const result = await workflow.run({ pacienteId: 'pid', sucursalId: 'sid' }, actor);

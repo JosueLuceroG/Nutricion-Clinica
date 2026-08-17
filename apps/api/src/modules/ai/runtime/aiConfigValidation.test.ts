@@ -50,9 +50,22 @@ describe('validateAiConfig', () => {
 
   it('fails fast when an enabled model has no registered adapter', () => {
     const { registry, providers, qualifications } = build();
-    providers.register({ ...adapter, id: 'ollama' });
-    const issues = validateAiConfig({ ...baseEnv, AI_ALLOWED_MODELS: 'llama3.2' }, registry, providers, qualifications);
-    expect(issues.some((i) => i.severity === 'error' && i.message.includes('ModelRegistry'))).toBe(false);
+    registry.register({
+      id: 'X1',
+      provider: 'provider-x',
+      providerModelName: 'X1',
+      enabled: true,
+      supportedCapabilities: ['chat_general'],
+      supportsStructuredOutput: false,
+      supportsTools: false,
+      supportsEmbeddings: false,
+      supportsVision: false,
+      maxContextTokens: 4096,
+      isDefault: false,
+      respectsRequestedModel: true,
+    });
+    const issues = validateAiConfig({ ...baseEnv, AI_ALLOWED_MODELS: 'gpt-4o-mini,X1' }, registry, providers, qualifications);
+    expect(issues.some((i) => i.severity === 'error' && i.message.includes('no tiene adapter'))).toBe(true);
   });
 
   it('fails fast when qualification is enforced but certification metadata is missing', () => {

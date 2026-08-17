@@ -31,6 +31,8 @@ function aiWith(content: string): (req: AICompletionRequest) => Promise<GatewayR
       usage: { promptTokens: 10, completionTokens: 8, totalTokens: 18 },
     },
     attempts: [],
+    executionId: 'exec-1',
+    correlationId: 'corr-1',
   });
 }
 

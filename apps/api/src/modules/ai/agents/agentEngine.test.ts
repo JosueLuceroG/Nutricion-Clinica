@@ -65,6 +65,8 @@ function makeGateway(sequence: Array<{ content: string; tokens?: number; model?:
         usage: { promptTokens: 10, completionTokens: next.tokens ?? 5, totalTokens: next.tokens ?? 15 },
       },
       attempts: [],
+      executionId: 'exec-1',
+      correlationId: 'corr-1',
     };
   });
   const gateway = { complete: completions } as unknown as AIGateway;
@@ -299,5 +301,7 @@ function makeCompletion(content: string, tokens = 5): GatewayResult {
     model: 'gpt-4o-mini',
     result: { content, model: 'gpt-4o-mini', finishReason: 'stop', usage: { promptTokens: 10, completionTokens: tokens, totalTokens: 10 + tokens } },
     attempts: [],
+    executionId: 'exec-1',
+    correlationId: 'corr-1',
   };
 }
