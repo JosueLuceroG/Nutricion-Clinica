@@ -39,6 +39,20 @@ export const ACTIVE_TOOLSET: ReadonlyArray<{ id: string; riskLevel: string; sche
   { id: 'meal_plan', riskLevel: 'medium', schemaKeys: ['kcalTarget', 'macros'] },
   { id: 'adherence_summary', riskLevel: 'medium', schemaKeys: ['fecha', 'cumplimiento'] },
   { id: 'billing_history', riskLevel: 'high', schemaKeys: ['fecha', 'monto'] },
+  { id: 'search_patient', riskLevel: 'high', schemaKeys: ['id', 'nombres', 'apellido_paterno', 'telefono'] },
+  { id: 'get_patient_history', riskLevel: 'high', schemaKeys: ['windowDays', 'consultations', 'anthropometry', 'labs', 'plans', 'adherence'] },
+  { id: 'get_diet', riskLevel: 'medium', schemaKeys: ['meals_json', 'kcal_target', 'protein_target_g', 'carbs_target_g', 'fat_target_g'] },
+  { id: 'get_body_composition', riskLevel: 'high', schemaKeys: ['bmi', 'bodyFatPct', 'circumferences', 'skinfolds'] },
+  { id: 'get_vital_signs', riskLevel: 'high', schemaKeys: ['vitals_json', 'consultation_date'] },
+  { id: 'get_medications', riskLevel: 'high', schemaKeys: ['nombre', 'dosis', 'activo'] },
+  { id: 'get_allergies', riskLevel: 'high', schemaKeys: ['sustancia', 'severidad', 'reaccion'] },
+  { id: 'get_intolerances', riskLevel: 'high', schemaKeys: ['alimento', 'severidad'] },
+  { id: 'get_diagnoses', riskLevel: 'high', schemaKeys: ['condicion', 'estado', 'fecha_diagnostico'] },
+  { id: 'get_clinical_notes', riskLevel: 'high', schemaKeys: ['subjective', 'objective', 'assessment', 'plan'] },
+  { id: 'get_documents', riskLevel: 'high', schemaKeys: ['tipo', 'nombre_archivo', 'hash_sha256'] },
+  { id: 'get_appointments', riskLevel: 'medium', schemaKeys: ['consultation_date', 'status', 'reason'] },
+  { id: 'get_patient_metrics', riskLevel: 'medium', schemaKeys: ['consultationsTotal', 'adherenceMenuAvgLast30Days', 'labPanelsTotal', 'latestWeightKg'] },
+  { id: 'get_evolution', riskLevel: 'high', schemaKeys: ['series', 'deltas', 'scope'] },
 ];
 
 /** Fingerprint determinista FNV-1a del toolset: cambiar tool/schema → fingerprint distinto → certificación stale. */
@@ -59,7 +73,7 @@ export const CURRENT_VERSIONS: CurrentVersions = {
   promptVersion: {
     chat_general: 'prompt.chat_general.v1',
     structured_json: 'prompt.structured_json.v1',
-    nutrition_reasoning: 'prompt.nutrition_reasoning.v1',
+    nutrition_reasoning: 'prompt.nutrition_reasoning.v2',
     patient_support: 'prompt.patient_support.v1',
   },
   toolsetVersion: computeToolsetVersion(ACTIVE_TOOLSET),
@@ -67,7 +81,7 @@ export const CURRENT_VERSIONS: CurrentVersions = {
   outputSchemaVersion: {
     chat_general: 'output.chat_general.v1',
     structured_json: 'output.structured_json.v1',
-    nutrition_reasoning: 'output.nutrition_reasoning.v1',
+    nutrition_reasoning: 'output.nutrition_reasoning.v2',
     patient_support: 'output.patient_support.v1',
     default: 'output.default.v1',
   },

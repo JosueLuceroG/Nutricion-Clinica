@@ -117,7 +117,7 @@ describe('version change → requalification (Build 05, spec 65)', () => {
     const r = registry();
     const res = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
-      versions: { ...v, promptVersion: { ...v.promptVersion, nutrition_reasoning: 'prompt.nutrition_reasoning.v2' } },
+      versions: { ...v, promptVersion: { ...v.promptVersion, nutrition_reasoning: 'prompt.nutrition_reasoning.v3' } },
     });
     expect(res.eligible).toBe(false);
     expect(res.stale).toBe(true);
@@ -161,6 +161,29 @@ describe('version change → requalification (Build 05, spec 65)', () => {
     expect(res.requalificationRequired).toBe(true);
     expect(res.reason).toContain('REQUALIFICATION_REQUIRED');
   });
+
+  it('Build 06: una certificación exacta de Build 05 (toolset 7 herramientas, v1) queda STALE con CURRENT_VERSIONS', () => {
+    const r = registry();
+    const build05Versions: typeof v = {
+      promptVersion: { ...v.promptVersion, nutrition_reasoning: 'prompt.nutrition_reasoning.v1' },
+      toolsetVersion: 'toolset.3b1a4c2d', // Build 05: 7 herramientas
+      policyVersion: v.policyVersion,
+      outputSchemaVersion: { ...v.outputSchemaVersion, nutrition_reasoning: 'output.nutrition_reasoning.v1' },
+      evaluationDatasetVersion: v.evaluationDatasetVersion,
+      knowledgePolicyVersion: v.knowledgePolicyVersion,
+    };
+    const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
+    expect(current.eligible).toBe(true);
+    expect(current.stale).toBe(false);
+    const build05 = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', {
+      requiredState: 'APPROVED_NUTRITION_SUPPORT',
+      versions: build05Versions,
+    });
+    expect(build05.eligible).toBe(false);
+    expect(build05.stale).toBe(true);
+    expect(build05.requalificationRequired).toBe(true);
+    expect(build05.reason).toContain('Sin certificación clínica exacta');
+  });
 });
 
 describe('versions determinism (Build 05)', () => {
@@ -176,7 +199,8 @@ describe('versions determinism (Build 05)', () => {
   it('CURRENT_VERSIONS usa el dataset golden y versiones estables', () => {
     expect(CURRENT_VERSIONS.evaluationDatasetVersion).toBe(GOLDEN_DATASET_VERSION);
     expect(CURRENT_VERSIONS.policyVersion).toBe('policy-bundle.v1');
-    expect(CURRENT_VERSIONS.promptVersion.nutrition_reasoning).toBe('prompt.nutrition_reasoning.v1');
+    expect(CURRENT_VERSIONS.promptVersion.nutrition_reasoning).toBe('prompt.nutrition_reasoning.v2');
+    expect(CURRENT_VERSIONS.outputSchemaVersion.nutrition_reasoning).toBe('output.nutrition_reasoning.v2');
   });
 });
 
