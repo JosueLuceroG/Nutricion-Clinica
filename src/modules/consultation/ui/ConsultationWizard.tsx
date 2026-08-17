@@ -769,6 +769,7 @@ const StepReview = React.memo(function StepReview({ patientId }: { patientId: st
       vitals: vsRow || "No tomados",
       anthropometrySummary: v.anthropometryId ? `Registro antropométrico disponible (ID: ${v.anthropometryId})` : "No disponible",
       labSummary: v.labPanelId ? `Panel de laboratorio disponible (ID: ${v.labPanelId})` : "No disponible",
+      patientId,
     };
 
     const result = await ai.execute("summarizeConsultation", context);

@@ -165,6 +165,7 @@ async function generateWithBackendAi(prompt: string, onProgress?: ProgressCallba
       userPrompt: prompt,
       temperature: 0.7,
       maxTokens: 4000,
+      capability: "meal_plan_authoring",
     });
     onProgress?.(response.content);
     return parseJsonResponse(response.content);

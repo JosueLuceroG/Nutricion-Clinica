@@ -10,6 +10,8 @@ export interface AIRequest {
   maxTokens?: number;
   provider?: AIProviderId;
   responseFormat?: "json";
+  capability?: string;
+  patientId?: string;
 }
 
 export interface AIResponse {
