@@ -18,7 +18,7 @@ describe('buildEnvelope', () => {
   it('assembles erp, calculator and ai sources with reviewRequired true', () => {
     const envelope = buildEnvelope({
       ctx,
-      calculators: [{ id: 'calc_bmi', name: 'IMC', value: 24.2, unit: 'kg/m2', basis: 'formula' }],
+      calculators: [{ id: 'calc_bmi', name: 'IMC', value: 24.2, unit: 'kg/m2', basis: 'formula', calculatorVersion: 'calc.bmi.v1' }],
       safetyFlags: [],
       ai: { provider: 'openai', model: 'gpt-4o-mini', usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 } },
       reviewRequired: true,

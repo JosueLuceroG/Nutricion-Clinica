@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ACTIVITY_FACTORS, calculateBmi, hydrationNeeds, maintenanceCalories, mifflinStJeor, proteinTarget, runCalculators } from './calculators.js';
+import { ACTIVITY_FACTORS, assessCalculatorAvailability, calculateBmi, hydrationNeeds, maintenanceCalories, mifflinStJeor, proteinTarget, runCalculators, runCalculatorsDetailed } from './calculators.js';
 
 describe('calculators', () => {
   it('classifies BMI categories deterministically', () => {
@@ -59,5 +59,33 @@ describe('calculators', () => {
     expect(ids).toContain('calc_bmr');
     expect(ids).toContain('calc_maintenance');
     expect(full.length).toBe(5);
+  });
+
+  it('todo resultado de calculadora lleva calculatorVersion (provenance)', () => {
+    for (const calc of runCalculators({ weightKg: 70, heightM: 1.7, sex: 'femenino', ageYears: 35, activity: 'moderado' })) {
+      expect(calc.calculatorVersion).toMatch(/^calc\.[a-z_]+\.v1$/);
+    }
+  });
+
+  it('assessCalculatorAvailability reporta INSUFFICIENT_DATA cuando faltan campos', () => {
+    const empty = assessCalculatorAvailability({});
+    expect(empty.available).toBeNull();
+    expect(empty.unavailable.map((u) => u.id)).toEqual(expect.arrayContaining(['calc_bmi', 'calc_bmr', 'calc_hydration', 'calc_protein']));
+    expect(empty.unavailable.every((u) => u.reason === 'INSUFFICIENT_DATA')).toBe(true);
+
+    const partial = assessCalculatorAvailability({ weightKg: 70 });
+    expect(partial.available).toEqual(['calc_hydration', 'calc_protein']);
+    expect(partial.unavailable.find((u) => u.id === 'calc_bmi')?.missingFields).toEqual(['heightM']);
+  });
+
+  it('runCalculatorsDetailed nunca invoca calculadoras sin datos suficientes', () => {
+    const { results, unavailable } = runCalculatorsDetailed({ weightKg: 70, activity: 'moderado' });
+    const ids = results.map((r) => r.id);
+    expect(ids).toEqual(['calc_hydration', 'calc_protein']);
+    expect(unavailable.some((u) => u.id === 'calc_bmi')).toBe(true);
+
+    const full = runCalculatorsDetailed({ weightKg: 70, heightM: 1.7, sex: 'femenino', ageYears: 35, activity: 'moderado' });
+    expect(full.results.map((r) => r.id)).toEqual(['calc_bmi', 'calc_bmr', 'calc_maintenance', 'calc_hydration', 'calc_protein']);
+    expect(full.unavailable).toHaveLength(0);
   });
 });
