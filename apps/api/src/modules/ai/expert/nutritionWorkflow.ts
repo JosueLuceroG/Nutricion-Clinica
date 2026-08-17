@@ -65,6 +65,7 @@ export class NutritionWorkflow {
     return this.options.completeAi?.(req) ?? aiGateway.complete(req, {
       requiredCapability: 'nutrition_reasoning',
       egress: { capability: 'nutrition_reasoning', ...egress },
+      correlationId: egress.patientId,
     });
   }
 

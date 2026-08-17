@@ -8,11 +8,16 @@ import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { aiGateway } from './aiGateway.js';
 import { DEFAULT_EGRESS_CAPABILITY } from './egress/capabilityContracts.js';
+import { modelQualificationRegistry } from './evaluation/certification.js';
+import { modelRegistry } from './models/modelRegistry.js';
 import { createOllamaAdapter, createOpenAiAdapter } from './providers/openAiCompatibleAdapter.js';
 import { providerRegistry } from './providers/providerRegistry.js';
+import { assertAiConfigValid } from './runtime/aiConfigValidation.js';
 
-providerRegistry.register(createOpenAiAdapter());
-providerRegistry.register(createOllamaAdapter());
+modelRegistry.syncFromEnv(process.env);
+providerRegistry.register(createOpenAiAdapter(), { capabilities: ['chat_general', 'structured_json', 'nutrition_reasoning'] });
+providerRegistry.register(createOllamaAdapter(), { capabilities: ['chat_general', 'nutrition_reasoning'] });
+assertAiConfigValid(process.env, modelRegistry, providerRegistry, modelQualificationRegistry);
 
 export { resolveOpenAiApiKey } from './credentialProvider.js';
 export { mapOpenAiResponse } from './providers/openAiCompatibleAdapter.js';
@@ -22,7 +27,7 @@ type FinishReason = 'stop' | 'length' | 'error';
 export interface AICompleteResponse {
   content: string;
   model: string;
-  provider: 'openai' | 'ollama';
+  provider: string;
   finishReason: FinishReason;
   usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }
@@ -45,11 +50,14 @@ export type AICompleteRequest = z.infer<typeof CompleteSchema>;
 
 interface AuditResult {
   status: 'success' | 'error' | 'denied';
-  provider?: 'openai' | 'ollama';
+  provider?: string;
   model?: string;
   reason?: string;
   usage?: AICompleteResponse['usage'];
   attempts?: unknown;
+  executionId?: string;
+  correlationId?: string;
+  code?: string;
 }
 
 async function auditAiRequest(req: Request, result: AuditResult): Promise<void> {
@@ -87,6 +95,8 @@ router.post('/complete', async (req: Request, res: Response) => {
     return;
   }
 
+  const correlationId = (req.header?.('x-request-id') as string | undefined) ?? randomUUID();
+
   const gatewayResult = await aiGateway.complete(
     {
       model: parsed.data.model ?? '',
@@ -105,6 +115,7 @@ router.post('/complete', async (req: Request, res: Response) => {
         sucursalId: req.sucursalId ?? undefined,
         actor: { profesionalId: req.user?.sub },
       },
+      correlationId,
     },
   );
 
@@ -115,6 +126,9 @@ router.post('/complete', async (req: Request, res: Response) => {
       model: gatewayResult.attempts[0]?.model,
       reason: gatewayResult.message,
       attempts: gatewayResult.attempts,
+      executionId: gatewayResult.executionId,
+      correlationId: gatewayResult.correlationId,
+      code: gatewayResult.code,
     });
     res.status(gatewayResult.status).json({ error: gatewayResult.message });
     return;
@@ -126,6 +140,8 @@ router.post('/complete', async (req: Request, res: Response) => {
     model: gatewayResult.model,
     usage: gatewayResult.result.usage,
     attempts: gatewayResult.attempts,
+    executionId: gatewayResult.executionId,
+    correlationId: gatewayResult.correlationId,
   });
   res.json({
     content: gatewayResult.result.content,

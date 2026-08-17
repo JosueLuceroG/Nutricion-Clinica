@@ -270,6 +270,7 @@ export class BoundedAgentEngine {
             sucursalId: run.sucursalId,
             actor: run.actor,
           },
+          correlationId: run.id,
         },
       );
       if (!gatewayResult.ok) {

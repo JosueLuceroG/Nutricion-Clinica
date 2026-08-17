@@ -57,6 +57,7 @@ export class PatientWorkflow {
     return this.options.completeAi?.(req) ?? aiGateway.complete(req, {
       requiredCapability: 'patient_support',
       egress: { capability: 'patient_support', sucursalId: ctx.sucursalId, actor: { role: 'paciente' } },
+      correlationId: ctx.sucursalId,
     });
   }
 
