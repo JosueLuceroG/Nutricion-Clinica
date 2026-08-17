@@ -9,9 +9,17 @@ import type { Role } from '@nutriclinica/shared';
 import { decideAbstention } from './abstentionPolicy.js';
 import { runCalculators, type CalculatorResult } from './calculators.js';
 import { buildContext, erpContextDataSources, hasValidAnthropometry, numericTokensFromContext, renderContextForPrompt, type ContextDataSources, type PatientContext } from './contextBuilder.js';
-import { buildEnvelope, type EvidenceEnvelope } from './evidenceEnvelope.js';
+import { buildEnvelope, type EvidenceEnvelope, type EvidenceEnvelopeClinical } from './evidenceEnvelope.js';
 import { renderGoldenRulesForPrompt } from './goldenRules.js';
 import { assessContext, assessPhysiological, checkOutputNumbers, combineSafety, safetyRulesForPrompt, type SafetyReport } from './safetyEngine.js';
+import { capabilityRiskRegistry } from '../contracts/capabilityRiskRegistry.js';
+import { computeEffectiveRisk } from '../contracts/riskModel.js';
+import { isProfessionalReviewRequired } from '../contracts/humanReviewPolicy.js';
+import { computeConfidence } from '../contracts/confidenceEngine.js';
+import { detectContradictions } from '../contracts/contradictionDetection.js';
+import { deriveMissingInformation } from '../contracts/missingInformation.js';
+import { abstained, abstentionFromLegacyKind, type AbstentionResult } from '../contracts/abstentionContract.js';
+import type { ClinicalClaim } from '../contracts/evidenceEnvelope.js';
 
 export type NutritionAdviceStatus = 'advice' | 'abstained' | 'referral' | 'ai_unavailable';
 
@@ -107,6 +115,158 @@ export class NutritionWorkflow {
     return this.options.retrieveKnowledge?.(input) ?? retrieve(input);
   }
 
+  /** Contrato clínico determinista del consejo: riesgo, claims con procedencia real, confianza, abstención formal. */
+  private clinicalContract(input: {
+    ctx: PatientContext;
+    calculators: CalculatorResult[];
+    safety: SafetyReport;
+    knowledge: RetrievedChunk[];
+    citations?: CitationVerification;
+    abstentionKind?: string;
+    ai?: { provider: string; model: string };
+    status: NutritionAdviceStatus;
+  }): EvidenceEnvelopeClinical {
+    const riskEntry = capabilityRiskRegistry.get('nutrition_reasoning');
+    const baseRisk = riskEntry?.baseRisk ?? 'RISK_3';
+    const effectiveRisk = computeEffectiveRisk(baseRisk, {
+      redFlag: input.safety.hasBlocker,
+      majorUncertainty: input.safety.flags.some((f) => f.severity === 'warning') || (input.citations ? !input.citations.ok : false),
+      criticalDataMissing: input.ctx.profileMissing,
+    });
+
+    const claims: ClinicalClaim[] = [];
+    for (const calc of input.calculators) {
+      claims.push({
+        id: `claim-calc-${calc.id}`,
+        text: `${calc.name}: ${calc.value} ${calc.unit}`,
+        claimType: 'CALCULATED_VALUE',
+        evidence: [{
+          source: calc.id,
+          sourceType: 'CALCULATOR',
+          calculationId: calc.id,
+          calculationVersion: 'v1',
+          supports: ['valor calculado determinista'],
+        }],
+        confidence: 'HIGH',
+        missingInformation: [],
+        contradictions: [],
+      });
+    }
+    for (const flag of input.safety.flags.filter((f) => f.severity === 'blocker' || f.severity === 'warning')) {
+      claims.push({
+        id: `claim-rule-${flag.id}`,
+        text: flag.message,
+        claimType: 'RULE_RESULT',
+        evidence: [{
+          source: 'safety_validator',
+          sourceType: 'RULE_ENGINE',
+          ruleId: flag.ruleId,
+          ruleVersion: 'v1',
+          supports: ['resultado de validador determinista'],
+        }],
+        confidence: 'HIGH',
+        missingInformation: [],
+        contradictions: [],
+      });
+    }
+    if (input.citations?.ok && input.knowledge.length > 0) {
+      const withVersion = input.knowledge.filter((chunk) => Boolean((chunk as unknown as { version?: string }).version));
+      for (const chunk of withVersion) {
+        claims.push({
+          id: `claim-doc-${chunk.docId}`,
+          text: chunk.title,
+          claimType: 'DOCUMENTED_GUIDANCE',
+          evidence: [{
+            source: chunk.docId,
+            sourceType: 'RAG',
+            documentId: chunk.docId,
+            documentVersion: (chunk as unknown as { version: string }).version,
+            supports: ['contenido documental aprobado con cita válida'],
+          }],
+          confidence: 'MEDIUM',
+          missingInformation: [],
+          contradictions: [],
+        });
+      }
+    }
+    if (input.ai) {
+      claims.push({
+        id: 'claim-ai-output',
+        text: 'Respuesta generada por el modelo',
+        claimType: input.status === 'advice' ? 'AI_RECOMMENDATION' : 'AI_INTERPRETATION',
+        evidence: [{
+          source: `${input.ai.provider}/${input.ai.model}`,
+          sourceType: 'MODEL_INFERENCE',
+          supports: ['inferencia del modelo'],
+        }],
+        confidence: 'LOW',
+        missingInformation: [],
+        contradictions: [],
+      });
+    }
+
+    const citationValid = input.citations?.ok ?? true;
+    const groundingRequired = input.knowledge.length > 0;
+    const missingInformation = deriveMissingInformation({
+      requiredCapabilityFields: ['anthropometry', 'sex', 'age'],
+      presentCapabilityFields: [
+        ...(input.ctx.anthropometry ? ['anthropometry'] : []),
+        ...(input.ctx.genero ? ['sex'] : []),
+        ...(input.ctx.ageYears !== undefined ? ['age'] : []),
+      ],
+      toolFailures: [],
+      missingEvidence: input.calculators.length === 0 ? ['calculadoras deterministas'] : [],
+      staleData: [],
+      documentSupportMissing: input.citations && !input.citations.ok ? input.citations.missing : [],
+      groundingFailed: groundingRequired && !citationValid,
+    });
+
+    const contradictions = detectContradictions({
+      explicitClaims: input.safety.flags.filter((f) => f.id === 'out_unverified_number').map((f) => ({
+        ref: 'ai-output',
+        contradictsRef: 'contexto',
+        detail: f.message,
+      })),
+    });
+
+    const confidence = computeConfidence({
+      requiredEvidenceCount: 3,
+      evidenceCount: input.calculators.length + input.knowledge.filter((c) => (input.citations?.ok ? input.citations.cited.includes(c.docId) : false)).length,
+      authoritativeSources: input.calculators.length + (input.citations?.ok ? input.citations.cited.length : 0),
+      contradictions: contradictions.length,
+      missingRequired: input.ctx.profileMissing || input.calculators.length === 0 ? 1 : 0,
+      staleSources: 0,
+      validatorFailures: input.safety.flags.filter((f) => f.severity === 'blocker').length,
+      groundingValid: citationValid,
+      groundingRequired,
+      toolSuccess: true,
+      sourceTier: 'authoritative',
+      citationValid,
+    });
+
+    let abstentionResult: AbstentionResult | undefined;
+    if (input.abstentionKind) {
+      const code = abstentionFromLegacyKind(input.abstentionKind);
+      abstentionResult = abstained(code ? [code] : ['INSUFFICIENT_EVIDENCE'], {
+        missingInformation,
+        contradictions,
+        riskLevel: effectiveRisk,
+      });
+    }
+
+    return {
+      capability: 'nutrition_reasoning',
+      baseRisk,
+      effectiveRisk,
+      claims,
+      confidence,
+      missingInformation,
+      contradictions,
+      requiresProfessionalReview: isProfessionalReviewRequired(effectiveRisk, riskEntry?.humanReviewPolicy),
+      abstention: abstentionResult,
+    };
+  }
+
   async run(input: NutritionAdviceInput, actor: { profesionalId: string; role: string }): Promise<NutritionAdviceResult> {
     const now = this.options.now?.() ?? new Date();
     const audit = this.options.audit;
@@ -132,6 +292,14 @@ export class NutritionWorkflow {
         abstention: { kind: 'knowledge_unavailable', reason: 'El conocimiento de respaldo no esta disponible' },
         reviewRequired: true,
         generatedAt: now,
+        clinical: this.clinicalContract({
+          ctx,
+          calculators: [],
+          safety: { flags: [], hasBlocker: false, requiresReferral: false },
+          knowledge: [],
+          abstentionKind: 'knowledge_unavailable',
+          status: 'abstained',
+        }),
       });
       const result: NutritionAdviceResult = { status: 'abstained', envelope };
       await audit?.({ status: result.status, pacienteId: input.pacienteId, sucursalId: input.sucursalId, actor, envelope, error: err instanceof Error ? err.message : String(err) });
@@ -182,6 +350,14 @@ export class NutritionWorkflow {
         },
         reviewRequired: true,
         generatedAt: now,
+        clinical: this.clinicalContract({
+          ctx,
+          calculators,
+          safety,
+          knowledge,
+          abstentionKind: abstention.kind ?? 'missing_data',
+          status: 'abstained',
+        }),
       });
       const result: NutritionAdviceResult = {
         status: abstention.kind === 'safety' ? 'referral' : 'abstained',
@@ -206,6 +382,13 @@ export class NutritionWorkflow {
         safetyFlags: safety.flags,
         reviewRequired: true,
         generatedAt: now,
+        clinical: this.clinicalContract({
+          ctx,
+          calculators,
+          safety,
+          knowledge,
+          status: 'ai_unavailable',
+        }),
       });
       const result: NutritionAdviceResult = { status: 'ai_unavailable', envelope };
       await audit?.({ status: result.status, pacienteId: input.pacienteId, sucursalId: input.sucursalId, actor, envelope, error: gatewayResult.message });
@@ -228,6 +411,15 @@ export class NutritionWorkflow {
         citations,
         reviewRequired: true,
         generatedAt: now,
+        clinical: this.clinicalContract({
+          ctx,
+          calculators,
+          safety,
+          knowledge,
+          citations,
+          abstentionKind: 'ungrounded',
+          status: 'abstained',
+        }),
       });
       const result: NutritionAdviceResult = { status: 'abstained', envelope };
       await audit?.({ status: result.status, pacienteId: input.pacienteId, sucursalId: input.sucursalId, actor, envelope });
@@ -248,6 +440,15 @@ export class NutritionWorkflow {
         citations,
         reviewRequired: true,
         generatedAt: now,
+        clinical: this.clinicalContract({
+          ctx,
+          calculators,
+          safety: combineSafety(safety, outputSafety),
+          knowledge,
+          citations,
+          abstentionKind: 'unverifiable',
+          status: 'abstained',
+        }),
       });
       const result: NutritionAdviceResult = { status: 'abstained', envelope };
       await audit?.({ status: result.status, pacienteId: input.pacienteId, sucursalId: input.sucursalId, actor, envelope });
@@ -269,6 +470,15 @@ export class NutritionWorkflow {
       citations,
       reviewRequired: true,
       generatedAt: now,
+      clinical: this.clinicalContract({
+        ctx,
+        calculators,
+        safety,
+        knowledge,
+        citations,
+        ai: { provider: gatewayResult.provider, model: gatewayResult.model },
+        status: 'advice',
+      }),
     });
     const result: NutritionAdviceResult = { status: 'advice', envelope, advice: { content: completion.content } };
     await audit?.({ status: result.status, pacienteId: input.pacienteId, sucursalId: input.sucursalId, actor, envelope });

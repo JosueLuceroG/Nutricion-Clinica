@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { nutritionExpertWorkflow, type NutritionAdviceInput, type NutritionAdviceResult, type NutritionWorkflow } from '../expert/nutritionWorkflow.js';
+import type { EvidenceEnvelopeClinical } from '../expert/evidenceEnvelope.js';
 import type { ClinicalGateConfig } from './config.js';
+
+export interface ShadowRunClinical {
+  capability: string;
+  effectiveRisk: EvidenceEnvelopeClinical['effectiveRisk'];
+  certificationState?: string;
+  confidence?: EvidenceEnvelopeClinical['confidence'];
+  abstained: boolean;
+  requiresProfessionalReview: boolean;
+}
 
 export interface ShadowRun {
   id: string;
@@ -11,6 +21,7 @@ export interface ShadowRun {
   runAt: string;
   served: boolean;
   result: NutritionAdviceResult;
+  clinical?: ShadowRunClinical;
 }
 
 export interface ShadowModeOptions {
@@ -42,6 +53,15 @@ export class ShadowMode {
       runAt: now().toISOString(),
       served: opts.served,
       result,
+      clinical: result.envelope.clinical
+        ? {
+            capability: result.envelope.clinical.capability,
+            effectiveRisk: result.envelope.clinical.effectiveRisk,
+            confidence: result.envelope.clinical.confidence,
+            abstained: Boolean(result.envelope.clinical.abstention),
+            requiresProfessionalReview: result.envelope.clinical.requiresProfessionalReview,
+          }
+        : undefined,
     };
   }
 }

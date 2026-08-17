@@ -4,6 +4,12 @@ import type { SafetyFlag } from './safetyEngine.js';
 import type { CitationVerification } from '../rag/citationVerifier.js';
 import type { RetrievedChunk } from '../rag/retrieval.js';
 import type { MemoryEntry } from '../memory/memoryTypes.js';
+import type { ClinicalClaim } from '../contracts/evidenceEnvelope.js';
+import type { Contradiction } from '../contracts/contradictionDetection.js';
+import type { MissingInfoItem } from '../contracts/missingInformation.js';
+import type { ConfidenceCategory } from '../contracts/confidenceEngine.js';
+import type { RiskLevel } from '../contracts/riskModel.js';
+import type { AbstentionResult } from '../contracts/abstentionContract.js';
 
 export type EvidenceSourceType = 'erp' | 'calculator' | 'golden_rule' | 'ai' | 'knowledge' | 'memory';
 
@@ -23,6 +29,19 @@ export interface AiEvidence {
   finishReason?: 'stop' | 'length' | 'error';
 }
 
+/** Contrato clínico (Build 05) anexo al envelope: riesgo, claims, confianza, abstención formal, revisión. */
+export interface EvidenceEnvelopeClinical {
+  capability: string;
+  baseRisk: RiskLevel;
+  effectiveRisk: RiskLevel;
+  claims: ClinicalClaim[];
+  confidence: ConfidenceCategory;
+  missingInformation: MissingInfoItem[];
+  contradictions: Contradiction[];
+  requiresProfessionalReview: boolean;
+  abstention?: AbstentionResult;
+}
+
 export interface EvidenceEnvelope {
   version: '1.0';
   generatedAt: string;
@@ -34,6 +53,7 @@ export interface EvidenceEnvelope {
   ai?: AiEvidence;
   citations?: CitationVerification;
   reviewRequired: boolean;
+  clinical?: EvidenceEnvelopeClinical;
 }
 
 export function buildEnvelope(input: {
@@ -47,6 +67,7 @@ export function buildEnvelope(input: {
   citations?: CitationVerification;
   reviewRequired: boolean;
   generatedAt?: Date;
+  clinical?: EvidenceEnvelopeClinical;
 }): EvidenceEnvelope {
   const sources: EvidenceSource[] = [];
   if (!input.ctx.profileMissing) {
@@ -90,5 +111,6 @@ export function buildEnvelope(input: {
     ai: input.ai,
     citations: input.citations,
     reviewRequired: input.reviewRequired,
+    clinical: input.clinical,
   };
 }
