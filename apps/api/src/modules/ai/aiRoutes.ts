@@ -6,7 +6,7 @@ import { getPool } from '../../db/connection.js';
 import { rateLimit } from '../../middleware/rateLimit.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
-import { aiGateway } from './aiGateway.js';
+import { aiGateway, type GatewayResult } from './aiGateway.js';
 import { DEFAULT_EGRESS_CAPABILITY } from './egress/capabilityContracts.js';
 import { modelQualificationRegistry } from './evaluation/certification.js';
 import { modelRegistry } from './models/modelRegistry.js';
@@ -58,6 +58,39 @@ interface AuditResult {
   executionId?: string;
   correlationId?: string;
   code?: string;
+  capability?: string;
+  baseRisk?: string;
+  effectiveRisk?: string;
+  modelVersion?: string;
+  certificationState?: string;
+  certificationId?: string;
+  promptVersion?: string;
+  toolsetVersion?: string;
+  policyVersion?: string;
+  outputSchemaVersion?: string;
+  evidenceConfidence?: string;
+  abstained?: boolean;
+  requiresProfessionalReview?: boolean;
+}
+
+function auditClinical(result: AuditResult, clinical: GatewayResult['clinical']): AuditResult {
+  if (!clinical) return result;
+  return {
+    ...result,
+    capability: clinical.capability,
+    baseRisk: clinical.baseRisk,
+    effectiveRisk: clinical.effectiveRisk,
+    modelVersion: clinical.modelVersion,
+    certificationState: clinical.certificationState,
+    certificationId: clinical.certificationId,
+    promptVersion: clinical.promptVersion,
+    toolsetVersion: clinical.toolsetVersion,
+    policyVersion: clinical.policyVersion,
+    outputSchemaVersion: clinical.outputSchemaVersion,
+    evidenceConfidence: clinical.confidence,
+    abstained: clinical.abstained,
+    requiresProfessionalReview: clinical.requiresProfessionalReview,
+  };
 }
 
 async function auditAiRequest(req: Request, result: AuditResult): Promise<void> {
@@ -120,7 +153,7 @@ router.post('/complete', async (req: Request, res: Response) => {
   );
 
   if (!gatewayResult.ok) {
-    await auditAiRequest(req, {
+    await auditAiRequest(req, auditClinical({
       status: 'denied',
       provider: gatewayResult.attempts[0]?.provider,
       model: gatewayResult.attempts[0]?.model,
@@ -129,12 +162,12 @@ router.post('/complete', async (req: Request, res: Response) => {
       executionId: gatewayResult.executionId,
       correlationId: gatewayResult.correlationId,
       code: gatewayResult.code,
-    });
+    }, gatewayResult.clinical));
     res.status(gatewayResult.status).json({ error: gatewayResult.message });
     return;
   }
 
-  await auditAiRequest(req, {
+  await auditAiRequest(req, auditClinical({
     status: 'success',
     provider: gatewayResult.provider,
     model: gatewayResult.model,
@@ -142,7 +175,7 @@ router.post('/complete', async (req: Request, res: Response) => {
     attempts: gatewayResult.attempts,
     executionId: gatewayResult.executionId,
     correlationId: gatewayResult.correlationId,
-  });
+  }, gatewayResult.clinical));
   res.json({
     content: gatewayResult.result.content,
     model: gatewayResult.result.model,

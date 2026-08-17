@@ -8,12 +8,19 @@ import type { AIModelCapability } from './evaluation/capabilities.js';
 import { modelQualificationRegistry } from './evaluation/certification.js';
 import { getDatasetFingerprint } from './evaluation/nutritionGoldenDataset.js';
 import { pinnedVersionPolicy } from './evaluation/pinnedVersions.js';
-import { modelRegistry, type ModelRegistry } from './models/modelRegistry.js';
+import { modelRegistry, resolvedModelVersion, type ModelRegistry } from './models/modelRegistry.js';
 import { ProviderCallError, type AICompletionRequest, type AICompletionResult, type AIUsage } from './providers/aiProviderAdapter.js';
 import { providerRegistry } from './providers/providerRegistry.js';
 import { getFallbackProviderOrder } from './routing/fallbackPolicy.js';
 import { ModelRouter } from './routing/modelRouter.js';
 import { modelCircuitBreaker, readCircuitBreakerConfig } from './resilience/modelCircuitBreaker.js';
+import { capabilityRiskRegistry } from './contracts/capabilityRiskRegistry.js';
+import { computeEffectiveRisk, type RiskLevel, type RiskSignals } from './contracts/riskModel.js';
+import { isProfessionalReviewRequired } from './contracts/humanReviewPolicy.js';
+import type { ConfidenceCategory } from './contracts/confidenceEngine.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
+import { requiredCertificationFor, type CertificationState } from './certification/certificationStates.js';
+import { CURRENT_VERSIONS } from './certification/versions.js';
 
 export type GatewayAttemptOutcome = 'success' | 'policy_denied' | 'breaker_open' | 'provider_error';
 
@@ -46,6 +53,7 @@ export type GatewayResult =
       attempts: GatewayAttempt[];
       executionId: string;
       correlationId: string;
+      clinical?: ClinicalExecutionMetadata;
     }
   | {
       ok: false;
@@ -55,7 +63,25 @@ export type GatewayResult =
       attempts: GatewayAttempt[];
       executionId: string;
       correlationId: string;
+      clinical?: ClinicalExecutionMetadata;
     };
+
+/** Metadata clínica segura para auditoría (nunca PHI crudo). */
+export interface ClinicalExecutionMetadata {
+  capability: string;
+  baseRisk: RiskLevel;
+  effectiveRisk: RiskLevel;
+  modelVersion: string;
+  certificationState?: CertificationState;
+  certificationId?: string;
+  promptVersion: string;
+  toolsetVersion: string;
+  policyVersion: string;
+  outputSchemaVersion: string;
+  confidence?: ConfidenceCategory;
+  abstained: boolean;
+  requiresProfessionalReview: boolean;
+}
 
 export interface AIGatewayEgressContext {
   capability: string;
@@ -73,6 +99,8 @@ export interface OrchestratorExecutionInput {
   signal?: AbortSignal;
   egress?: AIGatewayEgressContext;
   correlationId?: string;
+  /** Señales deterministas para el cálculo del riesgo efectivo (el LLM nunca lo define). */
+  riskSignals?: RiskSignals;
 }
 
 export interface AIOrchestratorOptions {
@@ -152,6 +180,37 @@ export class AIOrchestrator {
     const requiredResidency = contract?.requiredResidency ?? null;
     const attempts: GatewayAttempt[] = [];
 
+    const riskEntry = capabilityRiskRegistry.get(egressCapability);
+    if (!riskEntry) {
+      return {
+        ok: false,
+        status: 403,
+        code: 'CAPABILITY_DENIED',
+        message: 'Capability sin registro de riesgo',
+        attempts: [{ provider: input.preferredProvider ?? '', model: '', outcome: 'policy_denied', message: 'unknown_capability' }],
+        executionId,
+        correlationId,
+      };
+    }
+    const effectiveRisk = computeEffectiveRisk(riskEntry.baseRisk, input.riskSignals);
+    const requiredCertification = requiredCertificationFor(effectiveRisk, riskEntry.minimumModelCertification);
+    const reviewRequired = isProfessionalReviewRequired(effectiveRisk, riskEntry.humanReviewPolicy);
+    const outputSchemaVersion = CURRENT_VERSIONS.outputSchemaVersion[requiredCapability] ?? CURRENT_VERSIONS.outputSchemaVersion.default;
+    const clinicalBase: ClinicalExecutionMetadata = {
+      capability: egressCapability,
+      baseRisk: riskEntry.baseRisk,
+      effectiveRisk,
+      modelVersion: 'UNKNOWN',
+      certificationState: undefined,
+      certificationId: undefined,
+      promptVersion: CURRENT_VERSIONS.promptVersion[requiredCapability] ?? '',
+      toolsetVersion: CURRENT_VERSIONS.toolsetVersion,
+      policyVersion: CURRENT_VERSIONS.policyVersion,
+      outputSchemaVersion,
+      abstained: false,
+      requiresProfessionalReview: reviewRequired,
+    };
+
     const fallbackOrder = getFallbackProviderOrder(env);
     const allowedProviders = getAllowedProviders(env);
     if (input.preferredProvider && !allowedProviders.includes(input.preferredProvider)) {
@@ -163,6 +222,7 @@ export class AIOrchestrator {
         attempts: [{ provider: input.preferredProvider, model: '', outcome: 'policy_denied', message: 'provider' }],
         executionId,
         correlationId,
+        clinical: clinicalBase,
       };
     }
     const primaryProvider = input.preferredProvider ?? getAIProvider(env);
@@ -178,9 +238,11 @@ export class AIOrchestrator {
         attempts: [{ provider: primaryProvider, model: primaryModel, outcome: 'policy_denied', message: primaryDecision.reason }],
         executionId,
         correlationId,
+        clinical: clinicalBase,
       };
     }
 
+    const qualificationEnforced = (env.AI_QUALIFICATION_ENFORCED ?? 'true') === 'true';
     const routeResult = this.router.route({
       capability: requiredCapability,
       preferredProvider: primaryProvider,
@@ -190,7 +252,13 @@ export class AIOrchestrator {
       registry: this.modelRegistry,
       defaultModelByProvider: (provider) => (provider === 'ollama' || provider === 'openai' ? credentialProvider.getDefaultModel(provider) : ''),
       breaker: { isOpen: (p, m) => modelCircuitBreaker.isOpen(breakerKey(p, m), breakerConfig) },
-      qualification: (p, m, c) => this.checkQualification(p, m, c, env),
+      qualification: (p, m, c) => this.checkQualification(p, m, c, env, effectiveRisk, requiredCertification),
+      certification: qualificationEnforced
+        ? (p, m, c) => clinicalCertificationRegistry.resolve(p, m, resolvedModelVersion(this.modelRegistry.get(m)), c, {
+            requiredState: requiredCertification,
+          })
+        : undefined,
+      effectiveRisk,
       clinicalDataPossible,
       requiredResidency,
       structuredOutputRequired: input.request.responseFormat === 'json',
@@ -206,6 +274,7 @@ export class AIOrchestrator {
         attempts,
         executionId,
         correlationId,
+        clinical: clinicalBase,
       };
     }
 
@@ -223,7 +292,7 @@ export class AIOrchestrator {
         continue;
       }
 
-      const qualification = this.checkQualification(candidate.provider, candidate.model, requiredCapability, env);
+      const qualification = this.checkQualification(candidate.provider, candidate.model, requiredCapability, env, effectiveRisk, requiredCertification);
       if (!qualification.allowed) {
         attempts.push({ provider: candidate.provider, model: candidate.model, outcome: 'policy_denied', message: qualification.message });
         continue;
@@ -268,7 +337,12 @@ export class AIOrchestrator {
         );
         modelCircuitBreaker.recordSuccess(key);
         attempts.push({ provider: candidate.provider, model: candidate.model, outcome: 'success', usage: result.usage });
-        return { ok: true, provider: candidate.provider, model: candidate.model, result, attempts, executionId, correlationId };
+        const clinical: ClinicalExecutionMetadata = {
+          ...clinicalBase,
+          modelVersion: resolvedModelVersion(this.modelRegistry.get(candidate.model)),
+          ...this.resolveCertificationMetadata(candidate.provider, candidate.model, requiredCapability, requiredCertification),
+        };
+        return { ok: true, provider: candidate.provider, model: candidate.model, result, attempts, executionId, correlationId, clinical };
       } catch (err) {
         modelCircuitBreaker.recordFailure(key, breakerConfig);
         if (err instanceof ProviderCallError) {
@@ -301,6 +375,7 @@ export class AIOrchestrator {
         attempts,
         executionId,
         correlationId,
+        clinical: { ...clinicalBase, abstained: true },
       };
     }
 
@@ -310,7 +385,25 @@ export class AIOrchestrator {
       ? (configFailure.message ?? 'IA no configurada en el servidor')
       : 'Proveedor de IA no disponible';
 
-    return { ok: false, status, code: operationalCode(attempts, status), message, attempts, executionId, correlationId };
+    return { ok: false, status, code: operationalCode(attempts, status), message, attempts, executionId, correlationId, clinical: clinicalBase };
+  }
+
+  private resolveCertificationMetadata(
+    provider: string,
+    model: string,
+    capability: AIModelCapability,
+    requiredState: CertificationState,
+  ): { certificationState?: CertificationState; certificationId?: string } {
+    if ((this.env().AI_QUALIFICATION_ENFORCED ?? 'true') !== 'true') return {};
+    const resolution = clinicalCertificationRegistry.resolve(
+      provider,
+      model,
+      resolvedModelVersion(this.modelRegistry.get(model)),
+      capability,
+      { requiredState },
+    );
+    if (!resolution.eligible || !resolution.state) return {};
+    return { certificationState: resolution.state, certificationId: resolution.certificationId };
   }
 
   private resolvePrimaryModel(provider: string, preferred: string | undefined, _env: NodeJS.ProcessEnv): string {
@@ -329,6 +422,8 @@ export class AIOrchestrator {
     model: string,
     capability: AIModelCapability,
     env: NodeJS.ProcessEnv,
+    effectiveRisk: RiskLevel,
+    requiredCertification: CertificationState,
   ): { allowed: boolean; message?: string } {
     if ((env.AI_QUALIFICATION_ENFORCED ?? 'true') !== 'true') {
       return { allowed: true };
@@ -351,6 +446,19 @@ export class AIOrchestrator {
     const pin = pinnedVersionPolicy.check(provider as AIProviderId, model, env);
     if (!pin.allowed) {
       return { allowed: false, message: `Version de modelo no permitida para ${provider} (esperada '${pin.expected}', recibida '${pin.actual}')` };
+    }
+
+    if (effectiveRisk && requiredCertification) {
+      const resolution = clinicalCertificationRegistry.resolve(
+        provider,
+        model,
+        resolvedModelVersion(this.modelRegistry.get(model)),
+        capability,
+        { requiredState: requiredCertification },
+      );
+      if (!resolution.eligible) {
+        return { allowed: false, message: resolution.reason ?? 'Certificación clínica no satisfecha' };
+      }
     }
 
     return { allowed: true };

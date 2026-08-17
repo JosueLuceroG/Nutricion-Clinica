@@ -3,8 +3,9 @@ import type { AIModelCapability } from './evaluation/capabilities.js';
 import { AIOrchestrator } from './aiOrchestrator.js';
 import type { AIGatewayEgressContext, GatewayResult } from './aiOrchestrator.js';
 import type { AICompletionRequest, AICompletionResult } from './providers/aiProviderAdapter.js';
+import type { RiskSignals } from './contracts/riskModel.js';
 
-export type { GatewayAttempt, GatewayAttemptOutcome, GatewayResult, AIErrorCode, AIGatewayEgressContext } from './aiOrchestrator.js';
+export type { GatewayAttempt, GatewayAttemptOutcome, GatewayResult, AIErrorCode, AIGatewayEgressContext, ClinicalExecutionMetadata } from './aiOrchestrator.js';
 
 export interface AIGatewayOptions {
   getProviderAdapter?: (provider: string) => ProviderLike | undefined;
@@ -35,6 +36,7 @@ export class AIGateway {
       requiredCapability?: AIModelCapability;
       egress?: AIGatewayEgressContext;
       correlationId?: string;
+      riskSignals?: RiskSignals;
     },
   ): Promise<GatewayResult> {
     return this.orchestrator.execute({
@@ -45,6 +47,7 @@ export class AIGateway {
       signal: opts?.signal,
       egress: opts?.egress,
       correlationId: opts?.correlationId,
+      riskSignals: opts?.riskSignals,
     });
   }
 }

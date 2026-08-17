@@ -3,6 +3,8 @@ import { getAllowedProviders } from '../aiEgressPolicy.js';
 import { compareResidency } from '../egress/providerDataPolicy.js';
 import type { ModelRegistry } from '../models/modelRegistry.js';
 import type { ProviderDataPolicy } from '../egress/providerDataPolicy.js';
+import type { RiskLevel } from '../contracts/riskModel.js';
+import type { CertificationResolution } from '../certification/clinicalCertification.js';
 
 export interface RoutingTarget {
   provider: string;
@@ -21,7 +23,11 @@ export type RejectionReason =
   | 'phi_not_allowed'
   | 'residency_mismatch'
   | 'residency_unknown'
-  | 'qualification_denied';
+  | 'qualification_denied'
+  | 'certification_denied'
+  | 'stale_certification'
+  | 'blocked_model'
+  | 'experimental_not_allowed';
 
 export interface EligibilityNote {
   provider: string;
@@ -40,6 +46,10 @@ export interface ModelRouteInput {
   defaultModelByProvider: (provider: string) => string;
   breaker?: { isOpen(provider: string, model: string): boolean };
   qualification?: (provider: string, model: string, capability: AIModelCapability) => { allowed: boolean; message?: string };
+  /** Certificación clínica granular: el riesgo efectivo decide el requisito; el router no certifica nada por sí mismo. */
+  certification?: (provider: string, model: string, capability: AIModelCapability) => CertificationResolution;
+  /** Riesgo efectivo calculado por código determinista (el router nunca lo baja). */
+  effectiveRisk?: RiskLevel;
   providerDataPolicy?: (provider: string) => ProviderDataPolicy;
   requiredResidency?: string | null;
   clinicalDataPossible: boolean;
@@ -171,6 +181,20 @@ export class ModelRouter {
       const qualification = input.qualification(target.provider, target.model, input.capability);
       if (!qualification.allowed) {
         note('qualification_denied', qualification.message ?? 'No supera el gate de calificación');
+      }
+    }
+    if (input.certification) {
+      const resolution = input.certification(target.provider, target.model, input.capability);
+      if (!resolution.eligible) {
+        if (resolution.state === 'BLOCKED') {
+          note('blocked_model', resolution.reason ?? 'Modelo BLOCKED');
+        } else if (resolution.stale) {
+          note('stale_certification', resolution.reason ?? 'Certificación stale (requalification requerida)');
+        } else if (resolution.state === 'EXPERIMENTAL') {
+          note('experimental_not_allowed', resolution.reason ?? 'Modelo EXPERIMENTAL no elegible');
+        } else {
+          note('certification_denied', resolution.reason ?? 'Certificación clínica no satisfecha');
+        }
       }
     }
     if (input.breaker?.isOpen(target.provider, target.model)) {
