@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Role } from '@nutriclinica/shared';
 import { isConsentAccepted, type ConsentChecker } from '../aiConsent.js';
+import { egressCapabilityForAgent, filterToolResultByCapability } from '../egress/capabilityContracts.js';
 import { roleSatisfies } from '../tools/toolAuthorization.js';
 import type { AIGateway } from '../aiGateway.js';
 import { aiGateway } from '../aiGateway.js';
@@ -250,16 +251,26 @@ export class BoundedAgentEngine {
       }
 
       const remainingTokens = Math.max(128, ctx.tracker.remainingTokens(run.budgetUsed));
+      const egressCapability = egressCapabilityForAgent(definition.id);
       const gatewayResult = await this.gateway.complete(
         {
           model: '',
           systemPrompt: this.buildSystemPrompt(definition),
-          userPrompt: this.buildUserPrompt(run),
+          userPrompt: this.buildUserPrompt(run, egressCapability),
           temperature: 0.2,
           maxTokens: remainingTokens,
           responseFormat: 'json',
         },
-        { requiredCapability: definition.capability, signal: ctx.signal },
+        {
+          requiredCapability: definition.capability,
+          signal: ctx.signal,
+          egress: {
+            capability: egressCapability,
+            patientId: run.pacienteId,
+            sucursalId: run.sucursalId,
+            actor: run.actor,
+          },
+        },
       );
       if (!gatewayResult.ok) {
         run.status = 'failed';
@@ -394,12 +405,14 @@ export class BoundedAgentEngine {
     return `${definition.systemPrompt}\n\nHerramientas autorizadas:\n${catalog.join('\n')}\n\nSiempre responde con JSON valido.`;
   }
 
-  private buildUserPrompt(run: AgentRun): string {
+  private buildUserPrompt(run: AgentRun, egressCapability: string): string {
     const steps = run.steps
       .map((step) => {
         if (step.kind === 'tool') {
-          const result = typeof step.toolResult === 'string' ? step.toolResult : JSON.stringify(step.toolResult ?? null);
-          return `- paso ${step.index} (herramienta ${step.toolId}): ${String(result).slice(0, 800)}`;
+          const toolId = step.toolId ?? 'desconocida';
+          const filtered = filterToolResultByCapability(toolId, step.toolResult, egressCapability);
+          const result = typeof filtered.filtered === 'string' ? filtered.filtered : JSON.stringify(filtered.filtered ?? null);
+          return `- paso ${step.index} (herramienta ${toolId}): ${String(result).slice(0, 800)}`;
         }
         return `- paso ${step.index} (modelo): ${step.summary}`;
       })

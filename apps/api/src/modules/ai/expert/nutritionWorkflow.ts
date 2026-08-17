@@ -1,5 +1,6 @@
 import type { AICompletionRequest } from '../providers/aiProviderAdapter.js';
 import { aiGateway, type GatewayResult } from '../aiGateway.js';
+import { filterStructuredShape } from '../egress/capabilityContracts.js';
 import { verifyCitations, CITATION_PATTERN, type CitationVerification } from '../rag/citationVerifier.js';
 import { selectKnowledgeDocStore, type KnowledgeDocStore } from '../rag/knowledgeGovernance.js';
 import { retrieve, type RetrievedChunk } from '../rag/retrieval.js';
@@ -60,8 +61,11 @@ const SYSTEM_INSTRUCTIONS = [
 export class NutritionWorkflow {
   constructor(private readonly options: NutritionWorkflowOptions = {}) {}
 
-  private async ai(req: AICompletionRequest): Promise<GatewayResult> {
-    return this.options.completeAi?.(req) ?? aiGateway.complete(req, { requiredCapability: 'nutrition_reasoning' });
+  private async ai(req: AICompletionRequest, egress: { patientId: string; sucursalId: string; actor: { profesionalId: string; role: string } }): Promise<GatewayResult> {
+    return this.options.completeAi?.(req) ?? aiGateway.complete(req, {
+      requiredCapability: 'nutrition_reasoning',
+      egress: { capability: 'nutrition_reasoning', ...egress },
+    });
   }
 
   private buildPrompt(ctx: PatientContext, calculators: CalculatorResult[], goal: string | undefined, notes: string | undefined, knowledge: RetrievedChunk[], memory: MemoryEntry[]): string {
@@ -186,8 +190,14 @@ export class NutritionWorkflow {
       return result;
     }
 
-    const prompt = this.buildPrompt(ctx, calculators, input.goal, input.notes, knowledge, memory);
-    const gatewayResult = await this.ai({ model: '', systemPrompt: prompt, userPrompt: input.goal ?? 'Genera el consejo educativo.' });
+    const egressFilteredCtx = filterStructuredShape('expert_context', ctx, 'nutrition_reasoning');
+    const ctxForPrompt = (egressFilteredCtx.filtered ?? ctx) as PatientContext;
+
+    const prompt = this.buildPrompt(ctxForPrompt, calculators, input.goal, input.notes, knowledge, memory);
+    const gatewayResult = await this.ai(
+      { model: '', systemPrompt: prompt, userPrompt: input.goal ?? 'Genera el consejo educativo.' },
+      { patientId: input.pacienteId, sucursalId: input.sucursalId, actor },
+    );
     if (!gatewayResult.ok) {
       const envelope = buildEnvelope({
         ctx,

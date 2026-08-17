@@ -1,4 +1,5 @@
 import { aiGateway, type GatewayResult } from './aiGateway.js';
+import { DEFAULT_EGRESS_CAPABILITY } from './egress/capabilityContracts.js';
 import type { AIProviderId } from './credentialProvider.js';
 import type { AICompletionRequest } from './providers/aiProviderAdapter.js';
 
@@ -40,7 +41,7 @@ export class AIOrchestrator {
             maxTokens: step.maxTokens,
             responseFormat: step.responseFormat,
           },
-          { preferredProvider: step.provider, signal: opts?.signal },
+          { preferredProvider: step.provider, signal: opts?.signal, egress: { capability: DEFAULT_EGRESS_CAPABILITY } },
         );
         outcomes.push({ index, success: result.ok, result });
         if (!result.ok) {

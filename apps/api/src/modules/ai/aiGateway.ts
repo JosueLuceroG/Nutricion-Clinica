@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { evaluateEgress, type EgressDenialReason } from './aiEgressPolicy.js';
+import { AIDataEgressPolicy } from './egress/egressPolicy.js';
 import type { AIModelCapability } from './evaluation/capabilities.js';
 import type { AIProviderId } from './credentialProvider.js';
 import { modelQualificationRegistry } from './evaluation/certification.js';
@@ -27,6 +29,15 @@ export type GatewayResult =
 export interface AIGatewayOptions {
   getProviderAdapter?: (provider: AIProviderId) => ProviderLike | undefined;
   env?: NodeJS.ProcessEnv;
+  egressPolicy?: AIDataEgressPolicy;
+}
+
+export interface AIGatewayEgressContext {
+  capability: string;
+  patientId?: string;
+  sucursalId?: string;
+  actor?: { profesionalId?: string; role?: string };
+  structured?: Array<{ shape: string; value: unknown }>;
 }
 
 interface ProviderLike {
@@ -46,7 +57,11 @@ function breakerKey(provider: AIProviderId, model: string): string {
 }
 
 export class AIGateway {
-  constructor(private readonly options: AIGatewayOptions = {}) {}
+  private readonly egressPolicy: AIDataEgressPolicy;
+
+  constructor(private readonly options: AIGatewayOptions = {}) {
+    this.egressPolicy = options.egressPolicy ?? new AIDataEgressPolicy();
+  }
 
   private getAdapter(provider: AIProviderId): ProviderLike | undefined {
     return this.options.getProviderAdapter?.(provider) ?? providerRegistry.get(provider);
@@ -54,11 +69,18 @@ export class AIGateway {
 
   async complete(
     req: AICompletionRequest,
-    opts?: { preferredProvider?: AIProviderId; signal?: AbortSignal; requiredCapability?: AIModelCapability },
+    opts?: {
+      preferredProvider?: AIProviderId;
+      signal?: AbortSignal;
+      requiredCapability?: AIModelCapability;
+      egress?: AIGatewayEgressContext;
+    },
   ): Promise<GatewayResult> {
     const env = this.options.env ?? process.env;
     const breakerConfig = readCircuitBreakerConfig(env);
     const requiredCapability = opts?.requiredCapability ?? 'chat_general';
+    const executionId = randomUUID();
+    const egressContext = opts?.egress;
     const attempts: GatewayAttempt[] = [];
 
     const primary = fallbackPolicy.resolvePrimary({ provider: opts?.preferredProvider, model: req.model }, env);
@@ -96,6 +118,29 @@ export class AIGateway {
         continue;
       }
 
+      let callRequest = req;
+      if (egressContext) {
+        const policyResult = await this.egressPolicy.evaluate(
+          {
+            capability: egressContext.capability,
+            provider: candidate.provider,
+            model: candidate.model,
+            patientId: egressContext.patientId,
+            sucursalId: egressContext.sucursalId,
+            actor: egressContext.actor,
+            systemPrompt: req.systemPrompt,
+            userPrompt: req.userPrompt,
+            structured: egressContext.structured,
+          },
+          executionId,
+        );
+        if (policyResult.decision === 'DENY') {
+          attempts.push({ provider: candidate.provider, model: candidate.model, outcome: 'policy_denied', message: policyResult.reasonCodes.join(',') });
+          continue;
+        }
+        callRequest = { ...req, ...policyResult.request };
+      }
+
       const adapter = this.getAdapter(candidate.provider);
       if (!adapter) {
         attempts.push({ provider: candidate.provider, model: candidate.model, outcome: 'provider_error', message: `Provider not registered: ${candidate.provider}` });
@@ -104,7 +149,7 @@ export class AIGateway {
 
       try {
         const result = await adapter.complete(
-          { ...req, model: candidate.model },
+          { ...callRequest, model: candidate.model },
           { signal: opts?.signal },
         );
         modelCircuitBreaker.recordSuccess(key);

@@ -27,7 +27,7 @@ describe('AIOrchestrator', () => {
     expect(result.steps.map((s) => s.success)).toEqual([true, true]);
     expect(gateway).toHaveBeenCalledTimes(2);
     expect(gateway.mock.calls[1]?.[0]).toMatchObject({ systemPrompt: 's2', userPrompt: 'u2' });
-    expect(gateway.mock.calls[1]?.[1]).toEqual({ preferredProvider: 'ollama', signal: undefined });
+    expect(gateway.mock.calls[1]?.[1]).toEqual({ preferredProvider: 'ollama', signal: undefined, egress: { capability: 'generic_assistant' } });
   });
 
   it('stops at the first failed step and reports partial success', async () => {

@@ -7,6 +7,7 @@ import { rateLimit } from '../../middleware/rateLimit.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { aiGateway } from './aiGateway.js';
+import { DEFAULT_EGRESS_CAPABILITY } from './egress/capabilityContracts.js';
 import { createOllamaAdapter, createOpenAiAdapter } from './providers/openAiCompatibleAdapter.js';
 import { providerRegistry } from './providers/providerRegistry.js';
 
@@ -35,6 +36,8 @@ const CompleteSchema = z
     maxTokens: z.number().int().min(1).max(4_000).optional(),
     provider: z.enum(['ollama', 'openai']).optional(),
     responseFormat: z.literal('json').optional(),
+    capability: z.string().trim().min(1).max(100).optional(),
+    patientId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -96,6 +99,12 @@ router.post('/complete', async (req: Request, res: Response) => {
     {
       preferredProvider: parsed.data.provider,
       requiredCapability: parsed.data.responseFormat === 'json' ? 'structured_json' : 'chat_general',
+      egress: {
+        capability: parsed.data.capability ?? DEFAULT_EGRESS_CAPABILITY,
+        patientId: parsed.data.patientId,
+        sucursalId: req.sucursalId ?? undefined,
+        actor: { profesionalId: req.user?.sub },
+      },
     },
   );
 

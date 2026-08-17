@@ -24,7 +24,10 @@ async function main(): Promise<void> {
 
   const evaluator = new ModelEvaluator({
     run: async (request) => {
-      const result = await aiGateway.complete(request, { requiredCapability: 'chat_general' });
+      const result = await aiGateway.complete(request, {
+        requiredCapability: 'chat_general',
+        egress: { capability: 'model_evaluation' },
+      });
       if (!result.ok) {
         throw new Error(`${result.status}: ${result.message}`);
       }

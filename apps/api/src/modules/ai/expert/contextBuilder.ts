@@ -29,6 +29,7 @@ export interface PatientContext {
   recentLabs: Array<Record<string, unknown>>;
   adherence: Array<Record<string, unknown>>;
   recentConsultations: Array<Record<string, unknown>>;
+  recentConsultationsCount?: number;
 }
 
 export interface ContextDataSources {
@@ -132,6 +133,7 @@ export async function buildContext(
     recentLabs: labs ?? [],
     adherence: adherence ?? [],
     recentConsultations: consultations ?? [],
+    recentConsultationsCount: consultations?.length ?? 0,
   };
 }
 
@@ -158,8 +160,8 @@ export function renderContextForPrompt(ctx: PatientContext): string {
       lines.push(`  * ${String(lab.lab_name ?? 'sin nombre')} (${String(lab.taken_at ?? 'fecha no disponible')}): ${JSON.stringify(lab.results_json ?? lab)}`);
     }
   }
-  if (ctx.recentConsultations.length > 0) {
-    lines.push(`- Consultas recientes: ${ctx.recentConsultations.length}`);
+  if ((ctx.recentConsultationsCount ?? ctx.recentConsultations.length) > 0) {
+    lines.push(`- Consultas recientes: ${ctx.recentConsultationsCount ?? ctx.recentConsultations.length}`);
   }
   return lines.join('\n');
 }

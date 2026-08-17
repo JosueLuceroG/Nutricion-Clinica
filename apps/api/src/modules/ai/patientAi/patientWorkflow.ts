@@ -53,8 +53,11 @@ const PATIENT_SCOPED_ROLE = 'nutriologa';
 export class PatientWorkflow {
   constructor(private readonly options: PatientWorkflowOptions = {}) {}
 
-  private async ai(req: AICompletionRequest): Promise<GatewayResult> {
-    return this.options.completeAi?.(req) ?? aiGateway.complete(req, { requiredCapability: 'patient_support' });
+  private async ai(req: AICompletionRequest, ctx: { sucursalId: string }): Promise<GatewayResult> {
+    return this.options.completeAi?.(req) ?? aiGateway.complete(req, {
+      requiredCapability: 'patient_support',
+      egress: { capability: 'patient_support', sucursalId: ctx.sucursalId, actor: { role: 'paciente' } },
+    });
   }
 
   private async retrieveEducational(input: { store: KnowledgeDocStore; query: string; now: Date; sucursalId: string }): Promise<RetrievedChunk[]> {
@@ -133,7 +136,7 @@ export class PatientWorkflow {
     }
 
     const prompt = this.buildPrompt(input.query, knowledge);
-    const gatewayResult = await this.ai({ model: '', systemPrompt: prompt, userPrompt: input.query });
+    const gatewayResult = await this.ai({ model: '', systemPrompt: prompt, userPrompt: input.query }, { sucursalId: ctx.sucursalId });
     if (!gatewayResult.ok) {
       return {
         status: 'ai_unavailable',
