@@ -1,4 +1,4 @@
-import type { AIProviderId } from '../credentialProvider.js';
+import type { AIModelCapability } from '../evaluation/capabilities.js';
 
 export interface AICompletionRequest {
   model: string;
@@ -26,7 +26,7 @@ export type ProviderCallErrorKind = 'http' | 'network' | 'timeout';
 
 export class ProviderCallError extends Error {
   constructor(
-    public readonly provider: AIProviderId,
+    public readonly provider: string,
     public readonly kind: ProviderCallErrorKind,
     message: string,
     public readonly status?: number,
@@ -37,8 +37,12 @@ export class ProviderCallError extends Error {
 }
 
 export interface AIProviderAdapter {
-  readonly id: AIProviderId;
+  readonly id: string;
   complete(req: AICompletionRequest, opts?: { signal?: AbortSignal }): Promise<AICompletionResult>;
+}
+
+export interface AIProviderMeta {
+  capabilities?: AIModelCapability[];
 }
 
 export function withTimeout(signal: AbortSignal | undefined, timeoutMs: number, abortError: Error): AbortSignal {
