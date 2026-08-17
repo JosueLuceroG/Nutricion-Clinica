@@ -40,6 +40,9 @@ export interface ToolResultEnvelope {
   dataCategories: AIToolDefinition['dataCategories'];
   provenance: { source: 'erp'; query: string; retrievedAt: string };
   freshness: { maxAgeMs: number; ageMs: number; isFresh: boolean };
+  toolVersion: string;
+  patientScoped: boolean;
+  freshnessStatus: 'CURRENT' | 'SLIGHTLY_STALE' | 'STALE' | 'UNKNOWN';
 }
 
 export type ToolInvokeFailure =
@@ -101,6 +104,25 @@ export class ToolExecutionService {
 
     try {
       const data = await tool.execute({ args: parsed.data, ctx: { sucursalId: req.sucursalId, profesionalId: req.actor.profesionalId, role: req.actor.role } });
+      if (tool.outputSchema) {
+        const outputCheck = tool.outputSchema.safeParse(data);
+        if (!outputCheck.success) {
+          await audit?.({
+            toolId: tool.id,
+            profesionalId: req.actor.profesionalId,
+            role: req.actor.role,
+            sucursalId: req.sucursalId,
+            pacienteId: req.pacienteId,
+            ok: false,
+            status: 502,
+            reason: `Salida de la herramienta no valida: ${outputCheck.error.message}`,
+            riskLevel: tool.riskLevel,
+            dataCategories: tool.dataCategories,
+            retrievedAt: now.toISOString(),
+          });
+          return { ok: false, status: 502, error: 'La herramienta devolvio una salida no valida' };
+        }
+      }
       const retrievedAt = now.toISOString();
       await audit?.({
         toolId: tool.id,
@@ -122,6 +144,9 @@ export class ToolExecutionService {
         dataCategories: tool.dataCategories,
         provenance: { source: 'erp', query: tool.id, retrievedAt },
         freshness: { maxAgeMs: tool.maxAgeMs, ageMs: 0, isFresh: true },
+        toolVersion: tool.toolVersion ?? '1.0.0',
+        patientScoped: tool.patientScoped ?? true,
+        freshnessStatus: 'CURRENT',
       };
     } catch (err) {
       await audit?.({
