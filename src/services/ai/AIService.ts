@@ -142,7 +142,6 @@ class AIService {
     try {
       const response = await aiClient.complete(
         {
-          model: def.model,
           systemPrompt,
           userPrompt,
           temperature: def.temperature,

@@ -160,7 +160,6 @@ export async function generateMealPlan(input: ChefInput, onProgress?: ProgressCa
 async function generateWithBackendAi(prompt: string, onProgress?: ProgressCallback): Promise<ChefResult> {
   try {
     const response = await aiClient.complete({
-      model: "gpt-4o-mini",
       systemPrompt: "Eres un nutriólogo experto. Responde solo con JSON válido para generar planes de alimentación.",
       userPrompt: prompt,
       temperature: 0.7,
