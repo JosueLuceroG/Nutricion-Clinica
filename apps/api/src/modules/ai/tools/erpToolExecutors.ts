@@ -26,6 +26,8 @@ const PATIENT_INPUT = (pid: string, sid: string) => [
   { name: 'sucursal_id', type: () => sql.UniqueIdentifier(), value: sid },
 ];
 
+const PATIENT_ONLY_INPUT = (pid: string) => [{ name: 'id', type: () => sql.UniqueIdentifier(), value: pid }];
+
 export const patientProfileTool = defineTool({
   id: 'patient_profile',
   name: 'Perfil del paciente',
@@ -410,9 +412,9 @@ export const medicationsTool = defineTool({
     if (!found) return [];
     const rows = await execRead<Record<string, unknown>>(
       `SELECT id, nombre, dosis, frecuencia, via_administracion, fecha_inicio, fecha_fin, motivo, activo
-       FROM medicamentos WHERE paciente_id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL AND activo = 1
+       FROM medicamentos WHERE paciente_id = @id AND deleted_at IS NULL AND activo = 1
        ORDER BY fecha_inicio DESC`,
-      PATIENT_INPUT(args.pacienteId, ctx.sucursalId),
+      PATIENT_ONLY_INPUT(args.pacienteId),
     );
     return rows;
   },
@@ -435,8 +437,8 @@ export const allergiesTool = defineTool({
     if (!found) return [];
     const rows = await execRead<Record<string, unknown>>(
       `SELECT id, sustancia, reaccion, severidad, diagnosticada, notas
-       FROM alergias WHERE paciente_id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
-      PATIENT_INPUT(args.pacienteId, ctx.sucursalId),
+       FROM alergias WHERE paciente_id = @id AND deleted_at IS NULL ORDER BY created_at DESC`,
+      PATIENT_ONLY_INPUT(args.pacienteId),
     );
     return rows;
   },
@@ -459,8 +461,8 @@ export const intolerancesTool = defineTool({
     if (!found) return [];
     const rows = await execRead<Record<string, unknown>>(
       `SELECT id, alimento, sintomas, severidad, notas
-       FROM intolerancias WHERE paciente_id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
-      PATIENT_INPUT(args.pacienteId, ctx.sucursalId),
+       FROM intolerancias WHERE paciente_id = @id AND deleted_at IS NULL ORDER BY created_at DESC`,
+      PATIENT_ONLY_INPUT(args.pacienteId),
     );
     return rows;
   },
@@ -483,8 +485,8 @@ export const diagnosesTool = defineTool({
     if (!found) return [];
     const rows = await execRead<Record<string, unknown>>(
       `SELECT id, condicion, fecha_diagnostico, estado, tratamiento, notas
-       FROM historia_personal WHERE paciente_id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_diagnostico DESC`,
-      PATIENT_INPUT(args.pacienteId, ctx.sucursalId),
+       FROM historia_personal WHERE paciente_id = @id AND deleted_at IS NULL ORDER BY fecha_diagnostico DESC`,
+      PATIENT_ONLY_INPUT(args.pacienteId),
     );
     return rows;
   },
@@ -532,8 +534,8 @@ export const documentsTool = defineTool({
     if (!found) return [];
     const rows = await execRead<Record<string, unknown>>(
       `SELECT TOP (@limit) id, tipo, nombre_archivo, mime_type, tamano_bytes, hash_sha256, fecha_documento, notas
-       FROM documentos WHERE paciente_id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
-      [...PATIENT_INPUT(args.pacienteId, ctx.sucursalId), { name: 'limit', type: () => sql.Int(), value: args.limit ?? 20 }],
+       FROM documentos WHERE paciente_id = @id AND deleted_at IS NULL ORDER BY created_at DESC`,
+      [...PATIENT_ONLY_INPUT(args.pacienteId), { name: 'limit', type: () => sql.Int(), value: args.limit ?? 20 }],
     );
     return rows;
   },
