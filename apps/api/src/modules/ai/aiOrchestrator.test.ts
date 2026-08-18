@@ -21,6 +21,7 @@ function runtimeEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
     AI_EGRESS_ENABLED: 'true',
     AI_ALLOWED_PROVIDERS: 'openai,ollama',
     AI_QUALIFICATION_ENFORCED: 'false',
+    AI_MODEL_MODE: 'ORGANIZATION_PREFERRED',
     ...overrides,
   } as NodeJS.ProcessEnv;
 }

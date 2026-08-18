@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import router, { mapOpenAiResponse, resolveOpenAiApiKey } from './aiRoutes.js';
 
@@ -39,6 +39,10 @@ const validBody = {
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+
+beforeEach(() => {
+  vi.stubEnv('AI_MODEL_MODE', 'ORGANIZATION_PREFERRED');
 });
 
 describe('aiRoutes', () => {

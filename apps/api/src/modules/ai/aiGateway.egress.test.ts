@@ -21,6 +21,7 @@ function egressEnv(): NodeJS.ProcessEnv {
     AI_ALLOWED_PROVIDERS: 'openai,ollama',
     AI_ALLOWED_MODELS: '',
     AI_FALLBACK_PROVIDERS: 'ollama',
+    AI_MODEL_MODE: 'ORGANIZATION_PREFERRED',
   } as NodeJS.ProcessEnv;
 }
 

@@ -27,7 +27,7 @@ describe('AIGateway', () => {
     ollama = fakeAdapter('ollama', async () => SUCCESS);
     gateway = new AIGateway({
       getProviderAdapter: (provider) => (provider === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED' } as NodeJS.ProcessEnv,
     });
   });
 
@@ -105,7 +105,7 @@ describe('AIGateway', () => {
     modelCircuitBreaker.recordFailure('openai:gpt-4o-mini', config);
     const breakerGateway = new AIGateway({
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true', AI_CIRCUIT_BREAKER_THRESHOLD: '2' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED', AI_CIRCUIT_BREAKER_THRESHOLD: '2' } as NodeJS.ProcessEnv,
     });
 
     const result = await breakerGateway.complete(req);
@@ -119,7 +119,7 @@ describe('AIGateway', () => {
   it('opens the circuit after repeated failures', async () => {
     const breakerGateway = new AIGateway({
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true', AI_CIRCUIT_BREAKER_THRESHOLD: '2' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED', AI_CIRCUIT_BREAKER_THRESHOLD: '2' } as NodeJS.ProcessEnv,
     });
     openAi.complete = vi.fn(async () => { throw new ProviderCallError('openai', 'http', 'boom', 502); });
 
@@ -135,7 +135,7 @@ describe('AIGateway', () => {
   it('allows a half-open probe after cooldown and recovers on success', async () => {
     const breakerGateway = new AIGateway({
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true', AI_CIRCUIT_BREAKER_THRESHOLD: '1', AI_CIRCUIT_BREAKER_COOLDOWN_MS: '0' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED', AI_CIRCUIT_BREAKER_THRESHOLD: '1', AI_CIRCUIT_BREAKER_COOLDOWN_MS: '0' } as NodeJS.ProcessEnv,
     });
     openAi.complete = vi.fn(async () => { throw new ProviderCallError('openai', 'http', 'boom', 502); });
 
@@ -153,7 +153,7 @@ describe('AIGateway', () => {
   it('reports unregistered providers as failed attempts', async () => {
     const unregistered = new AIGateway({
       getProviderAdapter: () => undefined,
-      env: { AI_EGRESS_ENABLED: 'true' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED' } as NodeJS.ProcessEnv,
     });
 
     const result = await unregistered.complete(req);
@@ -176,7 +176,7 @@ describe('AIGateway', () => {
   it('denies with 403 when no candidate is certified for the required capability', async () => {
     const deniedGateway = new AIGateway({
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true', AI_FALLBACK_PROVIDERS: 'ollama' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED', AI_FALLBACK_PROVIDERS: 'ollama' } as NodeJS.ProcessEnv,
     });
 
     const result = await deniedGateway.complete(req, { preferredProvider: 'ollama', requiredCapability: 'structured_json' });
@@ -200,6 +200,7 @@ describe('AIGateway', () => {
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
       env: {
         AI_EGRESS_ENABLED: 'true',
+        AI_MODEL_MODE: 'ORGANIZATION_PREFERRED',
         AI_PINNED_MODEL_VERSIONS: '{"openai":"gpt-4o-2024-08-06","ollama":"llama3.2-x"}',
       } as NodeJS.ProcessEnv,
     });
@@ -214,7 +215,7 @@ describe('AIGateway', () => {
   it('skips qualification checks when AI_QUALIFICATION_ENFORCED=false', async () => {
     const lenientGateway = new AIGateway({
       getProviderAdapter: (p) => (p === 'openai' ? openAi : ollama),
-      env: { AI_EGRESS_ENABLED: 'true', AI_QUALIFICATION_ENFORCED: 'false' } as NodeJS.ProcessEnv,
+      env: { AI_EGRESS_ENABLED: 'true', AI_MODEL_MODE: 'ORGANIZATION_PREFERRED', AI_QUALIFICATION_ENFORCED: 'false' } as NodeJS.ProcessEnv,
     });
 
     const result = await lenientGateway.complete(req, { preferredProvider: 'ollama', requiredCapability: 'structured_json' });

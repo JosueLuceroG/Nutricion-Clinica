@@ -66,6 +66,7 @@ const baseEnv = {
   AI_PROVIDER: 'openai',
   AI_EGRESS_ENABLED: 'true',
   AI_QUALIFICATION_ENFORCED: 'true',
+  AI_MODEL_MODE: 'ORGANIZATION_PREFERRED',
   OPENAI_API_KEY: 'sk-test',
 };
 
