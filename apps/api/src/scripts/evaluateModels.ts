@@ -7,6 +7,9 @@ import { modelCardRegistry } from '../modules/ai/evaluation/modelCard.js';
 import { ModelEvaluator } from '../modules/ai/evaluation/modelEvaluator.js';
 import { getDatasetFingerprint } from '../modules/ai/evaluation/nutritionGoldenDataset.js';
 import { parsePinnedVersions } from '../modules/ai/evaluation/pinnedVersions.js';
+import { createOllamaAdapter, createOpenAiAdapter } from '../modules/ai/providers/openAiCompatibleAdapter.js';
+import { providerRegistry } from '../modules/ai/providers/providerRegistry.js';
+import { modelRegistry } from '../modules/ai/models/modelRegistry.js';
 
 const REPORTS_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'modules', 'ai', 'evaluation', 'reports');
 
@@ -15,6 +18,10 @@ async function main(): Promise<void> {
     console.error('AI_EGRESS_ENABLED no esta en true: la evaluacion requiere egress activo.');
     process.exit(1);
   }
+
+  modelRegistry.syncFromEnv(process.env);
+  providerRegistry.register(createOpenAiAdapter(), { capabilities: ['chat_general', 'structured_json', 'nutrition_reasoning'] });
+  providerRegistry.register(createOllamaAdapter(), { capabilities: ['chat_general', 'nutrition_reasoning'] });
 
   const pins = parsePinnedVersions(process.env);
   const fingerprint = getDatasetFingerprint();

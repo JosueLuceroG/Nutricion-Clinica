@@ -56,7 +56,7 @@ const DEFAULT_MODEL_CARDS: ModelCard[] = [
     limitations: 'Sin soporte de JSON mode; menor capacidad de razonamiento; requiere hardware local.',
     risks: ['Alucinaciones en datos ausentes', 'Salida no estructurada', 'Rendimiento variable segun hardware'],
     capabilities: ['chat_general'],
-    evaluationReport: 'llama3.2-chat-general-v1.json',
+    evaluationReport: 'ollama-llama3.2-chat_general.json',
   },
 ];
 
