@@ -171,6 +171,7 @@ describe('version change → requalification (Build 05, spec 65)', () => {
       outputSchemaVersion: { ...v.outputSchemaVersion, nutrition_reasoning: 'output.nutrition_reasoning.v1' },
       evaluationDatasetVersion: v.evaluationDatasetVersion,
       knowledgePolicyVersion: v.knowledgePolicyVersion,
+      retrievalPolicyVersion: v.retrievalPolicyVersion,
       smaeCatalogVersion: 'smae-catalog-v0', // Build 05: catalogo previo al data-driven
     };
     const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
@@ -184,6 +185,26 @@ describe('version change → requalification (Build 05, spec 65)', () => {
     expect(build05.stale).toBe(true);
     expect(build05.requalificationRequired).toBe(true);
     expect(build05.reason).toContain('Sin certificación clínica exacta');
+  });
+
+  it('Build 07: una certificación con knowledge-policy.v1 queda STALE (retrieval-policy.v2 vigente)', () => {
+    const r = registry();
+    const build06Versions: typeof v = {
+      ...v,
+      knowledgePolicyVersion: 'knowledge-policy.v1',
+      retrievalPolicyVersion: 'retrieval-policy.v1',
+    };
+    const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
+    expect(current.eligible).toBe(true);
+    expect(current.stale).toBe(false);
+    const build06 = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', {
+      requiredState: 'APPROVED_NUTRITION_SUPPORT',
+      versions: build06Versions,
+    });
+    expect(build06.eligible).toBe(false);
+    expect(build06.stale).toBe(true);
+    expect(build06.requalificationRequired).toBe(true);
+    expect(build06.reason).toContain('Sin certificación clínica exacta');
   });
 });
 

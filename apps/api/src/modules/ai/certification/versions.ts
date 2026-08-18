@@ -27,6 +27,8 @@ export interface CurrentVersions {
   outputSchemaVersion: OutputSchemaVersions;
   evaluationDatasetVersion: string;
   knowledgePolicyVersion: string;
+  /** retrieval-policy.v2: expansion de sinonimos + retrieval versionado (Build 07). */
+  retrievalPolicyVersion: string;
   /** Fingerprint del catálogo SMAE: cambio de contenido ⇒ clave distinta ⇒ STALE. */
   smaeCatalogVersion: string;
 }
@@ -89,7 +91,8 @@ export const CURRENT_VERSIONS: CurrentVersions = {
     default: 'output.default.v1',
   },
   evaluationDatasetVersion: GOLDEN_DATASET_VERSION,
-  knowledgePolicyVersion: 'knowledge-policy.v1',
+  knowledgePolicyVersion: 'knowledge-policy.v2',
+  retrievalPolicyVersion: 'retrieval-policy.v2',
   smaeCatalogVersion: SMAE_CATALOG_VERSION,
 };
 

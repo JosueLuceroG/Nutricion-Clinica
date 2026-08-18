@@ -10,6 +10,8 @@ import { isProfessionalReviewRequired } from '../contracts/humanReviewPolicy.js'
 import { checkOutputNumbers } from '../expert/safetyEngine.js';
 import { selectKnowledgeDocStore, type KnowledgeDocStore } from '../rag/knowledgeGovernance.js';
 import { retrieve, type RetrievedChunk } from '../rag/retrieval.js';
+import { selectKnowledgeVersionStore, type KnowledgeVersionStore } from '../rag/knowledgeVersioning.js';
+import { retrieveVersioned, type VersionedRetrievedChunk } from '../rag/versionedRetrieval.js';
 import { verifyCitations } from '../rag/citationVerifier.js';
 import { getNutritionCapability, NUTRITION_CAPABILITY_CATALOG } from './nutritionCapabilityRegistry.js';
 import { capabilityHandlers, type CapabilityFact } from './capabilityHandlers.js';
@@ -62,7 +64,27 @@ export interface NutritionCapabilityOptions {
   completeAi?: (req: AICompletionRequest) => Promise<GatewayResult>;
   knowledgeStore?: KnowledgeDocStore;
   retrieveKnowledge?: (input: { store: KnowledgeDocStore; query: string; now: Date; actor: { role: Role; sucursalId: string } }) => Promise<RetrievedChunk[]>;
+  knowledgeVersionStore?: KnowledgeVersionStore;
   now?: Date;
+}
+
+export function versionedChunkToRetrieved(chunk: VersionedRetrievedChunk): RetrievedChunk {
+  return {
+    docId: chunk.documentId,
+    title: chunk.title,
+    tier: chunk.knowledgeTier,
+    category: chunk.category,
+    chunkIndex: chunk.chunkIndex,
+    snippet: chunk.snippet,
+    score: chunk.score,
+    documentVersion: chunk.documentVersion,
+    chunkId: chunk.chunkId,
+    effectiveFrom: chunk.effectiveFrom,
+    effectiveTo: chunk.effectiveTo,
+    retrievedAt: chunk.retrievedAt,
+    contentFingerprint: chunk.contentFingerprint,
+    citationValid: chunk.citationValid,
+  };
 }
 
 const CAPABILITY_STAGE_INSTRUCTIONS = [
@@ -84,7 +106,19 @@ export class NutritionCapabilityService {
   }
 
   private async retrieveKnowledge(input: { store: KnowledgeDocStore; query: string; now: Date; actor: { role: Role; sucursalId: string } }): Promise<RetrievedChunk[]> {
-    return this.options.retrieveKnowledge?.(input) ?? retrieve(input);
+    if (this.options.retrieveKnowledge) return this.options.retrieveKnowledge(input);
+    const env = this.options.env ?? process.env;
+    if (env.AI_RAG_VERSIONED === 'true') {
+      const versionStore = this.options.knowledgeVersionStore ?? selectKnowledgeVersionStore(env);
+      const envelope = await retrieveVersioned({
+        store: versionStore,
+        query: input.query,
+        now: input.now,
+        actor: input.actor,
+      });
+      return envelope.chunks.map(versionedChunkToRetrieved);
+    }
+    return retrieve(input);
   }
 
   async executeCapability(request: CapabilityRunRequest, options: NutritionCapabilityOptions = {}): Promise<CapabilityRunResult> {

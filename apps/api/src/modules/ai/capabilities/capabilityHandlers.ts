@@ -4,6 +4,8 @@ import { summarizeExchanges, validateMealPlan, suggestSubstitutions, type MealPl
 import { SMAE_CATALOG_VERSION } from '../smae/smaeCatalog.js';
 import { computeFreshness } from '../tools/toolDefinition.js';
 import type { RetrievedChunk } from '../rag/retrieval.js';
+import { POISONING_MARKERS } from '../rag/poisoningGuard.js';
+import { detectKnowledgeConflicts } from '../rag/knowledgeConflicts.js';
 import type { CapabilityRunRequest } from './nutritionCapabilityService.js';
 
 /**
@@ -491,16 +493,36 @@ export const capabilityHandlers: Record<string, CapabilityHandler> = {
     if (knowledge.length === 0) {
       return { facts, flags, payload: { contextLines, diagnoses, knowledgeCount: 0 }, promptSections: ['Sin fuentes de conocimiento recuperadas.'], abstain: { kind: 'knowledge_unavailable', reason: 'No se recuperaron fuentes de protocolo autorizadas' } };
     }
-    for (const chunk of knowledge.slice(0, 10)) {
-      facts.push(fact(ctx, 'DOCUMENTED_GUIDANCE', `Fuente [${chunk.docId}] ${chunk.title} (${chunk.tier})`, { type: 'erp', ref: chunk.docId }));
+    const versioned = knowledge.every((k) => typeof k.documentVersion === 'number');
+    if (versioned) {
+      const conflicts = detectKnowledgeConflicts(
+        knowledge.map((k) => ({
+          documentId: k.docId,
+          documentVersion: k.documentVersion as number,
+          knowledgeTier: k.tier,
+          effectiveFrom: k.effectiveFrom as string,
+          title: k.title,
+          category: k.category,
+          contentFingerprint: k.contentFingerprint as string,
+        })),
+      );
+      for (const conflict of conflicts) {
+        flags.push({ id: `knowledge-conflict-${conflict.topic}`, severity: 'warning', message: `Fuentes aprobadas contradictorias sobre ${conflict.topic}: ${conflict.sources.map((s) => `[${s.documentId}] v${s.documentVersion}`).join(', ')}` });
+      }
+    }
+    for (const chunk of knowledge) {
+      if (POISONING_MARKERS.some((marker) => chunk.snippet.toLowerCase().includes(marker))) {
+        flags.push({ id: `poisoning-suspicion-${chunk.docId}`, severity: 'blocker', message: `Fuente [${chunk.docId}] con marcador de inyeccion detectado` });
+      }
+      facts.push(fact(ctx, 'DOCUMENTED_GUIDANCE', `Fuente [${chunk.docId}] ${chunk.title} (${chunk.tier})${typeof chunk.documentVersion === 'number' ? ` v${chunk.documentVersion}` : ''}`, { type: 'erp', ref: chunk.docId }));
     }
     return {
       facts,
       flags,
-      payload: { contextLines, diagnoses, knowledgeCount: knowledge.length },
+      payload: { contextLines, diagnoses, knowledgeCount: knowledge.length, versioned },
       promptSections: [
         `Contexto para comparar contra protocolo:\n${contextLines.map((l) => `- ${l}`).join('\n')}`,
-        `Fuentes recuperadas (cita con [docId] solo si la usas):\n${knowledge.map((k) => `- [${k.docId}] ${k.title} (${k.tier}): ${k.snippet}`).join('\n')}`,
+        `Fuentes recuperadas (cita con [docId] solo si la usas):\n${knowledge.map((k) => `- [${k.docId}] ${k.title} (${k.tier})${typeof k.documentVersion === 'number' ? ` v${k.documentVersion}` : ''}: ${k.snippet}`).join('\n')}`,
       ],
       knowledge,
     };
