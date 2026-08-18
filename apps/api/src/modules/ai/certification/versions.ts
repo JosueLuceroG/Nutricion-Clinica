@@ -1,4 +1,5 @@
 import type { AIModelCapability } from '../evaluation/capabilities.js';
+import { SMAE_CATALOG_VERSION } from '../smae/smaeCatalog.js';
 
 /**
  * Versiones reproducibles de los componentes que integran la clave de certificación.
@@ -26,6 +27,8 @@ export interface CurrentVersions {
   outputSchemaVersion: OutputSchemaVersions;
   evaluationDatasetVersion: string;
   knowledgePolicyVersion: string;
+  /** Fingerprint del catálogo SMAE: cambio de contenido ⇒ clave distinta ⇒ STALE. */
+  smaeCatalogVersion: string;
 }
 
 export const GOLDEN_DATASET_VERSION = 'nutrition-golden-v1';
@@ -87,6 +90,7 @@ export const CURRENT_VERSIONS: CurrentVersions = {
   },
   evaluationDatasetVersion: GOLDEN_DATASET_VERSION,
   knowledgePolicyVersion: 'knowledge-policy.v1',
+  smaeCatalogVersion: SMAE_CATALOG_VERSION,
 };
 
 export function promptVersionFor(capability: AIModelCapability, versions: CurrentVersions = CURRENT_VERSIONS): string {

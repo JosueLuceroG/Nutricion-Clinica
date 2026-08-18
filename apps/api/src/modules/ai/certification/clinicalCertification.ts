@@ -15,6 +15,8 @@ export interface CertificationKey {
   outputSchemaVersion: string;
   evaluationDatasetVersion?: string;
   knowledgePolicyVersion?: string;
+  /** Fingerprint del catálogo SMAE vigente al momento de la certificación. */
+  smaeCatalogVersion?: string;
 }
 
 export interface ClinicalCertificationRecord {
@@ -52,6 +54,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.chat_general,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_GENERAL',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -71,6 +74,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.structured_json,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_ANALYTICS',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -90,6 +94,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.nutrition_reasoning,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_NUTRITION_SUPPORT',
     evaluatedAt: '2026-08-14T00:00:00.000Z',
@@ -109,6 +114,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.chat_general,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_GENERAL',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -128,6 +134,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.structured_json,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_ANALYTICS',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -147,6 +154,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.nutrition_reasoning,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'EXPERIMENTAL',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -166,6 +174,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.chat_general,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_GENERAL',
     evaluatedAt: '2026-08-13T00:00:00.000Z',
@@ -185,6 +194,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.structured_json,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'RESTRICTED',
     restrictedCapabilities: [],
@@ -205,6 +215,7 @@ const RECORD_SEEDS: ClinicalCertificationRecord[] = [
       outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion.nutrition_reasoning,
       evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
       knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+      smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
     },
     state: 'APPROVED_NUTRITION_SUPPORT',
     evaluatedAt: '2026-08-14T00:00:00.000Z',
@@ -272,8 +283,9 @@ export class ClinicalCertificationRegistry {
           ['toolsetVersion', key.toolsetVersion, versions.toolsetVersion],
           ['policyVersion', key.policyVersion, versions.policyVersion],
           ['outputSchemaVersion', key.outputSchemaVersion, versions.outputSchemaVersion[capabilityId]],
+          ['smaeCatalogVersion', key.smaeCatalogVersion, versions.smaeCatalogVersion],
         ] as const;
-        const mismatches = keyFields.filter(([, expected, actual]) => expected !== actual);
+        const mismatches = keyFields.filter(([, expected, actual]) => expected !== undefined && expected !== actual);
         if (mismatches.length === 0) {
           match = record;
           break;

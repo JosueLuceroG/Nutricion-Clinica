@@ -171,6 +171,7 @@ describe('version change → requalification (Build 05, spec 65)', () => {
       outputSchemaVersion: { ...v.outputSchemaVersion, nutrition_reasoning: 'output.nutrition_reasoning.v1' },
       evaluationDatasetVersion: v.evaluationDatasetVersion,
       knowledgePolicyVersion: v.knowledgePolicyVersion,
+      smaeCatalogVersion: 'smae-catalog-v0', // Build 05: catalogo previo al data-driven
     };
     const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
     expect(current.eligible).toBe(true);
