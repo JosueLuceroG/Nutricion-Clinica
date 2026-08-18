@@ -9,6 +9,14 @@ export interface RetrievedChunk {
   chunkIndex: number;
   snippet: string;
   score: number;
+  /** Campos opcionales del retrieval versionado (presentes solo con AI_RAG_VERSIONED=true). */
+  documentVersion?: number;
+  chunkId?: string;
+  effectiveFrom?: string;
+  effectiveTo?: string;
+  retrievedAt?: string;
+  contentFingerprint?: string;
+  citationValid?: boolean;
 }
 
 export function chunkContent(content: string, maxChars: number): string[] {
