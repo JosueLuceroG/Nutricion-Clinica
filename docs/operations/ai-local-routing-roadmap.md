@@ -1,4 +1,4 @@
-# ROADMAP NUTRICLINICA_LOCAL_AUTO — Build 07.5 (NO EJECUTADO)
+# ROADMAP NUTRICLINICA_LOCAL_AUTO — Build 07.5 (EJECUTADO 2026-08-18, reporte en ai-remediation-build-07-5.md)
 
 Preparación contractual de routing automático local (Build 07). La selección del
 modelo por defecto es **Build 07.5**: este documento fija reglas y no elige modelo.
