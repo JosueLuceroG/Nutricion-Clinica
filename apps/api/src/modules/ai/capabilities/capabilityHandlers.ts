@@ -2,6 +2,7 @@ import { evaluateDrugNutrientInteractions } from './drugNutrientRules.js';
 import { runCalculatorsDetailed, type BmiResult, type CalculatorResult } from '../expert/calculators.js';
 import { summarizeExchanges, validateMealPlan, suggestSubstitutions, type MealPlanValidation } from '../smae/smaeEngine.js';
 import { SMAE_CATALOG_VERSION } from '../smae/smaeCatalog.js';
+import { computeFreshness } from '../tools/toolDefinition.js';
 import type { RetrievedChunk } from '../rag/retrieval.js';
 import type { CapabilityRunRequest } from './nutritionCapabilityService.js';
 
@@ -168,7 +169,7 @@ export const capabilityHandlers: Record<string, CapabilityHandler> = {
     if (diagnoses.length > 0) facts.push(fact(ctx, 'OBSERVED_FACT', `${diagnoses.length} condiciones registradas`, { type: 'erp', ref: 'get_diagnoses' }));
     flags.push(...allergyFlags(ctx, allergies));
 
-    const gaps = buildDataGaps({ profile: Boolean(profile), anthropometry: Boolean(anthropometry), labs: labs.length > 0, plan: Boolean(plan), adherence: adherence.length > 0, allergies: allergies.length > 0, medications: medications.length > 0 });
+    const gaps = buildDataGaps({ profile: Boolean(profile), anthropometry: Boolean(anthropometry), anthropometryRecent: anthropometryIsRecent(anthropometry, ctx.now), labs: labs.length > 0, plan: Boolean(plan), adherence: adherence.length > 0, allergies: allergies.length > 0, medications: medications.length > 0 });
     for (const gap of gaps) {
       facts.push(fact(ctx, 'RULE_RESULT', `Brecha de datos: ${gap.field}`, { type: 'rule_engine', ref: 'rule.data_gaps' }));
     }
@@ -242,7 +243,7 @@ export const capabilityHandlers: Record<string, CapabilityHandler> = {
     const plan = tool(ctx, 'meal_plan');
     const adherence = asArray(tool(ctx, 'adherence_summary'));
     const allergies = asArray(tool(ctx, 'get_allergies'));
-    const gaps = buildDataGaps({ profile: Boolean(profile), anthropometry: Boolean(anthropometry), labs: labs.length > 0, plan: Boolean(plan), adherence: adherence.length > 0, allergies: allergies.length > 0, medications: true });
+    const gaps = buildDataGaps({ profile: Boolean(profile), anthropometry: Boolean(anthropometry), anthropometryRecent: anthropometryIsRecent(anthropometry, ctx.now), labs: labs.length > 0, plan: Boolean(plan), adherence: adherence.length > 0, allergies: allergies.length > 0, medications: true });
     const facts: CapabilityFact[] = gaps.map((gap) => fact(ctx, 'RULE_RESULT', `Brecha: ${gap.field} (${gap.severity})`, { type: 'rule_engine', ref: 'rule.data_gaps' }));
     if (gaps.length === 0) facts.push(fact(ctx, 'RULE_RESULT', 'No se detectaron brechas de datos requeridos', { type: 'rule_engine', ref: 'rule.data_gaps' }));
     return {
@@ -732,10 +733,20 @@ async function mealPlanReview(ctx: HandlerContext, withNarrative: boolean): Prom
   };
 }
 
-function buildDataGaps(input: { profile: boolean; anthropometry: boolean; labs: boolean; plan: boolean; adherence: boolean; allergies: boolean; medications: boolean }): Array<{ field: string; severity: 'info' | 'warning' }> {
+const ANTHROPOMETRY_MAX_AGE_MS = 180 * 24 * 60 * 60 * 1000;
+
+function anthropometryIsRecent(anthropometry: unknown, now: Date): boolean {
+  if (!anthropometry || typeof anthropometry !== 'object') return false;
+  const measuredAt = (anthropometry as Record<string, unknown>).measuredAt;
+  if (typeof measuredAt !== 'string') return false;
+  return computeFreshness({ measuredAt, now, maxAgeMs: ANTHROPOMETRY_MAX_AGE_MS }).isFresh;
+}
+
+function buildDataGaps(input: { profile: boolean; anthropometry: boolean; anthropometryRecent: boolean; labs: boolean; plan: boolean; adherence: boolean; allergies: boolean; medications: boolean }): Array<{ field: string; severity: 'info' | 'warning' }> {
   const gaps: Array<{ field: string; severity: 'info' | 'warning' }> = [];
   if (!input.profile) gaps.push({ field: 'perfil del paciente', severity: 'warning' });
   if (!input.anthropometry) gaps.push({ field: 'antropometría reciente', severity: 'warning' });
+  else if (!input.anthropometryRecent) gaps.push({ field: 'antropometría desactualizada (>180 días)', severity: 'warning' });
   if (!input.labs) gaps.push({ field: 'laboratorios recientes', severity: 'info' });
   if (!input.plan) gaps.push({ field: 'plan alimenticio activo', severity: 'info' });
   if (!input.adherence) gaps.push({ field: 'registros de adherencia', severity: 'info' });
