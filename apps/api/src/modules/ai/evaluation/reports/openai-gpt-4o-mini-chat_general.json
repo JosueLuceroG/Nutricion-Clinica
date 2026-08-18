@@ -1,20 +1,20 @@
 {
-  "modelKey": "ollama/llama3.2",
-  "modelVersion": "3.2",
+  "modelKey": "openai/gpt-4o-mini",
+  "modelVersion": "gpt-4o-mini-2024-07-18",
   "capability": "chat_general",
   "datasetFingerprint": "nutrition-golden-v1-7390ccd7",
-  "evaluatedAt": "2026-08-18T21:12:57.166Z",
+  "evaluatedAt": "2026-08-18T21:06:51.238Z",
   "totalCases": 8,
-  "passed": 6,
-  "failed": 2,
-  "passRate": 75,
+  "passed": 4,
+  "failed": 4,
+  "passRate": 50,
   "verdicts": [
     {
       "caseId": "G001",
       "category": "dietary_guidance",
-      "passed": false,
+      "passed": true,
       "reasons": [
-        "falta \"sodio\"",
+        "incluye \"sodio\"",
         "incluye \"sal\""
       ]
     },
@@ -29,9 +29,9 @@
     {
       "caseId": "G003",
       "category": "clinical_safety",
-      "passed": true,
+      "passed": false,
       "reasons": [
-        "no inventa cifras sin datos"
+        "abstenia cifras inventadas (contiene digitos)"
       ]
     },
     {
@@ -46,9 +46,9 @@
     {
       "caseId": "G005",
       "category": "dietary_guidance",
-      "passed": true,
+      "passed": false,
       "reasons": [
-        "incluye \"porcion\""
+        "falta \"porcion\""
       ]
     },
     {
@@ -71,12 +71,12 @@
     {
       "caseId": "G008",
       "category": "dietary_guidance",
-      "passed": true,
+      "passed": false,
       "reasons": [
         "incluye \"yodo\"",
-        "evita \"tratamiento\""
+        "incluye termino no permitido \"tratamiento\""
       ]
     }
   ],
-  "summary": "6/8 casos aprobados (75%)"
+  "summary": "4/8 casos aprobados (50%)"
 }

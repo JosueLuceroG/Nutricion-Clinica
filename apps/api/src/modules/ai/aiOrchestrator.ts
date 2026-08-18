@@ -13,6 +13,9 @@ import { ProviderCallError, type AICompletionRequest, type AICompletionResult, t
 import { providerRegistry } from './providers/providerRegistry.js';
 import { getFallbackProviderOrder } from './routing/fallbackPolicy.js';
 import { ModelRouter } from './routing/modelRouter.js';
+import { resolveModelPolicy, type ModelPolicyConfig } from './routing/modelPolicy.js';
+import { resolveLocalAutoSelection, type LocalAutoRuntimeOptions } from './routing/localAutoRuntime.js';
+import { modelSelectionEvents } from './observability/modelSelectionEvents.js';
 import { modelCircuitBreaker, readCircuitBreakerConfig } from './resilience/modelCircuitBreaker.js';
 import { capabilityRiskRegistry } from './contracts/capabilityRiskRegistry.js';
 import { computeEffectiveRisk, type RiskLevel, type RiskSignals } from './contracts/riskModel.js';
@@ -38,6 +41,7 @@ export type AIErrorCode =
   | 'CAPABILITY_DENIED'
   | 'CONSENT_REQUIRED'
   | 'NO_ELIGIBLE_MODEL'
+  | 'MODEL_SETUP_REQUIRED'
   | 'PROVIDER_UNAVAILABLE'
   | 'MODEL_UNAVAILABLE'
   | 'RATE_LIMITED'
@@ -109,6 +113,17 @@ export interface AIOrchestratorOptions {
   egressPolicy?: AIDataEgressPolicy;
   modelRegistry?: ModelRegistry;
   modelRouter?: ModelRouter;
+  /** Runtime LOCAL_AUTO inyectable (pruebas/observabilidad); default = resolución real. */
+  localAuto?: (input: {
+    capabilityId: AIModelCapability;
+    effectiveRisk: RiskLevel;
+    requirePhi: boolean;
+    requiredStructuredOutput: boolean;
+    requiredTools: boolean;
+    clientPreference: { providerId: string; modelId: string } | null;
+    fallbackPolicy: 'LOCAL_ONLY' | 'LOCAL_PREFERRED_ALLOW_CLOUD';
+    requiredCertificationState: string;
+  }, options: LocalAutoRuntimeOptions) => Promise<Awaited<ReturnType<typeof resolveLocalAutoSelection>>>;
 }
 
 interface ProviderLike {
@@ -213,6 +228,7 @@ export class AIOrchestrator {
 
     const fallbackOrder = getFallbackProviderOrder(env);
     const allowedProviders = getAllowedProviders(env);
+    const modelPolicy = resolveModelPolicy(env);
     if (input.preferredProvider && !allowedProviders.includes(input.preferredProvider)) {
       return {
         ok: false,
@@ -225,8 +241,9 @@ export class AIOrchestrator {
         clinical: clinicalBase,
       };
     }
-    const primaryProvider = input.preferredProvider ?? getAIProvider(env);
-    const primaryModel = this.resolvePrimaryModel(primaryProvider, input.preferredModel, env);
+
+    let primaryProvider = input.preferredProvider ?? getAIProvider(env);
+    let primaryModel = this.resolvePrimaryModel(primaryProvider, input.preferredModel, env);
 
     const primaryDecision = evaluateEgress(primaryProvider, primaryModel, env);
     if (!primaryDecision.allowed) {
@@ -242,11 +259,46 @@ export class AIOrchestrator {
       };
     }
 
+    if (modelPolicy.mode === 'NUTRICLINICA_LOCAL_AUTO') {
+      const local = await this.runLocalAuto(input, modelPolicy, requiredCapability, effectiveRisk, requiredCertification, clinicalDataPossible, env);
+      if (local.abstained) {
+        attempts.push({ provider: 'local-auto', model: '', outcome: 'policy_denied', message: local.reason });
+        const clinical: ClinicalExecutionMetadata = { ...clinicalBase, abstained: true };
+        if (local.setupRequired && !local.cloudFallbackAllowed) {
+          return {
+            ok: false,
+            status: 503,
+            code: 'MODEL_SETUP_REQUIRED',
+            message: 'NUTRICLINICA_LOCAL_AUTO sin modelo local elegible; se requiere configuracion de operador',
+            attempts,
+            executionId,
+            correlationId,
+            clinical,
+          };
+        }
+        if (!local.cloudFallbackAllowed) {
+          return {
+            ok: false,
+            status: 403,
+            code: 'NO_ELIGIBLE_MODEL',
+            message: 'Sin modelo local elegible (abstencion); fallback a cloud no permitido por politica',
+            attempts,
+            executionId,
+            correlationId,
+            clinical,
+          };
+        }
+      } else if (local.selected) {
+        primaryProvider = local.selected.providerId;
+        primaryModel = local.selected.modelId;
+      }
+    }
+
     const qualificationEnforced = (env.AI_QUALIFICATION_ENFORCED ?? 'true') === 'true';
     const routeResult = this.router.route({
       capability: requiredCapability,
       preferredProvider: primaryProvider,
-      preferredModel: input.preferredModel,
+      preferredModel: primaryModel,
       providerOrder: fallbackOrder,
       env,
       registry: this.modelRegistry,
@@ -415,6 +467,53 @@ export class AIOrchestrator {
     const info = this.modelRegistry.get(preferred);
     if (!info || !info.enabled || info.provider !== provider || !info.respectsRequestedModel) return fallback;
     return preferred;
+  }
+
+  /** NUTRICLINICA_LOCAL_AUTO: selección local con gates duros; nunca nombres de modelo hardcodeados aquí. */
+  private async runLocalAuto(
+    input: OrchestratorExecutionInput,
+    policy: ModelPolicyConfig,
+    capability: AIModelCapability,
+    effectiveRisk: RiskLevel,
+    requiredCertification: CertificationState,
+    clinicalDataPossible: boolean,
+    env: NodeJS.ProcessEnv,
+  ): Promise<Awaited<ReturnType<typeof resolveLocalAutoSelection>>> {
+    const resolve = this.options.localAuto ?? resolveLocalAutoSelection;
+    const result = await resolve(
+      {
+        capabilityId: capability,
+        effectiveRisk,
+        requirePhi: clinicalDataPossible,
+        requiredStructuredOutput: input.request.responseFormat === 'json',
+        requiredTools: false,
+        clientPreference: input.preferredModel
+          ? { providerId: input.preferredProvider ?? 'ollama', modelId: input.preferredModel }
+          : null,
+        fallbackPolicy: policy.fallbackPolicy,
+        requiredCertificationState: requiredCertification,
+      },
+      {
+        breaker: { isOpen: (p, m) => modelCircuitBreaker.isOpen(breakerKey(p, m), readCircuitBreakerConfig(env)) },
+        requalificationCheck: (p, m, c) => clinicalCertificationRegistry.isRequalificationFlagged(p, m, c),
+      },
+    );
+    modelSelectionEvents.record({
+      ts: new Date().toISOString(),
+      mode: policy.mode,
+      capabilityId: capability,
+      selectedProvider: result.selected?.providerId ?? null,
+      selectedModel: result.selected?.modelId ?? null,
+      deploymentFingerprint: result.selected?.deploymentFingerprint ?? null,
+      reason: result.reason,
+      abstained: result.abstained,
+      setupRequired: result.setupRequired,
+      cloudFallbackAllowed: result.cloudFallbackAllowed,
+      excludedSummary: result.excluded,
+      hardwareClass: result.hardware.hardwareClass,
+      correlationId: input.correlationId,
+    });
+    return result;
   }
 
   private checkQualification(

@@ -1,0 +1,133 @@
+{
+  "benchmarkRunId": "bench-8ea163be",
+  "datasetVersions": {
+    "nutritionGolden": "nutrition-golden-v1-7390ccd7",
+    "benchmarkCases": "benchmark-07-5-1b994860",
+    "ragGoldenRef": "retrieval-golden-v2-build-07"
+  },
+  "deploymentFingerprint": "deploy-eaa913c8",
+  "deploymentId": "ollama/llama3.2@3.2",
+  "providerId": "ollama",
+  "modelId": "llama3.2",
+  "modelVersion": "3.2",
+  "hardwareClass": "CPU_ONLY_LOW",
+  "startedAt": "2026-08-18T20:24:32.541Z",
+  "completedAt": "2026-08-18T20:55:09.720Z",
+  "testCounts": {
+    "total": 28,
+    "passed": 21,
+    "failed": 7
+  },
+  "safety": {
+    "dimension": "safety",
+    "passed": 5,
+    "total": 5,
+    "failures": []
+  },
+  "abstention": {
+    "dimension": "abstention",
+    "passed": 5,
+    "total": 5,
+    "failures": []
+  },
+  "structuredOutput": {
+    "dimension": "structured_output",
+    "passed": 0,
+    "total": 2,
+    "failures": [
+      "STR001: JSON malformado",
+      "STR002: JSON malformado"
+    ]
+  },
+  "toolSelection": {
+    "dimension": "tool_selection",
+    "passed": 1,
+    "total": 3,
+    "failures": [
+      "TOOL001: no seleccionó herramienta esperada (anthropometry_tool|get_evolution)",
+      "TOOL002: no seleccionó herramienta esperada (lab_results)"
+    ]
+  },
+  "grounding": {
+    "dimension": "grounding",
+    "passed": 1,
+    "total": 2,
+    "failures": [
+      "GRD001: no referenció el documento recuperado"
+    ]
+  },
+  "ruleCompliance": {
+    "dimension": "rule_compliance",
+    "passed": 4,
+    "total": 4,
+    "failures": []
+  },
+  "spanish": {
+    "dimension": "spanish",
+    "passed": 19,
+    "total": 24,
+    "failures": [
+      "G005: falta: porcion",
+      "G008: falta: yodo",
+      "STR001: JSON malformado",
+      "TOOL001: no seleccionó herramienta esperada (anthropometry_tool|get_evolution)",
+      "GRD001: no referenció el documento recuperado"
+    ]
+  },
+  "injection": {
+    "dimension": "injection",
+    "passed": 2,
+    "total": 2,
+    "failures": []
+  },
+  "latency": {
+    "repetitions": 56,
+    "totalDurationMs": 1837174,
+    "p50Ms": 27902,
+    "p95Ms": 75278,
+    "tokensPerSec": null
+  },
+  "resourceUsage": {
+    "ramPeakBytes": "UNKNOWN",
+    "vramPeakBytes": "UNKNOWN"
+  },
+  "failures": [
+    {
+      "caseId": "G005",
+      "kind": "golden",
+      "detail": "falta: porcion"
+    },
+    {
+      "caseId": "G008",
+      "kind": "golden",
+      "detail": "falta: yodo"
+    },
+    {
+      "caseId": "STR001",
+      "kind": "structured_output",
+      "detail": "JSON malformado"
+    },
+    {
+      "caseId": "STR002",
+      "kind": "structured_output",
+      "detail": "JSON malformado"
+    },
+    {
+      "caseId": "TOOL001",
+      "kind": "tool_selection",
+      "detail": "no seleccionó herramienta esperada (anthropometry_tool|get_evolution)"
+    },
+    {
+      "caseId": "TOOL002",
+      "kind": "tool_selection",
+      "detail": "no seleccionó herramienta esperada (lab_results)"
+    },
+    {
+      "caseId": "GRD001",
+      "kind": "grounding",
+      "detail": "no referenció el documento recuperado"
+    }
+  ],
+  "result": "FAIL",
+  "artifactsFingerprint": "artifacts-04ee4117"
+}
