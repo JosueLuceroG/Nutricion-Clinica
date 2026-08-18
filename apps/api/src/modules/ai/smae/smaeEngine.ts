@@ -1,4 +1,4 @@
-import { FOOD_GROUPS, FoodGroupLabel, FoodGroupSchema, GroupNutrition, SMAE_CATALOG_VERSION, SYSTEM_FOODS, type FoodGroup, type GroupNutritionProfile, type SmaeFood } from './smaeCatalog.js';
+import { FOOD_GROUPS, FoodGroupLabel, FoodGroupSchema, GroupNutrition, SMAE_CATALOG, activeEntries, type FoodGroup, type GroupNutritionProfile, type SmaeCatalog, type SmaeFood } from './smaeCatalog.js';
 
 /**
  * Motor SMAE determinista (lado servidor).
@@ -8,6 +8,11 @@ import { FOOD_GROUPS, FoodGroupLabel, FoodGroupSchema, GroupNutrition, SMAE_CATA
  *  - El LLM nunca calcula equivalentes ni valida planes; solo interpreta
  *    los resultados de este motor.
  *  - Un grupo desconocido es un error de validación (nunca se infiere).
+ *  - El motor es DATA-DRIVEN: opera sobre cualquier catálogo válido
+ *    (SmaeCatalog); el contenido nunca se ramifica en el código del motor.
+ *    Agregar un alimento nuevo NO requiere cambios de lógica (18.2/18.4).
+ *  - Las funciones aceptan `catalog` (por defecto el catálogo de producción);
+ *    cada resultado reporta catalog.version (fingerprint) y engineVersion.
  */
 
 export interface ExchangeEntry {
@@ -21,6 +26,7 @@ export interface ExchangeEntry {
 
 export interface ExchangeSummary {
   catalogVersion: string;
+  engineVersion: string;
   entries: ExchangeEntry[];
   totals: { kcal: number; proteinG: number; carbsG: number; fatG: number };
   exchangesByGroup: Record<string, number>;
@@ -42,6 +48,7 @@ export interface MealPlanIssue {
 export interface MealPlanValidation {
   ok: boolean;
   catalogVersion: string;
+  engineVersion: string;
   summary: ExchangeSummary | null;
   issues: MealPlanIssue[];
   deviations: { kcalPct: number; proteinPct: number; carbsPct: number; fatPct: number } | null;
@@ -75,17 +82,18 @@ function nutritionTimes(nutrition: GroupNutritionProfile, portions: number): Gro
 }
 
 /** Convierte los ítems de un plan (meals_json) en un resumen de equivalentes por grupo. */
-export function summarizeExchanges(items: PlanMealItem[]): ExchangeSummary {
+export function summarizeExchanges(items: PlanMealItem[], catalog: SmaeCatalog = SMAE_CATALOG): ExchangeSummary {
   const entries: ExchangeEntry[] = [];
   const exchangesByGroup: Record<string, number> = {};
   const totals = { kcal: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+  const activeFoods = activeEntries(catalog);
 
   for (const item of items) {
     const group = typeof item.group === 'string' ? groupOf(item.group) : null;
     if (!group) continue;
     const portions = normalizePortions(item.portions);
     if (portions === null) continue;
-    const food = typeof item.foodId === 'string' ? SYSTEM_FOODS.find((f) => f.id === item.foodId) : undefined;
+    const food = typeof item.foodId === 'string' ? activeFoods.find((f) => f.id === item.foodId) : undefined;
     const nutrition = nutritionTimes(GroupNutrition[group], portions);
     totals.kcal += nutrition.kcal;
     totals.proteinG += nutrition.proteinG;
@@ -103,7 +111,7 @@ export function summarizeExchanges(items: PlanMealItem[]): ExchangeSummary {
   }
 
   const roundedTotals = { kcal: round1(totals.kcal), proteinG: round1(totals.proteinG), carbsG: round1(totals.carbsG), fatG: round1(totals.fatG) };
-  return { catalogVersion: SMAE_CATALOG_VERSION, entries, totals: roundedTotals, exchangesByGroup };
+  return { catalogVersion: catalog.version, engineVersion: catalog.engineVersion, entries, totals: roundedTotals, exchangesByGroup };
 }
 
 export function GroupNutritionLabel(group: FoodGroup): string {
@@ -115,8 +123,9 @@ export function GroupNutritionLabel(group: FoodGroup): string {
  * Determinista y sin LLM. Devuelve issues con severidad; `ok` solo cuando
  * no hay errores (grupos/porciones inválidos) aunque haya advertencias.
  */
-export function validateMealPlan(items: PlanMealItem[], targets?: MealPlanTargets, tolerancePct = 10): MealPlanValidation {
+export function validateMealPlan(items: PlanMealItem[], targets?: MealPlanTargets, tolerancePct = 10, catalog: SmaeCatalog = SMAE_CATALOG): MealPlanValidation {
   const issues: MealPlanIssue[] = [];
+  const activeFoods = activeEntries(catalog);
 
   for (const item of items) {
     const group = typeof item.group === 'string' ? groupOf(item.group) : null;
@@ -128,15 +137,15 @@ export function validateMealPlan(items: PlanMealItem[], targets?: MealPlanTarget
       issues.push({ code: 'INVALID_PORTIONS', severity: 'error', message: `Porciones inválidas para el ítem '${String(item.foodName ?? item.group)}'` });
       continue;
     }
-    if (typeof item.foodId === 'string' && !SYSTEM_FOODS.some((f) => f.id === item.foodId)) {
-      issues.push({ code: 'UNKNOWN_FOOD', severity: 'warning', message: `Alimento '${item.foodId}' fuera del catálogo SMAE del sistema (puede ser un alimento custom del cliente)` });
+    if (typeof item.foodId === 'string' && !activeFoods.some((f) => f.id === item.foodId)) {
+      issues.push({ code: 'UNKNOWN_FOOD', severity: 'warning', message: `Alimento '${item.foodId}' sin equivalencia validada en el catálogo SMAE (SMAE_ITEM_NOT_FOUND; puede ser un alimento custom del cliente)` });
     }
   }
 
-  const summary = summarizeExchanges(items);
+  const summary = summarizeExchanges(items, catalog);
 
   if (!targets) {
-    return { ok: issues.every((i) => i.severity !== 'error'), catalogVersion: SMAE_CATALOG_VERSION, summary, issues: [...issues, { code: 'NO_TARGETS', severity: 'info', message: 'El plan no declara objetivos calóricos/macros' }], deviations: null };
+    return { ok: issues.every((i) => i.severity !== 'error'), catalogVersion: catalog.version, engineVersion: catalog.engineVersion, summary, issues: [...issues, { code: 'NO_TARGETS', severity: 'info', message: 'El plan no declara objetivos calóricos/macros' }], deviations: null };
   }
 
   const pct = (actual: number, target: number): number => (target > 0 ? (actual - target) / target : 0);
@@ -153,7 +162,7 @@ export function validateMealPlan(items: PlanMealItem[], targets?: MealPlanTarget
     }
   }
 
-  return { ok: issues.every((i) => i.severity !== 'error'), catalogVersion: SMAE_CATALOG_VERSION, summary, issues, deviations };
+  return { ok: issues.every((i) => i.severity !== 'error'), catalogVersion: catalog.version, engineVersion: catalog.engineVersion, summary, issues, deviations };
 }
 
 export interface SubstitutionConstraint {
@@ -164,15 +173,17 @@ export interface SubstitutionConstraint {
 /**
  * Sustituciones dentro del MISMO grupo SMAE. Filtra por alergias e
  * intolerancias (coincidencia acento/uso-insensible en nombre y keywords).
- * Si un alimento no coincide con el catálogo, devuelve vacío y `unmatched`.
+ * Si un alimento no coincide con el catálogo (o está inactivo), devuelve
+ * vacío y `unmatched` (SMAE_ITEM_NOT_FOUND: el LLM nunca inventa equivalentes).
  */
-export function suggestSubstitutions(foodId: string, constraints?: SubstitutionConstraint): { candidates: SmaeFood[]; unmatched: boolean } {
-  const food = SYSTEM_FOODS.find((f) => f.id === foodId);
+export function suggestSubstitutions(foodId: string, constraints?: SubstitutionConstraint, catalog: SmaeCatalog = SMAE_CATALOG): { candidates: SmaeFood[]; unmatched: boolean } {
+  const active = activeEntries(catalog);
+  const food = active.find((f) => f.id === foodId);
   if (!food) return { candidates: [], unmatched: true };
   const blockTexts = [...(constraints?.allergenTexts ?? []), ...(constraints?.intoleranceTexts ?? [])]
     .map((text) => normalizeLower(text))
     .filter((text) => text.length > 0);
-  const candidates = SYSTEM_FOODS.filter((candidate) => {
+  const candidates = active.filter((candidate) => {
     if (candidate.id === food.id) return false;
     if (candidate.group !== food.group) return false;
     if (blockTexts.length === 0) return true;

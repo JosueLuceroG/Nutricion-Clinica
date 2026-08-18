@@ -3,18 +3,29 @@ import { z } from 'zod';
 /**
  * Catálogo SMAE 5ª edición (lado servidor).
  *
- * Espejo determinista de la fuente canónica del cliente
- * (src/modules/smae/domain/FoodGroup.ts y SYSTEM_FOODS.ts) para que el
- * servidor pueda validar planes, calcular equivalentes y sugerir
- * sustituciones SIN depender del conocimiento del LLM.
+ * Fuente autoritativa del contenido: el catálogo del cliente
+ * (src/modules/smae/domain/FoodGroup.ts y SYSTEM_FOODS.ts). Este módulo es el
+ * espejo determinista validado en el servidor para calcular equivalentes,
+ * validar planes y sugerir sustituciones SIN depender del conocimiento del LLM.
  *
- * Reglas:
- *  - Los valores nutrimentales son los del SMAE 5ª edición (inmutables).
- *  - Cualquier cambio al catálogo requiere incrementar SMAE_CATALOG_VERSION
- *    (invalida certificaciones por toolset/provenance).
+ * Arquitectura de catálogo incremental (NUNCA cerrado):
+ *  - El contenido del catálogo es DATA: entra por `loadSmaeCatalog` y se valida
+ *    fail-closed (ítem inválido ⇒ el catálogo completo se rechaza, nunca se
+ *    calcula con datos malformados).
+ *  - El motor (smaeEngine) es código: procesa cualquier catálogo válido sin
+ *    cambios de lógica por alimento. Agregar un alimento nuevo del SMAE NO
+ *    requiere tocar el motor.
+ *  - Versiones separadas: SMAE_ENGINE_VERSION (algoritmo) vs
+ *    SMAE_CATALOG_VERSION (contenido, derivado de un fingerprint determinista).
+ *  - Cualquier cambio de contenido (agregar/desactivar ítems) cambia el
+ *    fingerprint/versión; el fingerprint se usa en provenance/evidencia y en la
+ *    clave exacta de certificación (ver certification/versions.ts).
  */
 
-export const SMAE_CATALOG_VERSION = 'smae-5a-v1';
+export const SMAE_ENGINE_VERSION = 'smae-engine-v1';
+
+/** Etiqueta semántica de la fuente (edición SMAE), independiente del fingerprint. */
+export const SMAE_CATALOG_SOURCE_LABEL = 'smae-5a-edicion';
 
 export const FoodGroupSchema = z.enum([
   'verduras',
@@ -84,18 +95,142 @@ export const FoodGroupLabel: Record<FoodGroup, string> = {
   'azucares-con-grasa': 'Azúcares con grasa',
 };
 
+/**
+ * Estado de un ítem del catálogo:
+ *  - active: válido, participa en búsquedas, sustituciones y validación.
+ *  - inactive: válido pero desactivado (no participa; se conserva con
+ *    trazabilidad y sigue contando en el fingerprint del catálogo).
+ * Los ítems malformados NO EXISTEN en el catálogo: `loadSmaeCatalog` falla
+ * fail-closed si un ítem no pasa validación (nunca se calcula con basura).
+ */
+export type CatalogItemStatus = 'active' | 'inactive';
+
 export interface SmaeFood {
+  readonly id: string;
+  readonly group: FoodGroup;
+  readonly name: string;
+  readonly shortName: string;
+  readonly serving: string;
+  readonly servingGrams: number;
+  readonly keywords: readonly string[];
+  readonly nutrition: GroupNutritionProfile;
+  readonly status: CatalogItemStatus;
+}
+
+export interface SmaeCatalogItemInput {
   id: string;
   group: FoodGroup;
   name: string;
   shortName: string;
   serving: string;
   servingGrams: number;
-  keywords: readonly string[];
+  keywords?: readonly string[];
   nutrition: GroupNutritionProfile;
+  status?: CatalogItemStatus;
 }
 
-const RAW_SYSTEM_FOODS: ReadonlyArray<Omit<SmaeFood, 'nutrition'>> = [
+const SmaeCatalogItemSchema = z.object({
+  id: z.string().regex(/^[a-z0-9-]+$/, 'id inválido (solo minúsculas, dígitos y guiones)'),
+  group: FoodGroupSchema,
+  name: z.string().min(1, 'nombre vacío'),
+  shortName: z.string().min(1, 'nombre corto vacío'),
+  serving: z.string().min(1, 'ración vacía'),
+  servingGrams: z.number().positive('ración en gramos debe ser positiva'),
+  keywords: z.array(z.string().min(1)).default([]),
+  nutrition: z.object({
+    kcal: z.number().nonnegative('kcal no puede ser negativa'),
+    proteinG: z.number().nonnegative('proteína no puede ser negativa'),
+    carbsG: z.number().nonnegative('CHO no puede ser negativo'),
+    fatG: z.number().nonnegative('grasa no puede ser negativa'),
+  }),
+  status: z.enum(['active', 'inactive']).default('active'),
+});
+
+export type SmaeCatalogValidation = { ok: true; item: SmaeFood } | { ok: false; errors: string[] };
+
+/** Valida un ítem candidato del catálogo. Los ítems inválidos NUNCA entran activos. */
+export function validateSmaeCatalogItem(input: unknown): SmaeCatalogValidation {
+  const parsed = SmaeCatalogItemSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`) };
+  }
+  return { ok: true, item: { ...parsed.data, nutrition: parsed.data.nutrition } };
+}
+
+export interface SmaeCatalog {
+  readonly version: string;
+  readonly fingerprint: string;
+  readonly engineVersion: string;
+  readonly sourceLabel: string;
+  readonly entries: readonly SmaeFood[];
+}
+
+function canonicalLine(food: SmaeFood): string {
+  const keywords = [...food.keywords].slice().sort().join(',');
+  return [
+    food.id,
+    food.group,
+    food.status,
+    food.servingGrams,
+    food.nutrition.kcal,
+    food.nutrition.proteinG,
+    food.nutrition.carbsG,
+    food.nutrition.fatG,
+    food.name,
+    food.shortName,
+    food.serving,
+    keywords,
+  ].join('|');
+}
+
+/** Fingerprint FNV-1a determinista del contenido del catálogo (orden canónico por id). */
+export function computeSmaeCatalogFingerprint(entries: readonly SmaeFood[]): string {
+  const canonical = entries
+    .map(canonicalLine)
+    .sort()
+    .join('\n');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < canonical.length; i++) {
+    hash ^= canonical.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
+}
+
+/**
+ * Carga y valida un catálogo completo. FAIL CLOSED: cualquier ítem inválido o
+ * id duplicado rechaza el catálogo entero (nunca se calcula con datos
+ * malformados). La versión del catálogo deriva del fingerprint del contenido.
+ */
+export function loadSmaeCatalog(inputs: readonly SmaeCatalogItemInput[]): SmaeCatalog {
+  const entries: SmaeFood[] = [];
+  const seen = new Set<string>();
+  for (const input of inputs) {
+    const validation = validateSmaeCatalogItem(input);
+    if (!validation.ok) {
+      throw new Error(`Catálogo SMAE inválido (fail-closed): ítem '${String((input as { id?: unknown })?.id ?? '?')}' → ${validation.errors.join('; ')}`);
+    }
+    if (seen.has(validation.item.id)) {
+      throw new Error(`Catálogo SMAE inválido (fail-closed): id duplicado '${validation.item.id}'`);
+    }
+    seen.add(validation.item.id);
+    entries.push(validation.item);
+  }
+  const fingerprint = computeSmaeCatalogFingerprint(entries);
+  return {
+    version: `smae-catalog-${fingerprint}`,
+    fingerprint,
+    engineVersion: SMAE_ENGINE_VERSION,
+    sourceLabel: SMAE_CATALOG_SOURCE_LABEL,
+    entries,
+  };
+}
+
+export function activeEntries(catalog: SmaeCatalog): readonly SmaeFood[] {
+  return catalog.entries.filter((food) => food.status === 'active');
+}
+
+const RAW_SYSTEM_FOODS: ReadonlyArray<Omit<SmaeFood, 'nutrition' | 'status'>> = [
   { id: 'verdura-acelga', group: 'verduras', name: 'Acelga', shortName: 'Acelga', serving: '1 taza de hojas crudas', servingGrams: 50, keywords: ['hoja', 'verde', 'cocida', 'vegetal'] },
   { id: 'verdura-brocoli', group: 'verduras', name: 'Brócoli', shortName: 'Brócoli', serving: '1 taza de floretes cocidos', servingGrams: 90, keywords: ['florete', 'verde', 'cocido', 'vegetal'] },
   { id: 'verdura-espinaca', group: 'verduras', name: 'Espinaca', shortName: 'Espinaca', serving: '1 taza de hojas crudas', servingGrams: 50, keywords: ['hoja', 'verde', 'cocida', 'vegetal'] },
@@ -135,15 +270,22 @@ const RAW_SYSTEM_FOODS: ReadonlyArray<Omit<SmaeFood, 'nutrition'>> = [
   { id: 'azucar-chocolate', group: 'azucares-con-grasa', name: 'Chocolate amargo (70%)', shortName: 'Chocolate', serving: '1 cuadrito (10g)', servingGrams: 10, keywords: ['amargo', 'cacao', 'antojo'] },
 ];
 
-export const SYSTEM_FOODS: readonly SmaeFood[] = RAW_SYSTEM_FOODS.map((food) => ({
-  ...food,
-  nutrition: GroupNutrition[food.group],
-}));
+/**
+ * Catálogo de producción: carga validada de la fuente canónica (paridad con
+ * SYSTEM_FOODS.ts). 37 ítems activos hoy; el catálogo es incremental (18.1).
+ */
+export const SMAE_CATALOG: SmaeCatalog = loadSmaeCatalog(
+  RAW_SYSTEM_FOODS.map((food) => ({ ...food, nutrition: GroupNutrition[food.group], status: 'active' as const })),
+);
 
-const FOOD_MAP = new Map<string, SmaeFood>(SYSTEM_FOODS.map((food) => [food.id, food]));
+/** Versión derivada del fingerprint determinista del contenido actual. */
+export const SMAE_CATALOG_VERSION: string = SMAE_CATALOG.version;
 
-export function getSmaeFoodById(id: string): SmaeFood | null {
-  return FOOD_MAP.get(id) ?? null;
+/** Alimentos activos del catálogo de producción (compatibilidad y paridad). */
+export const SYSTEM_FOODS: readonly SmaeFood[] = activeEntries(SMAE_CATALOG);
+
+export function getSmaeFoodById(id: string, catalog: SmaeCatalog = SMAE_CATALOG): SmaeFood | null {
+  return activeEntries(catalog).find((food) => food.id === id) ?? null;
 }
 
 export function normalizeText(text: string): string {
@@ -153,10 +295,10 @@ export function normalizeText(text: string): string {
     .replace(/[\u0300-\u036f]/g, '');
 }
 
-export function searchSmaeFoods(query: string): SmaeFood[] {
+export function searchSmaeFoods(query: string, catalog: SmaeCatalog = SMAE_CATALOG): SmaeFood[] {
   const q = normalizeText(query.trim());
   if (!q) return [];
-  return SYSTEM_FOODS.filter((food) => {
+  return activeEntries(catalog).filter((food) => {
     const haystack = [food.name, food.shortName, ...food.keywords].map(normalizeText);
     return haystack.some((h) => h.includes(q));
   });
