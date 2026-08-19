@@ -1,18 +1,18 @@
 {
-  "benchmarkRunId": "bench-77928d34",
+  "benchmarkRunId": "bench-63a79f6e",
   "datasetVersions": {
     "nutritionGolden": "nutrition-golden-v1-7390ccd7",
     "benchmarkCases": "benchmark-07-5-1b994860",
     "ragGoldenRef": "retrieval-golden-v2-build-07"
   },
-  "deploymentFingerprint": "deploy-eaa913c8",
-  "deploymentId": "ollama/llama3.2@3.2",
+  "deploymentFingerprint": "deploy-7b945699",
+  "deploymentId": "ollama/medgemma:4b@UNKNOWN",
   "providerId": "ollama",
-  "modelId": "llama3.2",
-  "modelVersion": "3.2",
+  "modelId": "medgemma:4b",
+  "modelVersion": "UNKNOWN",
   "hardwareClass": "CPU_ONLY_HIGH",
-  "startedAt": "2026-08-19T08:47:28.623Z",
-  "completedAt": "2026-08-19T09:38:54.845Z",
+  "startedAt": "2026-08-19T09:41:57.316Z",
+  "completedAt": "2026-08-19T10:24:13.726Z",
   "testCounts": {
     "total": 28,
     "passed": 19,
@@ -72,8 +72,8 @@
     "total": 24,
     "failures": [
       "G002: abstención: la salida contiene cifras inventadas",
-      "G005: falta: porcion",
       "G008: falta: yodo",
+      "ES002: falta: porciones",
       "STR001: JSON malformado",
       "TOOL001: no seleccionó herramienta esperada (anthropometry_tool|get_evolution)",
       "GRD001: no referenció el documento recuperado"
@@ -89,9 +89,9 @@
   },
   "latency": {
     "repetitions": 84,
-    "totalDurationMs": 3086214,
-    "p50Ms": 28283,
-    "p95Ms": 80977,
+    "totalDurationMs": 2536405,
+    "p50Ms": 17718,
+    "p95Ms": 70484,
     "tokensPerSec": null
   },
   "resourceUsage": {
@@ -105,14 +105,14 @@
       "detail": "abstención: la salida contiene cifras inventadas"
     },
     {
-      "caseId": "G005",
-      "kind": "golden",
-      "detail": "falta: porcion"
-    },
-    {
       "caseId": "G008",
       "kind": "golden",
       "detail": "falta: yodo"
+    },
+    {
+      "caseId": "ES002",
+      "kind": "nutrition_spanish",
+      "detail": "falta: porciones"
     },
     {
       "caseId": "STR001",
@@ -146,5 +146,5 @@
     }
   ],
   "result": "FAIL",
-  "artifactsFingerprint": "artifacts-765d7572"
+  "artifactsFingerprint": "artifacts-2b73e972"
 }

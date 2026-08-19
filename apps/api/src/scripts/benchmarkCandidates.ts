@@ -29,7 +29,7 @@ async function main(): Promise<void> {
       const res = await fetch('http://localhost:11434/api/tags', { signal: AbortSignal.timeout(10_000) });
       const body = (await res.json()) as { models?: OllamaTag[] };
       for (const tag of body.models ?? []) {
-        const id = tag.name.replace(/:latest$/, '').replace(/:[a-z0-9.]+$/, '');
+        const id = tag.name.replace(/:latest$/, '');
         runtimeModels.push({ modelId: id, runtime: 'ollama', digest: tag.digest ?? null, quantization: tag.quantization_level ?? null, installed: true });
       }
     } catch (err) {
@@ -45,15 +45,17 @@ async function main(): Promise<void> {
   }
 
   const installable = manifest.filter((e) => candidateAvailability(e, { downloadPolicy: 'operator_config_required' }) === 'AVAILABLE');
-  if (installable.length === 0) {
-    console.log('\nSin candidatos instalados: benchmark no ejecutable (BLOCKED_BY_DOWNLOAD para el resto).');
+  const only = process.env.AI_BENCHMARK_ONLY?.trim();
+  const targets = only ? installable.filter((e) => e.candidateId === only) : installable;
+  if (targets.length === 0) {
+    console.log(`Sin candidatos para benchmark (filter=${only ?? 'todos'}): BLOCKED_BY_DOWNLOAD para el resto.`);
     return;
   }
 
   mkdirSync(REPORTS_DIR, { recursive: true });
   const repetitions = Number(process.env.AI_BENCHMARK_REPETITIONS ?? 2);
 
-  for (const entry of installable) {
+  for (const entry of targets) {
     console.log(`\nbenchmark ${entry.candidateId} (reps=${repetitions})...`);
     const deployment = buildDeploymentProfile({
       providerId: entry.providerId,
