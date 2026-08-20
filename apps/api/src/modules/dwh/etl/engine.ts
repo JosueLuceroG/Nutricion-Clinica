@@ -6,6 +6,7 @@ import { readDwhConfig } from '../config.js';
 import { applyDwhSchema, DWH_SCHEMA_VERSION } from '../schema/dwhSchema.js';
 import { populateDimDate } from './dimDate.js';
 import { DWH_CODE_VERSION, DWH_TRANSFORMATION_VERSION, type EtlCounts, type EtlReject, type EtlRunResult } from './types.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 /**
  * Motor ETL idempotente y versionado.
@@ -150,6 +151,7 @@ async function recordReconciliation(ctx: EtlContext, pipelineId: string, factTab
 }
 
 export async function runPipeline(spec: PipelineSpec, opts: { failInjectionPipeline?: string | null } = {}): Promise<EtlRunResult> {
+  const startedAt = performance.now();
   const oltp = await getPool();
   const dwh = await getDwhPool();
   const sourceEnvironment = (process.env.DB_NAME ?? 'nutriclinica').trim();
@@ -202,6 +204,22 @@ export async function runPipeline(spec: PipelineSpec, opts: { failInjectionPipel
     const unexpectedLoss = await recordReconciliation(ctx, spec.pipelineId, spec.pipelineId, extracted.expected, loaded, filtered, extracted.rejects.length);
     await completeLoadRun(ctx, counts, 'succeeded', null);
 
+    emitTelemetry({
+      eventType: 'dwh.etl',
+      executionId: `etl-${ctx.loadRunId}`,
+      loadRunId: ctx.loadRunId,
+      capability: 'dwh',
+      status: 'succeeded',
+      durationMs: Math.round(performance.now() - startedAt),
+      counts: {
+        extracted: counts.extracted,
+        inserted: counts.inserted,
+        updated: counts.updated,
+        rejected: counts.rejected,
+        unexpectedLoss,
+      },
+    });
+
     return {
       loadRunId: ctx.loadRunId,
       pipelineId: spec.pipelineId,
@@ -217,6 +235,15 @@ export async function runPipeline(spec: PipelineSpec, opts: { failInjectionPipel
     if (ctx.loadRunId > 0) {
       await completeLoadRun(ctx, counts, 'failed', message).catch(() => undefined);
     }
+    emitTelemetry({
+      eventType: 'dwh.etl',
+      executionId: `etl-${ctx.loadRunId || 0}`,
+      loadRunId: ctx.loadRunId || 0,
+      capability: 'dwh',
+      status: 'failed',
+      reasonCode: message.startsWith('INYECTADO') ? 'INYECTADO' : 'ETL_FAILED',
+      counts: { extracted: counts.extracted, inserted: counts.inserted, updated: counts.updated, rejected: counts.rejected },
+    });
     return {
       loadRunId: ctx.loadRunId,
       pipelineId: spec.pipelineId,

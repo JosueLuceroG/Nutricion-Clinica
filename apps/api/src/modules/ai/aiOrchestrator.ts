@@ -24,6 +24,7 @@ import type { ConfidenceCategory } from './contracts/confidenceEngine.js';
 import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 import { requiredCertificationFor, type CertificationState } from './certification/certificationStates.js';
 import { CURRENT_VERSIONS } from './certification/versions.js';
+import { emitTelemetry } from '../observability/telemetryService.js';
 
 export type GatewayAttemptOutcome = 'success' | 'policy_denied' | 'breaker_open' | 'provider_error';
 
@@ -182,10 +183,50 @@ export class AIOrchestrator {
     return this.options.getProviderAdapter?.(provider) ?? providerRegistry.get(provider);
   }
 
+  /** Telemetria terminal (fail-soft, sin PHI): un solo conteo por executionId por tipo. */
+  private emitTerminal(
+    eventType: 'ai.execution.completed' | 'ai.execution.abstained' | 'ai.execution.denied' | 'ai.execution.failed',
+    meta: {
+      executionId: string;
+      correlationId: string;
+      clinical?: ClinicalExecutionMetadata;
+      provider?: string;
+      model?: string;
+      status: string;
+      reasonCode?: string;
+      durationMs: number;
+      attempts: GatewayAttempt[];
+    },
+  ): void {
+    const counts = meta.attempts.reduce<Record<string, number>>((acc, a) => {
+      acc[a.outcome] = (acc[a.outcome] ?? 0) + 1;
+      return acc;
+    }, {});
+    emitTelemetry({
+      eventType,
+      executionId: meta.executionId,
+      correlationId: meta.correlationId,
+      capability: meta.clinical?.capability,
+      baseRisk: meta.clinical?.baseRisk,
+      effectiveRisk: meta.clinical?.effectiveRisk,
+      provider: meta.provider,
+      model: meta.model,
+      certificationState: meta.clinical?.certificationState,
+      status: meta.status,
+      reasonCode: meta.reasonCode,
+      durationMs: Math.round(meta.durationMs),
+      counts,
+      versionBundle: meta.clinical
+        ? `${meta.clinical.promptVersion}|${meta.clinical.toolsetVersion}|${meta.clinical.policyVersion}|${meta.clinical.outputSchemaVersion}`
+        : undefined,
+    });
+  }
+
   async execute(input: OrchestratorExecutionInput): Promise<GatewayResult> {
     const env = this.env();
     const executionId = randomUUID();
     const correlationId = input.correlationId ?? executionId;
+    const startedAt = performance.now();
     const breakerConfig = readCircuitBreakerConfig(env);
     const requiredCapability = input.requiredCapability ?? 'chat_general';
     const egressContext = input.egress;
@@ -197,6 +238,10 @@ export class AIOrchestrator {
 
     const riskEntry = capabilityRiskRegistry.get(egressCapability);
     if (!riskEntry) {
+      this.emitTerminal('ai.execution.denied', {
+        executionId, correlationId, status: 'denied', reasonCode: 'CAPABILITY_DENIED',
+        durationMs: performance.now() - startedAt, attempts: [{ provider: input.preferredProvider ?? '', model: '', outcome: 'policy_denied', message: 'unknown_capability' }],
+      });
       return {
         ok: false,
         status: 403,
@@ -230,6 +275,11 @@ export class AIOrchestrator {
     const allowedProviders = getAllowedProviders(env);
     const modelPolicy = resolveModelPolicy(env);
     if (input.preferredProvider && !allowedProviders.includes(input.preferredProvider)) {
+      this.emitTerminal('ai.execution.denied', {
+        executionId, correlationId, clinical: clinicalBase, provider: input.preferredProvider, status: 'denied',
+        reasonCode: 'NO_ELIGIBLE_MODEL', durationMs: performance.now() - startedAt,
+        attempts: [{ provider: input.preferredProvider, model: '', outcome: 'policy_denied', message: 'provider' }],
+      });
       return {
         ok: false,
         status: 403,
@@ -247,6 +297,12 @@ export class AIOrchestrator {
 
     const primaryDecision = evaluateEgress(primaryProvider, primaryModel, env);
     if (!primaryDecision.allowed) {
+      this.emitTerminal('ai.execution.denied', {
+        executionId, correlationId, clinical: clinicalBase, provider: primaryProvider, model: primaryModel, status: 'denied',
+        reasonCode: primaryDecision.reason === 'kill_switch' ? 'KILL_SWITCH' : 'NO_ELIGIBLE_MODEL',
+        durationMs: performance.now() - startedAt,
+        attempts: [{ provider: primaryProvider, model: primaryModel, outcome: 'policy_denied', message: primaryDecision.reason }],
+      });
       return {
         ok: false,
         status: denialStatus(primaryDecision.reason),
@@ -265,6 +321,10 @@ export class AIOrchestrator {
         attempts.push({ provider: 'local-auto', model: '', outcome: 'policy_denied', message: local.reason });
         const clinical: ClinicalExecutionMetadata = { ...clinicalBase, abstained: true };
         if (local.setupRequired && !local.cloudFallbackAllowed) {
+          this.emitTerminal('ai.execution.denied', {
+            executionId, correlationId, clinical, status: 'denied', reasonCode: 'MODEL_SETUP_REQUIRED',
+            durationMs: performance.now() - startedAt, attempts,
+          });
           return {
             ok: false,
             status: 503,
@@ -277,6 +337,10 @@ export class AIOrchestrator {
           };
         }
         if (!local.cloudFallbackAllowed) {
+          this.emitTerminal('ai.execution.abstained', {
+            executionId, correlationId, clinical, status: 'abstained', reasonCode: 'NO_ELIGIBLE_MODEL',
+            durationMs: performance.now() - startedAt, attempts,
+          });
           return {
             ok: false,
             status: 403,
@@ -318,6 +382,10 @@ export class AIOrchestrator {
     });
 
     if (routeResult.candidates.length === 0) {
+      this.emitTerminal('ai.execution.abstained', {
+        executionId, correlationId, clinical: clinicalBase, status: 'abstained', reasonCode: 'NO_ELIGIBLE_MODEL',
+        durationMs: performance.now() - startedAt, attempts,
+      });
       return {
         ok: false,
         status: 403,
@@ -394,6 +462,10 @@ export class AIOrchestrator {
           modelVersion: resolvedModelVersion(this.modelRegistry.get(candidate.model)),
           ...this.resolveCertificationMetadata(candidate.provider, candidate.model, requiredCapability, requiredCertification),
         };
+        this.emitTerminal('ai.execution.completed', {
+          executionId, correlationId, clinical, provider: candidate.provider, model: candidate.model,
+          status: 'completed', durationMs: performance.now() - startedAt, attempts,
+        });
         return { ok: true, provider: candidate.provider, model: candidate.model, result, attempts, executionId, correlationId, clinical };
       } catch (err) {
         modelCircuitBreaker.recordFailure(key, breakerConfig);
@@ -419,6 +491,11 @@ export class AIOrchestrator {
     const firstPolicyDenial = attempts.find((a) => a.outcome === 'policy_denied');
     if (attempts.length > 0 && attempts.every((a) => a.outcome === 'policy_denied')) {
       const message = firstPolicyDenial?.message ?? 'Ningun modelo disponible para la solicitud';
+      this.emitTerminal('ai.execution.abstained', {
+        executionId, correlationId, clinical: { ...clinicalBase, abstained: true }, status: 'abstained',
+        reasonCode: denialCodeFrom(attempts.map((a) => a.message).filter((m): m is string => Boolean(m))),
+        durationMs: performance.now() - startedAt, attempts,
+      });
       return {
         ok: false,
         status: 403,
@@ -437,6 +514,10 @@ export class AIOrchestrator {
       ? (configFailure.message ?? 'IA no configurada en el servidor')
       : 'Proveedor de IA no disponible';
 
+    this.emitTerminal('ai.execution.failed', {
+      executionId, correlationId, clinical: clinicalBase, status: 'failed',
+      reasonCode: operationalCode(attempts, status), durationMs: performance.now() - startedAt, attempts,
+    });
     return { ok: false, status, code: operationalCode(attempts, status), message, attempts, executionId, correlationId, clinical: clinicalBase };
   }
 

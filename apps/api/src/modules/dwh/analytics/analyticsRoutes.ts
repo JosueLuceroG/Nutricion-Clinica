@@ -1,4 +1,5 @@
 import { Router as ExpressRouter, type Router, type Request, type Response, type NextFunction } from 'express';
+import { randomUUID } from 'node:crypto';
 import { requireAuth } from '../../auth/middleware/requireAuth.js';
 import { requireSucursalAccess, getRequestSucursalId } from '../../tenancy/middleware/requireSucursalAccess.js';
 import { readDwhConfig } from '../config.js';
@@ -7,6 +8,7 @@ import { executeAnalyticsTool, listAnalyticsTools, getAnalyticsTool } from './to
 import { listApprovedMetrics } from '../semantic/catalog.js';
 import { computeMetric, comparePeriods } from '../semantic/metricService.js';
 import { buildAnalyticsNarrative } from './aiNarrative.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 /**
  * API analytics sobre el DWH real (Build 08).
@@ -57,7 +59,16 @@ router.get('/metrics/:metricId', async (req: Request, res: Response, next: NextF
     const scope = await resolveScope(user, getRequestSucursalId(req), req.query.all === 'true');
     const { from, to } = parseDateRange(req.query as Record<string, unknown>);
     const metricId = String(req.params.metricId);
+    const startedAt = performance.now();
     const metric = await computeMetric({ metricId, from, to, scope });
+    emitTelemetry({
+      eventType: 'analytics.query',
+      executionId: `analytics-${randomUUID()}`,
+      capability: 'dwh',
+      status: metric.status === 'OK' ? 'completed' : metric.status.toLowerCase(),
+      counts: { metric: 1, suppressedCells: metric.suppressedCells },
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     res.json(metric);
   } catch (err) { next(err); }
 });
@@ -94,7 +105,17 @@ router.get('/tools/:toolId', async (req: Request, res: Response, next: NextFunct
     const scope = await resolveScope(user, getRequestSucursalId(req), req.query.all === 'true');
     if (toolId === 'breakdown_by_professional') assertCanBreakdownByProfessional(scope);
     const params = { ...(req.query as Record<string, unknown>) };
+    const startedAt = performance.now();
     const result = await executeAnalyticsTool(toolId, params, scope);
+    emitTelemetry({
+      eventType: 'analytics.query',
+      executionId: `analytics-tool-${randomUUID()}`,
+      toolCallId: toolId,
+      capability: 'dwh',
+      status: 'completed',
+      counts: { tool: 1 },
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     res.json(result);
   } catch (err) { next(err); }
 });

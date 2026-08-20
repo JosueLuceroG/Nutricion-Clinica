@@ -2,6 +2,7 @@ import type { KnowledgeDoc } from './knowledgeGovernance.js';
 import type { RetrievalGoldenQuery } from './retrievalEvaluation.js';
 import { retrieveFromDocs, type RetrievedChunk } from './retrieval.js';
 import { verifyCitations } from './citationVerifier.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 export interface GroundnessQueryResult {
   id: string;
@@ -42,6 +43,12 @@ export async function evaluateGroundness(input: {
     });
   }
   const groundedQueries = queries.filter((q) => q.grounded).length;
+  emitTelemetry({
+    eventType: 'rag.grounding',
+    executionId: `grounding-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}`,
+    status: groundedQueries === queries.length ? 'passed' : 'failed',
+    counts: { grounded: groundedQueries, total: queries.length },
+  });
   return {
     queries,
     groundedQueries,

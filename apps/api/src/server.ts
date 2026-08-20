@@ -31,6 +31,8 @@ import agentRouter from "./modules/ai/agents/agentRoutes.js";
 import specializationRouter from "./modules/ai/specialization/specializationRoutes.js";
 import analyticsRouter from "./modules/dwh/analyticsRoutes.js";
 import dwhAnalyticsRouter from "./modules/dwh/analytics/analyticsRoutes.js";
+import telemetryRouter from "./modules/observability/telemetryRoutes.js";
+import shadowRouter from "./modules/shadow/shadowRoutes.js";
 import { startDwhScheduler } from "./modules/dwh/scheduler.js";
 import { registerTelemedicinaChannel } from "./modules/telemedicina/signalingServer.js";
 import { registerChatChannel } from "./modules/patientPortal/chatServer.js";
@@ -103,6 +105,8 @@ app.use("/ai/agents", agentRouter);
 app.use("/ai/specialization", specializationRouter);
 app.use("/dwh", analyticsRouter);
 app.use("/dwh/analytics", dwhAnalyticsRouter);
+app.use("/observability", telemetryRouter);
+app.use("/shadow", shadowRouter);
 
 app.use(errorHandler);
 

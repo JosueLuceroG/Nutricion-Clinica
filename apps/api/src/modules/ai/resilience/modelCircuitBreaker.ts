@@ -1,3 +1,5 @@
+import { emitTelemetry } from '../../observability/telemetryService.js';
+
 export interface CircuitBreakerConfig {
   threshold: number;
   cooldownMs: number;
@@ -25,6 +27,18 @@ export class ModelCircuitBreaker {
     current.failures += 1;
     if (current.failures >= config.threshold) {
       current.openedAt = Date.now();
+      const [provider, model] = key.split(':');
+      emitTelemetry({
+        eventType: 'breaker.transition',
+        executionId: `breaker-${key}-${Date.now()}`,
+        provider,
+        model,
+        status: 'opened',
+        reasonCode: 'OPERATIONAL',
+        breakerState: 'OPEN',
+        breakerReasonCategory: 'OPERATIONAL',
+        counts: { failures: current.failures },
+      });
     }
     this.state.set(key, current);
   }
@@ -38,6 +52,16 @@ export class ModelCircuitBreaker {
     if (!current || current.openedAt === null) return false;
     if (Date.now() - current.openedAt >= config.cooldownMs) {
       this.state.delete(key);
+      const [provider, model] = key.split(':');
+      emitTelemetry({
+        eventType: 'breaker.transition',
+        executionId: `breaker-${key}-${Date.now()}`,
+        provider,
+        model,
+        status: 'half_open_retry',
+        breakerState: 'HALF_OPEN',
+        breakerReasonCategory: 'OPERATIONAL',
+      });
       return false;
     }
     return true;

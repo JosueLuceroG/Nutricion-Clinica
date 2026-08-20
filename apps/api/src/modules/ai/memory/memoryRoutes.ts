@@ -11,6 +11,7 @@ import { roleSatisfies } from '../tools/toolAuthorization.js';
 import { readMemoryConfig } from './config.js';
 import { buildMemoryEntry, type MemoryEntry, type MemorySource, type MemoryVisibility } from './memoryTypes.js';
 import { selectMemoryStore, type MemoryStore } from './memoryStore.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 const SaveSchema = z
   .object({
@@ -83,6 +84,10 @@ export function createMemoryRouter(deps: {
     const sucursalId = req.sucursalId ?? '';
     const consent = await consentChecker(parsed.data.pacienteId, sucursalId, MEMORY_CONSENT_TIPO);
     if (!consent) {
+      emitTelemetry({
+        eventType: 'memory.access', executionId: `memory-${randomUUID()}`, capability: 'memory',
+        status: 'consent_denied', counts: { denied: 1 },
+      });
       res.status(403).json({ error: "Consentimiento 'ai_memory' no otorgado" });
       return;
     }
@@ -109,6 +114,10 @@ export function createMemoryRouter(deps: {
     }
 
     await auditMemory(req, { operacion: 'create', pacienteId: entry.pacienteId, entryId: entry.id });
+    emitTelemetry({
+      eventType: 'memory.access', executionId: `memory-${randomUUID()}`, capability: 'memory',
+      status: 'created', counts: { created: 1 },
+    });
     res.json({ entry });
   });
 
@@ -131,12 +140,20 @@ export function createMemoryRouter(deps: {
     const sucursalId = req.sucursalId ?? '';
     const consent = await consentChecker(String(req.params.pacienteId), sucursalId, MEMORY_CONSENT_TIPO);
     if (!consent) {
+      emitTelemetry({
+        eventType: 'memory.access', executionId: `memory-${randomUUID()}`, capability: 'memory',
+        status: 'consent_denied', counts: { denied: 1 },
+      });
       res.status(403).json({ error: "Consentimiento 'ai_memory' no otorgado" });
       return;
     }
 
     try {
       const entries = await store.list({ pacienteId: String(req.params.pacienteId), sucursalId, actorId: req.user.sub, now: now() });
+      emitTelemetry({
+        eventType: 'memory.access', executionId: `memory-${randomUUID()}`, capability: 'memory',
+        status: 'listed', counts: { listed: entries.length },
+      });
       res.json({ entries: entries.slice(0, config.maxEntries) });
     } catch (err) {
       console.warn('[memory] list failed:', err instanceof Error ? err.message : err);

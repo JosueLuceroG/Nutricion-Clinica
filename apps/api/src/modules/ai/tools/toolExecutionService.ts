@@ -2,6 +2,7 @@ import type { Role } from '@nutriclinica/shared';
 import { authorizeTool, type ToolConsentCheck } from './toolAuthorization.js';
 import type { AIToolDefinition } from './toolDefinition.js';
 import { aiToolRegistry, type AIToolRegistry } from './toolRegistry.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 export interface ToolInvokeRequest {
   toolId: string;
@@ -60,8 +61,13 @@ export class ToolExecutionService {
     const audit = options.audit ?? this.defaultOptions.audit;
     const now = options.now ?? this.defaultOptions.now ?? new Date();
     const consent = options.consent ?? this.defaultOptions.consent;
+    const startedAt = performance.now();
 
     if (!this.registry.isToolsEnabled(env)) {
+      emitTelemetry({
+        eventType: 'tool.invocation', executionId: `tool-${req.toolId}-${Date.now()}`, toolCallId: `tool-${req.toolId}-${Date.now()}`,
+        status: 'disabled', capability: 'tools', counts: { disabled: 1 },
+      });
       return { ok: false, status: 503, error: 'Herramientas IA deshabilitadas' };
     }
 
@@ -70,6 +76,10 @@ export class ToolExecutionService {
       return { ok: false, status: 404, error: 'Herramienta desconocida' };
     }
     if (!this.registry.allowedToolIds(env).has(tool.id)) {
+      emitTelemetry({
+        eventType: 'tool.invocation', executionId: `tool-${req.toolId}-${Date.now()}`, toolCallId: `tool-${req.toolId}-${Date.now()}`,
+        status: 'unauthorized', capability: 'tools', counts: { unauthorized: 1 },
+      });
       return { ok: false, status: 403, error: 'Herramienta no permitida' };
     }
 
@@ -163,6 +173,16 @@ export class ToolExecutionService {
         retrievedAt: now.toISOString(),
       });
       return { ok: false, status: 502, error: 'Fallo la ejecucion de la herramienta' };
+    } finally {
+      emitTelemetry({
+        eventType: 'tool.invocation',
+        executionId: `tool-${req.toolId}-${Date.now()}`,
+        toolCallId: `tool-${req.toolId}-${Date.now()}`,
+        status: 'invoked',
+        capability: 'tools',
+        durationMs: Math.round(performance.now() - startedAt),
+        counts: { tools: 1 },
+      });
     }
   }
 }

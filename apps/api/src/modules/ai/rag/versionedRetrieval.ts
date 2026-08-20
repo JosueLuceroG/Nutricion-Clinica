@@ -7,6 +7,7 @@ import {
 } from './knowledgeVersioning.js';
 import { chunkContent, tokenize } from './retrieval.js';
 import { expandPhraseMatches, expandTerms, RETRIEVAL_POLICY_VERSION, synonymPolicyFingerprint } from './synonymExpansion.js';
+import { emitTelemetry } from '../../observability/telemetryService.js';
 
 export const RETRIEVED_CHUNK_VERSION = 'retrieved-chunk.v1';
 
@@ -158,13 +159,26 @@ export async function retrieveVersioned(input: {
   actor: { role: Role; sucursalId: string };
 }): Promise<RetrievalEnvelope> {
   const eligible = await input.store.listEligible({ sucursalId: input.actor.sucursalId, now: input.now });
-  return retrieveVersionedFromDocs({
+  const envelope = retrieveVersionedFromDocs({
     query: input.query,
     versions: eligible,
     topK: input.topK,
     now: input.now,
     actor: input.actor,
   });
+  emitTelemetry({
+    eventType: 'rag.retrieval',
+    executionId: `retrieval-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}`,
+    retrievalId: `retrieval-${Date.now()}-${Math.floor(Math.random() * 0xffff).toString(16)}`,
+    status: envelope.noAnswer ? 'no_answer' : 'found',
+    capability: 'knowledge',
+    counts: {
+      candidate: envelope.candidateCount,
+      eligible: envelope.eligibleCount,
+      returned: envelope.chunks.length,
+    },
+  });
+  return envelope;
 }
 
 /** Chunk ids citables para el contrato de cita [documentId]. */
