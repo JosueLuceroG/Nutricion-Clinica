@@ -26,5 +26,7 @@ export function mapLegacySourceType(type: EvidenceSourceType): ClinicalSourceTyp
   return LEGACY_SOURCE_TYPE_MAP[type];
 }
 
-/** DWH no existe todavía: la arquitectura lo soporta como tipo, nunca se afirma que haya un DWH real. */
-export const DWH_REAL_AVAILABLE = false;
+/** DWH real disponible (Build 08): base separada con ETL versionado y capa semántica.
+ *  Esta bandera se consulta con cautela: los flujos deben verificar DWH_ENABLED y
+ *  la existencia de carga exitosa antes de afirmar datos del DWH. */
+export const DWH_REAL_AVAILABLE = true;

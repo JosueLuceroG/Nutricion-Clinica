@@ -30,6 +30,8 @@ import actionRouter from "./modules/ai/actions/actionRoutes.js";
 import agentRouter from "./modules/ai/agents/agentRoutes.js";
 import specializationRouter from "./modules/ai/specialization/specializationRoutes.js";
 import analyticsRouter from "./modules/dwh/analyticsRoutes.js";
+import dwhAnalyticsRouter from "./modules/dwh/analytics/analyticsRoutes.js";
+import { startDwhScheduler } from "./modules/dwh/scheduler.js";
 import { registerTelemedicinaChannel } from "./modules/telemedicina/signalingServer.js";
 import { registerChatChannel } from "./modules/patientPortal/chatServer.js";
 import { setupWebsocketGateway } from "./modules/ws/websocketGateway.js";
@@ -100,6 +102,7 @@ app.use("/ai/actions", actionRouter);
 app.use("/ai/agents", agentRouter);
 app.use("/ai/specialization", specializationRouter);
 app.use("/dwh", analyticsRouter);
+app.use("/dwh/analytics", dwhAnalyticsRouter);
 
 app.use(errorHandler);
 
@@ -133,3 +136,5 @@ if (RETENTION_CONFIG.cleanupEnabled) {
     "[retention] cleanup disabled via RETENTION_CLEANUP_ENABLED=false",
   );
 }
+
+startDwhScheduler();

@@ -27,6 +27,11 @@ export interface ClaimProvenanceLike {
   ruleVersion?: string;
   documentId?: string;
   documentVersion?: string;
+  metricId?: string;
+  metricVersion?: string;
+  period?: string;
+  loadRunId?: number | null;
+  reconciliationStatus?: string;
   observedAt?: string | null;
   evidenceCount?: number;
 }

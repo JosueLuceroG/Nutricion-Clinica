@@ -22,6 +22,19 @@ export interface EvidenceItem {
   calculationVersion?: string;
   ruleId?: string;
   ruleVersion?: string;
+  /** Identidad de la métrica semántica (Build 08, DWH). */
+  metricId?: string;
+  metricVersion?: string;
+  /** Período cubierto por la observación, 'YYYY-MM-DD..YYYY-MM-DD'. */
+  period?: string;
+  /** Número de observaciones fechadas que soporta este ítem (DWH trend: 2+). */
+  observations?: number;
+  /** Run ETL que produjo los datos (dwh_load_runs). */
+  loadRunId?: number | null;
+  /** Estado de reconciliación del pipeline al momento de la observación. */
+  reconciliationStatus?: string;
+  /** Lineage determinista (cadena de procedencia). */
+  lineage?: string;
   recordDate?: string | null;
   observedAt?: string | null;
   loadedAt?: string | null;
@@ -73,8 +86,13 @@ function claimProvenance(item: EvidenceItem): ClaimProvenanceLike {
     ruleVersion: item.ruleVersion,
     documentId: item.documentId,
     documentVersion: item.documentVersion,
+    metricId: item.metricId,
+    metricVersion: item.metricVersion,
+    period: item.period,
+    loadRunId: item.loadRunId,
+    reconciliationStatus: item.reconciliationStatus,
     observedAt: item.observedAt ?? null,
-    evidenceCount: item.observedAt ? 1 : 0,
+    evidenceCount: item.observations ?? (item.observedAt ? 1 : 0),
   };
 }
 

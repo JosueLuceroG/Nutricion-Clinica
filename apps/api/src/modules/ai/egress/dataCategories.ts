@@ -18,7 +18,8 @@ export type DataCategoryId =
   | 'APPOINTMENTS'
   | 'FINANCIAL'
   | 'CONTACT_INFORMATION'
-  | 'IDENTIFIERS';
+  | 'IDENTIFIERS'
+  | 'ANALYTICS_AGGREGATE';
 
 export type Sensitivity = 'low' | 'moderate' | 'high' | 'critical';
 
@@ -62,6 +63,8 @@ export const DATA_CATEGORIES: Readonly<Record<DataCategoryId, DataCategoryDef>> 
   FINANCIAL: category({ sensitivity: 'high', containsPHI: true, patientBound: true, externalProviderAllowed: false, localProviderAllowed: false, requiresConsent: true }),
   CONTACT_INFORMATION: category({ sensitivity: 'critical', containsPHI: true, patientBound: true, externalProviderAllowed: false, localProviderAllowed: true, requiresConsent: true }),
   IDENTIFIERS: category({ sensitivity: 'critical', containsPHI: true, patientBound: true, externalProviderAllowed: false, localProviderAllowed: false, requiresConsent: true }),
+  /** Build 08: salida agregada del DWH (métricas semánticas). NO contiene PHI. */
+  ANALYTICS_AGGREGATE: category({ sensitivity: 'low', containsPHI: false, patientBound: false, externalProviderAllowed: false, localProviderAllowed: true, requiresConsent: false }),
 };
 
 export function isCategoryDefined(id: string): id is DataCategoryId {

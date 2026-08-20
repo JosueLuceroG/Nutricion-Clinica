@@ -44,7 +44,7 @@ const SEEDS: Seed[] = [
   { capabilityId: 'chat_general', baseRisk: 'RISK_1', minimumModelCertification: 'APPROVED_GENERAL', requiredEvidenceCount: 1, requiredSourceTypes: ['ERP'] },
   { capabilityId: 'patient_education', baseRisk: 'RISK_1', minimumModelCertification: 'APPROVED_GENERAL', requiredEvidenceCount: 1, requiredSourceTypes: ['RAG'] },
   { capabilityId: 'structured_json', baseRisk: 'RISK_2', minimumModelCertification: 'APPROVED_ANALYTICS', requiredEvidenceCount: 1, requiredSourceTypes: ['ERP'], humanReviewPolicy: 'capability_dependent', abstain: true },
-  { capabilityId: 'dashboard_analytics', baseRisk: 'RISK_2', minimumModelCertification: 'APPROVED_ANALYTICS', requiredEvidenceCount: 1, requiredSourceTypes: ['ERP'], humanReviewPolicy: 'capability_dependent', abstain: true },
+  { capabilityId: 'dashboard_analytics', baseRisk: 'RISK_2', minimumModelCertification: 'APPROVED_ANALYTICS', requiredEvidenceCount: 1, requiredSourceTypes: ['ERP', 'DWH'], humanReviewPolicy: 'capability_dependent', abstain: true },
   { capabilityId: 'clinical_summary', baseRisk: 'RISK_2', minimumModelCertification: 'APPROVED_ANALYTICS', requiredEvidenceCount: 2, requiredSourceTypes: ['ERP', 'RAG'], humanReviewPolicy: 'capability_dependent', abstain: true },
   { capabilityId: 'patient_overview', baseRisk: 'RISK_2', minimumModelCertification: 'APPROVED_ANALYTICS', requiredEvidenceCount: 2, requiredSourceTypes: ['ERP'], humanReviewPolicy: 'capability_dependent', abstain: true },
   { capabilityId: 'nutrition_reasoning', baseRisk: 'RISK_3', minimumModelCertification: 'APPROVED_NUTRITION_SUPPORT', requiredEvidenceCount: 3, requiredSourceTypes: ['ERP', 'CALCULATOR', 'RAG'], abstain: true },
