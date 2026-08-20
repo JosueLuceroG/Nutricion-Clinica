@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "reset:staging": "tsx src/db/stagingReset.ts",
     "ai:evaluate": "tsx src/scripts/evaluateModels.ts",
     "ai:benchmark": "tsx src/scripts/benchmarkCandidates.ts",
     "ai:evaluate-retrieval": "tsx src/scripts/evaluateRetrieval.ts",

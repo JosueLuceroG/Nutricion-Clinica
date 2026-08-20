@@ -118,14 +118,56 @@ describe('shadowPrerequisites: lectura honesta BLOCKED', () => {
   it('con modelo golden y staging y revisores -> readiness false por state DISABLED', async () => {
     const store = selectTelemetryStore({ AI_TELEMETRY_STORE: 'memory' });
     await store.record({ eventType: 'dwh.etl', executionId: 'etl-1', status: 'succeeded', counts: { loaded: 10 } });
+    const readiness = await evaluateShadowPrerequisites({});
+    expect(readiness.ready).toBe(false);
+    expect(readiness.machineReadable).toBe('BLOCKED');
+  });
+
+  it('modo técnico GOLDEN completo -> readiness READY (camino de ingeniería)', async () => {
+    const store = selectTelemetryStore({ AI_TELEMETRY_STORE: 'memory' });
+    await store.record({ eventType: 'dwh.etl', executionId: 'etl-1', status: 'succeeded', counts: { loaded: 10 } });
     const readiness = await evaluateShadowPrerequisites({
       SHADOW_TEST_QUALIFIED_PROVIDER: 'fake',
       SHADOW_TEST_QUALIFIED_MODEL: 'golden',
       AI_STAGING_BASE_URL: 'https://staging',
       SHADOW_REVIEWER_KEYS: 'rev1,rev2',
       AI_SHADOW_STATE: 'TECHNICAL_TEST_ONLY',
+      AI_EGRESS_ENABLED: 'true',
+      SHADOW_ROLLBACK_VERIFIED: 'true',
+      SHADOW_BACKUP_VERIFIED: 'true',
     });
     expect(readiness.ready).toBe(true);
     expect(readiness.machineReadable).toBe('READY');
+  });
+
+  it('piloto profesional sin declaraciones explícitas -> BLOCKED (consent, umbrales, rollback, backup)', async () => {
+    const readiness = await evaluateShadowPrerequisites({
+      SHADOW_TEST_QUALIFIED_PROVIDER: 'fake',
+      SHADOW_TEST_QUALIFIED_MODEL: 'golden',
+      AI_STAGING_BASE_URL: 'https://staging',
+      SHADOW_REVIEWER_KEYS: 'rev1',
+      AI_SHADOW_STATE: 'READY_FOR_PROFESSIONAL_SHADOW',
+      AI_EGRESS_ENABLED: 'true',
+    });
+    expect(readiness.ready).toBe(false);
+    expect(readiness.machineReadable).toBe('BLOCKED');
+    const ids = readiness.prerequisites.filter((p) => !p.met).map((p) => p.id);
+    expect(ids).toContain('consent_ready');
+    expect(ids).toContain('professional_review_ready');
+    expect(ids).toContain('thresholds_configured');
+    expect(ids).toContain('rollback_ready');
+    expect(ids).toContain('backup_ready');
+  });
+
+  it('modelo real con REQUALIFICATION_REQUIRED (llama3.2) -> model_certification_valid NO met', async () => {
+    const readiness = await evaluateShadowPrerequisites({
+      SHADOW_TEST_QUALIFIED_PROVIDER: 'ollama',
+      SHADOW_TEST_QUALIFIED_MODEL: 'llama3.2',
+      AI_STAGING_BASE_URL: 'https://staging',
+      AI_SHADOW_STATE: 'READY_FOR_PROFESSIONAL_SHADOW',
+    });
+    const cert = readiness.prerequisites.find((p) => p.id === 'model_certification_valid')!;
+    expect(cert.met).toBe(false);
+    expect(cert.detail).toContain('REQUALIFICATION_REQUIRED');
   });
 });

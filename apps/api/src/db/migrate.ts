@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import sql from 'mssql';
 import { getPool, closePool } from './connection.js';
+import { assertTargetSafe } from '../modules/deployment/targetGuard.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -177,6 +178,8 @@ async function main(): Promise<void> {
   const force = args.includes('--force');
   console.log('=== nutriclinica: migraciones SQL Server ===');
   try {
+    // Build 09.5A §6, §26-27: fail-closed contra PRODUCTION/UNKNOWN.
+    assertTargetSafe('migrate', process.env);
     const results = await applyMigrations({ force });
     const errors = results.filter((r) => r.status === 'error');
     console.log(`\nresultado: ${results.length} archivos, ${errors.length} errores`);

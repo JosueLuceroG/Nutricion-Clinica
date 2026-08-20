@@ -111,6 +111,8 @@ export async function resolveLocalAutoSelection(
       : clinicalCertificationRegistry.resolve(candidate.providerId, candidate.modelId, modelVersion, input.capabilityId, {
           requiredState: input.requiredCertificationState as Parameters<typeof clinicalCertificationRegistry.resolve>[4]['requiredState'],
           allowExperimental: options.allowExperimental,
+          // Build 09.5A §57: la certificación queda ligada al fingerprint del deployment.
+          deploymentFingerprint: deployment.fingerprint,
         });
     if (options.requalificationCheck?.(candidate.providerId, candidate.modelId, input.capabilityId)) {
       certification.requalificationRequired = true;

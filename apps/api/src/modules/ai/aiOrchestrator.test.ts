@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIOrchestrator } from './aiOrchestrator.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 import { AIDataEgressPolicy } from './egress/index.js';
 import { ModelRegistry } from './models/modelRegistry.js';
 import { ProviderCallError, type AICompletionResult } from './providers/aiProviderAdapter.js';
@@ -322,6 +323,7 @@ describe('AIOrchestrator runtime', () => {
     expect(ollama.complete).not.toHaveBeenCalled();
     expect(modelCircuitBreaker.isOpen('ollama:llama3.2', breakerConfig)).toBe(false);
 
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'chat_general');
     ollama.complete = vi.fn(async () => { throw new ProviderCallError('ollama', 'http', 'boom', 502); });
     await orch.execute({ request: { model: '', systemPrompt: 'sys', userPrompt: 'user' }, preferredProvider: 'ollama' });
     expect(modelCircuitBreaker.isOpen('ollama:llama3.2', breakerConfig)).toBe(false);

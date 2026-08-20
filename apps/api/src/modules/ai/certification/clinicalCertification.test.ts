@@ -11,29 +11,34 @@ function registry(): ClinicalCertificationRegistry {
   return new ClinicalCertificationRegistry();
 }
 
-describe('clinicalCertification (Build 05, spec 63)', () => {
-  it('gpt-4o-mini está certificado APPROVED_NUTRITION_SUPPORT para nutrition_reasoning', () => {
+describe('clinicalCertification (Build 05, spec 63; Build 09.5A: torneo 07.5A)', () => {
+  it('gpt-4o-mini tiene registro APPROVED_NUTRITION_SUPPORT pero REQUALIFICATION_REQUIRED (torneo 07.5A: 4/8 FAIL)', () => {
     const r = registry();
     const res = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
-    expect(res.eligible).toBe(true);
+    expect(res.eligible).toBe(false);
     expect(res.state).toBe('APPROVED_NUTRITION_SUPPORT');
     expect(res.certificationId).toBe('cert-openai-gpt-4o-mini-nutrition_reasoning-v1');
     expect(res.stale).toBe(false);
+    expect(res.requalificationRequired).toBe(true);
+    expect(res.reason).toContain('REQUALIFICATION_REQUIRED');
   });
 
   it('gpt-4o-mini NO satisface APPROVED_PATIENT (nunca APPROVED_GENERAL sirve para paciente)', () => {
     const r = registry();
+    r.clearRequalificationRequired('openai', 'gpt-4o-mini', 'chat_general');
     const res = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'chat_general', { requiredState: 'APPROVED_PATIENT' });
     expect(res.eligible).toBe(false);
     expect(res.state).toBe('APPROVED_GENERAL');
     expect(res.reason).toContain('no satisface el requisito');
   });
 
-  it('llama3.2 (ollama) satisface APPROVED_NUTRITION_SUPPORT para nutrition_reasoning', () => {
+  it('llama3.2 (ollama) REQUALIFICATION_REQUIRED (torneo 07.5A: 6/8 FAIL) pese a registro APPROVED_NUTRITION_SUPPORT', () => {
     const r = registry();
     const res = r.resolve('ollama', 'llama3.2', '3.2', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
-    expect(res.eligible).toBe(true);
+    expect(res.eligible).toBe(false);
     expect(res.state).toBe('APPROVED_NUTRITION_SUPPORT');
+    expect(res.requalificationRequired).toBe(true);
+    expect(res.reason).toContain('REQUALIFICATION_REQUIRED');
   });
 
   it('llama3.2 RESTRICTED con lista vacía: nunca aprobación genérica', () => {
@@ -155,6 +160,7 @@ describe('version change → requalification (Build 05, spec 65)', () => {
 
   it('markRequalificationRequired bloquea incluso con clave exacta', () => {
     const r = registry();
+    r.clearRequalificationRequired('openai', 'gpt-4o-mini', 'nutrition_reasoning');
     r.markRequalificationRequired('openai', 'gpt-4o-mini', 'nutrition_reasoning');
     const res = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
     expect(res.eligible).toBe(false);
@@ -175,8 +181,9 @@ describe('version change → requalification (Build 05, spec 65)', () => {
       smaeCatalogVersion: 'smae-catalog-v0', // Build 05: catalogo previo al data-driven
     };
     const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
-    expect(current.eligible).toBe(true);
+    expect(current.eligible).toBe(false);
     expect(current.stale).toBe(false);
+    expect(current.requalificationRequired).toBe(true);
     const build05 = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
       versions: build05Versions,
@@ -195,8 +202,9 @@ describe('version change → requalification (Build 05, spec 65)', () => {
       retrievalPolicyVersion: 'retrieval-policy.v1',
     };
     const current = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', { requiredState: 'APPROVED_NUTRITION_SUPPORT' });
-    expect(current.eligible).toBe(true);
+    expect(current.eligible).toBe(false);
     expect(current.stale).toBe(false);
+    expect(current.requalificationRequired).toBe(true);
     const build06 = r.resolve('openai', 'gpt-4o-mini', 'gpt-4o-mini-2024-07-18', 'nutrition_reasoning', {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
       versions: build06Versions,
@@ -242,14 +250,14 @@ describe('modelCardView (Build 05)', () => {
     evaluationReport: 'r1.json',
   };
 
-  it('deriva capacidades aprobadas desde la certificación granular', () => {
+  it('deriva capacidades aprobadas desde la certificación granular (con flags 07.5A marcados)', () => {
     const view = buildModelCardView(card, { certifications: registry() });
     expect(view.approvedCapabilities.map((c) => c.capability)).toEqual(
       expect.arrayContaining(['chat_general', 'structured_json', 'nutrition_reasoning']),
     );
     const nutrition = view.approvedCapabilities.find((c) => c.capability === 'nutrition_reasoning');
     expect(nutrition?.state).toBe('APPROVED_NUTRITION_SUPPORT');
-    expect(view.clinicalQualification).toBe('approved');
+    expect(view.requalificationRequired).toBe(true);
   });
 
   it('sin data → UNKNOWN / NOT_EVALUATED, nunca inventa resultados', () => {

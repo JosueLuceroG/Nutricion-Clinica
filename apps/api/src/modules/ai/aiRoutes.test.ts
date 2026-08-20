@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import router, { mapOpenAiResponse, resolveOpenAiApiKey } from './aiRoutes.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 
 interface ExpressLayerLike {
   handle?: ((req: Request, res: Response, next: NextFunction) => void | Promise<void>) & { name?: string };
@@ -43,6 +44,8 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.stubEnv('AI_MODEL_MODE', 'ORGANIZATION_PREFERRED');
+  clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'chat_general');
+  clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'chat_general');
 });
 
 describe('aiRoutes', () => {

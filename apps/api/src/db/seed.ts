@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import sql from 'mssql';
 import { getPool, closePool } from './connection.js';
+import { assertTargetSafe } from '../modules/deployment/targetGuard.js';
 
 interface SeedConfig {
   adminEmail: string;
@@ -105,6 +106,8 @@ export async function runSeed(): Promise<{ sucursalId: string; profesionalId: st
 async function main(): Promise<void> {
   console.log('=== nutriclinica: seed (sucursal + admin) ===');
   try {
+    // Build 09.5A §6, §26-27: fail-closed contra PRODUCTION/UNKNOWN.
+    assertTargetSafe('seed', process.env);
     const result = await runSeed();
     console.log(`ok sucursal_id=${result.sucursalId}`);
     console.log(`ok profesional_id=${result.profesionalId}`);

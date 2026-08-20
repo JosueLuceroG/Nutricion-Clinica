@@ -42,6 +42,37 @@ import {
   runRetentionCleanup,
   RETENTION_CONFIG,
 } from "./services/retention/index.js";
+import { assertStartupConfigValid } from "./modules/deployment/startupValidation.js";
+import { initializeCertificationPersistence } from "./modules/ai/certification/certificationPersistence.js";
+import { readEnvironmentClass } from "./modules/deployment/environmentIdentity.js";
+import deploymentRouter from "./modules/deployment/deploymentRoutes.js";
+import { validateAiConfig } from "./modules/ai/runtime/aiConfigValidation.js";
+import { modelRegistry } from "./modules/ai/models/modelRegistry.js";
+import { providerRegistry } from "./modules/ai/providers/providerRegistry.js";
+import { modelQualificationRegistry } from "./modules/ai/evaluation/certification.js";
+
+// Fail-fast antes de arrancar: entorno, bases, DWH, AI, flags, CORS.
+assertStartupConfigValid(process.env, {
+  ai: {
+    validate: (env) =>
+      validateAiConfig(env, modelRegistry, providerRegistry, modelQualificationRegistry)
+        .map((issue) => ({ severity: issue.severity, message: issue.message })),
+  },
+});
+
+// CORS: comodín prohibido en STAGING/PRODUCTION (validado antes de listen).
+const corsOrigins = (
+  process.env.CORS_ORIGIN ??
+  "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost"
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const environmentClass = readEnvironmentClass(process.env);
+if ((environmentClass === "STAGING" || environmentClass === "PRODUCTION") && corsOrigins.some((o) => o === "*" || o.includes("*"))) {
+  throw new Error(`CORS_ORIGIN con comodín prohibido en ${environmentClass}: arranque abortado`);
+}
 
 const app = express();
 
@@ -56,14 +87,6 @@ app.use((_req, res, next) => {
   );
   next();
 });
-
-const corsOrigins = (
-  process.env.CORS_ORIGIN ??
-  "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost"
-)
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
 
 app.use(
   cors({
@@ -107,6 +130,7 @@ app.use("/dwh", analyticsRouter);
 app.use("/dwh/analytics", dwhAnalyticsRouter);
 app.use("/observability", telemetryRouter);
 app.use("/shadow", shadowRouter);
+app.use("/deployment", deploymentRouter);
 
 app.use(errorHandler);
 
@@ -118,9 +142,16 @@ setupWebsocketGateway(httpServer, {
   chat: registerChatChannel,
 });
 
-httpServer.listen(port, () => {
-  console.log(`[nutriclinica-api] listening on http://localhost:${port}`);
-});
+async function bootstrap(): Promise<void> {
+  // Certificación clínica desde BD (fail-closed): sin persistencia cargada
+  // ningún modelo aparece elegible tras un reinicio (Build 09.5A §56-57).
+  await initializeCertificationPersistence(process.env);
+  httpServer.listen(port, () => {
+    console.log(`[nutriclinica-api] listening on http://localhost:${port}`);
+  });
+}
+
+void bootstrap();
 
 if (RETENTION_CONFIG.cleanupEnabled) {
   const schedule = RETENTION_CONFIG.cronSchedule;

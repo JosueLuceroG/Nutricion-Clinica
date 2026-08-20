@@ -3,6 +3,7 @@ import { AIOrchestrator, type AIOrchestratorOptions } from './aiOrchestrator.js'
 import { ModelRegistry, type ModelInfo } from './models/modelRegistry.js';
 import { ModelRouter } from './routing/modelRouter.js';
 import { AIDataEgressPolicy } from './egress/egressPolicy.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 
 const SEED: ModelInfo[] = [
   {
@@ -140,28 +141,35 @@ describe('aiOrchestrator + certificación clínica (Build 05)', () => {
   });
 
   it('la ejecución exitosa lleva metadata clínica completa sin PHI', async () => {
-    const o = orchestrator();
-    const result = await o.execute({
-      request: { model: 'gpt-4o-mini', systemPrompt: 'x', userPrompt: 'y' },
-      requiredCapability: 'nutrition_reasoning',
-      preferredProvider: 'openai',
-      egress: {
-        capability: 'nutrition_reasoning',
-        patientId: '11111111-1111-1111-1111-111111111111',
-        sucursalId: '22222222-2222-2222-2222-222222222222',
-        actor: { profesionalId: '33333333-3333-3333-3333-333333333333' },
-      },
-    });
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.provider).toBe('ollama');
-      expect(result.clinical?.capability).toBe('nutrition_reasoning');
-      expect(result.clinical?.effectiveRisk).toBe('RISK_3');
-      expect(result.clinical?.certificationState).toBe('APPROVED_NUTRITION_SUPPORT');
-      expect(result.clinical?.modelVersion).toBe('3.2');
-      expect(result.clinical?.promptVersion).toBeTruthy();
-      expect(result.clinical?.toolsetVersion).toMatch(/^toolset\./);
-      expect(result.clinical?.requiresProfessionalReview).toBe(true);
+    // Escenario controlado: se desmarca el flag 07.5A solo para este test
+    // (el default sigue bloqueando llama3.2 en producción/resto de tests).
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'nutrition_reasoning');
+    try {
+      const o = orchestrator();
+      const result = await o.execute({
+        request: { model: 'gpt-4o-mini', systemPrompt: 'x', userPrompt: 'y' },
+        requiredCapability: 'nutrition_reasoning',
+        preferredProvider: 'openai',
+        egress: {
+          capability: 'nutrition_reasoning',
+          patientId: '11111111-1111-1111-1111-111111111111',
+          sucursalId: '22222222-2222-2222-2222-222222222222',
+          actor: { profesionalId: '33333333-3333-3333-3333-333333333333' },
+        },
+      });
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.provider).toBe('ollama');
+        expect(result.clinical?.capability).toBe('nutrition_reasoning');
+        expect(result.clinical?.effectiveRisk).toBe('RISK_3');
+        expect(result.clinical?.certificationState).toBe('APPROVED_NUTRITION_SUPPORT');
+        expect(result.clinical?.modelVersion).toBe('3.2');
+        expect(result.clinical?.promptVersion).toBeTruthy();
+        expect(result.clinical?.toolsetVersion).toMatch(/^toolset\./);
+        expect(result.clinical?.requiresProfessionalReview).toBe(true);
+      }
+    } finally {
+      clinicalCertificationRegistry.markRequalificationRequired('ollama', 'llama3.2', 'nutrition_reasoning');
     }
   });
 

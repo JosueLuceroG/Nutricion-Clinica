@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIGateway } from './aiGateway.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 import { modelCircuitBreaker } from './resilience/modelCircuitBreaker.js';
 import { ProviderCallError, type AICompletionResult, type AIProviderAdapter } from './providers/aiProviderAdapter.js';
 
@@ -23,6 +24,9 @@ describe('AIGateway', () => {
 
   beforeEach(() => {
     modelCircuitBreaker.reset();
+    clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'chat_general');
+    clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'structured_json');
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'chat_general');
     openAi = fakeAdapter('openai', async () => SUCCESS);
     ollama = fakeAdapter('ollama', async () => SUCCESS);
     gateway = new AIGateway({

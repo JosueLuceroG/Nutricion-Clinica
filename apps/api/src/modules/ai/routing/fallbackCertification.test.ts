@@ -80,7 +80,7 @@ function certFor(riskSignals: Parameters<typeof computeEffectiveRisk>[1] = {}) {
 }
 
 describe('modelRouter certificación clínica (Build 05, spec 63/64/66)', () => {
-  it('gpt-4o-mini es candidato para nutrition_reasoning con certificación APPROVED_NUTRITION_SUPPORT', () => {
+  it('tras el torneo 07.5A ningún modelo semilla es ejecutable para nutrition_reasoning (REQUALIFICATION_REQUIRED)', () => {
     const result = router.route({
       capability: 'nutrition_reasoning',
       preferredProvider: 'openai',
@@ -94,8 +94,11 @@ describe('modelRouter certificación clínica (Build 05, spec 63/64/66)', () => 
       effectiveRisk: 'RISK_3',
       certification: certFor(),
     });
-    expect(result.candidates.map((c) => c.model)).toContain('gpt-4o-mini');
-    expect(result.ineligible.filter((n) => n.reason.startsWith('certification') || n.reason === 'blocked_model' || n.reason === 'stale_certification' || n.reason === 'experimental_not_allowed')).toEqual([]);
+    const ineligible = result.ineligible.filter((n) => n.model === 'gpt-4o-mini' && (n.reason === 'certification_denied' || n.reason === 'stale_certification'));
+    expect(ineligible.length).toBeGreaterThan(0);
+    expect(ineligible[0]!.message).toContain('REQUALIFICATION_REQUIRED');
+    expect(result.ineligible.some((n) => n.model === 'llama3.2' && (n.reason === 'certification_denied' || n.reason === 'stale_certification'))).toBe(true);
+    expect(result.candidates.map((c) => c.model)).toEqual(['gpt-4o-mini', 'llama3.2']);
   });
 
   it('un modelo sin certificación clínica NUNCA es candidato (arquitectónico, spec 66)', () => {
@@ -141,7 +144,7 @@ describe('modelRouter certificación clínica (Build 05, spec 63/64/66)', () => 
 });
 
 describe('fallback con certificación (Build 05, spec 64)', () => {
-  it('A certificado en structured_json pero B RESTRICTED: B nunca es candidato ni se le llama (spec 66)', () => {
+  it('structured_json: gpt-4o-mini REQUALIFICATION_REQUIRED (07.5A) y llama3.2 RESTRICTED: ninguno ejecutable (spec 66)', () => {
     const route = router.route({
       capability: 'structured_json',
       preferredProvider: 'openai',
@@ -155,56 +158,66 @@ describe('fallback con certificación (Build 05, spec 64)', () => {
       effectiveRisk: 'RISK_2',
       certification: certFor(),
     });
-    expect(route.candidates.map((c) => c.model)).toContain('gpt-4o-mini');
+    const miniNotes = route.ineligible.filter((n) => n.model === 'gpt-4o-mini');
+    expect(miniNotes.some((n) => n.reason === 'certification_denied')).toBe(true);
+    expect(miniNotes.find((n) => n.reason === 'certification_denied')?.message).toContain('REQUALIFICATION_REQUIRED');
     const bNotes = route.ineligible.filter((n) => n.model === 'llama3.2');
     expect(bNotes.some((n) => n.reason === 'certification_denied')).toBe(true);
     expect(bNotes.find((n) => n.reason === 'certification_denied')?.message).toContain('RESTRICTED');
-    expect(route.ineligible.filter((n) => n.model === 'gpt-4o-mini' && (n.reason === 'certification_denied' || n.reason === 'stale_certification' || n.reason === 'blocked_model' || n.reason === 'experimental_not_allowed'))).toEqual([]);
+    expect(route.candidates.map((c) => c.model)).toEqual(['gpt-4o-mini', 'llama3.2']);
   });
 
   it('A timeout → B certificado para el riesgo → fallback operativo ejecuta B', async () => {
-    const options: AIOrchestratorOptions = {
-      env: () => ({ ...baseEnv }),
-      modelRegistry: registry,
-      modelRouter: router,
-      egressPolicy: AIDataEgressPolicy.withInMemoryStore({
+    // Escenario controlado de fallback: se desmarca el flag 07.5A solo para este
+    // test y se restaura al final (el flag por defecto sigue bloqueando llama3.2).
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'nutrition_reasoning');
+    try {
+      const options: AIOrchestratorOptions = {
         env: () => ({ ...baseEnv }),
-        consentStatusProvider: async () => ({ status: 'valid', reference: 'cons-1' }),
-        namesProvider: async () => ['Ana Gómez'],
-      }),
-      getProviderAdapter: (provider) => ({
-        complete: async () => {
-          if (provider === 'openai') throw new Error('timeout del proveedor');
-          return { content: 'respuesta local', model: 'llama3.2', finishReason: 'stop', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } };
+        modelRegistry: registry,
+        modelRouter: router,
+        egressPolicy: AIDataEgressPolicy.withInMemoryStore({
+          env: () => ({ ...baseEnv }),
+          consentStatusProvider: async () => ({ status: 'valid', reference: 'cons-1' }),
+          namesProvider: async () => ['Ana Gómez'],
+        }),
+        getProviderAdapter: (provider) => ({
+          complete: async () => {
+            if (provider === 'openai') throw new Error('timeout del proveedor');
+            return { content: 'respuesta local', model: 'llama3.2', finishReason: 'stop', usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 } };
+          },
+        }),
+      };
+      const orchestrator = new AIOrchestrator(options);
+      const result = await orchestrator.execute({
+        request: { model: 'gpt-4o-mini', systemPrompt: 'x', userPrompt: 'y' },
+        requiredCapability: 'nutrition_reasoning',
+        preferredProvider: 'openai',
+        egress: {
+          capability: 'nutrition_reasoning',
+          patientId: '11111111-1111-1111-1111-111111111111',
+          sucursalId: '22222222-2222-2222-2222-222222222222',
+          actor: { profesionalId: '33333333-3333-3333-3333-333333333333' },
         },
-      }),
-    };
-    const orchestrator = new AIOrchestrator(options);
-    const result = await orchestrator.execute({
-      request: { model: 'gpt-4o-mini', systemPrompt: 'x', userPrompt: 'y' },
-      requiredCapability: 'nutrition_reasoning',
-      preferredProvider: 'openai',
-      egress: {
-        capability: 'nutrition_reasoning',
-        patientId: '11111111-1111-1111-1111-111111111111',
-        sucursalId: '22222222-2222-2222-2222-222222222222',
-        actor: { profesionalId: '33333333-3333-3333-3333-333333333333' },
-      },
-    });
+      });
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.provider).toBe('ollama');
-      expect(result.clinical?.certificationState).toBe('APPROVED_NUTRITION_SUPPORT');
-      expect(result.clinical?.effectiveRisk).toBe('RISK_3');
-      expect(result.clinical?.requiresProfessionalReview).toBe(true);
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.provider).toBe('ollama');
+        expect(result.clinical?.certificationState).toBe('APPROVED_NUTRITION_SUPPORT');
+        expect(result.clinical?.effectiveRisk).toBe('RISK_3');
+        expect(result.clinical?.requiresProfessionalReview).toBe(true);
+      }
+    } finally {
+      clinicalCertificationRegistry.markRequalificationRequired('ollama', 'llama3.2', 'nutrition_reasoning');
     }
   });
 
-  it('llama3.2 satisface APPROVED_NUTRITION_SUPPORT por clave exacta', () => {
+  it('llama3.2 con flag 07.5A: REQUALIFICATION_REQUIRED por clave exacta', () => {
     const res = clinicalCertificationRegistry.resolve('ollama', 'llama3.2', '3.2', 'nutrition_reasoning', {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
     });
-    expect(res.eligible).toBe(true);
+    expect(res.eligible).toBe(false);
+    expect(res.requalificationRequired).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIGateway } from './aiGateway.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 import { AIDataEgressPolicy, InMemoryEgressManifestStore } from './egress/index.js';
 import { modelCircuitBreaker } from './resilience/modelCircuitBreaker.js';
 import { ProviderCallError, type AICompletionResult, type AIProviderAdapter } from './providers/aiProviderAdapter.js';
@@ -33,6 +34,10 @@ describe('AIGateway + egress (Build 03)', () => {
 
   beforeEach(() => {
     modelCircuitBreaker.reset();
+    clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'chat_general');
+    clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'nutrition_reasoning');
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'chat_general');
+    clinicalCertificationRegistry.clearRequalificationRequired('ollama', 'llama3.2', 'nutrition_reasoning');
     openAi = fakeAdapter('openai', async () => SUCCESS);
     ollama = fakeAdapter('ollama', async () => SUCCESS);
     store = new InMemoryEgressManifestStore();

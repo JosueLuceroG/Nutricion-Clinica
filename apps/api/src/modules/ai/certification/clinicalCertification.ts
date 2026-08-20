@@ -2,6 +2,7 @@ import type { AIModelCapability } from '../evaluation/capabilities.js';
 import { GOLDEN_DATASET_V1_FINGERPRINT } from '../evaluation/certification.js';
 import { CURRENT_VERSIONS, type CurrentVersions } from './versions.js';
 import { stateSatisfies, type CertificationState } from './certificationStates.js';
+import type { RequalificationFlag } from './certificationPersistence.js';
 
 /** Clave EXACTA de certificación: la combinación completa, nunca solo provider+model. */
 export interface CertificationKey {
@@ -19,6 +20,12 @@ export interface CertificationKey {
   retrievalPolicyVersion?: string;
   /** Fingerprint del catálogo SMAE vigente al momento de la certificación. */
   smaeCatalogVersion?: string;
+  /**
+   * Fingerprint del deployment (digest/cuantización/runtime/settings).
+   * Mismo modelo en deployment materialmente distinto => NO se reutiliza la
+   * certificación (Build 09.5A §57). Sin fingerprint = legado/semilla.
+   */
+  deploymentFingerprint?: string;
 }
 
 export interface ClinicalCertificationRecord {
@@ -241,14 +248,37 @@ export interface ResolveContext {
   versions?: CurrentVersions;
   evaluationDatasetVersion?: string;
   knowledgePolicyVersion?: string;
+  /** Fingerprint del deployment vigente (Build 09.5A §57): exige coincidencia exacta. */
+  deploymentFingerprint?: string;
 }
+
+/**
+ * Flags de requalificación POR DEFECTO (Build 07.5A, resultado del torneo
+ * clínico). En runtime el estado proviene de la BD (ai_requalification_flags,
+ * migración 039); aquí codificamos el mismo resultado como estado base para
+ * que tests/desarrollo reflejen la realidad: los modelos con re-evaluación
+ * histórica FALLIDA NO pueden aparecer elegibles.
+ */
+export const DEFAULT_REQUALIFICATION_FLAGS: RequalificationFlag[] = [
+  { providerId: 'ollama', modelId: 'llama3.2', capabilityId: 'chat_general', reasonRef: 'FAILED_REQUALIFICATION: torneo clínico 07.5A' },
+  { providerId: 'ollama', modelId: 'llama3.2', capabilityId: 'nutrition_reasoning', reasonRef: 'FAILED_REQUALIFICATION: torneo clínico 07.5A' },
+  { providerId: 'openai', modelId: 'gpt-4o-mini', capabilityId: 'chat_general', reasonRef: 'FAILED_REQUALIFICATION: re-evaluación histórica 07.5A (4/8)' },
+  { providerId: 'openai', modelId: 'gpt-4o-mini', capabilityId: 'structured_json', reasonRef: 'FAILED_REQUALIFICATION: re-evaluación histórica 07.5A (4/8)' },
+  { providerId: 'openai', modelId: 'gpt-4o-mini', capabilityId: 'nutrition_reasoning', reasonRef: 'FAILED_REQUALIFICATION: re-evaluación histórica 07.5A (4/8)' },
+];
 
 export class ClinicalCertificationRegistry {
   private readonly records = new Map<string, ClinicalCertificationRecord>();
   private readonly requalificationFlags = new Set<string>();
 
-  constructor(seed: ClinicalCertificationRecord[] = RECORD_SEEDS) {
+  constructor(
+    seed: ClinicalCertificationRecord[] = RECORD_SEEDS,
+    requalificationFlags: readonly RequalificationFlag[] = DEFAULT_REQUALIFICATION_FLAGS,
+  ) {
     for (const record of seed) this.register(record);
+    for (const flag of requalificationFlags) {
+      this.markRequalificationRequired(flag.providerId, flag.modelId, flag.capabilityId);
+    }
   }
 
   register(record: ClinicalCertificationRecord): void {
@@ -263,8 +293,29 @@ export class ClinicalCertificationRegistry {
     return this.records.get(certificationId);
   }
 
+  /** Reemplaza TODO el estado por el persistido en BD (Build 09.5A §56). */
+  replaceAll(records: ClinicalCertificationRecord[], requalificationFlags: readonly RequalificationFlag[]): void {
+    this.records.clear();
+    this.requalificationFlags.clear();
+    for (const record of records) this.register(record);
+    for (const flag of requalificationFlags) {
+      this.markRequalificationRequired(flag.providerId, flag.modelId, flag.capabilityId);
+    }
+  }
+
   markRequalificationRequired(providerId: string, modelId: string, capabilityId: AIModelCapability): void {
     this.requalificationFlags.add(`${providerId}/${modelId}/${capabilityId}`);
+  }
+
+  clearRequalificationRequired(providerId: string, modelId: string, capabilityId: AIModelCapability): void {
+    this.requalificationFlags.delete(`${providerId}/${modelId}/${capabilityId}`);
+  }
+
+  listRequalificationFlags(): RequalificationFlag[] {
+    return Array.from(this.requalificationFlags).map((key) => {
+      const [providerId, modelId, capabilityId] = key.split('/');
+      return { providerId: providerId!, modelId: modelId!, capabilityId: capabilityId! as AIModelCapability };
+    });
   }
 
   isRequalificationFlagged(providerId: string, modelId: string, capabilityId: AIModelCapability): boolean {
@@ -312,6 +363,19 @@ export class ClinicalCertificationRegistry {
         stale: true,
         requalificationRequired: true,
         reason: `Sin certificación clínica exacta para ${providerId}/${modelId}@${modelVersion}/${capabilityId}`,
+      };
+    }
+
+    // Build 09.5A §57: fingerprint de deployment distinto (o ausente cuando el
+    // contexto lo exige) => la certificación NO se reutiliza => requalification.
+    if (context.deploymentFingerprint !== undefined && match.key.deploymentFingerprint !== context.deploymentFingerprint) {
+      return {
+        eligible: false,
+        state: match.state,
+        certificationId: match.certificationId,
+        stale: true,
+        requalificationRequired: true,
+        reason: `Deployment fingerprint distinto: certificación no reutilizable (esperado ${context.deploymentFingerprint})`,
       };
     }
 

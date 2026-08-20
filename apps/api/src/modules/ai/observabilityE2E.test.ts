@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIOrchestrator } from './aiOrchestrator.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
 import { modelCircuitBreaker } from './resilience/modelCircuitBreaker.js';
 import { resetAggregatorForTests, telemetryAggregates } from '../observability/aggregator.js';
 import { resetTelemetryStoreForTests, selectTelemetryStore } from '../observability/telemetryStore.js';
@@ -21,6 +22,7 @@ describe('Build 09 E2E: telemetria del orquestador', () => {
   beforeEach(() => {
     calls = 0;
     modelCircuitBreaker.reset();
+    clinicalCertificationRegistry.clearRequalificationRequired('openai', 'gpt-4o-mini', 'chat_general');
     resetAggregatorForTests();
     resetTelemetryStoreForTests();
     resetTelemetryForTests();
