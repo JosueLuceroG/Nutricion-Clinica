@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 import { createExpertRouter } from './expertRoutes.js';
 import { ClinicalAutoDisable } from '../clinicalGate/autoDisable.js';
+import { readClinicalGateConfig } from '../clinicalGate/config.js';
 import { InMemoryClinicalReviewStore } from '../clinicalGate/reviewStore.js';
 import { ShadowMode } from '../clinicalGate/shadowMode.js';
 import type { NutritionAdviceResult, NutritionWorkflow } from './nutritionWorkflow.js';
@@ -50,7 +51,11 @@ const result: NutritionAdviceResult = {
 
 function makeEnv() {
   const store = new InMemoryClinicalReviewStore();
-  const autoDisable = new ClinicalAutoDisable(store);
+  const autoDisable = new ClinicalAutoDisable(
+    store,
+    readClinicalGateConfig,
+    () => new Date('2026-08-14T12:00:00.000Z'),
+  );
   const shadow = new ShadowMode({
     workflow: { run: async () => result } as unknown as NutritionWorkflow,
     id: () => RUN_ID,

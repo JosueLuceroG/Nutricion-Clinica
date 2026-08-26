@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { DEXIE_SCHEMA_VERSION } from "@nutriclinica/shared";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import type { AnthropometryRow } from "@modules/anthropometry/infrastructure/anthropometryMapper";
 import type { LabPanelRow } from "@modules/laboratory/infrastructure/labPanelMapper";
@@ -541,7 +542,7 @@ export class NutriClinicaDB extends Dexie {
       patients: PATIENT_STORES,
     });
 
-    this.version(33)
+    this.version(DEXIE_SCHEMA_VERSION)
       .stores({
         anthropometry: ANTHROPOMETRY_STORES,
         lab_panels: LAB_PANELS_STORES,

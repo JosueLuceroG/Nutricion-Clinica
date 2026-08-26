@@ -11,6 +11,7 @@
 
 import { useAuthStore } from '@store/authStore';
 import { useSyncStore } from '@store/syncStore';
+import { getApiBaseUrl } from './apiBaseUrl.js';
 
 export class HttpError extends Error {
   constructor(
@@ -50,15 +51,8 @@ function buildUrl(base: string, path: string, query?: HttpClientOptions['query']
   return url.toString();
 }
 
-function getBaseUrl(): string {
-  const fromProcess = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
-  if (fromProcess) return fromProcess;
-  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
-  return fromVite ?? 'http://localhost:3000';
-}
-
 export async function httpRequest<T = unknown>(path: string, options: HttpClientOptions = {}): Promise<T> {
-  const base = getBaseUrl();
+  const base = getApiBaseUrl();
   const url = buildUrl(base, path, options.query);
 
   const headers: Record<string, string> = {

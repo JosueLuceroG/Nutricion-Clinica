@@ -27,7 +27,7 @@ import type {
   SyncPushOperation,
   SyncPushResultItem,
 } from "@nutriclinica/shared";
-import { SYNC_SCHEMA_VERSION } from "@nutriclinica/shared";
+import { SYNC_SCHEMA_VERSION, API_VERSION } from "@nutriclinica/shared";
 import { type SyncQueueRepository } from "./syncQueueRepository.js";
 import {
   isSyncApplying,
@@ -43,6 +43,7 @@ import { withSucursalScope } from "@services/tenancy/sucursalScope";
 import {
   SyncAuthError,
   SyncSchemaMismatchError,
+  ApiContractMismatchError,
 } from "@modules/sync/domain/errors.js";
 import { HttpError, NetworkError } from "../api/httpClient.js";
 
@@ -183,6 +184,12 @@ export class SyncEngine {
         throw new SyncSchemaMismatchError(
           manifest.syncSchemaVersion,
           SYNC_SCHEMA_VERSION,
+        );
+      }
+      if (manifest.apiContractVersion !== API_VERSION) {
+        throw new ApiContractMismatchError(
+          manifest.apiContractVersion,
+          API_VERSION,
         );
       }
 

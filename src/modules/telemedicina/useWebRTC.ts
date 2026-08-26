@@ -2,6 +2,7 @@ import * as React from "react";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import { telemedicinaApi } from "@services/api/telemedicinaApi";
+import { getApiBaseUrl } from "@services/api/apiBaseUrl";
 
 const DEFAULT_STUN_URLS = ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"];
 const TURN_CONFIG_CACHE_TTL = 300_000; // 5 min
@@ -39,13 +40,17 @@ interface UseWebRtcReturn {
 }
 
 function getWsUrl(): string {
-  const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
-  const base = apiUrl.replace(/^http/, "ws");
+  const base = getApiBaseUrl().replace(/^http/, "ws");
   return `${base}/ws/telemedicina`;
 }
 
 function env(): Record<string, string | undefined> {
-  return (import.meta as unknown as { env?: Record<string, string> }).env ?? {};
+  return {
+    VITE_STUN_URLS: import.meta.env.VITE_STUN_URLS,
+    VITE_TURN_URLS: import.meta.env.VITE_TURN_URLS,
+    VITE_TURN_USERNAME: import.meta.env.VITE_TURN_USERNAME,
+    VITE_TURN_CREDENTIAL: import.meta.env.VITE_TURN_CREDENTIAL,
+  };
 }
 
 function csv(value: string | undefined): string[] {
@@ -58,7 +63,7 @@ async function fetchTurnConfig(): Promise<TurnConfigDTO | null> {
     return turnConfigCache.data;
   }
 
-  const apiUrl = getApiUrl();
+  const apiUrl = getApiBaseUrl();
   const token = useAuthStore.getState().token;
   const sucursalId = useSyncStore.getState().sucursalId;
   if (!token) return null;
@@ -77,10 +82,6 @@ async function fetchTurnConfig(): Promise<TurnConfigDTO | null> {
   } catch {
     return null;
   }
-}
-
-function getApiUrl(): string {
-  return (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? 'http://localhost:3000';
 }
 
 async function buildRtcConfig(): Promise<RTCConfiguration> {

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { NetworkError, httpRequest } from "./httpClient.js";
+import { getApiBaseUrl } from "./apiBaseUrl.js";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 
@@ -532,16 +533,6 @@ export async function listPatientPortalAdherence(
     .parse(response).records;
 }
 
-/** Base URL del backend para construir URLs absolutas de descarga. */
-function getBackendBaseUrl(): string {
-  const fromVite = (import.meta as unknown as { env?: Record<string, string> })
-    .env?.VITE_API_URL;
-  if (fromVite) return fromVite;
-  const fromProcess =
-    typeof process !== "undefined" ? process.env?.VITE_API_URL : undefined;
-  return fromProcess ?? "http://localhost:3000";
-}
-
 const PortalMessageSchema = z.object({
   id: z.string(),
   tokenId: z.string(),
@@ -713,7 +704,7 @@ export function getDocumentDownloadUrl(
   token: string,
   documentId: string,
 ): string {
-  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download`;
+  return `${getApiBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download`;
 }
 
 /** URL para previsualizar un documento del portal en el navegador. */
@@ -721,15 +712,15 @@ export function getDocumentPreviewUrl(
   token: string,
   documentId: string,
 ): string {
-  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
+  return `${getApiBaseUrl()}/patient-portal/${encodeURIComponent(token)}/documents/${encodeURIComponent(documentId)}/download?preview=1`;
 }
 
 export function getMealPhotoImageUrl(token: string, mealPhotoId: string): string {
-  return `${getBackendBaseUrl()}/patient-portal/${encodeURIComponent(token)}/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
+  return `${getApiBaseUrl()}/patient-portal/${encodeURIComponent(token)}/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
 }
 
 export function getProfessionalMealPhotoImageUrl(mealPhotoId: string): string {
-  return `${getBackendBaseUrl()}/patient-portal/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
+  return `${getApiBaseUrl()}/patient-portal/meal-photos/${encodeURIComponent(mealPhotoId)}/image`;
 }
 
 export async function fetchProfessionalMealPhotoObjectUrl(

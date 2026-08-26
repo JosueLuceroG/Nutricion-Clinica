@@ -135,6 +135,8 @@ export interface Pending2faTokenPayload extends JwtStandardClaims {
 
 export const SYNC_SCHEMA_VERSION = 2;
 export const API_VERSION = "v1";
+/** Versión del esquema Dexie del cliente (fuente única: src/services/db/dexieSchema.ts, cadena final). */
+export const DEXIE_SCHEMA_VERSION = 33;
 
 export const SYNCABLE_ENTITIES = [
   "pacientes",
@@ -199,6 +201,7 @@ export interface SyncPullChange {
 
 export interface SyncManifest {
   apiVersion: string;
+  apiContractVersion: string;
   syncSchemaVersion: number;
   serverTime: string;
   entities: SyncableEntity[];

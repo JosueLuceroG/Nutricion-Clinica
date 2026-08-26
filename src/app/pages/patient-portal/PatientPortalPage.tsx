@@ -42,6 +42,7 @@ import {
 import { getSystemFoodById } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "@modules/mealplan/domain/MealSlot";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
+import { getApiBaseUrl } from "@services/api/apiBaseUrl";
 import {
   flushPendingPortalAdherenceSubmissions,
   getDocumentDownloadUrl,
@@ -1266,9 +1267,8 @@ function MessagingCard({ token }: { token: string }) {
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
   const getChatWsUrl = React.useCallback(async () => {
-    const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
     const { ticket } = await getPatientPortalChatWsTicket(token);
-    return `${apiUrl.replace(/^http/, "ws")}/ws/chat?ticket=${encodeURIComponent(ticket)}`;
+    return `${getApiBaseUrl().replace(/^http/, "ws")}/ws/chat?ticket=${encodeURIComponent(ticket)}`;
   }, [token]);
 
   const { messages, send, loading, isRealtime } = useRealtimeChat({

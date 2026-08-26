@@ -19,6 +19,7 @@
     "ai:benchmark": "tsx src/scripts/benchmarkCandidates.ts",
     "ai:evaluate-retrieval": "tsx src/scripts/evaluateRetrieval.ts",
     "ai:evaluate-groundness": "tsx src/scripts/evaluateGroundness.ts",
+    "release:manifest": "tsx src/scripts/generateReleaseManifest.ts",
     "test": "vitest run"
   },
   "dependencies": {

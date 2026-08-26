@@ -16,7 +16,20 @@ describe('deploymentManifest (Build 09.5A §22)', () => {
     expect(manifest.dwhSchemaVersion).toMatch(/^dwh-/);
     expect(manifest.semanticCatalogVersion).toBeTruthy();
     expect(manifest.promptBundleVersion).toMatch(/^prompt-bundle\.[0-9a-f]{8}$/);
+    expect(manifest.outputSchemaBundleVersion).toMatch(/^output-schema-bundle\.[0-9a-f]{8}$/);
     expect(manifest.deployedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(manifest.desktopChannel).toBe('primary');
+    expect(manifest.desktopVersion).toBeTruthy();
+    expect(manifest.desktopTauriVersion).toBeTruthy();
+    expect(manifest.dexieSchemaVersion).toBe(33);
+    expect(manifest.syncProtocolVersion).toBe(2);
+    expect(manifest.webChannel).toBe('secondary');
+    expect(manifest.webVersion).toBeTruthy();
+    expect(manifest.apiContractVersion).toBe('v1');
+    expect(manifest.memoryPolicyVersion).toBeTruthy();
+    expect(manifest.retrievalPolicyVersion).toBe('retrieval-policy.v2');
+    expect(manifest.evaluationDatasetVersion).toBe('nutrition-golden-v1');
+    expect(manifest.apiVersion).toBe('0.1.0');
   });
 
   it('manifiesto nunca contiene secretos', () => {

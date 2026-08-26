@@ -8,7 +8,7 @@ import { useSyncStore } from "@store/syncStore";
 void useAuthStore;
 void useSyncStore;
 import { HttpError, NetworkError } from "../api/httpClient.js";
-import { SYNC_SCHEMA_VERSION, type SyncPullCursors } from "@nutriclinica/shared";
+import { API_VERSION, SYNC_SCHEMA_VERSION, type SyncPullCursors } from "@nutriclinica/shared";
 import { setSyncApplying } from "./syncEnqueuer.js";
 
 const { mockManifest, mockPull, mockPush } = vi.hoisted(() => ({
@@ -84,6 +84,7 @@ describe("SyncEngine", () => {
 
     mockManifest.mockResolvedValue({
       apiVersion: "v1",
+      apiContractVersion: API_VERSION,
       syncSchemaVersion: SYNC_SCHEMA_VERSION,
       serverTime: "2026-06-04T00:00:00.000Z",
       entities: ["pacientes"],
@@ -112,6 +113,7 @@ describe("SyncEngine", () => {
   it("lanza si schema version no coincide", async () => {
     mockManifest.mockResolvedValueOnce({
       apiVersion: "v1",
+      apiContractVersion: API_VERSION,
       syncSchemaVersion: 999,
       serverTime: "2026-06-04T00:00:00.000Z",
       entities: [],
@@ -119,6 +121,20 @@ describe("SyncEngine", () => {
       supportsDelta: true,
     });
     await expect(engine.sync()).rejects.toThrow(/Schema mismatch/);
+  });
+
+  it("lanza si el contrato de API no coincide (fail-closed)", async () => {
+    mockManifest.mockResolvedValueOnce({
+      apiVersion: "v1",
+      apiContractVersion: "v2",
+      syncSchemaVersion: SYNC_SCHEMA_VERSION,
+      serverTime: "2026-06-04T00:00:00.000Z",
+      entities: [],
+      maxBatchSize: 500,
+      supportsDelta: true,
+    });
+    await expect(engine.sync()).rejects.toThrow(/API contract mismatch/);
+    expect(mockPull).not.toHaveBeenCalled();
   });
 
   it("pull: aplica cambios al Dexie local y persiste cursor por entidad", async () => {
@@ -291,6 +307,7 @@ describe("SyncEngine", () => {
       authGetState.mockReturnValue({ token: "tok", sucursalActivaId: "suc-2" });
       return {
         apiVersion: "v1",
+        apiContractVersion: API_VERSION,
         syncSchemaVersion: SYNC_SCHEMA_VERSION,
         serverTime: "t",
         entities: ["pacientes"],
@@ -592,6 +609,7 @@ describe("SyncEngine", () => {
     });
     mockManifest.mockResolvedValue({
       apiVersion: "v1",
+      apiContractVersion: API_VERSION,
       syncSchemaVersion: SYNC_SCHEMA_VERSION,
       serverTime: "t",
       entities: ["pacientes"],

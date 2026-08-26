@@ -23,3 +23,10 @@ export class SyncSchemaMismatchError extends Error {
     this.name = 'SyncSchemaMismatchError';
   }
 }
+
+export class ApiContractMismatchError extends Error {
+  constructor(public readonly serverContract: string, public readonly clientContract: string) {
+    super(`API contract mismatch: server=${serverContract} client=${clientContract}`);
+    this.name = 'ApiContractMismatchError';
+  }
+}

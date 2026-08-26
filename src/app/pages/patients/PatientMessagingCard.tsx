@@ -13,10 +13,10 @@ import {
   getProfessionalChatWsTicket,
 } from "@services/api/patientPortalApi";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
+import { getApiBaseUrl } from "@services/api/apiBaseUrl";
 
 function getChatWsUrl(): string {
-  const apiUrl = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL ?? "http://localhost:3000";
-  const base = apiUrl.replace(/^http/, "ws");
+  const base = getApiBaseUrl().replace(/^http/, "ws");
   return `${base}/ws/chat`;
 }
 

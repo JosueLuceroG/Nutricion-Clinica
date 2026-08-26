@@ -1,6 +1,7 @@
 import sql from "mssql";
 import { getPool } from "../../../db/connection.js";
 import {
+  API_VERSION,
   SYNCABLE_ENTITIES,
   SYNC_SCHEMA_VERSION,
   type SyncableEntity,
@@ -65,6 +66,7 @@ export async function getManifest(): Promise<SyncManifest> {
     .query<{ t: Date }>("SELECT SYSUTCDATETIME() AS t");
   return {
     apiVersion: "v1",
+    apiContractVersion: API_VERSION,
     syncSchemaVersion: SYNC_SCHEMA_VERSION,
     serverTime: (timeResult.recordset[0]?.t ?? new Date()).toISOString(),
     entities: [...SYNCABLE_ENTITIES],
