@@ -152,7 +152,9 @@ export class SqlClinicalReviewStore implements ClinicalReviewStore {
 }
 
 export function selectClinicalReviewStore(env: NodeJS.ProcessEnv = process.env): ClinicalReviewStore {
-  return env.AI_CLINICAL_REVIEW_STORE === 'sql' ? new SqlClinicalReviewStore() : inMemoryClinicalReviewStore;
+  return env.AI_CLINICAL_REVIEW_STORE?.trim() === 'sql'
+    ? new SqlClinicalReviewStore()
+    : inMemoryClinicalReviewStore;
 }
 
 export const inMemoryClinicalReviewStore = new InMemoryClinicalReviewStore();

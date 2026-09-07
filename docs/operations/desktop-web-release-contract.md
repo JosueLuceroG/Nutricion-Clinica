@@ -1,6 +1,6 @@
 # Desktop-First + Web-Secondary Release Contract
 
-Fecha: 2026-08-26. Baseline: `v0.1.0-rc.1`.
+Fecha: 2026-08-29. Baseline: `v0.1.0-rc.1`.
 
 ## 1. Channels
 
@@ -40,13 +40,14 @@ migracion Dexie por si solas.
 - SQL/DWH credentials, JWT signing secret, encryption keys, AI provider keys
   y service credentials viven exclusivamente en el servidor.
 - Cualquier `VITE_*` queda visible en JavaScript/binario. Nunca contiene un
-  secreto durable. TURN por env solo puede ser publico/efimero; se prefiere
-  el endpoint autenticado `/telemedicina/turn-config`.
+  secreto durable. El cliente no acepta TURN por `VITE_*`: usa exclusivamente
+  `/telemedicina/turn-config` autenticado y credenciales efimeras.
 
-Gap real: el CSP Tauri actual permite `self`/IPC pero no el futuro origen
-remoto de API/WebSocket. Step 02 debe agregar el origen exacto autorizado (y
-`wss:` correspondiente) o un bridge IPC controlado. No se autoriza `*` ni un
-origen arbitrario en esta fase.
+El CSP Tauri base permite solo `self`/IPC y no inventa un dominio remoto. El
+workflow de release materializa `DESKTOP_PUBLIC_API_URL` en cada target y
+reemplaza allowlists remotas anteriores por ese origen HTTPS/WSS exacto. El
+valor concreto sigue `PENDING_TARGET_ORIGIN`; no se autoriza `*` ni un origen
+no aprobado.
 
 ## 4. API and sync gates
 
@@ -117,21 +118,21 @@ gate E2E contra infraestructura real.
 
 ## 8. Tauri configuration
 
-| Campo | Valor/estado |
-|---|---|
-| Product | `NutriClinica` |
-| Identifier | `com.nutriclinica.app` |
-| Version | `0.1.0` |
-| Tauri | `2.11.2` |
-| Build frontend | `pnpm build` -> `dist/` |
-| Dev URL | `http://localhost:1420` (solo dev) |
-| Bundle targets | `all` |
-| Windows window | 1440x900, min 1024x700, maximized/fullscreen, custom decorations |
-| Plugins | log, fs, notification |
-| Capabilities | core/window/webview/event/app/resources/menu/tray, log, notification |
-| Native commands | health, app version, CSV a Downloads |
-| Updater | NOT_IMPLEMENTED |
-| Signing | NOT_CONFIGURED |
+| Campo           | Valor/estado                                                         |
+| --------------- | -------------------------------------------------------------------- |
+| Product         | `NutriClinica`                                                       |
+| Identifier      | `com.nutriclinica.app`                                               |
+| Version         | `0.1.0`                                                              |
+| Tauri           | `2.11.2`                                                             |
+| Build frontend  | `pnpm build` -> `dist/`                                              |
+| Dev URL         | `http://localhost:1420` (solo dev)                                   |
+| Bundle targets  | `all`                                                                |
+| Windows window  | 1440x900, min 1024x700, maximized/fullscreen, custom decorations     |
+| Plugins         | log, fs, notification                                                |
+| Capabilities    | core/window/webview/event/app/resources/menu/tray, log, notification |
+| Native commands | health, app version, CSV a Downloads                                 |
+| Updater         | NOT_IMPLEMENTED                                                      |
+| Signing         | NOT_CONFIGURED                                                       |
 
 El identificador `.app` genera warning en macOS y debe decidirse antes de una
 release macOS firmada. No se renombra en esta fase porque es identidad
@@ -161,14 +162,22 @@ Requisitos futuros, sin implementacion falsa:
 - staged rollout, mandatory upgrade explicito y recuperacion de datos;
 - rollback de aplicacion sin downgrade destructivo de schema.
 
+El workflow de tags ejecuta primero el gate Step 02 y luego falla cerrado salvo
+que target HTTPS/WSS+CSP, signing, updater y autorizacion esten configurados. Si
+se habilita, tambien exige firmas de updater, Authenticode valido en Windows y
+firma de certificado verificable en macOS antes de publicar. La publicacion
+adjunta los archivos de imagen API/Web, bundles Desktop, manifiesto final ligado
+a digests y `SHA256SUMS`; no despliega esos artefactos a infraestructura.
+
 WINDOWS_SIGNING = NOT_CONFIGURED. MACOS_SIGNING = NOT_CONFIGURED. No se
 generaron certificados ni se commitearon secretos.
 
 ## 11. Distribution targets
 
-El workflow actual intenta `ubuntu-latest`, `windows-latest` y
-`macos-latest`. Esta ejecucion valida Windows x64 (EXE, MSI, NSIS). macOS y
-Linux quedan `BLOCKED_BY_HOST_OS`; no se afirma PASS cruzado.
+La matriz declarada cubre `ubuntu-latest`, `windows-latest` y `macos-latest`,
+pero el gate de publicacion permanece bloqueado con la configuracion actual.
+La evidencia local previa valida Windows x64 (EXE, MSI, NSIS); macOS y Linux
+siguen `BLOCKED_BY_HOST_OS` y no se afirma PASS cruzado.
 
 WEB_BUILD = PASS. WEB_HOSTING = NOT_CONFIGURED. Build capability no equivale
 a producto web desplegado.

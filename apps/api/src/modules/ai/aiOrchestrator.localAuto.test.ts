@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AIOrchestrator } from './aiOrchestrator.js';
+import { clinicalCertificationRegistry } from './certification/clinicalCertification.js';
+import { CURRENT_VERSIONS } from './certification/versions.js';
 import { AIDataEgressPolicy } from './egress/index.js';
+import { GOLDEN_DATASET_V1_FINGERPRINT } from './evaluation/certification.js';
 import { ModelRegistry } from './models/modelRegistry.js';
 import type { AICompletionResult } from './providers/aiProviderAdapter.js';
 import { modelCircuitBreaker } from './resilience/modelCircuitBreaker.js';
@@ -98,6 +101,67 @@ describe('AIOrchestrator NUTRICLINICA_LOCAL_AUTO (Build 07.5)', () => {
       expect(result.model).toBe('llama3.2');
     }
     expect(calls).toEqual(['ollama:llama3.2']);
+  });
+
+  it('conserva el fingerprint del deployment local en todos los gates de certificacion', async () => {
+    const priorRecords = clinicalCertificationRegistry.list();
+    const priorFlags = clinicalCertificationRegistry.listRequalificationFlags();
+    const deploymentFingerprint = 'deploy-aaaaaaaa';
+    const capability = 'chat_general' as const;
+    clinicalCertificationRegistry.replaceAll(
+      [
+        {
+          certificationId: 'cert-local-deployment',
+          key: {
+            providerId: 'ollama',
+            modelId: 'llama3.2',
+            modelVersion: '3.2',
+            capabilityId: capability,
+            promptVersion: CURRENT_VERSIONS.promptVersion[capability],
+            toolsetVersion: CURRENT_VERSIONS.toolsetVersion,
+            policyVersion: CURRENT_VERSIONS.policyVersion,
+            outputSchemaVersion: CURRENT_VERSIONS.outputSchemaVersion[capability],
+            evaluationDatasetVersion: CURRENT_VERSIONS.evaluationDatasetVersion,
+            knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
+            retrievalPolicyVersion: CURRENT_VERSIONS.retrievalPolicyVersion,
+            smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
+            deploymentFingerprint,
+          },
+          state: 'APPROVED_GENERAL',
+          evaluatedAt: '2026-08-20T00:00:00.000Z',
+          datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+          reportRef: 'reports/local-deployment.json',
+        },
+      ],
+      [],
+    );
+
+    try {
+      const o = orchestrator({
+        env: env({ AI_QUALIFICATION_ENFORCED: 'true' }),
+        localAuto: async () =>
+          localAutoResult({
+            selected: {
+              providerId: 'ollama',
+              modelId: 'llama3.2',
+              deploymentFingerprint,
+              candidateId: 'ollama-llama3.2-3b',
+            },
+          }),
+      });
+
+      const result = await o.execute({
+        request: { model: '', systemPrompt: 's', userPrompt: 'u' },
+      });
+
+      expect(result.ok).toBe(true);
+      if (result.ok) {
+        expect(result.provider).toBe('ollama');
+        expect(result.clinical?.certificationId).toBe('cert-local-deployment');
+      }
+    } finally {
+      clinicalCertificationRegistry.replaceAll(priorRecords, priorFlags);
+    }
   });
 
   it('sin candidato elegible + LOCAL_ONLY -> 403 NO_ELIGIBLE_MODEL abstencion', async () => {

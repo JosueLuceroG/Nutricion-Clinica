@@ -108,6 +108,8 @@ export interface WsTicketResponse {
   expiresAt: string;
 }
 
+export const WS_TICKET_PROTOCOL = "nutriclinica-ticket";
+
 export type JwtTokenType = "access" | "pending_2fa";
 
 interface JwtStandardClaims {

@@ -5,6 +5,7 @@ import { sensitiveActionApi } from "@services/api/sensitiveActionApi";
 import { useAuthStore } from "@store/authStore";
 import { isSyncRunning } from "@services/sync/syncEnqueuer";
 import { withDatabaseOperationLock } from "@services/sync/databaseOperationLock";
+import { APP_VERSION } from "../../appVersion";
 import type {
   BackupAuthorization,
   BackupData,
@@ -13,7 +14,6 @@ import type {
   BackupTable,
 } from "./types";
 
-const APP_VERSION = "0.1.0";
 const BACKUP_VERSION = 2;
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const SYNC_MANAGED_TABLES = new Set([

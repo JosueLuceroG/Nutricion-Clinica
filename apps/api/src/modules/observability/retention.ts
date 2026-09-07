@@ -10,11 +10,38 @@ export interface TelemetryRetentionConfig {
   alertDays: number;
 }
 
-export function readTelemetryRetention(env: NodeJS.ProcessEnv = process.env): TelemetryRetentionConfig {
+function readRetentionDays(
+  raw: string | undefined,
+  fallback: number,
+  name: string,
+): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 1 || value > 36_500) {
+    throw new Error(`${name} debe ser entero entre 1 y 36500`);
+  }
+  return value;
+}
+
+export function readTelemetryRetention(
+  env: NodeJS.ProcessEnv = process.env,
+): TelemetryRetentionConfig {
   return {
-    rawEventsDays: Number(env.AI_TELEMETRY_RETENTION_RAW_DAYS ?? 7),
-    aggregatesDays: Number(env.AI_TELEMETRY_RETENTION_AGG_DAYS ?? 90),
-    alertDays: Number(env.AI_TELEMETRY_RETENTION_ALERT_DAYS ?? 30),
+    rawEventsDays: readRetentionDays(
+      env.AI_TELEMETRY_RETENTION_RAW_DAYS,
+      7,
+      "AI_TELEMETRY_RETENTION_RAW_DAYS",
+    ),
+    aggregatesDays: readRetentionDays(
+      env.AI_TELEMETRY_RETENTION_AGG_DAYS,
+      90,
+      "AI_TELEMETRY_RETENTION_AGG_DAYS",
+    ),
+    alertDays: readRetentionDays(
+      env.AI_TELEMETRY_RETENTION_ALERT_DAYS,
+      30,
+      "AI_TELEMETRY_RETENTION_ALERT_DAYS",
+    ),
   };
 }
 

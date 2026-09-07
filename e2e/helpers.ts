@@ -9,7 +9,16 @@ import { expect, type Page } from "@playwright/test";
 
 export const ADMIN_EMAIL =
   process.env.E2E_ADMIN_EMAIL ?? "admin@nutriclinica.local";
-export const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin123!";
+
+export function e2eAdminPassword(): string {
+  const password = process.env.E2E_ADMIN_PASSWORD;
+  if (!password) {
+    throw new Error(
+      "E2E_ADMIN_PASSWORD is required for API-backed Playwright tests",
+    );
+  }
+  return password;
+}
 
 /**
  * Fake login: inyecta un estado de auth en localStorage ANTES de que
@@ -71,7 +80,7 @@ export async function loginAsAdmin(page: Page): Promise<void> {
   const passwordInput = page.getByRole("textbox", {
     name: /Contrase[ñn]a/i,
   });
-  await passwordInput.fill(ADMIN_PASSWORD);
+  await passwordInput.fill(e2eAdminPassword());
   await passwordInput.press("Enter");
   // El router redirige al Panel tras login OK
   await page.waitForURL((url) => url.hash !== "#/login", { timeout: 15_000 });

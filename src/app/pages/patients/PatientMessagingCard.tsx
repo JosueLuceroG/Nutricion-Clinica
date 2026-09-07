@@ -26,13 +26,13 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
-  const buildWsUrl = React.useCallback(async () => {
+  const buildWsConnection = React.useCallback(async () => {
     const { ticket } = await getProfessionalChatWsTicket(patientId);
-    return `${getChatWsUrl()}?ticket=${encodeURIComponent(ticket)}`;
+    return { url: getChatWsUrl(), ticket };
   }, [patientId]);
 
   const { messages, send, markAsRead, loading, isRealtime } = useRealtimeChat({
-    getWsUrl: buildWsUrl,
+    getWsConnection: buildWsConnection,
     fetchMessages: React.useCallback(
       (signal) => listProfessionalMessages(patientId, signal),
       [patientId],

@@ -2,8 +2,7 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "node:http";
-import cron from "node-cron";
-import { healthRouter } from "./routes/health.js";
+import { createHealthRouter } from "./routes/health.js";
 import authRouter from "./modules/auth/authRoutes.js";
 import twoFactorRouter from "./modules/auth/twoFactorRoutes.js";
 import telemedicinaRouter, {
@@ -33,15 +32,10 @@ import analyticsRouter from "./modules/dwh/analyticsRoutes.js";
 import dwhAnalyticsRouter from "./modules/dwh/analytics/analyticsRoutes.js";
 import telemetryRouter from "./modules/observability/telemetryRoutes.js";
 import shadowRouter from "./modules/shadow/shadowRoutes.js";
-import { startDwhScheduler } from "./modules/dwh/scheduler.js";
 import { registerTelemedicinaChannel } from "./modules/telemedicina/signalingServer.js";
 import { registerChatChannel } from "./modules/patientPortal/chatServer.js";
 import { setupWebsocketGateway } from "./modules/ws/websocketGateway.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import {
-  runRetentionCleanup,
-  RETENTION_CONFIG,
-} from "./services/retention/index.js";
 import { assertStartupConfigValid } from "./modules/deployment/startupValidation.js";
 import { initializeCertificationPersistence } from "./modules/ai/certification/certificationPersistence.js";
 import { readEnvironmentClass } from "./modules/deployment/environmentIdentity.js";
@@ -50,31 +44,27 @@ import { validateAiConfig } from "./modules/ai/runtime/aiConfigValidation.js";
 import { modelRegistry } from "./modules/ai/models/modelRegistry.js";
 import { providerRegistry } from "./modules/ai/providers/providerRegistry.js";
 import { modelQualificationRegistry } from "./modules/ai/evaluation/certification.js";
+import { readServerRuntimeConfig } from "./modules/deployment/runtimeConfig.js";
+import {
+  startRuntimeJobs,
+  type RuntimeJobsHandle,
+} from "./services/jobs/runtimeJobs.js";
+import { closePool } from "./db/connection.js";
+import { closeDwhPool } from "./modules/dwh/dwhConnection.js";
 
-// Fail-fast antes de arrancar: entorno, bases, DWH, AI, flags, CORS.
-assertStartupConfigValid(process.env, {
-  ai: {
-    validate: (env) =>
-      validateAiConfig(env, modelRegistry, providerRegistry, modelQualificationRegistry)
-        .map((issue) => ({ severity: issue.severity, message: issue.message })),
-  },
-});
-
-// CORS: comodín prohibido en STAGING/PRODUCTION (validado antes de listen).
 const corsOrigins = (
   process.env.CORS_ORIGIN ??
   "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost"
 )
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
 
 const environmentClass = readEnvironmentClass(process.env);
-if ((environmentClass === "STAGING" || environmentClass === "PRODUCTION") && corsOrigins.some((o) => o === "*" || o.includes("*"))) {
-  throw new Error(`CORS_ORIGIN con comodín prohibido en ${environmentClass}: arranque abortado`);
-}
 
 const app = express();
+let runtime: ReturnType<typeof readServerRuntimeConfig> | null = null;
+let shuttingDown = false;
 
 app.disable("x-powered-by");
 app.use((_req, res, next) => {
@@ -101,7 +91,7 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 
-app.use("/health", healthRouter);
+app.use("/health", createHealthRouter({ isShuttingDown: () => shuttingDown }));
 app.use("/auth", authRouter);
 app.use("/auth", twoFactorRouter);
 app.use("/telemedicina", turnRouter);
@@ -134,42 +124,135 @@ app.use("/deployment", deploymentRouter);
 
 app.use(errorHandler);
 
-const port = Number(process.env.PORT ?? 3000);
 const httpServer = createServer(app);
 
-setupWebsocketGateway(httpServer, {
+const websocketServer = setupWebsocketGateway(httpServer, {
   telemedicina: registerTelemedicinaChannel,
   chat: registerChatChannel,
 });
 
+let runtimeJobs: RuntimeJobsHandle | null = null;
+
 async function bootstrap(): Promise<void> {
+  try {
+    assertStartupConfigValid(process.env, {
+      role: "api",
+      ai: {
+        validate: (env) =>
+          validateAiConfig(
+            env,
+            modelRegistry,
+            providerRegistry,
+            modelQualificationRegistry,
+          ).map((issue) => ({
+            severity: issue.severity,
+            message: issue.message,
+          })),
+      },
+    });
+  } catch (error) {
+    if (environmentClass === "LOCAL" || environmentClass === "TEST") {
+      throw error;
+    }
+    const sanitized = new Error("startup configuration rejected (fail-fast)");
+    sanitized.name = "StartupConfigError";
+    throw sanitized;
+  }
+
+  const configuredRuntime = readServerRuntimeConfig(process.env);
+  runtime = configuredRuntime;
+  app.set("trust proxy", configuredRuntime.trustProxy);
+
   // Certificación clínica desde BD (fail-closed): sin persistencia cargada
   // ningún modelo aparece elegible tras un reinicio (Build 09.5A §56-57).
   await initializeCertificationPersistence(process.env);
-  httpServer.listen(port, () => {
-    console.log(`[nutriclinica-api] listening on http://localhost:${port}`);
+  if (shuttingDown) return;
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error) => reject(error);
+    httpServer.once("error", onError);
+    httpServer.listen(
+      configuredRuntime.port,
+      configuredRuntime.bindHost,
+      () => {
+        httpServer.off("error", onError);
+        resolve();
+      },
+    );
   });
+  if (shuttingDown) {
+    await closeHttpServer();
+    return;
+  }
+  if (configuredRuntime.backgroundJobsEnabled) {
+    runtimeJobs = startRuntimeJobs();
+  } else {
+    console.log("[nutriclinica-api] background jobs disabled for API process");
+  }
+  console.log(
+    `[nutriclinica-api] listening on ${configuredRuntime.bindHost}:${configuredRuntime.port} (${environmentClass})`,
+  );
 }
 
-void bootstrap();
-
-if (RETENTION_CONFIG.cleanupEnabled) {
-  const schedule = RETENTION_CONFIG.cronSchedule;
-  console.log(
-    `[retention] scheduling cleanup cron: "${schedule}" (${RETENTION_CONFIG.years} years)`,
-  );
-  cron.schedule(schedule, () => {
-    console.log("[retention] running scheduled cleanup...");
-    void runRetentionCleanup().then((result) => {
-      console.log(
-        `[retention] cleanup done: ${result.deletedCount} deleted, ${result.errors.length} errors`,
-      );
+async function closeHttpServer(): Promise<void> {
+  if (!httpServer.listening) return;
+  await new Promise<void>((resolve) => {
+    const timeout = setTimeout(() => {
+      httpServer.closeAllConnections();
+      resolve();
+    }, runtime?.shutdownTimeoutMs ?? 15_000);
+    timeout.unref();
+    httpServer.close(() => {
+      clearTimeout(timeout);
+      resolve();
     });
   });
-} else {
-  console.log(
-    "[retention] cleanup disabled via RETENTION_CLEANUP_ENABLED=false",
-  );
 }
 
-startDwhScheduler();
+async function closeWebsocketServer(): Promise<void> {
+  if (!httpServer.listening && websocketServer.clients.size === 0) return;
+  await new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      for (const client of websocketServer.clients) client.terminate();
+      finish();
+    }, runtime?.shutdownTimeoutMs ?? 15_000);
+    timeout.unref();
+    websocketServer.close(finish);
+  });
+}
+
+async function shutdown(signal: string, exitCode = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[nutriclinica-api] shutdown ${signal}`);
+  for (const client of websocketServer.clients) {
+    client.close(1001, "server shutdown");
+  }
+  await Promise.allSettled([
+    closeHttpServer(),
+    closeWebsocketServer(),
+    runtimeJobs?.stop() ?? Promise.resolve(),
+  ]);
+  await Promise.allSettled([closePool(), closeDwhPool()]);
+  process.exitCode = exitCode;
+}
+
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));
+
+void bootstrap().catch((error: unknown) => {
+  const detail =
+    error instanceof Error
+      ? environmentClass === "LOCAL" || environmentClass === "TEST"
+        ? error.message
+        : error.name
+      : "UnknownStartupError";
+  console.error("[nutriclinica-api] startup failed (fail-fast):", detail);
+  void shutdown("STARTUP_FAILURE", 1);
+});

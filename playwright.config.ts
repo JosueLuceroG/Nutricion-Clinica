@@ -1,15 +1,17 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const configuredBaseUrl = process.env.BASE_URL?.trim();
+const baseURL = configuredBaseUrl || "http://localhost:1420";
+
 /**
  * Playwright E2E para la web (Vite en :1420) hablando contra el API
  * Node + Express (en :3000).
  *
- * Prereqs: el usuario debe tener levantados:
- *   - `cd apps/api && pnpm dev`     → :3000
- *   - `pnpm dev`                    → :1420
+ * El servidor Vite se levanta automáticamente. El suite E2E completo también
+ * requiere que el operador levante una API/SQL local autorizada en :3000.
  *
- * `webServer` reusa instancias si ya están corriendo (reuseExistingServer: true)
- * para no duplicar servers durante el desarrollo. En CI se levantan desde cero.
+ * CI ejecuta `e2e:portable`, que usa fixtures offline/fake login y no afirma
+ * integración SQL. El E2E completo pertenece a staging/local SQL controlado.
  *
  * Base URL configurable vía env BASE_URL si en el futuro la app se sirve
  * desde otro host (e.g. Tauri preview, staging, ngrok).
@@ -22,7 +24,7 @@ export default defineConfig({
   workers: 1, // un solo browser a la vez — la app usa localStorage/IndexedDB persistentes
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: process.env.BASE_URL ?? "http://localhost:1420",
+    baseURL,
     trace: "on-first-retry",
     video: "retain-on-failure",
     screenshot: "only-on-failure",
@@ -35,12 +37,12 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-  // NO levantamos webServer aquí: el usuario ya tiene `pnpm dev` corriendo.
-  // Si el puerto no responde, los tests fallan con un mensaje claro.
-  // (Si quieres auto-start, descomenta el bloque siguiente.)
-  //
-  // webServer: [
-  //   { command: "cd apps/api && pnpm dev", url: "http://localhost:3000/health", reuseExistingServer: true, timeout: 60_000 },
-  //   { command: "pnpm dev", url: "http://localhost:1420", reuseExistingServer: true, timeout: 60_000 },
-  // ],
+  webServer: configuredBaseUrl
+    ? undefined
+    : {
+        command: "pnpm dev",
+        url: baseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });

@@ -5,6 +5,12 @@ Release source: **56bbe4e** (o commit posterior únicamente por fixes del
 staging). Proveedor-agnóstico: sin asunciones de cloud/VPS. A ejecutar SOLO
 por el operador cuando exista infraestructura autorizada.
 
+Step 02 update (2026-08-27): execute this checklist together with
+`real-staging-requirements.md`. The canonical server artifacts are the API/Web
+OCI images and the API image's explicit `server.js`, `migrate.js`,
+`dwh-schema.js` and `jobs.js` commands. Where this historical runbook differs,
+the Step 02 documents prevail.
+
 ## 0. Preflight
 
 ```powershell
@@ -28,13 +34,32 @@ Server-side (`.env` del host, nunca en git):
 
 ```
 ENVIRONMENT_CLASS=STAGING
+ENVIRONMENT_NAME=<nombre staging aprobado>
 INSTANCE_ID=<id seguro, p.ej. staging-nc-01>
+DEPLOYMENT_ID=<change/rollout id>
 RELEASE_VERSION=<release>
+DESKTOP_RELEASE_VERSION=<mismo release completo>
+GIT_COMMIT=<sha completo de 40 caracteres>
+PUBLIC_API_URL=https://<api staging>
+PUBLIC_WEB_URL=https://<web staging>
+API_BIND_HOST=0.0.0.0
+TRUST_PROXY=<saltos o IP/CIDR exacto>
+BACKGROUND_JOBS_ENABLED=false
 DB_SERVER=<host SQL no local>
 DB_NAME=<staging_nc_oltp>          # exigido explícito en STAGING
 DWH_DATABASE=<staging_nc_dw>       # ≠ DB_NAME y ≠ defaults locales
+DB_ENCRYPT=true
+DB_TRUST_CERT=false
 CORS_ORIGIN=https://<frontend-origin>   # sin comodines
 AI_CERTIFICATION_STORE=sql
+AI_TELEMETRY_STORE=sql
+AI_CLINICAL_REVIEW_STORE=sql
+EXTERNAL_SIDE_EFFECTS_MODE=DISABLED
+AI_EGRESS_ENABLED=false
+AI_PATIENT_ENABLED=false
+AI_SHADOW_STATE=DISABLED
+AI_SHADOW_MODE_ENABLED=false
+AI_QUALIFICATION_ENFORCED=true
 ```
 
 La API arranca fail-fast: config malformada (clase UNKNOWN, DB_NAME=DWH,
@@ -58,7 +83,9 @@ rápido" (§18).
 
 ```powershell
 pnpm install --frozen-lockfile
-pnpm --filter @nutriclinica/api migrate
+pnpm --filter @nutriclinica/api build:deploy
+# Run exactly once in the target runtime using the API image:
+# node dist-deploy/migrate.js
 ```
 
 Verificar:
@@ -77,6 +104,8 @@ Verificar:
   Build 08 (schema `dwh-08-002`): `DWH_ENABLED=true`,
   `DWH_DATABASE=staging_nc_dw`, `DWH_SCHEDULED_LOAD_ENABLED=false`
   (disparar cargas manualmente en el smoke).
+- Ejecutar exactamente una vez `node dist-deploy/dwh-schema.js` desde la misma
+  imagen API antes de habilitar ETL.
 - Verificar: DWH ≠ OLTP, schema version correcta, catálogo semántico
   disponible, ETL ejecutable contra OLTP staging.
 
@@ -86,15 +115,20 @@ Verificar:
 pnpm lint
 pnpm typecheck
 pnpm test                    # frontend
-pnpm build
+$env:CI='true'; $env:VITE_API_URL='/api'; pnpm build
 pnpm --filter @nutriclinica/api typecheck
 pnpm --filter @nutriclinica/api test
-pnpm --filter @nutriclinica/api build
+pnpm --filter @nutriclinica/api build:deploy
+pnpm deployment:test
+pnpm deployment:api-artifact:test
+pnpm deployment:web-artifact:verify
+pnpm e2e:portable
 ```
 
-Baseline mínimo esperado: API 1130 passed / 54 skipped / 0 failed;
-frontend 1994 passed / 1 skipped; lint 0 errores; typecheck PASS; build
-PASS. Secret scan tracked: 0.
+La referencia local Step 02 es API 1181 passed y frontend 1996 passed, sin
+fallos; los skips se reportan por separado y no se convierten en PASS. Lint
+debe tener 0 errores, ambos typechecks/builds PASS y secret scan tracked 0.
+`e2e:portable` no reemplaza el E2E SQL-backed de staging de la seccion 11.
 
 ## 6. Manifiesto de despliegue
 
@@ -114,9 +148,11 @@ conocidos. Cualquier fallo crítico ⇒ STOP.
 
 ## 8. Deploy API
 
-Topología soportada más simple: build `tsc` + `node dist/server.js` detrás
-de un reverse proxy (nginx/caddy/IIS/equivalente), o el contenedor que el
-operador elija (no introducir k8s/compose solo por moda, §58). Verificar:
+Topología canónica: imagen `apps/api/Dockerfile`, un proceso
+`node dist-deploy/server.js` detrás del edge TLS, replica `1` y
+`BACKGROUND_JOBS_ENABLED=false`. Node nativo es alternativa secundaria solo
+si reproduce exactamente artefacto, service manager, secretos, health y
+graceful shutdown. Verificar:
 
 - startup config validation PASS (fail-fast activo);
 - `GET /deployment/identity` y `/deployment/readiness` coherentes;
@@ -125,7 +161,9 @@ operador elija (no introducir k8s/compose solo por moda, §58). Verificar:
 
 ## 9. Deploy frontend
 
-- `VITE_API_BASE_URL=https://<api-staging-origin>` en el build.
+- `VITE_API_URL=/api` para Web same-origin; el edge/Web proxy enruta a API.
+- Desktop staging usa `VITE_API_URL=https://<api-staging-origin>` y CSP exacto
+  HTTPS/WSS, sin wildcard.
 - Servir `dist/` estático (Dockerfile/nginx existentes o equivalente).
 - Verificar que NO quedan URLs `http://localhost` embebidas en el
   artefacto (grep del bundle: `localhost`, `127.0.0.1`).
@@ -143,8 +181,10 @@ operador elija (no introducir k8s/compose solo por moda, §58). Verificar:
 
 - **Auth**: login/JWT/logout/revocación/denegación de usuario inactivo/
   role scoping con usuarios sintéticos.
-- **WebSocket**: auth, tenant scope correcto, suscripción autorizada,
-  cross-tenant denegado, reconexión. Sin fuga cross-tenant.
+- **WebSocket**: auth por ticket de un uso en `Sec-WebSocket-Protocol`, tenant
+  scope correcto, query-string ticket denegado, suscripción autorizada,
+  cross-tenant denegado y reconexión. Sin fuga cross-tenant ni credenciales en
+  logs del edge/proxy/aplicación.
 - **OLTP**: leer paciente/consulta/antropometría/labs/plan-adherencia
   sintéticos con scopes de tenant y paciente.
 - **DWH/ETL**: load run, watermark, reconciliación, freshness, métrica
@@ -185,12 +225,14 @@ operador elija (no introducir k8s/compose solo por moda, §58). Verificar:
 - Release A → release B/current → smoke → rollback app a A → smoke.
 - Sin downgrade destructivo de migraciones.
 - Si no hay artefacto previo desplegable: `ROLLBACK_E2E =
-  BLOCKED_BY_NO_PRIOR_ARTIFACT` (no fingir).
+BLOCKED_BY_NO_PRIOR_ARTIFACT` (no fingir).
 
 ## 14. ETL scheduler + jobs + efectos externos
 
-- Scheduler de ETL: lock/lease de una sola instancia; sin cargas duplicadas
-  concurrentes.
+- API replica `1` con jobs apagados. Runner dedicado
+  `node dist-deploy/jobs.js`, replica `1`, con jobs/schedules explícitos.
+- Los locks/noOverlap actuales no autorizan múltiples runners; retención no
+  tiene lock cross-instance y ETL no es un scheduler distribuido completo.
 - Inventariar jobs; deshabilitar integraciones que puedan contactar
   usuarios reales (email/SMS/notificaciones) salvo mock/sandbox explícito.
 - Pagos/billing: sandbox o deshabilitado. Webhooks externos: deshabilitados

@@ -1,5 +1,10 @@
 import { test, expect, request, type Page } from "@playwright/test";
-import { ADMIN_EMAIL, ADMIN_PASSWORD, loginAsAdmin, hashUrl } from "./helpers";
+import {
+  ADMIN_EMAIL,
+  e2eAdminPassword,
+  loginAsAdmin,
+  hashUrl,
+} from "./helpers";
 
 /**
  * E2E de "Marcar pagada" en /consultas/:id.
@@ -29,9 +34,15 @@ async function forceSync(page: Page) {
   await expect(syncBtn).toBeEnabled({ timeout: 60_000 });
 }
 
-async function readConsultationRow(page: Page, id: string): Promise<{ paid?: boolean; payment_status?: string | null } | null> {
+async function readConsultationRow(
+  page: Page,
+  id: string,
+): Promise<{ paid?: boolean; payment_status?: string | null } | null> {
   return page.evaluate(async (consultationId: string) => {
-    return new Promise<{ paid?: boolean; payment_status?: string | null } | null>((resolve, reject) => {
+    return new Promise<{
+      paid?: boolean;
+      payment_status?: string | null;
+    } | null>((resolve, reject) => {
       const req = indexedDB.open("nutriclinica");
       req.onsuccess = () => {
         const db = req.result;
@@ -49,7 +60,7 @@ async function readConsultationRow(page: Page, id: string): Promise<{ paid?: boo
 async function apiLogin(): Promise<string> {
   const ctx = await request.newContext({ baseURL: API_BASE });
   const resp = await ctx.post("/auth/login", {
-    data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    data: { email: ADMIN_EMAIL, password: e2eAdminPassword() },
   });
   if (!resp.ok()) {
     throw new Error(`Login API falló: ${resp.status()} ${await resp.text()}`);
@@ -58,7 +69,11 @@ async function apiLogin(): Promise<string> {
   return body.token;
 }
 
-async function pushUnpaidConsultation(token: string, id: string, cost: number): Promise<void> {
+async function pushUnpaidConsultation(
+  token: string,
+  id: string,
+  cost: number,
+): Promise<void> {
   const ctx = await request.newContext({ baseURL: API_BASE });
   const now = new Date().toISOString();
   const resp = await ctx.post("/sync/push", {
@@ -97,15 +112,20 @@ async function pushUnpaidConsultation(token: string, id: string, cost: number): 
     },
   });
   if (!resp.ok()) {
-    throw new Error(`Push consulta falló: ${resp.status()} ${await resp.text()}`);
+    throw new Error(
+      `Push consulta falló: ${resp.status()} ${await resp.text()}`,
+    );
   }
   await ctx.dispose();
 }
 
-test.describe.serial("Billing — marcar consulta como pagada desde el detalle", () => {
+test.describe
+  .serial("Billing — marcar consulta como pagada desde el detalle", () => {
   test.setTimeout(90_000);
 
-  test("botón 'Marcar pagada' en ConsultationDetailPage abre dialog y persiste", async ({ page }) => {
+  test("botón 'Marcar pagada' en ConsultationDetailPage abre dialog y persiste", async ({
+    page,
+  }) => {
     // 1) Setup: crear una consulta con cost > 0 vía API
     const token = await apiLogin();
     const consultationId = `CCCCCCCC-1111-1111-1111-${Date.now().toString().slice(-12)}`;
@@ -130,7 +150,9 @@ test.describe.serial("Billing — marcar consulta como pagada desde el detalle",
     // 3) Navegar al detalle de la consulta
     await page.goto(hashUrl(`/consultas/${consultationId}`));
     // El PageHeader muestra "Consulta #N" (texto, no heading role)
-    await expect(page.getByText(/Consulta #\d+/i).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/Consulta #\d+/i).first()).toBeVisible({
+      timeout: 15_000,
+    });
 
     // 4) Verificar que el botón "Marcar pagada" está visible
     const markPaid = page.getByTestId("mark-paid-detail");
@@ -141,36 +163,64 @@ test.describe.serial("Billing — marcar consulta como pagada desde el detalle",
     await markPaid.click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText(/Registrar pago|Marcar( como)? pagada/i).first()).toBeVisible();
+    await expect(
+      dialog.getByText(/Registrar pago|Marcar( como)? pagada/i).first(),
+    ).toBeVisible();
 
     // 6) Llenar método de pago (requerido) y referencia
     const methodTrigger = page.getByTestId("paid-method");
     await methodTrigger.click();
-    await page.getByRole("option", { name: /efectivo|cash/i }).first().click();
+    await page
+      .getByRole("option", { name: /efectivo|cash/i })
+      .first()
+      .click();
     await page.getByTestId("paid-reference").fill("E2E-001");
 
     // 7) Submit
-    await dialog.getByRole("button", { name: /Marcar( como)? pagada|Guardando/i }).click();
+    await dialog
+      .getByRole("button", { name: /Marcar( como)? pagada|Guardando/i })
+      .click();
 
     // 8) Dialog cierra y la UI refleja el pago
     await expect(dialog).not.toBeVisible({ timeout: 10_000 });
     // El botón ahora dice "Editar pago" en lugar de "Marcar pagada"
-    await expect(page.getByTestId("mark-paid-detail")).toHaveText(/Editar pago/i, {
-      timeout: 10_000,
-    });
-    await expect.poll(async () => (await readConsultationRow(page, consultationId))?.paid ?? false, {
-      timeout: 10_000,
-    }).toBe(true);
+    await expect(page.getByTestId("mark-paid-detail")).toHaveText(
+      /Editar pago/i,
+      {
+        timeout: 10_000,
+      },
+    );
+    await expect
+      .poll(
+        async () =>
+          (await readConsultationRow(page, consultationId))?.paid ?? false,
+        {
+          timeout: 10_000,
+        },
+      )
+      .toBe(true);
 
     // 9) Re-sync y recarga de ruta: el pago persiste localmente y no rebota.
     await forceSync(page);
-    await expect.poll(async () => (await readConsultationRow(page, consultationId))?.payment_status ?? null, {
-      timeout: 10_000,
-    }).toBe("paid");
+    await expect
+      .poll(
+        async () =>
+          (await readConsultationRow(page, consultationId))?.payment_status ??
+          null,
+        {
+          timeout: 10_000,
+        },
+      )
+      .toBe("paid");
     await page.goto(hashUrl(`/consultas/${consultationId}`));
-    await expect(page.getByText(/Consulta #\d+/i).first()).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByTestId("mark-paid-detail")).toHaveText(/Editar pago/i, {
+    await expect(page.getByText(/Consulta #\d+/i).first()).toBeVisible({
       timeout: 10_000,
     });
+    await expect(page.getByTestId("mark-paid-detail")).toHaveText(
+      /Editar pago/i,
+      {
+        timeout: 10_000,
+      },
+    );
   });
 });

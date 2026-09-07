@@ -1,11 +1,47 @@
 import { describe, expect, it } from 'vitest';
-import { ClinicalCertificationRegistry } from './clinicalCertification.js';
+import { ClinicalCertificationRegistry, type ClinicalCertificationRecord } from './clinicalCertification.js';
 import { CURRENT_VERSIONS, computeToolsetVersion, ACTIVE_TOOLSET, GOLDEN_DATASET_VERSION } from './versions.js';
 import { minCertificationForRisk, requiredCertificationFor, stateSatisfies } from './certificationStates.js';
 import { buildModelCardView } from './modelCardView.js';
 import type { ModelCard } from '../evaluation/modelCard.js';
+import { GOLDEN_DATASET_V1_FINGERPRINT } from '../evaluation/certification.js';
 
 const v = CURRENT_VERSIONS;
+
+function exactRecord(
+  overrides: Partial<ClinicalCertificationRecord> & {
+    certificationId: string;
+    modelId?: string;
+    deploymentFingerprint?: string;
+  },
+): ClinicalCertificationRecord {
+  const capability = overrides.key?.capabilityId ?? 'chat_general';
+  return {
+    certificationId: overrides.certificationId,
+    key: {
+      providerId: 'openai',
+      modelId: overrides.modelId ?? 'exact-model',
+      modelVersion: '1',
+      capabilityId: capability,
+      promptVersion: v.promptVersion[capability],
+      toolsetVersion: v.toolsetVersion,
+      policyVersion: v.policyVersion,
+      outputSchemaVersion: v.outputSchemaVersion[capability],
+      evaluationDatasetVersion: v.evaluationDatasetVersion,
+      knowledgePolicyVersion: v.knowledgePolicyVersion,
+      retrievalPolicyVersion: v.retrievalPolicyVersion,
+      smaeCatalogVersion: v.smaeCatalogVersion,
+      deploymentFingerprint: overrides.deploymentFingerprint,
+      ...overrides.key,
+    },
+    state: overrides.state ?? 'APPROVED_GENERAL',
+    restrictedCapabilities: overrides.restrictedCapabilities,
+    evaluatedAt: overrides.evaluatedAt ?? '2026-08-20T00:00:00.000Z',
+    datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+    reportRef: overrides.reportRef ?? 'exact.json',
+    knownFailures: overrides.knownFailures,
+  };
+}
 
 function registry(): ClinicalCertificationRegistry {
   return new ClinicalCertificationRegistry();
@@ -80,10 +116,14 @@ describe('clinicalCertification (Build 05, spec 63; Build 09.5A: torneo 07.5A)',
         toolsetVersion: v.toolsetVersion,
         policyVersion: v.policyVersion,
         outputSchemaVersion: v.outputSchemaVersion.chat_general,
+        evaluationDatasetVersion: v.evaluationDatasetVersion,
+        knowledgePolicyVersion: v.knowledgePolicyVersion,
+        retrievalPolicyVersion: v.retrievalPolicyVersion,
+        smaeCatalogVersion: v.smaeCatalogVersion,
       },
       state: 'BLOCKED',
       evaluatedAt: '2026-08-17T00:00:00.000Z',
-      datasetFingerprint: 'fp',
+      datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
       reportRef: 'blocked.json',
     });
     const res = r.resolve('openai', 'gpt-4o-bloqueado', 'v1', 'chat_general', { requiredState: 'APPROVED_GENERAL' });
@@ -145,6 +185,167 @@ describe('version change → requalification (Build 05, spec 65)', () => {
     });
     expect(res.eligible).toBe(false);
     expect(res.requalificationRequired).toBe(true);
+  });
+
+  it('cambiar evaluationDatasetVersion invalida la certificación', () => {
+    const r = registry();
+    const res = r.resolve('openai', 'gpt-4o', 'gpt-4o-2024-08-06', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+      versions: { ...v, evaluationDatasetVersion: 'nutrition-golden-v2' },
+    });
+    expect(res.eligible).toBe(false);
+    expect(res.stale).toBe(true);
+    expect(res.requalificationRequired).toBe(true);
+  });
+
+  it('campos de versión ausentes nunca satisfacen una clave exacta', () => {
+    const r = new ClinicalCertificationRegistry([], []);
+    r.register({
+      certificationId: 'legacy-incomplete',
+      key: {
+        providerId: 'openai',
+        modelId: 'legacy-model',
+        modelVersion: '1',
+        capabilityId: 'chat_general',
+        promptVersion: v.promptVersion.chat_general,
+        toolsetVersion: v.toolsetVersion,
+        policyVersion: v.policyVersion,
+        outputSchemaVersion: v.outputSchemaVersion.chat_general,
+      },
+      state: 'APPROVED_GENERAL',
+      evaluatedAt: '2026-08-20T00:00:00.000Z',
+      datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+      reportRef: 'legacy.json',
+    });
+    const res = r.resolve('openai', 'legacy-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    });
+    expect(res.eligible).toBe(false);
+    expect(res.stale).toBe(true);
+  });
+
+  it('usa la certificación exacta más reciente sin requerir reinicio', () => {
+    const r = new ClinicalCertificationRegistry([], []);
+    const key = {
+      providerId: 'openai',
+      modelId: 'versioned-model',
+      modelVersion: '1',
+      capabilityId: 'chat_general' as const,
+      promptVersion: v.promptVersion.chat_general,
+      toolsetVersion: v.toolsetVersion,
+      policyVersion: v.policyVersion,
+      outputSchemaVersion: v.outputSchemaVersion.chat_general,
+      evaluationDatasetVersion: v.evaluationDatasetVersion,
+      knowledgePolicyVersion: v.knowledgePolicyVersion,
+      retrievalPolicyVersion: v.retrievalPolicyVersion,
+      smaeCatalogVersion: v.smaeCatalogVersion,
+    };
+    r.register({
+      certificationId: 'cert-older-approved',
+      key,
+      state: 'APPROVED_GENERAL',
+      evaluatedAt: '2026-08-19T00:00:00.000Z',
+      datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+      reportRef: 'older.json',
+    });
+    r.register({
+      certificationId: 'cert-newer-blocked',
+      key,
+      state: 'BLOCKED',
+      evaluatedAt: '2026-08-20T00:00:00.000Z',
+      datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+      reportRef: 'newer.json',
+    });
+    const res = r.resolve('openai', 'versioned-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    });
+    expect(res.eligible).toBe(false);
+    expect(res.state).toBe('BLOCKED');
+    expect(res.certificationId).toBe('cert-newer-blocked');
+  });
+
+  it('selecciona la certificación más reciente del deployment solicitado', () => {
+    const r = new ClinicalCertificationRegistry([], []);
+    r.register(exactRecord({
+      certificationId: 'cert-deployment-a',
+      deploymentFingerprint: 'deploy-aaaaaaaa',
+      evaluatedAt: '2026-08-19T00:00:00.000Z',
+    }));
+    r.register(exactRecord({
+      certificationId: 'cert-deployment-b',
+      deploymentFingerprint: 'deploy-bbbbbbbb',
+      evaluatedAt: '2026-08-20T00:00:00.000Z',
+    }));
+
+    const deploymentA = r.resolve('openai', 'exact-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+      deploymentFingerprint: 'deploy-aaaaaaaa',
+    });
+    expect(deploymentA.eligible).toBe(true);
+    expect(deploymentA.certificationId).toBe('cert-deployment-a');
+
+    const undeclaredDeployment = r.resolve('openai', 'exact-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    });
+    expect(undeclaredDeployment.eligible).toBe(false);
+    expect(undeclaredDeployment.requalificationRequired).toBe(true);
+    expect(undeclaredDeployment.reason).toContain('no declaró su fingerprint');
+  });
+
+  it('un flag de requalification bloquea también un registro RESTRICTED permitido', () => {
+    const r = new ClinicalCertificationRegistry([], []);
+    r.register(exactRecord({
+      certificationId: 'cert-restricted',
+      state: 'RESTRICTED',
+      restrictedCapabilities: ['chat_general'],
+    }));
+    r.markRequalificationRequired('openai', 'exact-model', 'chat_general');
+
+    const res = r.resolve('openai', 'exact-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    });
+    expect(res.eligible).toBe(false);
+    expect(res.requalificationRequired).toBe(true);
+    expect(res.reason).toContain('REQUALIFICATION_REQUIRED');
+  });
+
+  it('falla cerrado ante timestamps futuros o empates en la evidencia más reciente', () => {
+    const future = new ClinicalCertificationRegistry([], []);
+    future.register(exactRecord({
+      certificationId: 'cert-future',
+      evaluatedAt: new Date(Date.now() + 60_000).toISOString(),
+    }));
+    expect(future.resolve('openai', 'exact-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    }).eligible).toBe(false);
+
+    const tied = new ClinicalCertificationRegistry([], []);
+    tied.register(exactRecord({ certificationId: 'cert-tied-approved' }));
+    tied.register(exactRecord({ certificationId: 'cert-tied-blocked', state: 'BLOCKED' }));
+    const tiedResolution = tied.resolve('openai', 'exact-model', '1', 'chat_general', {
+      requiredState: 'APPROVED_GENERAL',
+    });
+    expect(tiedResolution.eligible).toBe(false);
+    expect(tiedResolution.requalificationRequired).toBe(true);
+    expect(tiedResolution.reason).toContain('comparten evaluatedAt');
+  });
+
+  it('no expone referencias mutables a los registros internos', () => {
+    const r = new ClinicalCertificationRegistry([], []);
+    const source = exactRecord({
+      certificationId: 'cert-cloned',
+      knownFailures: ['failure-a'],
+    });
+    r.register(source);
+    source.state = 'BLOCKED';
+    source.key.modelVersion = 'mutated';
+    r.get('cert-cloned')!.knownFailures!.push('failure-b');
+
+    expect(r.get('cert-cloned')).toMatchObject({
+      state: 'APPROVED_GENERAL',
+      key: { modelVersion: '1' },
+      knownFailures: ['failure-a'],
+    });
   });
 
   it('el historial nunca se borra: el registro stale sigue listado', () => {
@@ -250,13 +451,14 @@ describe('modelCardView (Build 05)', () => {
     evaluationReport: 'r1.json',
   };
 
-  it('deriva capacidades aprobadas desde la certificación granular (con flags 07.5A marcados)', () => {
+  it('solo expone capacidades actualmente elegibles como aprobadas', () => {
     const view = buildModelCardView(card, { certifications: registry() });
-    expect(view.approvedCapabilities.map((c) => c.capability)).toEqual(
-      expect.arrayContaining(['chat_general', 'structured_json', 'nutrition_reasoning']),
+    expect(view.approvedCapabilities).toEqual([]);
+    expect(view.certificationStates).toEqual(
+      expect.arrayContaining(['APPROVED_GENERAL', 'APPROVED_ANALYTICS', 'APPROVED_NUTRITION_SUPPORT']),
     );
-    const nutrition = view.approvedCapabilities.find((c) => c.capability === 'nutrition_reasoning');
-    expect(nutrition?.state).toBe('APPROVED_NUTRITION_SUPPORT');
+    expect(view.lastQualificationDate).toBe('2026-08-14T00:00:00.000Z');
+    expect(view.clinicalQualification).toBe('not_approved');
     expect(view.requalificationRequired).toBe(true);
   });
 
@@ -281,7 +483,7 @@ describe('modelCardView (Build 05)', () => {
     expect(view.lastQualificationDate).toBe('UNKNOWN');
   });
 
-  it('gpt-4o en nutrition_reasoning es experimental, no aprobado', () => {
+  it('solo evalúa capabilities declaradas por la Model Card', () => {
     const card4o: ModelCard = {
       key: 'openai/gpt-4o',
       provider: 'openai',
@@ -293,10 +495,41 @@ describe('modelCardView (Build 05)', () => {
       intendedUse: 'Asistencia general',
       limitations: '',
       risks: [],
-      capabilities: ['chat_general', 'structured_json', 'nutrition_reasoning'],
+      capabilities: ['chat_general', 'structured_json'],
       evaluationReport: '',
     };
     const view = buildModelCardView(card4o, { certifications: registry() });
-    expect(view.clinicalQualification).toBe('experimental');
+    expect(view.clinicalQualification).toBe('not_approved');
+    expect(view.certificationStates).not.toContain('EXPERIMENTAL');
+  });
+
+  it('patient_support exige APPROVED_PATIENT y respeta la identidad del deployment', () => {
+    const patientCard: ModelCard = {
+      ...card,
+      key: 'openai/patient-model',
+      model: 'patient-model',
+      version: '1',
+      capabilities: ['patient_support'],
+    };
+    const certifications = new ClinicalCertificationRegistry([], []);
+    certifications.register(exactRecord({
+      certificationId: 'cert-patient-general',
+      modelId: 'patient-model',
+      state: 'APPROVED_GENERAL',
+      deploymentFingerprint: 'deploy-aaaaaaaa',
+      key: {
+        ...exactRecord({ certificationId: 'key-template', modelId: 'patient-model' }).key,
+        modelId: 'patient-model',
+        capabilityId: 'patient_support',
+        promptVersion: v.promptVersion.patient_support,
+        outputSchemaVersion: v.outputSchemaVersion.patient_support,
+        deploymentFingerprint: 'deploy-aaaaaaaa',
+      },
+    }));
+
+    expect(buildModelCardView(patientCard, {
+      certifications,
+      deploymentFingerprint: 'deploy-aaaaaaaa',
+    }).approvedCapabilities).toEqual([]);
   });
 });

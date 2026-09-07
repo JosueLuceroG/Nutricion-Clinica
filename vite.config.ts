@@ -53,7 +53,7 @@ export default defineConfig({
   build: {
     target: "es2022",
     minify: "esbuild",
-    sourcemap: process.env.CI ? false : true,
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -96,7 +96,10 @@ export default defineConfig({
             return "dnd";
           }
 
-          if (isDependency(id, "jspdf") || isDependency(id, "jspdf-autotable")) {
+          if (
+            isDependency(id, "jspdf") ||
+            isDependency(id, "jspdf-autotable")
+          ) {
             return "pdf";
           }
 
@@ -108,7 +111,10 @@ export default defineConfig({
             return "ocr";
           }
 
-          if (isDependency(id, "i18next") || isDependency(id, "react-i18next")) {
+          if (
+            isDependency(id, "i18next") ||
+            isDependency(id, "react-i18next")
+          ) {
             return "i18n";
           }
 

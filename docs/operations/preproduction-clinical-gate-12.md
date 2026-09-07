@@ -20,10 +20,10 @@ disagreements, pruebas fail-closed y rollback/disable switch para el expert.
 - `comparison.ts`: veredictos `aligned | minor_divergence | critical_disagreement`
   y `classifyComparison`: un `critical_disagreement` SOLO cuenta cuando el run
   fue servido al paciente.
-- `reviewStore.ts`: `ClinicalReviewStore` con implementacion in-memory
-  (default, segura en instancia unica) y `SqlClinicalReviewStore` (tablas
-  `clinical_shadow_runs` y `clinical_reviews`, migracion `028-clinical-gate.sql`)
-  para staging/multi-instancia.
+- `reviewStore.ts`: `ClinicalReviewStore` con implementacion in-memory para
+  desarrollo local y `SqlClinicalReviewStore` (tablas `clinical_shadow_runs` y
+  `clinical_reviews`, migracion `028-clinical-gate.sql`) obligatoria en
+  STAGING/PRODUCTION.
 - `autoDisable.ts`: cuenta critical disagreements en la ventana (por sucursal
   o global) y auto-deshabilita al alcanzar el umbral; falla cerrado ante
   errores de almacen (503 `Expert deshabilitado por revision clinica`).
@@ -38,7 +38,7 @@ disagreements, pruebas fail-closed y rollback/disable switch para el expert.
 - `POST /ai/expert/review`: el profesional compara un shadow run
   (`shadowRunId`, `verdict`, `notes`); los critical disagreements servidos
   incrementan el contador de auto-disable. Responde `{ critical, reason,
-  autoDisabled }`.
+autoDisabled }`.
 
 ## Reglas de rollback
 
@@ -64,6 +64,6 @@ disagreements, pruebas fail-closed y rollback/disable switch para el expert.
 
 ## Estado
 
-Completada localmente; staging pendiente (aplicar migracion 028, validar con
-datos reales, elegir `AI_CLINICAL_REVIEW_STORE=sql` para multi-instancia y
-calibrar umbrales con el equipo clinico).
+Completada localmente; staging pendiente (aplicar migracion 028, configurar
+`AI_CLINICAL_REVIEW_STORE=sql`, validar con datos reales y calibrar umbrales
+con el equipo clinico).

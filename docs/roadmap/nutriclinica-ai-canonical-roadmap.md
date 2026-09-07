@@ -101,8 +101,7 @@ disagreements, pruebas fail-closed y rollback/disable switch.
 
 Estado: completada localmente (ver `docs/operations/preproduction-clinical-gate-12.md`);
 staging pendiente (migracion 028, validacion con datos reales,
-`AI_CLINICAL_REVIEW_STORE=sql` para multi-instancia, calibracion de umbrales
-con el equipo clinico).
+`AI_CLINICAL_REVIEW_STORE=sql`, calibracion de umbrales con el equipo clinico).
 
 ## 13. RAG Gate
 

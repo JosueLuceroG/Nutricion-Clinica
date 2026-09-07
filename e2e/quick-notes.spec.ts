@@ -97,6 +97,11 @@ test.describe("notas rápidas", () => {
     await expect(restoredNote.getByLabel("Título")).toHaveValue(
       "Confirmar cita de Ana",
     );
+    await restoredNote.evaluate(async (element) => {
+      await Promise.all(
+        element.getAnimations().map((animation) => animation.finished),
+      );
+    });
     const restoredBox = await restoredNote.boundingBox();
     expect(restoredBox!.x).toBeCloseTo(resized!.x, 0);
     expect(restoredBox!.y).toBeCloseTo(resized!.y, 0);

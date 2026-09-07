@@ -27,6 +27,7 @@ test-results/
 # Build
 **/target/
 **/dist/
+**/dist-deploy/
 **/gen/
 /release-manifest.json
 

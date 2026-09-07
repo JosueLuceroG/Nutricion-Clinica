@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { InMemoryClinicalReviewStore } from './reviewStore.js';
+import {
+  InMemoryClinicalReviewStore,
+  SqlClinicalReviewStore,
+  selectClinicalReviewStore,
+} from './reviewStore.js';
 import type { ShadowRun } from './shadowMode.js';
 
 function run(id: string, served: boolean, sucursalId = 's1'): ShadowRun {
@@ -28,6 +32,14 @@ function run(id: string, served: boolean, sucursalId = 's1'): ShadowRun {
 }
 
 describe('InMemoryClinicalReviewStore', () => {
+  it('selects the validated SQL store with surrounding whitespace', () => {
+    expect(
+      selectClinicalReviewStore({
+        AI_CLINICAL_REVIEW_STORE: ' sql ',
+      } as NodeJS.ProcessEnv),
+    ).toBeInstanceOf(SqlClinicalReviewStore);
+  });
+
   it('saves and retrieves shadow runs', async () => {
     const store = new InMemoryClinicalReviewStore();
     await store.saveShadowRun(run('r1', true));

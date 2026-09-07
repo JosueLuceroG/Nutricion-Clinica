@@ -38,7 +38,11 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(cacheFirstStaticAsset(request));
+  event.respondWith(
+    isVersionedBuildAsset(url.pathname)
+      ? cacheFirstStaticAsset(request)
+      : networkFirstStaticAsset(request),
+  );
 });
 
 function isApiLikeRequest(request, url) {
@@ -73,4 +77,19 @@ async function cacheFirstStaticAsset(request) {
     await cache.put(request, response.clone());
   }
   return response;
+}
+
+function isVersionedBuildAsset(pathname) {
+  return /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/.test(pathname);
+}
+
+async function networkFirstStaticAsset(request) {
+  const cache = await caches.open(CACHE_NAME);
+  try {
+    const response = await fetch(request);
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch {
+    return (await cache.match(request)) ?? Response.error();
+  }
 }

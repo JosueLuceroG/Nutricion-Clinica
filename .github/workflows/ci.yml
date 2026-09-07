@@ -1,14 +1,32 @@
 name: CI
 
 on:
+  workflow_call:
+    inputs:
+      release_version:
+        description: Semantic version embedded in portable artifacts
+        required: false
+        type: string
+        default: 0.1.0-ci
+      public_api_url:
+        description: Exact public API origin for a release invocation
+        required: false
+        type: string
+        default: ""
+      public_web_url:
+        description: Exact public Web origin for a release invocation
+        required: false
+        type: string
+        default: ""
   push:
-    branches: [main, develop, "feature/**", "release/**"]
+    branches: [main, develop, "feature/**", "release/**", "infra/**"]
   pull_request:
     branches: [main, develop]
 
 env:
   PNPM_VERSION: 11.5.0
   NODE_VERSION: 24
+  RELEASE_VERSION: ${{ inputs.release_version || '0.1.0-ci' }}
 
 jobs:
   quality:
@@ -23,6 +41,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository secrets
+        if: runner.os == 'Linux'
+        uses: gitleaks/gitleaks-action@v2
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
         uses: actions/setup-node@v4
@@ -36,6 +60,7 @@ jobs:
 
       - name: Get pnpm store directory
         id: pnpm-cache
+        shell: bash
         run: echo "store-dir=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
@@ -48,9 +73,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Approve esbuild build scripts
-        run: pnpm approve-builds esbuild
 
       - name: Secret scan (tracked files)
         shell: bash
@@ -84,7 +106,7 @@ jobs:
         run: pnpm build
 
   e2e:
-    name: E2E (Playwright)
+    name: Portable UI E2E (Playwright)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: quality
@@ -118,9 +140,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Approve esbuild build scripts
-        run: pnpm approve-builds esbuild
-
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -131,11 +150,10 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run E2E tests
-        run: pnpm e2e
+      - name: Run portable UI E2E tests
+        run: pnpm e2e:portable
 
       - name: Upload test results on failure
         if: failure()
@@ -145,4 +163,123 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          retention-days: 7
+
+  deployment-artifacts:
+    name: Portable Deployment Artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm ${{ env.PNPM_VERSION }}
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate deployment driver
+        run: |
+          pnpm deployment:test
+          pnpm --filter @nutriclinica/api build:deploy
+          pnpm deployment:api-artifact:test
+
+      - name: Build API image
+        run: >-
+          docker buildx build --load
+          --file apps/api/Dockerfile
+          --metadata-file api-image-metadata.json
+          --build-arg RELEASE_VERSION=${RELEASE_VERSION}
+          --build-arg RELEASE_COMMIT=${{ github.sha }}
+          --tag nutriclinica-api:${RELEASE_VERSION}
+          .
+
+      - name: Build Web image
+        run: >-
+          docker buildx build --load
+          --file Dockerfile
+          --metadata-file web-image-metadata.json
+          --build-arg VITE_API_URL=/api
+          --build-arg RELEASE_VERSION=${RELEASE_VERSION}
+          --build-arg RELEASE_COMMIT=${{ github.sha }}
+          --tag nutriclinica-web:${RELEASE_VERSION}
+          .
+
+      - name: Build and verify release manifest
+        env:
+          ENVIRONMENT_CLASS: TEST
+          INSTANCE_ID: ci-deployment-artifacts
+          GIT_COMMIT: ${{ github.sha }}
+          PUBLIC_API_URL: ${{ inputs.public_api_url }}
+          PUBLIC_WEB_URL: ${{ inputs.public_web_url }}
+          SECRET_SCAN_STATUS: PASS
+          SECRET_SCAN_COMMIT: ${{ github.sha }}
+          SECRET_SCAN_EVIDENCE_ID: github-run-${{ github.run_id }}-${{ github.run_attempt }}
+          DESKTOP_RELEASE_VERSION: ${{ env.RELEASE_VERSION }}
+          RELEASE_MANIFEST_VERIFICATION_MODE: foundation
+        run: |
+          export API_ARTIFACT_DIGEST="$(node -p \"JSON.parse(require('fs').readFileSync('api-image-metadata.json','utf8'))['containerimage.digest']\")"
+          export WEB_ARTIFACT_DIGEST="$(node -p \"JSON.parse(require('fs').readFileSync('web-image-metadata.json','utf8'))['containerimage.digest']\")"
+          export API_ARTIFACT="local/nutriclinica-api@${API_ARTIFACT_DIGEST}"
+          export WEB_ARTIFACT="local/nutriclinica-web@${WEB_ARTIFACT_DIGEST}"
+          pnpm --filter @nutriclinica/api release:manifest
+          pnpm deployment:manifest:verify
+
+      - name: Export portable image evidence
+        run: |
+          docker save --output "nutriclinica-api-${RELEASE_VERSION}.tar" "nutriclinica-api:${RELEASE_VERSION}"
+          docker save --output "nutriclinica-web-${RELEASE_VERSION}.tar" "nutriclinica-web:${RELEASE_VERSION}"
+
+      - name: Verify Web build contract
+        shell: bash
+        run: |
+          container_id="$(docker create "nutriclinica-web:${RELEASE_VERSION}")"
+          trap 'docker rm -f "${container_id}" >/dev/null 2>&1 || true' EXIT
+          mkdir -p web-image-dist
+          docker cp "${container_id}:/usr/share/nginx/html/." web-image-dist/
+          node deployment/scripts/verify-web-artifact.mjs web-image-dist
+
+      - name: Validate Compose contract
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: docker compose -f deployment/compose/compose.yaml config --quiet
+
+      - name: Run local deployment simulation
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: |
+          docker compose -f deployment/compose/compose.yaml up --detach --no-build
+          pnpm deployment:smoke | tee deployment-smoke.log
+
+      - name: Stop local deployment simulation
+        if: always()
+        env:
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: docker compose -f deployment/compose/compose.yaml down --volumes --remove-orphans
+
+      - name: Upload deployment evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: portable-deployment-${{ github.sha }}
+          path: |
+            release-manifest.json
+            api-image-metadata.json
+            web-image-metadata.json
+            nutriclinica-api-${{ env.RELEASE_VERSION }}.tar
+            nutriclinica-web-${{ env.RELEASE_VERSION }}.tar
+            deployment-smoke.log
           retention-days: 7

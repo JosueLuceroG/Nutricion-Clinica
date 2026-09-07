@@ -10,7 +10,11 @@ import {
   issueWsTicket,
   registerWsChannelHandler,
   setupWebsocketGateway,
+  ticketFromWebSocketProtocols,
   unregisterWsChannelHandler,
+  WS_EXPIRED_TICKET_CLEANUP_BATCH_SIZE,
+  WS_MAX_PAYLOAD_BYTES,
+  WS_TICKET_PROTOCOL,
   WS_TICKET_TTL_SECONDS,
   type WsTicketInfo,
 } from "./websocketGateway.js";
@@ -34,7 +38,12 @@ const { mockRequestInput, mockRequestQuery, mockPoolRequest, mockGetPool } =
 vi.mock("mssql", () => {
   const type = () => ({ type: "mock-type" });
   return {
-    default: { UniqueIdentifier: type, NVarChar: type, DateTime2: type },
+    default: {
+      UniqueIdentifier: type,
+      NVarChar: type,
+      DateTime2: type,
+      Int: type,
+    },
   };
 });
 
@@ -113,19 +122,46 @@ describe("ticket primitives", () => {
       origin: ORIGIN_ALLOWED,
     });
     const query = String(mockRequestQuery.mock.calls[0]?.[0]);
-    expect(query).toContain("UPDATE websocket_tickets");
+    expect(query).toContain("DELETE FROM websocket_tickets");
+    expect(query).toContain("OUTPUT DELETED.id");
     expect(query).toContain("consumed_at IS NULL");
     expect(query).toContain("expires_at > SYSUTCDATETIME()");
   });
 
+  it("binds consumption to the requested channel and origin", async () => {
+    mockRequestQuery.mockResolvedValueOnce({ recordset: [] });
+    await consumeWsTicket(TICKET_HEX, {
+      channel: "chat",
+      origin: `${ORIGIN_ALLOWED}/`,
+    });
+    expect(
+      mockRequestInput.mock.calls.find(
+        ([name]) => name === "expected_channel",
+      )?.[2],
+    ).toBe("chat");
+    expect(
+      mockRequestInput.mock.calls.find(
+        ([name]) => name === "expected_origin",
+      )?.[2],
+    ).toBe(ORIGIN_ALLOWED);
+    const query = String(mockRequestQuery.mock.calls[0]?.[0]);
+    expect(query).toContain("channel = @expected_channel");
+    expect(query).toContain("origin = @expected_origin");
+  });
+
   it("issueWsTicket stores only the hash and returns the plain ticket once", async () => {
+    mockRequestQuery.mockResolvedValueOnce({
+      recordset: [
+        { expires_at: new Date(Date.now() + WS_TICKET_TTL_SECONDS * 1000) },
+      ],
+    });
     const issued = await issueWsTicket({
       channel: "telemedicina",
       sub: "prof-1",
       sucursalId: "s1",
       resourceId: "11111111-1111-1111-1111-111111111222",
       pacienteId: null,
-      origin: ORIGIN_ALLOWED,
+      origin: `${ORIGIN_ALLOWED}/`,
     });
     expect(issued.ticket).toMatch(/^[0-9a-f]{64}$/);
     expect(new Date(issued.expiresAt).getTime()).toBeGreaterThan(Date.now());
@@ -136,11 +172,41 @@ describe("ticket primitives", () => {
     expect(
       mockRequestInput.mock.calls.find(([name]) => name === "channel")?.[2],
     ).toBe("telemedicina");
+    expect(
+      mockRequestInput.mock.calls.find(([name]) => name === "origin")?.[2],
+    ).toBe(ORIGIN_ALLOWED);
+    expect(String(mockRequestQuery.mock.calls[0]?.[0])).toContain(
+      "DATEADD(SECOND, @ttl_seconds, SYSUTCDATETIME())",
+    );
+    expect(String(mockRequestQuery.mock.calls[0]?.[0])).toContain(
+      "DELETE TOP (@cleanup_batch_size)",
+    );
+    expect(
+      mockRequestInput.mock.calls.find(
+        ([name]) => name === "cleanup_batch_size",
+      )?.[2],
+    ).toBe(WS_EXPIRED_TICKET_CLEANUP_BATCH_SIZE);
   });
 
   it("tickets expire shortly after issuance", () => {
     expect(WS_TICKET_TTL_SECONDS).toBeGreaterThanOrEqual(30);
     expect(WS_TICKET_TTL_SECONDS).toBeLessThanOrEqual(60);
+    expect(WS_MAX_PAYLOAD_BYTES).toBe(64 * 1024);
+  });
+
+  it("accepts only the fixed ticket subprotocol followed by a valid ticket", () => {
+    expect(
+      ticketFromWebSocketProtocols(`${WS_TICKET_PROTOCOL}, ${TICKET_HEX}`),
+    ).toBe(TICKET_HEX);
+    expect(ticketFromWebSocketProtocols(TICKET_HEX)).toBeNull();
+    expect(
+      ticketFromWebSocketProtocols(`${WS_TICKET_PROTOCOL}, malformed`),
+    ).toBeNull();
+    expect(
+      ticketFromWebSocketProtocols(
+        `${WS_TICKET_PROTOCOL}, ${TICKET_HEX}, unexpected`,
+      ),
+    ).toBeNull();
   });
 });
 
@@ -163,7 +229,7 @@ describe("isWsOriginAllowed", () => {
   });
 
   it("respects a custom CORS_ORIGIN allowlist", () => {
-    process.env.CORS_ORIGIN = "https://app.example.com";
+    process.env.CORS_ORIGIN = "https://app.example.com/";
     expect(isWsOriginAllowed("https://app.example.com")).toBe(true);
     expect(isWsOriginAllowed("http://localhost:1420")).toBe(false);
   });
@@ -175,12 +241,17 @@ describe("setupWebsocketGateway upgrade flow", () => {
     path: string,
     expectedStatus: number,
     origin?: string,
+    ticket?: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
-      const client = new WebSocket(
-        `ws://127.0.0.1:${port}${path}`,
-        origin ? { origin } : undefined,
-      );
+      const url = `ws://127.0.0.1:${port}${path}`;
+      const client = ticket
+        ? new WebSocket(
+            url,
+            [WS_TICKET_PROTOCOL, ticket],
+            origin ? { origin } : undefined,
+          )
+        : new WebSocket(url, origin ? { origin } : undefined);
       const timer = setTimeout(() => {
         client.terminate();
         reject(new Error("timeout waiting for upgrade rejection"));
@@ -207,7 +278,7 @@ describe("setupWebsocketGateway upgrade flow", () => {
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
     const port = (httpServer.address() as AddressInfo).port;
     try {
-      await expectRejected(port, "/ws/nope?ticket=abc", 404, ORIGIN_ALLOWED);
+      await expectRejected(port, "/ws/nope", 404, ORIGIN_ALLOWED);
       expect(mockGetPool).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
@@ -220,12 +291,7 @@ describe("setupWebsocketGateway upgrade flow", () => {
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
     const port = (httpServer.address() as AddressInfo).port;
     try {
-      await expectRejected(
-        port,
-        "/ws/chat?ticket=abc",
-        403,
-        "https://evil.example",
-      );
+      await expectRejected(port, "/ws/chat", 403, "https://evil.example");
       expect(mockGetPool).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
@@ -245,21 +311,56 @@ describe("setupWebsocketGateway upgrade flow", () => {
     }
   });
 
+  it("rejects query-string tickets so credentials cannot leak through URLs", async () => {
+    const httpServer = createServer();
+    setupWebsocketGateway(httpServer);
+    registerWsChannelHandler("chat", vi.fn());
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as AddressInfo).port;
+    try {
+      await expectRejected(
+        port,
+        `/ws/chat?ticket=${TICKET_HEX}`,
+        400,
+        ORIGIN_ALLOWED,
+      );
+      expect(mockGetPool).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    }
+  });
+
+  it("rejects every query string on credential-bearing upgrade paths", async () => {
+    const httpServer = createServer();
+    setupWebsocketGateway(httpServer);
+    registerWsChannelHandler("chat", vi.fn());
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as AddressInfo).port;
+    try {
+      await expectRejected(
+        port,
+        "/ws/chat?Ticket=redacted&trace=patient-data",
+        400,
+        ORIGIN_ALLOWED,
+        TICKET_HEX,
+      );
+      expect(mockGetPool).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    }
+  });
+
   it("rejects a ticket bound to a different channel", async () => {
     const httpServer = createServer();
     setupWebsocketGateway(httpServer);
+    registerWsChannelHandler("chat", vi.fn());
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
     const port = (httpServer.address() as AddressInfo).port;
     try {
       mockRequestQuery.mockResolvedValueOnce({
         recordset: [ticketRow({ channel: "telemedicina" })],
       });
-      await expectRejected(
-        port,
-        `/ws/chat?ticket=${TICKET_HEX}`,
-        401,
-        ORIGIN_ALLOWED,
-      );
+      await expectRejected(port, "/ws/chat", 401, ORIGIN_ALLOWED, TICKET_HEX);
     } finally {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     }
@@ -268,15 +369,11 @@ describe("setupWebsocketGateway upgrade flow", () => {
   it("rejects a missing/expired/already-consumed ticket", async () => {
     const httpServer = createServer();
     setupWebsocketGateway(httpServer);
+    registerWsChannelHandler("chat", vi.fn());
     await new Promise<void>((resolve) => httpServer.listen(0, resolve));
     const port = (httpServer.address() as AddressInfo).port;
     try {
-      await expectRejected(
-        port,
-        `/ws/chat?ticket=${TICKET_HEX}`,
-        401,
-        ORIGIN_ALLOWED,
-      );
+      await expectRejected(port, "/ws/chat", 401, ORIGIN_ALLOWED, TICKET_HEX);
     } finally {
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
     }
@@ -293,7 +390,8 @@ describe("setupWebsocketGateway upgrade flow", () => {
       mockRequestQuery.mockResolvedValueOnce({ recordset: [ticketRow()] });
 
       const client = new WebSocket(
-        `ws://127.0.0.1:${port}/ws/chat?ticket=${TICKET_HEX}`,
+        `ws://127.0.0.1:${port}/ws/chat`,
+        [WS_TICKET_PROTOCOL, TICKET_HEX],
         { origin: ORIGIN_ALLOWED },
       );
       await new Promise<void>((resolve, reject) => {
@@ -318,12 +416,7 @@ describe("setupWebsocketGateway upgrade flow", () => {
       client.close();
       await new Promise<void>((resolve) => setTimeout(resolve, 50));
 
-      await expectRejected(
-        port,
-        `/ws/chat?ticket=${TICKET_HEX}`,
-        401,
-        ORIGIN_ALLOWED,
-      );
+      await expectRejected(port, "/ws/chat", 401, ORIGIN_ALLOWED, TICKET_HEX);
     } finally {
       await new Promise<void>((resolve) => gateway.close(() => resolve()));
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));
@@ -342,12 +435,25 @@ describe("setupWebsocketGateway upgrade flow", () => {
         recordset: [ticketRow({ origin: "http://evil.example" })],
       });
 
-      await expectRejected(
-        port,
-        `/ws/chat?ticket=${TICKET_HEX}`,
-        403,
-        ORIGIN_ALLOWED,
-      );
+      await expectRejected(port, "/ws/chat", 403, ORIGIN_ALLOWED, TICKET_HEX);
+      expect(handler).not.toHaveBeenCalled();
+    } finally {
+      await new Promise<void>((resolve) => gateway.close(() => resolve()));
+      await new Promise<void>((resolve) => httpServer.close(() => resolve()));
+    }
+  });
+
+  it("rejects a browser-bound ticket when the client omits Origin", async () => {
+    const httpServer = createServer();
+    const gateway = setupWebsocketGateway(httpServer);
+    const handler = vi.fn();
+    registerWsChannelHandler("chat", handler);
+    await new Promise<void>((resolve) => httpServer.listen(0, resolve));
+    const port = (httpServer.address() as AddressInfo).port;
+    try {
+      mockRequestQuery.mockResolvedValueOnce({ recordset: [ticketRow()] });
+
+      await expectRejected(port, "/ws/chat", 403, undefined, TICKET_HEX);
       expect(handler).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => gateway.close(() => resolve()));
@@ -367,9 +473,10 @@ describe("setupWebsocketGateway upgrade flow", () => {
         recordset: [ticketRow({ origin: "" })],
       });
 
-      const client = new WebSocket(
-        `ws://127.0.0.1:${port}/ws/chat?ticket=${TICKET_HEX}`,
-      );
+      const client = new WebSocket(`ws://127.0.0.1:${port}/ws/chat`, [
+        WS_TICKET_PROTOCOL,
+        TICKET_HEX,
+      ]);
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
           () => reject(new Error("timeout waiting for ws open")),
@@ -407,10 +514,12 @@ describe("setupWebsocketGateway upgrade flow", () => {
       });
       await expectRejected(
         port,
-        `/ws/telemedicina?ticket=${TICKET_HEX}`,
+        "/ws/telemedicina",
         503,
         ORIGIN_ALLOWED,
+        TICKET_HEX,
       );
+      expect(mockGetPool).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => gateway.close(() => resolve()));
       await new Promise<void>((resolve) => httpServer.close(() => resolve()));

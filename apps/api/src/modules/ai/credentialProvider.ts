@@ -4,14 +4,18 @@ export interface AICredentials {
   model: string;
 }
 
-export type AIProviderId = 'openai' | 'ollama';
+export type AIProviderId = "openai" | "ollama";
 
-export function resolveOpenAiApiKey(env: NodeJS.ProcessEnv = process.env): string {
-  return env.OPENAI_API_KEY ?? env.AI_API_KEY ?? '';
+export function resolveOpenAiApiKey(
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  return env.OPENAI_API_KEY ?? env.AI_API_KEY ?? "";
 }
 
-export function getAIProvider(env: NodeJS.ProcessEnv = process.env): AIProviderId {
-  return (env.AI_PROVIDER ?? env.VITE_AI_PROVIDER ?? 'openai') === 'ollama' ? 'ollama' : 'openai';
+export function getAIProvider(
+  env: NodeJS.ProcessEnv = process.env,
+): AIProviderId {
+  return env.AI_PROVIDER?.trim() === "ollama" ? "ollama" : "openai";
 }
 
 export class CredentialProvider {
@@ -22,24 +26,36 @@ export class CredentialProvider {
   }
 
   getDefaultModel(provider: AIProviderId): string {
-    return provider === 'ollama'
-      ? (this.env.AI_MODEL ?? 'llama3.2')
-      : (this.env.OPENAI_MODEL ?? 'gpt-4o-mini');
+    return provider === "ollama"
+      ? (this.env.AI_MODEL ?? "llama3.2")
+      : (this.env.OPENAI_MODEL ?? "gpt-4o-mini");
   }
 
   getBaseUrl(provider: AIProviderId): string {
-    const url = this.env.OPENAI_BASE_URL ?? (provider === 'ollama' ? 'http://localhost:11434/v1' : 'https://api.openai.com/v1');
-    return url.replace(/\/$/, '');
+    if (provider === "ollama") {
+      const base = (
+        this.env.OLLAMA_BASE_URL ?? "http://localhost:11434"
+      ).replace(/\/$/, "");
+      return base.endsWith("/v1") ? base : `${base}/v1`;
+    }
+    return (this.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1").replace(
+      /\/$/,
+      "",
+    );
   }
 
   resolve(provider: AIProviderId, requestedModel?: string): AICredentials {
-    if (provider === 'ollama') {
-      return { apiKey: null, baseUrl: this.getBaseUrl(provider), model: this.getDefaultModel('ollama') };
+    if (provider === "ollama") {
+      return {
+        apiKey: null,
+        baseUrl: this.getBaseUrl(provider),
+        model: this.getDefaultModel("ollama"),
+      };
     }
     return {
       apiKey: this.getOpenAiApiKey() || null,
       baseUrl: this.getBaseUrl(provider),
-      model: requestedModel ?? this.getDefaultModel('openai'),
+      model: requestedModel ?? this.getDefaultModel("openai"),
     };
   }
 }

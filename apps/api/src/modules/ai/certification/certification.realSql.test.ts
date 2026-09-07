@@ -4,6 +4,7 @@ import { getPool } from '../../../db/connection.js';
 import { ClinicalCertificationRegistry } from './clinicalCertification.js';
 import { createSqlCertificationPersistence } from './certificationPersistence.js';
 import { CURRENT_VERSIONS } from './versions.js';
+import { GOLDEN_DATASET_V1_FINGERPRINT } from '../evaluation/certification.js';
 
 /**
  * VERIFICACIÓN SQL REAL — Build 09.5A (migración 039: persistencia de
@@ -68,12 +69,12 @@ describe.runIf(REAL_SQL)('Build 09.5A real SQL (nc_b09_oltp, migración 039)', (
         knowledgePolicyVersion: CURRENT_VERSIONS.knowledgePolicyVersion,
         retrievalPolicyVersion: CURRENT_VERSIONS.retrievalPolicyVersion,
         smaeCatalogVersion: CURRENT_VERSIONS.smaeCatalogVersion,
-        deploymentFingerprint: 'deploy-real-001',
+        deploymentFingerprint: 'deploy-a1b2c3d4',
       },
       state: 'APPROVED_NUTRITION_SUPPORT' as const,
       evaluatedAt: '2026-08-20T00:00:00.000Z',
-      datasetFingerprint: 'dataset-real-001',
-      reportRef: 'report-real-001.json',
+      datasetFingerprint: GOLDEN_DATASET_V1_FINGERPRINT,
+      reportRef: `report-real-001.json@sha256:${'a'.repeat(64)}`,
     };
     await persistence.saveCertificationRecord(record);
     await persistence.saveCertificationRecord(record);
@@ -81,19 +82,19 @@ describe.runIf(REAL_SQL)('Build 09.5A real SQL (nc_b09_oltp, migración 039)', (
     const loaded = await persistence.loadCertificationRecords();
     expect(loaded.filter((r) => r.key.providerId === 'cert-persistence-test').length).toBe(1);
     const loadedRecord = loaded.find((r) => r.certificationId === record.certificationId)!;
-    expect(loadedRecord.key.deploymentFingerprint).toBe('deploy-real-001');
+    expect(loadedRecord.key.deploymentFingerprint).toBe('deploy-a1b2c3d4');
 
     const restarted = new ClinicalCertificationRegistry();
     restarted.replaceAll(loaded, await persistence.loadRequalificationFlags());
     const res = restarted.resolve('cert-persistence-test', 'modelo-cert', '1.0', capability, {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
-      deploymentFingerprint: 'deploy-real-001',
+      deploymentFingerprint: 'deploy-a1b2c3d4',
     });
     expect(res.eligible).toBe(true);
 
     const changed = restarted.resolve('cert-persistence-test', 'modelo-cert', '1.0', capability, {
       requiredState: 'APPROVED_NUTRITION_SUPPORT',
-      deploymentFingerprint: 'deploy-real-002',
+      deploymentFingerprint: 'deploy-a1b2c3d5',
     });
     expect(changed.eligible).toBe(false);
     expect(changed.requalificationRequired).toBe(true);

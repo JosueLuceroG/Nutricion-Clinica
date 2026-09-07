@@ -50,6 +50,7 @@ El driver `mssql` (Node) no autentica cuentas locales de Windows vía NTLM
 ```powershell
 $env:DB_NAME='nc_b02_fresh'; pnpm migrate   # en apps/api
 ```
+
 - Esperado: 34 archivos, 0 errores; segundo run: 34 skip (idempotencia).
 - Verificar checksums archivo ↔ DB (SHA-256 UTF-8 con CRLF normalizado a LF):
   `SELECT filename, checksum FROM schema_migrations` y comparar con el hash
@@ -71,16 +72,16 @@ $env:DB_NAME='nc_b02_fresh'; pnpm migrate   # en apps/api
 
 ## 5. Gotchas reales de SQL Server (bugs que solo aparecen en el gate real)
 
-| Patrón | Falla real | Fix |
-|---|---|---|
-| `EXEC(N'...' + QUOTENAME(@x))` | `Incorrect syntax near 'QUOTENAME'` (solo concatena variables) | `DECLARE @sql NVARCHAR(MAX) = N'...' + QUOTENAME(@x); EXEC(@sql);` |
-| `ALTER ADD col` + `UPDATE col` en el mismo batch | `Invalid column name` (compilación por batch) | `GO` entre ALTER y UPDATE |
-| `BEGIN TRANSACTION` / `COMMIT` en batches distintos (driver mssql = sp_executesql) | `Transaction count after EXECUTE ...` | BEGIN+COMMIT en el mismo batch, o sin transacción (ALTER idempotente) |
-| `sqlcmd` sin `-I` | `Msg 1934` índices sobre columnas computadas | `-I` siempre |
-| Columna `plan` sin corchetes en SELECT/INSERT | `Incorrect syntax near the keyword 'plan'` (keyword reservado) | `[plan]` |
-| `.input("last_id", sql.UniqueIdentifier(), "")` (primer pull sin cursor) | `Validation failed for parameter 'last_id'. Invalid GUID.` | `lastId \|\| "00000000-0000-0000-0000-000000000000"` |
-| `INSERT ... (id)` sin valor | `Cannot insert the value NULL into column 'id'` | `NEWID()` explícito |
-| NTLM cuenta local vía tedious | `Login failed ... untrusted domain` | Login SQL dedicado |
+| Patrón                                                                             | Falla real                                                     | Fix                                                                   |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `EXEC(N'...' + QUOTENAME(@x))`                                                     | `Incorrect syntax near 'QUOTENAME'` (solo concatena variables) | `DECLARE @sql NVARCHAR(MAX) = N'...' + QUOTENAME(@x); EXEC(@sql);`    |
+| `ALTER ADD col` + `UPDATE col` en el mismo batch                                   | `Invalid column name` (compilación por batch)                  | `GO` entre ALTER y UPDATE                                             |
+| `BEGIN TRANSACTION` / `COMMIT` en batches distintos (driver mssql = sp_executesql) | `Transaction count after EXECUTE ...`                          | BEGIN+COMMIT en el mismo batch, o sin transacción (ALTER idempotente) |
+| `sqlcmd` sin `-I`                                                                  | `Msg 1934` índices sobre columnas computadas                   | `-I` siempre                                                          |
+| Columna `plan` sin corchetes en SELECT/INSERT                                      | `Incorrect syntax near the keyword 'plan'` (keyword reservado) | `[plan]`                                                              |
+| `.input("last_id", sql.UniqueIdentifier(), "")` (primer pull sin cursor)           | `Validation failed for parameter 'last_id'. Invalid GUID.`     | `lastId \|\| "00000000-0000-0000-0000-000000000000"`                  |
+| `INSERT ... (id)` sin valor                                                        | `Cannot insert the value NULL into column 'id'`                | `NEWID()` explícito                                                   |
+| NTLM cuenta local vía tedious                                                      | `Login failed ... untrusted domain`                            | Login SQL dedicado                                                    |
 
 ## 6. Smoke de integración real (HTTP → API → SQL)
 
@@ -101,7 +102,8 @@ $env:DB_NAME='nc_b02_fresh'; pnpm migrate   # en apps/api
 
 - Stack: API en `:3000` (default del frontend, configurable vía `VITE_API_URL`),
   web en `:1420` (`pnpm dev` o `vite preview` tras `pnpm build`).
-- Credenciales: `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD` (default `admin123!`).
+- Credenciales: `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD`; la contraseña es
+  obligatoria y no tiene default trackeado.
 - Las assertions del dashboard (`Pacientes nuevos`, `Actividad clínica`) requieren
   una DB con datos ricos: contra una base mínima fallan aunque el login funcione.
 - Bug de entorno conocido (ver Build 02): el botón `.nc-submit` computa `height: 0px`

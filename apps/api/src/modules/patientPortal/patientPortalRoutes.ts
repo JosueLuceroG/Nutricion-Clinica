@@ -6,7 +6,7 @@ import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
-import { sendEmail, logEmailSent, renderTemplate } from '../../services/email/emailService.js';
+import { sendEmail, logEmailSent, renderTemplate, escapeHtml } from '../../services/email/emailService.js';
 import { broadcastMessageNew, broadcastMessageRead } from './chatServer.js';
 import { issueWsTicket } from '../ws/websocketGateway.js';
 
@@ -291,6 +291,11 @@ function todayDateOnly(): string {
 
 function fullName(row: Pick<PortalAccessRow, 'nombres' | 'apellido_paterno' | 'apellido_materno'>): string {
   return [row.nombres, row.apellido_paterno, row.apellido_materno].filter(Boolean).join(' ');
+}
+
+export function buildProfessionalPatientUrl(patientId: string, env: NodeJS.ProcessEnv = process.env): string {
+  const publicWebUrl = (env.PUBLIC_WEB_URL?.trim() || 'https://app.invalid').replace(/\/+$/, '');
+  return `${publicWebUrl}/#/pacientes/${encodeURIComponent(patientId)}`;
 }
 
 function notFound(res: Response): void {
@@ -1232,7 +1237,7 @@ router.post('/:token/adherence', async (req: Request, res: Response, next: NextF
         asunto: subject,
         contenidoHtml: html,
         messageId: emailResult.messageId,
-        error: emailResult.success ? null : (emailResult.error ?? null),
+        error: emailResult.simulated ? 'SIMULATED_NOT_SENT' : emailResult.success ? null : (emailResult.error ?? null),
       });
     }
 
@@ -1647,11 +1652,12 @@ router.post('/:token/send-reminder', async (req: Request, res: Response, next: N
       asunto: subject,
       contenidoHtml: html,
       messageId: result.messageId,
-      error: result.success ? null : (result.error ?? 'Error desconocido'),
+      error: result.simulated ? 'SIMULATED_NOT_SENT' : result.success ? null : (result.error ?? 'Error desconocido'),
     });
 
     res.json({
-      sent: result.success,
+      sent: result.success && !result.simulated,
+      simulated: result.simulated,
       messageId: result.messageId,
       to: access.email,
       appointmentDate: variables.appointmentDate,
@@ -1894,12 +1900,13 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
         );
       const prof = profResult.recordset[0];
       if (prof?.email) {
-        const html = `<p>El paciente <strong>${fullName(access)}</strong> ha enviado un mensaje desde el portal.</p>
+        const professionalUrl = buildProfessionalPatientUrl(access.paciente_id);
+        const html = `<p>El paciente <strong>${escapeHtml(fullName(access))}</strong> ha enviado un mensaje desde el portal.</p>
                       <blockquote style="padding:12px;margin:12px 0;border-left:4px solid #3b82f6;background:#f8fafc;">
-                        ${body.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                        ${escapeHtml(body.content)}
                       </blockquote>
-                      <p><a href="${req.protocol}://${req.get('host')}/#/pacientes/${access.paciente_id}" style="color:#3b82f6;">Ver en NutriClínica</a></p>`;
-        const subject = `Nuevo mensaje de ${fullName(access)} - NutriClínica`;
+                      <p><a href="${escapeHtml(professionalUrl)}" style="color:#3b82f6;">Ver en NutriClínica</a></p>`;
+        const subject = 'Nuevo mensaje del portal - NutriClínica';
         const emailResult = await sendEmail({ to: prof.email, subject, html });
         await logEmailSent({
           pacienteId: access.paciente_id,
@@ -1908,7 +1915,7 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
           asunto: subject,
           contenidoHtml: html,
           messageId: emailResult.messageId,
-          error: emailResult.success ? null : (emailResult.error ?? 'Error desconocido'),
+          error: emailResult.simulated ? 'SIMULATED_NOT_SENT' : emailResult.success ? null : (emailResult.error ?? 'Error desconocido'),
         });
       }
     } catch {

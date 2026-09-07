@@ -27,6 +27,7 @@ import {
   Shield,
   Sparkles,
 } from "lucide-react";
+import { APP_VERSION } from "../../appVersion";
 import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
 import { Button } from "@components/ui/button";
@@ -123,7 +124,9 @@ export function Sidebar({ onUsePremiumLayout }: { onUsePremiumLayout?: () => voi
             </div>
             <div className="flex flex-col leading-tight">
               <span className="text-sm">{t("common.app_name")}</span>
-              <span className="text-[10px] text-muted-foreground">v0.1.0</span>
+              <span className="text-[10px] text-muted-foreground">
+                v{APP_VERSION}
+              </span>
             </div>
           </Link>
         )}

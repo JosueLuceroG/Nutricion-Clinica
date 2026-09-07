@@ -1,39 +1,39 @@
-$ErrorActionPreference = 'Continue'
 param(
   # Directorio donde SQL Server puede escribir el .bak (si falla con permiso,
   # pasa -BackupDir a una ruta accesible por el servicio de SQL Server).
   [string]$BackupDir = (Join-Path $env:TEMP 'nc_b09_5a_backup')
 )
+$ErrorActionPreference = 'Stop'
 $sqlcmd = 'C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\SQLCMD.EXE'
 $server = 'localhost\SQLEXPRESS'
-$pwFile = Join-Path $env:TEMP 'nc_b09_5a_pw.txt'
-$oltp = 'nc_b09_oltp'
-$restoreDb = 'nc_b09_5a_restore'
-$dw = 'nc_b09_dw'
-$login = 'nc_b09_5a_ci'
+$suffix = [guid]::NewGuid().ToString('N').Substring(0, 8)
+$oltp = "nc_b09_oltp_$suffix"
+$restoreDb = "nc_b09_restore_$suffix"
+$dw = "nc_b09_dw_$suffix"
+$login = "nc_b09_ci_$suffix"
 $apiDir = Join-Path $PSScriptRoot '..\apps\api'
-$bak = Join-Path $BackupDir 'nc_b09_oltp.bak'
+$BackupDir = Join-Path $BackupDir "run-$suffix"
+$bak = Join-Path $BackupDir "$oltp.bak"
+$restoreData = Join-Path $BackupDir "$restoreDb.mdf"
+$restoreLog = Join-Path $BackupDir "${restoreDb}_log.ldf"
+$bakSql = $bak.Replace("'", "''")
+$restoreDataSql = $restoreData.Replace("'", "''")
+$restoreLogSql = $restoreLog.Replace("'", "''")
 
 function Invoke-AdminSql([string]$q) {
   & $sqlcmd -S $server -E -C -b -I -Q $q 2>&1 | Out-String | Write-Output
-  if ($LASTEXITCODE -ne 0) { throw "sqlcmd admin fallo: $q" }
+  if ($LASTEXITCODE -ne 0) { throw 'sqlcmd admin fallo' }
 }
 
 Write-Output '== BUILD 09.5A VERIFICACION DESPLIEGUE + PERSISTENCIA (migracion 039, backup/restore, DWH) =='
 Write-Output "BackupDir: $BackupDir (ajustar con -BackupDir si SQL Server no puede escribir ahi)"
 
 try {
-  Write-Output '== 0. limpieza de estado parcial previo'
-  Invoke-AdminSql "IF DB_ID('$oltp') IS NOT NULL BEGIN ALTER DATABASE $oltp SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $oltp; END;"
-  Invoke-AdminSql "IF DB_ID('$restoreDb') IS NOT NULL BEGIN ALTER DATABASE $restoreDb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $restoreDb; END;"
-  Invoke-AdminSql "IF DB_ID('$dw') IS NOT NULL BEGIN ALTER DATABASE $dw SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $dw; END;"
-  Invoke-AdminSql "IF SUSER_ID('$login') IS NOT NULL DROP LOGIN $login;"
-  if (Test-Path -LiteralPath $pwFile) { Remove-Item -LiteralPath $pwFile -Force }
+  Write-Output '== 0. preparar recursos desechables con nombres unicos'
   if (Test-Path -LiteralPath $BackupDir) { Remove-Item -LiteralPath $BackupDir -Recurse -Force }
   New-Item -ItemType Directory -Path $BackupDir -Force | Out-Null
 
   $pw = [guid]::NewGuid().ToString('N') + 'Xx9'
-  Set-Content -LiteralPath $pwFile -Value $pw -Encoding ascii
 
   Write-Output '== 1. login + bases desechables'
   Invoke-AdminSql "IF SUSER_ID('$login') IS NULL CREATE LOGIN $login WITH PASSWORD='$pw', CHECK_POLICY=ON, CHECK_EXPIRATION=OFF;"
@@ -68,11 +68,11 @@ try {
 
   Write-Output '== 5. BACKUP/RESTORE roundtrip: copia de seguridad restaurable'
   try {
-    Invoke-AdminSql "BACKUP DATABASE [$oltp] TO DISK = N'$bak' WITH INIT, COMPRESSION;"
+    Invoke-AdminSql "BACKUP DATABASE [$oltp] TO DISK = N'$bakSql' WITH INIT, COMPRESSION;"
   } catch {
     throw "BACKUP fallo (revisa permisos del servicio SQL sobre $BackupDir; usa -BackupDir). $($_.Exception.Message)"
   }
-  Invoke-AdminSql "RESTORE DATABASE [$restoreDb] FROM DISK = N'$bak' WITH RECOVERY, REPLACE, MOVE N'nc_b09_oltp' TO N'$BackupDir\nc_b09_5a_restore.mdf', MOVE N'nc_b09_oltp_log' TO N'$BackupDir\nc_b09_5a_restore_log.ldf';"
+  Invoke-AdminSql "RESTORE DATABASE [$restoreDb] FROM DISK = N'$bakSql' WITH RECOVERY, MOVE N'$oltp' TO N'$restoreDataSql', MOVE N'${oltp}_log' TO N'$restoreLogSql';"
   Invoke-AdminSql "USE [$restoreDb]; SELECT COUNT(*) AS flag_count FROM ai_requalification_flags; SELECT COUNT(*) AS schema_ok FROM sys.tables WHERE name IN ('ai_certification_records','ai_requalification_flags');"
 
   Write-Output '== 6. DWH rebuild real: schema + ETL + fixtures (etl.realSql.test.ts)'
@@ -105,7 +105,6 @@ finally {
   try { Invoke-AdminSql "ALTER DATABASE $restoreDb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $restoreDb;" } catch { Write-Output 'cleanup restore ignorado' }
   try { Invoke-AdminSql "ALTER DATABASE $dw SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $dw;" } catch { Write-Output 'cleanup dw ignorado' }
   try { Invoke-AdminSql "DROP LOGIN $login;" } catch { Write-Output 'cleanup login ignorado' }
-  Remove-Item -LiteralPath $pwFile -Force -ErrorAction SilentlyContinue
   if (Test-Path -LiteralPath $BackupDir) { Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue }
   Remove-Item Env:DB_USER, Env:DB_PASSWORD, Env:DB_SERVER, Env:DB_TRUST_CERT, Env:DB_NAME, Env:DWH_DATABASE, Env:DWH_ENABLED, Env:DWH_SCHEDULED_LOAD_ENABLED, Env:DWH_STORE, Env:AI_REAL_SQL_TEST -ErrorAction SilentlyContinue
 }

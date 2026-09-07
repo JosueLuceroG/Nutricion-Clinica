@@ -1,7 +1,9 @@
-import nodemailer from 'nodemailer';
-import { createHash, randomUUID } from 'node:crypto';
-import sql from 'mssql';
-import { getPool } from '../../db/connection.js';
+import nodemailer from "nodemailer";
+import { createHash, randomUUID } from "node:crypto";
+import sql from "mssql";
+import { getPool } from "../../db/connection.js";
+import { readExternalSideEffectMode } from "../../modules/deployment/externalSideEffects.js";
+import { readEnvironmentClass } from "../../modules/deployment/environmentIdentity.js";
 
 interface EmailConfig {
   host: string;
@@ -19,14 +21,25 @@ function loadConfig(): EmailConfig | null {
   const pass = process.env.SMTP_PASS;
   const from = process.env.EMAIL_FROM;
   if (!host || !user || !pass || !from) return null;
-  return { host, port, user, pass, from, fromName: process.env.EMAIL_FROM_NAME || 'NutriClínica' };
+  return {
+    host,
+    port,
+    user,
+    pass,
+    from,
+    fromName: process.env.EMAIL_FROM_NAME || "NutriClínica",
+  };
 }
 
-async function getTransporter(config: EmailConfig): Promise<nodemailer.Transporter> {
+async function getTransporter(
+  config: EmailConfig,
+): Promise<nodemailer.Transporter> {
   const transporter = nodemailer.createTransport({
     host: config.host,
     port: config.port,
     secure: config.port === 465,
+    requireTLS: config.port !== 465,
+    tls: { rejectUnauthorized: true },
     auth: { user: config.user, pass: config.pass },
   });
   await transporter.verify();
@@ -38,11 +51,31 @@ export async function sendEmail(input: {
   subject: string;
   html: string;
   text?: string;
-}): Promise<{ success: boolean; messageId?: string; error?: string }> {
+}): Promise<{
+  success: boolean;
+  simulated: boolean;
+  messageId?: string;
+  error?: string;
+}> {
+  const mode = readExternalSideEffectMode();
+  const environmentClass = readEnvironmentClass();
+  if (mode !== "PRODUCTION" || environmentClass !== "PRODUCTION") {
+    console.log(
+      `[email] delivery ${mode === "UNKNOWN" ? "DISABLED" : mode}; no external message sent`,
+    );
+    return {
+      success: true,
+      simulated: true,
+      messageId: `simulated-${randomUUID()}`,
+    };
+  }
+
   const config = loadConfig();
   if (!config) {
-    console.log(`[email] SMTP no configurado. Simulando envío a ${input.to}: ${input.subject}`);
-    return { success: true, messageId: `simulated-${randomUUID()}` };
+    console.error(
+      "[email] production delivery configured without complete SMTP settings",
+    );
+    return { success: false, simulated: false, error: "SMTP_NOT_CONFIGURED" };
   }
 
   try {
@@ -51,14 +84,16 @@ export async function sendEmail(input: {
       from: `"${config.fromName}" <${config.from}>`,
       to: input.to,
       subject: input.subject,
-      text: input.text ?? '',
+      text: input.text ?? "",
       html: input.html,
     });
-    return { success: true, messageId: info.messageId };
+    return { success: true, simulated: false, messageId: info.messageId };
   } catch (err) {
-    const error = err instanceof Error ? err.message : 'Error desconocido al enviar email';
-    console.error(`[email] Error enviando a ${input.to}:`, error);
-    return { success: false, error };
+    console.error(
+      "[email] external delivery failed:",
+      err instanceof Error ? err.name : "UnknownDeliveryError",
+    );
+    return { success: false, simulated: false, error: "EMAIL_DELIVERY_FAILED" };
   }
 }
 
@@ -73,17 +108,19 @@ export async function logEmailSent(input: {
 }): Promise<void> {
   const pool = await getPool();
   const id = randomUUID();
-  const contentHash = createHash('sha256').update(input.contenidoHtml, 'utf8').digest('hex');
+  const contentHash = createHash("sha256")
+    .update(input.contenidoHtml, "utf8")
+    .digest("hex");
   await pool
     .request()
-    .input('id', sql.UniqueIdentifier(), id)
-    .input('paciente_id', sql.UniqueIdentifier(), input.pacienteId)
-    .input('tipo', sql.NVarChar(40), input.tipo)
-    .input('destinatario', sql.NVarChar(200), input.destinatario)
-    .input('asunto', sql.NVarChar(200), input.asunto)
-    .input('contenido_hash', sql.NVarChar(64), contentHash)
-    .input('message_id', sql.NVarChar(200), input.messageId ?? null)
-    .input('error', sql.NVarChar(500), input.error ?? null)
+    .input("id", sql.UniqueIdentifier(), id)
+    .input("paciente_id", sql.UniqueIdentifier(), input.pacienteId)
+    .input("tipo", sql.NVarChar(40), input.tipo)
+    .input("destinatario", sql.NVarChar(200), input.destinatario)
+    .input("asunto", sql.NVarChar(200), input.asunto)
+    .input("contenido_hash", sql.NVarChar(64), contentHash)
+    .input("message_id", sql.NVarChar(200), input.messageId ?? null)
+    .input("error", sql.NVarChar(500), input.error ?? null)
     .query(
       `INSERT INTO notificaciones_email
          (id, paciente_id, tipo, destinatario, asunto, contenido_hash, message_id, error)
@@ -92,7 +129,10 @@ export async function logEmailSent(input: {
     );
 }
 
-export function renderTemplate(templateName: string, variables: Record<string, string>): string {
+export function renderTemplate(
+  templateName: string,
+  variables: Record<string, string>,
+): string {
   const templates: Record<string, string> = {
     appointment_reminder: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:20px;">
 <h2 style="color:#2563eb;">NutriClínica — Recordatorio de cita</h2>
@@ -126,16 +166,16 @@ export function renderTemplate(templateName: string, variables: Record<string, s
 
   let html = templates[templateName] ?? `<p>Notificación de NutriClínica</p>`;
   for (const [key, value] of Object.entries(variables)) {
-    html = html.replace(new RegExp(`{{${key}}}`, 'g'), escapeHtml(value));
+    html = html.replace(new RegExp(`{{${key}}}`, "g"), escapeHtml(value));
   }
   return html;
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

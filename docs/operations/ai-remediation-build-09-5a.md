@@ -63,9 +63,10 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
   `openai/gpt-4o-mini`: chat_general, structured_json, nutrition_reasoning
   (torneo 07.5A: llama3.2 6/8 FAIL, gpt-4o-mini 4/8 FAIL). gpt-4o SIN flag
   (sin evidencia nueva). El constructor los aplica por defecto; el operador
-  puede marcarlos/limpiarlos con evidencia vía
-  `POST /deployment/certification/requalify` (admin-only) y registrar
-  certificaciones con evidencia vía `POST /deployment/certification/register`.
+  puede agregar/refrescar bloqueos vía
+  `POST /deployment/certification/requalify` (admin-only) y registrar solo
+  resultados no aprobados con evidencia vía
+  `POST /deployment/certification/register`.
 - Los tests de happy-path de gateway/orquestador usan clear/restore de flags
   sobre el registry global (los defaults siguen bloqueando en producción).
 
@@ -123,11 +124,17 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
 
 - GET `/identity`, `/manifest`, `/predeploy`, `/release-gate`, `/flags`,
   `/readiness`, `/certification`; POST `/certification/requalify` y
-  `/certification/register` (admin-only). Respuestas saneadas, sin secretos.
+  `/certification/register` (admin-only). Las mutaciones requieren escritura de
+  auditoría previa; el registro acepta solo estados no aprobados, el fingerprint
+  GOLDEN vigente, un `reportRef` ligado a SHA-256 y un `certificationId`
+  inmutable. Respuestas saneadas, sin secretos. Los estados `APPROVED_*`
+  requieren un pipeline de aprobación independiente que todavía no está
+  implementado.
 
 ## 10. Runbooks operativos
 
 ### R01 — Rotación de credenciales SQL (pendiente: operador)
+
 1. Crear nuevo login (`CREATE LOGIN` con contraseña fuerte, CHECK_POLICY=ON).
 2. Transferir permisos: `ALTER AUTHORIZATION` por base + `ALTER ROLE`.
 3. Cambiar `.env` del API (DB_USER/DB_PASSWORD) y reiniciar el servicio.
@@ -136,6 +143,7 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
    Hasta entonces: `STILL_REQUIRED`. NUNCA pedir ni registrar la contraseña.
 
 ### R02 — Backup / restore / DR
+
 1. Backup diario full con CHECKSUM + verificación `RESTORE VERIFYONLY`.
 2. Restore de prueba trimestral en base desechable (el runbook
    `verify-deployment-b09-5a.ps1` automatiza BACKUP/RESTORE roundtrip).
@@ -145,15 +153,20 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
    restaurada (verificado por el script).
 
 ### R03 — Onboarding de modelo (certificación)
+
 1. Evaluar contra el dataset GOLDEN (ai:evaluate); umbrales §63 (0 clínicos).
-2. Si el operador certifica: `POST /deployment/certification/register` con
-   evidencia (reportRef) — admin-only, auditable, con fingerprint de
-   despliegue.
-3. Limpiar el flag de requalification SOLO con evidencia nueva:
-   `POST /deployment/certification/requalify`.
-4. Sin evidencia: el modelo sigue REQUALIFICATION_REQUIRED (fail-closed).
+2. Registrar por HTTP únicamente resultados no aprobados con
+   `POST /deployment/certification/register`, evidencia inmutable
+   (`reportRef@sha256:...`) y fingerprint de despliegue. Un pipeline
+   independiente deberá registrar cualquier estado `APPROVED_*`.
+3. `POST /deployment/certification/requalify` solo agrega/refresca el bloqueo;
+   nunca lo limpia ni aprueba un modelo.
+4. El clear de requalification no está expuesto por HTTP. Hasta definir el
+   procedimiento independiente de aprobación, el modelo sigue
+   REQUALIFICATION_REQUIRED (fail-closed).
 
 ### R04 — Release
+
 1. `evaluatePreDeployGate` (Tier A) + `evaluateReleaseGate` en el entorno.
 2. `pnpm migrate` contra staging real (001-039, idempotente).
 3. Smoke real en staging; si falla: revert del release (rollback = revert de
@@ -161,12 +174,14 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
 4. PRODUCTION: solo si release gate READY y rotación VERIFIED_BY_OPERATOR.
 
 ### R05 — Incidente
+
 1. Detener egreso: `AI_EGRESS_ENABLED=false` (503 AI_DISABLED, fail-closed).
 2. Shadow: `AI_SHADOW_STATE=AUTO_DISABLED` (irreversible por el servidor).
 3. Revisar telemetría/alerts (sin PHI) + auditoría; nunca leer prompts crudos
    de paciente en producción.
 
 ### R06 — Fallo de modelo (timeouts/5xx/breaker)
+
 1. El circuit breaker abre automáticamente (threshold/cooldown configurables);
    el fallback operativo re-gatea cada candidato.
 2. Verificar `GET /observability/health`: infraestructura vs disponibilidad de
@@ -174,6 +189,7 @@ Patient AI, SIN reabrir el torneo, SIN tocar producción.
 3. Si el fallo es persistente: marcar requalification y pausar el modelo.
 
 ### R07 — Promoción staging → producción
+
 1. Requisitos innegociables: release gate READY (STAGING PASS, MODEL READY,
    SHADOW READY, validación profesional hecha, certificación otorgada),
    rotación VERIFIED_BY_OPERATOR, backup restaurable verificado.

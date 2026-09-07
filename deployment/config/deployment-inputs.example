@@ -1,0 +1,19 @@
+# Safe placeholders only. Secret values are injected by the approved
+# SecretProvider and are never part of this deployment driver input file.
+DEPLOYMENT_ENVIRONMENT=STAGING
+RELEASE_VERSION=<required-semver>
+RELEASE_COMMIT=<required-40-char-git-sha>
+API_ARTIFACT=<oci-repository>@sha256:<required-64-char-hex-digest>
+API_ARTIFACT_DIGEST=sha256:<required-64-char-hex-digest>
+WEB_ARTIFACT=<oci-repository>@sha256:<required-64-char-hex-digest>
+WEB_ARTIFACT_DIGEST=sha256:<required-64-char-hex-digest>
+API_HOST=https://<api-hostname>
+WEB_HOST=https://<web-hostname>
+OLTP_TARGET=<oltp-database-identity>
+DWH_TARGET=<different-dwh-database-identity>
+SECRET_PROVIDER=<approved-provider-contract-id>
+STORAGE_TARGET=<persistent-storage-identity>
+BACKUP_TARGET=<off-host-backup-identity>
+SECRET_SCAN_STATUS=PASS
+SECRET_SCAN_COMMIT=<same-required-40-char-git-sha>
+SECRET_SCAN_EVIDENCE_ID=<commit-bound-ci-attestation-id>

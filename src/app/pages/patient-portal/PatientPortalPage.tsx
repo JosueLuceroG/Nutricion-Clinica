@@ -1266,13 +1266,16 @@ function MessagingCard({ token }: { token: string }) {
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
-  const getChatWsUrl = React.useCallback(async () => {
+  const getChatWsConnection = React.useCallback(async () => {
     const { ticket } = await getPatientPortalChatWsTicket(token);
-    return `${getApiBaseUrl().replace(/^http/, "ws")}/ws/chat?ticket=${encodeURIComponent(ticket)}`;
+    return {
+      url: `${getApiBaseUrl().replace(/^http/, "ws")}/ws/chat`,
+      ticket,
+    };
   }, [token]);
 
   const { messages, send, loading, isRealtime } = useRealtimeChat({
-    getWsUrl: getChatWsUrl,
+    getWsConnection: getChatWsConnection,
     fetchMessages: React.useCallback(
       (signal) => listPatientPortalMessages(token, signal),
       [token],
