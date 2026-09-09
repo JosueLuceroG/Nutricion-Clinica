@@ -21,7 +21,11 @@ test("all external GitHub Actions use immutable commit SHAs with version comment
       if (!match || match[1].startsWith("./")) continue;
       externalUses.push(`${workflow.name}:${index + 1}`);
       const separator = match[1].lastIndexOf("@");
-      assert.notEqual(separator, -1, `${workflow.name}:${index + 1} has no ref`);
+      assert.notEqual(
+        separator,
+        -1,
+        `${workflow.name}:${index + 1} has no ref`,
+      );
       const ref = match[1].slice(separator + 1);
       assert.match(
         ref,
