@@ -29,6 +29,8 @@ services:
       PORT: "3000"
       TRUST_PROXY: "1"
       BACKGROUND_JOBS_ENABLED: "false"
+      API_REPLICAS: "1"
+      JOBS_REPLICAS: "1"
       SHUTDOWN_TIMEOUT_MS: "15000"
       PUBLIC_API_URL: http://127.0.0.1:${API_PORT:-3000}
       PUBLIC_WEB_URL: http://127.0.0.1:${WEB_PORT:-8080}

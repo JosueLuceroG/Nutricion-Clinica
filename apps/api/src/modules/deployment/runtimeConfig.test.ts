@@ -8,6 +8,8 @@ describe("deployment runtime config", () => {
       port: 3000,
       trustProxy: false,
       backgroundJobsEnabled: true,
+      apiReplicas: 1,
+      jobsReplicas: 1,
       shutdownTimeoutMs: 15_000,
     });
   });
@@ -46,5 +48,26 @@ describe("deployment runtime config", () => {
     expect(() =>
       readServerRuntimeConfig({ SHUTDOWN_TIMEOUT_MS: "50" }),
     ).toThrow(/SHUTDOWN_TIMEOUT_MS/);
+  });
+
+  it("keeps local multi-replica simulation available but blocks sensitive environments", () => {
+    expect(
+      readServerRuntimeConfig({ API_REPLICAS: "2", JOBS_REPLICAS: "3" }),
+    ).toMatchObject({ apiReplicas: 2, jobsReplicas: 3 });
+    expect(() =>
+      readServerRuntimeConfig({
+        ENVIRONMENT_CLASS: "STAGING",
+        API_REPLICAS: "2",
+      }),
+    ).toThrow(/MULTI_REPLICA_NOT_CERTIFIED/);
+    expect(() =>
+      readServerRuntimeConfig({
+        ENVIRONMENT_CLASS: "PRODUCTION",
+        JOBS_REPLICAS: "2",
+      }),
+    ).toThrow(/MULTI_REPLICA_NOT_CERTIFIED/);
+    expect(() => readServerRuntimeConfig({ API_REPLICAS: "1.5" })).toThrow(
+      /INVALID_REPLICA_CONFIGURATION/,
+    );
   });
 });

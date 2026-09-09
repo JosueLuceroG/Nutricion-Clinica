@@ -22,6 +22,7 @@ export interface StartupIssue {
   group: string;
   severity: "error" | "warning";
   message: string;
+  code?: string;
 }
 
 function parseBoolean(
@@ -224,16 +225,19 @@ export function validateStartupConfig(
     });
   }
 
-  if (role === "api") {
-    try {
-      readServerRuntimeConfig(env);
-    } catch (err) {
-      issues.push({
-        group: "runtime",
-        severity: "error",
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
+  try {
+    readServerRuntimeConfig(env);
+  } catch (err) {
+    const code =
+      typeof (err as { code?: unknown })?.code === "string"
+        ? (err as { code: string }).code
+        : undefined;
+    issues.push({
+      group: "runtime",
+      severity: "error",
+      message: err instanceof Error ? err.message : String(err),
+      ...(code ? { code } : {}),
+    });
   }
 
   const externalSideEffects = readExternalSideEffectMode(env);

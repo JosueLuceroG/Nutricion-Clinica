@@ -56,3 +56,14 @@ copyFileSync(
   join(apiRoot, "src", "modules", "dwh", "schema", "dwh-schema.sql"),
   join(outdir, "dwh-schema.sql"),
 );
+copyFileSync(
+  join(
+    apiRoot,
+    "src",
+    "modules",
+    "dwh",
+    "schema",
+    "dwh-upgrade-08-003.sql",
+  ),
+  join(outdir, "dwh-upgrade-08-003.sql"),
+);

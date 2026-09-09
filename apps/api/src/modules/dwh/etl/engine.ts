@@ -16,6 +16,7 @@ import {
   type EtlRunResult,
 } from "./types.js";
 import { emitTelemetry } from "../../observability/telemetryService.js";
+import { decideScd2Transition } from "./scd2.js";
 
 /**
  * Motor ETL idempotente y versionado.
@@ -548,8 +549,9 @@ export const dimSucursalPipeline: PipelineSpec = {
       activa: boolean;
       deleted_at: Date | null;
       updated_at: Date;
+      row_version: Buffer;
     }>(`
-        SELECT id, nombre, activa, deleted_at, updated_at
+        SELECT id, nombre, activa, deleted_at, updated_at, row_version
         FROM sucursales
         WHERE updated_at >= @watermark
       `);
@@ -558,6 +560,7 @@ export const dimSucursalPipeline: PipelineSpec = {
         ...r,
         activa: r.deleted_at === null && Boolean(r.activa),
         updatedAt: r.updated_at,
+        sourceVersion: r.row_version,
       })),
       expected: result.recordset.length,
       rejects: [],
@@ -569,7 +572,13 @@ export const dimSucursalPipeline: PipelineSpec = {
     let updated = 0;
     const map = await buildSucursalMap(ctx);
     for (const raw of rows) {
-      const row = raw as { id: Buffer; nombre: string; activa: boolean };
+      const row = raw as {
+        id: Buffer;
+        nombre: string;
+        activa: boolean;
+        updatedAt: Date;
+        sourceVersion: Buffer;
+      };
       const naturalId = guidHex(row.id);
       const existing = map.get(naturalId);
       if (existing !== undefined) {
@@ -579,26 +588,50 @@ export const dimSucursalPipeline: PipelineSpec = {
           .query<{
             nombre: string;
             activa: boolean;
-          }>("SELECT nombre, activa FROM dim_sucursal WHERE sucursal_key = @key");
-        const cur = current.recordset[0]!;
-        if (
-          cur.nombre !== row.nombre ||
-          Boolean(cur.activa) !== Boolean(row.activa)
-        ) {
+            valid_from: Date;
+            source_updated_at: Date | null;
+            source_version: Buffer | null;
+          }>(
+            "SELECT nombre, activa, valid_from, source_updated_at, source_version FROM dim_sucursal WHERE sucursal_key = @key AND is_current = 1",
+          );
+        const cur = current.recordset[0];
+        if (!cur) throw new Error("SCD2_CURRENT_ROW_MISSING: dim_sucursal");
+        const attributesEqual =
+          cur.nombre === row.nombre &&
+          Boolean(cur.activa) === Boolean(row.activa);
+        const transition = decideScd2Transition({
+          current: {
+            validFrom: cur.valid_from,
+            sourceUpdatedAt: cur.source_updated_at,
+            sourceVersion: cur.source_version,
+          },
+          incoming: {
+            sourceUpdatedAt: row.updatedAt,
+            sourceVersion: row.sourceVersion,
+          },
+          attributesEqual,
+        });
+        if (transition === "APPEND") {
           await ctx.dwh
             .request()
+            .input("currentKey", sql.Int, existing)
             .input("naturalId", sql.UniqueIdentifier, toGuidParam(row.id))
             .input("nombre", sql.NVarChar(120), row.nombre)
-            .input("activa", sql.Bit, row.activa).query(`
+            .input("activa", sql.Bit, row.activa)
+            .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+            .input("sourceVersion", sql.VarBinary(8), row.sourceVersion).query(`
               SET XACT_ABORT ON;
               BEGIN TRANSACTION;
               BEGIN TRY
-                UPDATE dim_sucursal
-                   SET valid_to = CAST(SYSUTCDATETIME() AS DATE), is_current = 0
-                 WHERE sucursal_natural_id = @naturalId AND is_current = 1;
-                INSERT INTO dim_sucursal (sucursal_natural_id, nombre, activa, valid_from, is_current)
-                VALUES (@naturalId, @nombre, @activa, CAST(SYSUTCDATETIME() AS DATE), 1);
-                COMMIT TRANSACTION;
+                 UPDATE dim_sucursal
+                    SET valid_to = @sourceUpdatedAt, is_current = 0, updated_at = SYSUTCDATETIME()
+                  WHERE sucursal_key = @currentKey AND is_current = 1;
+                 IF @@ROWCOUNT <> 1 THROW 51030, 'dim_sucursal current row changed during transition', 1;
+                 INSERT INTO dim_sucursal
+                   (sucursal_natural_id, nombre, activa, valid_from, valid_to, is_current, source_updated_at, source_version)
+                 VALUES
+                   (@naturalId, @nombre, @activa, @sourceUpdatedAt, NULL, 1, @sourceUpdatedAt, @sourceVersion);
+                 COMMIT TRANSACTION;
               END TRY
               BEGIN CATCH
                 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -606,6 +639,18 @@ export const dimSucursalPipeline: PipelineSpec = {
               END CATCH;
             `);
           inserted += 1;
+        } else if (transition === "REFRESH_SOURCE") {
+          await ctx.dwh
+            .request()
+            .input("key", sql.Int, existing)
+            .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+            .input("sourceVersion", sql.VarBinary(8), row.sourceVersion)
+            .query(`UPDATE dim_sucursal
+                       SET source_updated_at = @sourceUpdatedAt,
+                           source_version = @sourceVersion,
+                           updated_at = SYSUTCDATETIME()
+                     WHERE sucursal_key = @key AND is_current = 1`);
+          updated += 1;
         } else {
           updated += 1;
         }
@@ -614,9 +659,13 @@ export const dimSucursalPipeline: PipelineSpec = {
           .request()
           .input("naturalId", sql.UniqueIdentifier, toGuidParam(row.id))
           .input("nombre", sql.NVarChar(120), row.nombre)
-          .input("activa", sql.Bit, row.activa).query(`
-            INSERT INTO dim_sucursal (sucursal_natural_id, nombre, activa, valid_from, is_current)
-            VALUES (@naturalId, @nombre, @activa, CAST(SYSUTCDATETIME() AS DATE), 1)
+          .input("activa", sql.Bit, row.activa)
+          .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+          .input("sourceVersion", sql.VarBinary(8), row.sourceVersion).query(`
+            INSERT INTO dim_sucursal
+              (sucursal_natural_id, nombre, activa, valid_from, valid_to, is_current, source_updated_at, source_version)
+            VALUES
+              (@naturalId, @nombre, @activa, @sourceUpdatedAt, NULL, 1, @sourceUpdatedAt, @sourceVersion)
           `);
         inserted += 1;
       }
@@ -641,8 +690,9 @@ export const dimProfessionalPipeline: PipelineSpec = {
       activo: boolean;
       deleted_at: Date | null;
       updated_at: Date;
+      row_version: Buffer;
     }>(`
-        SELECT id, nombre_completo, cedula_profesional, rol, activo, deleted_at, updated_at
+        SELECT id, nombre_completo, cedula_profesional, rol, activo, deleted_at, updated_at, row_version
         FROM profesionales
         WHERE updated_at >= @watermark
       `);
@@ -651,6 +701,7 @@ export const dimProfessionalPipeline: PipelineSpec = {
         ...r,
         activo: r.deleted_at === null && Boolean(r.activo),
         updatedAt: r.updated_at,
+        sourceVersion: r.row_version,
       })),
       expected: result.recordset.length,
       rejects: [],
@@ -668,6 +719,8 @@ export const dimProfessionalPipeline: PipelineSpec = {
         cedula_profesional: string | null;
         rol: string;
         activo: boolean;
+        updatedAt: Date;
+        sourceVersion: Buffer;
       };
       const naturalId = guidHex(row.id);
       const existing = map.get(naturalId);
@@ -680,30 +733,55 @@ export const dimProfessionalPipeline: PipelineSpec = {
             cedula_profesional: string | null;
             rol: string;
             activo: boolean;
-          }>("SELECT nombre_completo, cedula_profesional, rol, activo FROM dim_professional WHERE professional_key = @key");
-        const cur = current.recordset[0]!;
-        if (
-          cur.nombre_completo !== row.nombre_completo ||
-          cur.cedula_profesional !== row.cedula_profesional ||
-          cur.rol !== row.rol ||
-          Boolean(cur.activo) !== Boolean(row.activo)
-        ) {
+            valid_from: Date;
+            source_updated_at: Date | null;
+            source_version: Buffer | null;
+          }>(
+            "SELECT nombre_completo, cedula_profesional, rol, activo, valid_from, source_updated_at, source_version FROM dim_professional WHERE professional_key = @key AND is_current = 1",
+          );
+        const cur = current.recordset[0];
+        if (!cur)
+          throw new Error("SCD2_CURRENT_ROW_MISSING: dim_professional");
+        const attributesEqual =
+          cur.nombre_completo === row.nombre_completo &&
+          cur.cedula_profesional === row.cedula_profesional &&
+          cur.rol === row.rol &&
+          Boolean(cur.activo) === Boolean(row.activo);
+        const transition = decideScd2Transition({
+          current: {
+            validFrom: cur.valid_from,
+            sourceUpdatedAt: cur.source_updated_at,
+            sourceVersion: cur.source_version,
+          },
+          incoming: {
+            sourceUpdatedAt: row.updatedAt,
+            sourceVersion: row.sourceVersion,
+          },
+          attributesEqual,
+        });
+        if (transition === "APPEND") {
           await ctx.dwh
             .request()
+            .input("currentKey", sql.Int, existing)
             .input("naturalId", sql.UniqueIdentifier, toGuidParam(row.id))
             .input("nombre", sql.NVarChar(160), row.nombre_completo)
             .input("cedula", sql.NVarChar(60), row.cedula_profesional ?? null)
             .input("rol", sql.NVarChar(30), row.rol)
-            .input("activo", sql.Bit, row.activo).query(`
+            .input("activo", sql.Bit, row.activo)
+            .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+            .input("sourceVersion", sql.VarBinary(8), row.sourceVersion).query(`
               SET XACT_ABORT ON;
               BEGIN TRANSACTION;
               BEGIN TRY
-                UPDATE dim_professional
-                   SET valid_to = CAST(SYSUTCDATETIME() AS DATE), is_current = 0
-                 WHERE professional_natural_id = @naturalId AND is_current = 1;
-                INSERT INTO dim_professional (professional_natural_id, nombre_completo, cedula_profesional, rol, activo, valid_from, is_current)
-                VALUES (@naturalId, @nombre, @cedula, @rol, @activo, CAST(SYSUTCDATETIME() AS DATE), 1);
-                COMMIT TRANSACTION;
+                 UPDATE dim_professional
+                    SET valid_to = @sourceUpdatedAt, is_current = 0, updated_at = SYSUTCDATETIME()
+                  WHERE professional_key = @currentKey AND is_current = 1;
+                 IF @@ROWCOUNT <> 1 THROW 51031, 'dim_professional current row changed during transition', 1;
+                 INSERT INTO dim_professional
+                   (professional_natural_id, nombre_completo, cedula_profesional, rol, activo, valid_from, valid_to, is_current, source_updated_at, source_version)
+                 VALUES
+                   (@naturalId, @nombre, @cedula, @rol, @activo, @sourceUpdatedAt, NULL, 1, @sourceUpdatedAt, @sourceVersion);
+                 COMMIT TRANSACTION;
               END TRY
               BEGIN CATCH
                 IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -711,6 +789,18 @@ export const dimProfessionalPipeline: PipelineSpec = {
               END CATCH;
             `);
           inserted += 1;
+        } else if (transition === "REFRESH_SOURCE") {
+          await ctx.dwh
+            .request()
+            .input("key", sql.Int, existing)
+            .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+            .input("sourceVersion", sql.VarBinary(8), row.sourceVersion)
+            .query(`UPDATE dim_professional
+                       SET source_updated_at = @sourceUpdatedAt,
+                           source_version = @sourceVersion,
+                           updated_at = SYSUTCDATETIME()
+                     WHERE professional_key = @key AND is_current = 1`);
+          updated += 1;
         } else {
           updated += 1;
         }
@@ -721,9 +811,13 @@ export const dimProfessionalPipeline: PipelineSpec = {
           .input("nombre", sql.NVarChar(160), row.nombre_completo)
           .input("cedula", sql.NVarChar(60), row.cedula_profesional ?? null)
           .input("rol", sql.NVarChar(30), row.rol)
-          .input("activo", sql.Bit, row.activo).query(`
-            INSERT INTO dim_professional (professional_natural_id, nombre_completo, cedula_profesional, rol, activo, valid_from, is_current)
-            VALUES (@naturalId, @nombre, @cedula, @rol, @activo, CAST(SYSUTCDATETIME() AS DATE), 1)
+          .input("activo", sql.Bit, row.activo)
+          .input("sourceUpdatedAt", sql.DateTime2(3), row.updatedAt)
+          .input("sourceVersion", sql.VarBinary(8), row.sourceVersion).query(`
+            INSERT INTO dim_professional
+              (professional_natural_id, nombre_completo, cedula_profesional, rol, activo, valid_from, valid_to, is_current, source_updated_at, source_version)
+            VALUES
+              (@naturalId, @nombre, @cedula, @rol, @activo, @sourceUpdatedAt, NULL, 1, @sourceUpdatedAt, @sourceVersion)
           `);
         inserted += 1;
       }

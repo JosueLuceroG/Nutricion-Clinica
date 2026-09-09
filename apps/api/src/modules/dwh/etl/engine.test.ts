@@ -218,6 +218,7 @@ describe("DWH ETL invariants", () => {
           activa: true,
           deleted_at: updatedAt,
           updated_at: updatedAt,
+          row_version: Buffer.alloc(8, 1),
         },
       ]),
     );
@@ -231,12 +232,15 @@ describe("DWH ETL invariants", () => {
           activo: true,
           deleted_at: updatedAt,
           updated_at: updatedAt,
+          row_version: Buffer.alloc(8, 2),
         },
       ]),
     );
 
     expect(branch.rows[0]?.activa).toBe(false);
+    expect(branch.rows[0]?.sourceVersion).toEqual(Buffer.alloc(8, 1));
     expect(professional.rows[0]?.activo).toBe(false);
+    expect(professional.rows[0]?.sourceVersion).toEqual(Buffer.alloc(8, 2));
     expect(queries).toHaveLength(2);
     for (const query of queries) {
       expect(query).toContain("updated_at >= @watermark");
@@ -246,16 +250,22 @@ describe("DWH ETL invariants", () => {
 
   it("versions professional license changes atomically", async () => {
     const id = Buffer.alloc(16, 3);
+    const sourceUpdatedAt = new Date("2026-01-02T13:00:00.000Z");
+    const sourceVersion = Buffer.alloc(8, 2);
     const queries: string[] = [];
+    const inputs: Array<Record<string, unknown>> = [];
     const context = {
       dwh: {
         request() {
+          const requestInputs: Record<string, unknown> = {};
           return {
-            input() {
+            input(name: string, _type: unknown, value: unknown) {
+              requestInputs[name] = value;
               return this;
             },
             async query(query: string) {
               queries.push(query);
+              inputs.push(requestInputs);
               if (query.includes("SELECT professional_natural_id")) {
                 return {
                   recordset: [
@@ -271,6 +281,11 @@ describe("DWH ETL invariants", () => {
                       cedula_profesional: "OLD",
                       rol: "nutriologa",
                       activo: true,
+                      valid_from: new Date("2026-01-02T09:00:00.000Z"),
+                      source_updated_at: new Date(
+                        "2026-01-02T09:00:00.000Z",
+                      ),
+                      source_version: Buffer.alloc(8, 1),
                     },
                   ],
                 };
@@ -289,6 +304,8 @@ describe("DWH ETL invariants", () => {
         cedula_profesional: "NEW",
         rol: "nutriologa",
         activo: true,
+        updatedAt: sourceUpdatedAt,
+        sourceVersion,
       },
     ]);
 
@@ -298,7 +315,14 @@ describe("DWH ETL invariants", () => {
     );
     expect(transition).toContain("UPDATE dim_professional");
     expect(transition).toContain("INSERT INTO dim_professional");
-    expect(transition).toContain("SYSUTCDATETIME()");
+    expect(transition).toContain("valid_to = @sourceUpdatedAt");
+    expect(transition).toContain("@sourceUpdatedAt, NULL, 1");
+    expect(inputs.some((input) => input.sourceUpdatedAt === sourceUpdatedAt)).toBe(
+      true,
+    );
+    expect(inputs.some((input) => input.sourceVersion === sourceVersion)).toBe(
+      true,
+    );
   });
 
   it("merges lab observations by panel and per-panel index", async () => {

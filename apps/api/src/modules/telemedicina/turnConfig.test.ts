@@ -4,8 +4,11 @@ import { buildTurnConfig, validIceUrls } from "./turnConfig.js";
 describe("buildTurnConfig", () => {
   it("returns no external ICE servers when side effects are disabled", () => {
     const config = buildTurnConfig({});
-    expect(config.configured).toBe(false);
-    expect(config.iceServers).toEqual([]);
+    expect(config).toEqual({
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: false,
+      iceServers: [],
+    });
   });
 
   it("uses custom STUN URLs when provided", () => {
@@ -14,6 +17,8 @@ describe("buildTurnConfig", () => {
       STUN_URLS: "stun:custom1.example.com,stun:custom2.example.com",
     });
     expect(config.iceServers).toHaveLength(1);
+    expect(config.policy).toBe("OPTIONAL_DIRECT_ALLOWED");
+    expect(config.configured).toBe(false);
     expect(config.iceServers[0]!.urls).toEqual([
       "stun:custom1.example.com",
       "stun:custom2.example.com",
@@ -29,6 +34,7 @@ describe("buildTurnConfig", () => {
       TURN_CREDENTIAL: "test-pass",
     });
     expect(config.configured).toBe(true);
+    expect(config.policy).toBe("OPTIONAL_DIRECT_ALLOWED");
     expect(config.iceServers).toHaveLength(2);
     expect(config.iceServers[1]!.urls).toEqual(["turn:turn.example.com:3478"]);
     expect(config.iceServers[1]!.username).toBe("test-user");
@@ -93,7 +99,11 @@ describe("buildTurnConfig", () => {
       TURN_USERNAME: "test-user",
       TURN_CREDENTIAL: "test-pass",
     });
-    expect(config).toEqual({ configured: false, iceServers: [] });
+    expect(config).toEqual({
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: false,
+      iceServers: [],
+    });
   });
 
   it("rejects configured ICE lists without any URL", () => {

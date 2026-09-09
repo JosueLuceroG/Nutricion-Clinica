@@ -1,13 +1,13 @@
 # NutriClinica Deployment Architecture
 
-Fecha: 2026-08-29. Estado: arquitectura objetivo aprobada para construir y
+Fecha: 2026-09-08. Estado: arquitectura objetivo aprobada para construir y
 verificar; ningun target real ha sido provisionado. Provider-agnostic.
 
 ## 1. Decision summary
 
 - Canal primario: `DESKTOP_TAURI`; canal secundario: Web.
 - Desktop y Web consumen un unico API Express y los contratos API `v1`, sync
-  `2`, Dexie `33`, OLTP `039` y DWH `dwh-08-002`.
+  `2`, Dexie `33`, OLTP `039` y DWH head `dwh-08-003`.
 - Ruta canonica del servidor: imagen API + imagen Web en un runtime OCI, con
   edge TLS externo y SQL Server privado. Desktop nunca se containeriza.
 - API, jobs y migraciones usan la misma imagen API, pero son procesos y ciclos
@@ -38,7 +38,7 @@ Browser Web ---------------- HTTPS/WSS ----------------+--> DNS/TLS edge
                                           +----------------+------------------+-------------+
                                           |                |                                |
                                      OLTP SQL          DWH SQL                     controlled egress
-                                     schema 039        dwh-08-002                  SMTP/TURN/AI
+                                     schema 039        dwh-08-003                  SMTP/TURN/AI
                                           ^                ^
                                           |                |
                                     migration job      DWH schema job
@@ -102,7 +102,7 @@ the replica matrix.
 | Meal photos/recording blobs    | OLTP `VARBINARY` columns where implemented    | part of OLTP backup capacity                                    | include in capacity/RPO sizing; no ephemeral filesystem assumption |
 | Document content               | external URL referenced by OLTP `url_storage` | storage target must define durability, encryption and deletion  | current repo stores metadata/reference, not an upload backend      |
 | Patient photo                  | OLTP value/URL according to current module    | part of OLTP or referenced storage policy                       | validate target size and retention before staging                  |
-| DWH facts/dimensions/lineage   | distinct SQL Server DWH `dwh-08-002`          | backup if RTO requires; otherwise tested rebuild from OLTP      | never same logical DB as OLTP                                      |
+| DWH facts/dimensions/lineage   | distinct SQL Server DWH head `dwh-08-003`     | backup if RTO requires; otherwise tested rebuild from OLTP      | never same logical DB as OLTP                                      |
 | RAG knowledge metadata/content | configured application store/source           | production target must document persistence and source recovery | no provider implied; memory mode is non-durable                    |
 | AI memory                      | `memory` or SQL store by configuration        | use SQL for durable staging/production requirements             | tenant/patient isolation remains mandatory                         |
 | AI telemetry/certification     | `memory` or SQL store                         | use SQL where restart persistence is required                   | certification failure remains fail-closed                          |
@@ -155,17 +155,20 @@ The API deployment build generates:
 | `dist-deploy/server.js`             | API HTTP/WebSocket process                      |
 | `dist-deploy/jobs.js`               | dedicated retention/ETL scheduler               |
 | `dist-deploy/migrate.js`            | OLTP migrations `001`-`039`                     |
-| `dist-deploy/dwh-schema.js`         | DWH schema `dwh-08-002`                         |
+| `dist-deploy/dwh-schema.js`         | applies DWH chain through `dwh-08-003`           |
 | `dist-deploy/retention-backfill.js` | bounded legacy retention dry-run/apply one-shot |
 | `dist-deploy/healthcheck.js`        | role-aware API/jobs container probe             |
 | `dist-deploy/dwh-schema.sql`        | immutable DWH DDL input                         |
+| `dist-deploy/dwh-upgrade-08-003.sql` | additive intraday SCD2 upgrade                 |
 | `migrations/*.sql`                  | immutable OLTP migration inputs                 |
 
 The existing `release-manifest.json` builder captures release/commit,
 environment and instance identity, an ISO generation timestamp in the legacy
 `deployedAt` field, Desktop/Web/API versions, API/sync/Dexie/OLTP/DWH contracts,
 endpoints, commit-bound scan evidence and artifact references bound to OCI
-digests. Foundation verification may retain explicit Desktop/endpoint blockers;
+digests. It records requested API/jobs replicas, certified maximum `1/1`, ETL
+`BLOCKED_NO_LEASE_RENEWAL` and retention
+`BLOCKED_NO_DISTRIBUTED_LOCK`. Foundation verification may retain explicit Desktop/endpoint blockers;
 deployment verification does not. It never contains credentials or PHI.
 
 ## 8. Network contract
@@ -205,8 +208,8 @@ release metadata, never SQL error details, host credentials or request data.
 
 | Job                 | Code                       | Data/effect                                                                                     | Default deployed process                                | Multi-replica safe                                                                          |
 | ------------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Recording retention | `services/retention`       | dry-run by default; bounded deletion only after legal-hold review attestation; aggregate counts | exactly one `jobs.js`; explicit cron/timezone/retention | NO: no cross-instance lock                                                                  |
-| DWH ETL             | `modules/dwh/scheduler.ts` | validates the one-shot DWH schema, then reads OLTP and loads/reconciles DWH                     | exactly one `jobs.js`; explicit cron/timezone           | PARTIAL: `noOverlap` + atomic SQL lease per pipeline; fixed 60-minute expiry has no renewal |
+| Recording retention | `services/retention`       | dry-run by default; bounded deletion only after legal-hold review attestation; aggregate counts | exactly one `jobs.js`; explicit cron/timezone/retention | `BLOCKED_NO_DISTRIBUTED_LOCK`                                                               |
+| DWH ETL             | `modules/dwh/scheduler.ts` | validates the one-shot DWH schema, then reads OLTP and loads/reconciles DWH                     | exactly one `jobs.js`; explicit cron/timezone           | `BLOCKED_NO_LEASE_RENEWAL`; atomic lease expires after 60 minutes                           |
 
 Canonical deployed API sets `BACKGROUND_JOBS_ENABLED=false`. The jobs
 workload sets it to `true` and must explicitly enable at least one job. API
@@ -226,6 +229,9 @@ startup does not run migrations, backup, restore, seed or DWH schema changes.
 
 API replicas = `1`; jobs replicas = `1`. Sticky sessions alone are
 insufficient because cross-process broadcasts and state still diverge.
+`API_REPLICAS` and `JOBS_REPLICAS` default to `1`; malformed values fail in
+every environment and values above `1` fail STAGING/PRODUCTION validation with
+`MULTI_REPLICA_NOT_CERTIFIED`.
 
 ## 12. WebSocket and long-lived connection requirements
 
@@ -246,9 +252,12 @@ insufficient because cross-process broadcasts and state still diverge.
 
 ## 13. Migration and data lifecycle
 
-The immutable DWH file has a historical header mismatch documented in
-`dwh-schema-version-erratum.md`; runtime version `dwh-08-002` and its canonical
-checksum are authoritative.
+The immutable base DWH file has a historical header mismatch documented in
+`dwh-schema-version-erratum.md`; that exact artifact remains registered as
+`dwh-08-002`. The current chain head is `dwh-08-003`, applied additively by
+`dwh-upgrade-08-003.sql`. The upgrade converts SCD2 validity to `DATETIME2(3)`,
+orders source states by `updated_at` plus OLTP `ROWVERSION`, and preserves
+existing rows.
 
 Canonical rollout order:
 
@@ -265,7 +274,7 @@ Canonical rollout order:
 5. Run it again in rehearsal/verification to prove all files skip with matching
    checksums. The CLI rejects `--force` in STAGING/PRODUCTION.
 6. If DWH is enabled, run exactly one `node dist-deploy/dwh-schema.js` and
-   verify schema version/checksum.
+   verify both immutable records plus the `dwh-08-003` head checksum.
 7. Replace API/Web; check liveness, readiness, auth/sync/WebSocket smokes.
 8. Start exactly one jobs runner only after API and SQL checks pass.
 9. Rollback application artifacts if needed. Do not downgrade OLTP/DWH
@@ -314,9 +323,13 @@ vault integration.
 `EXTERNAL_SIDE_EFFECTS_MODE` is `DISABLED`, `SANDBOX` or `PRODUCTION`.
 STAGING may use only `DISABLED`/`SANDBOX`; the current SMTP adapter sends only
 when both environment class and side-effect mode are `PRODUCTION`. Logs omit
-recipient and subject. AI egress, TURN and any future notification/payment
-adapters require separate allowlists/credentials and synthetic recipients in
-staging. Patient AI remains disabled and no clinical model is eligible.
+recipient and subject. The authenticated ICE endpoint is authoritative and
+declares `OPTIONAL_DIRECT_ALLOWED`: endpoint failure blocks signaling,
+`configured=false` permits direct ICE, and `configured=true` provides validated
+credentialed TURN entries. AI egress, TURN and any future
+notification/payment adapters require separate allowlists/credentials and
+synthetic recipients in staging. Patient AI remains disabled and no clinical
+model is eligible.
 
 ## 17. Observability and audit
 
@@ -342,6 +355,12 @@ startup/jobs/one-shot guard checks, release-manifest validation, Docker image
 builds, Compose syntax, a no-SQL local simulation and a portable UI E2E subset
 with offline fixtures. The SQL-backed full E2E remains a real-target gate. CI
 never deploys to a real host and has no provider credential.
+
+Every external GitHub Action is pinned to an immutable 40-character commit SHA
+with an adjacent version comment. Workflow permissions default to read-only;
+only release publication receives `contents: write`. Dependabot opens reviewed
+weekly GitHub Actions update PRs. Mutable refs and automatic dependency merges
+are not permitted.
 
 The tag workflow invokes that same CI foundation for the tagged SHA, validates
 release identity and public endpoints, then fails closed while Desktop target,

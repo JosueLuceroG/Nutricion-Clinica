@@ -101,7 +101,7 @@ describe("AIOrchestrator runtime", () => {
           executionId: string;
           patientRef: string | null;
         }) => {
-          events.push("audit-manifest");
+          events.push("egress-manifest-attempt");
           savedManifests.push({
             executionId: manifest.executionId,
             patientRef: manifest.patientRef,
@@ -141,7 +141,11 @@ describe("AIOrchestrator runtime", () => {
         ),
       ).toBe(false);
     }
-    expect(events).toEqual(["consent", "audit-manifest", "adapter"]);
+    expect(events).toEqual([
+      "consent",
+      "egress-manifest-attempt",
+      "adapter",
+    ]);
   });
 
   it("missing consent: 0 adapter calls and no fallback (terminal)", async () => {

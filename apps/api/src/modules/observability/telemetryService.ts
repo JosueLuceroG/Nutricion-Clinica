@@ -6,7 +6,9 @@ import type { TelemetryEvent } from './telemetryTypes.js';
  * Servicio de telemetria (facade). Fail-soft por diseno:
  * - un fallo de telemetria nunca rompe el flujo de negocio;
  * - la llamada al provider NUNCA depende de un exporter opcional;
- * - auditoria obligatoria (audit_log) sigue su propia politica fail-closed.
+ * - cada persistencia de telemetria es un intento fail-soft, no evidencia de
+ *   escritura exitosa;
+ * - requiredAuditLog(...) es un control separado y permanece fail-closed.
  *
  * Overhead: emit() es sincrono y ligero (validacion PHI + agregacion en memoria);
  * la persistencia SQL es fire-and-forget.

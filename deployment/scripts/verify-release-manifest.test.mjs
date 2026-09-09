@@ -21,7 +21,7 @@ function manifest(overrides = {}) {
     syncProtocolVersion: 2,
     dexieSchemaVersion: 33,
     oltpSchemaVersion: "039",
-    dwhSchemaVersion: "dwh-08-002",
+    dwhSchemaVersion: "dwh-08-003",
     desktopChannel: "primary",
     webChannel: "secondary",
     publicEndpoints: { api: "UNCONFIGURED", web: "UNCONFIGURED" },
@@ -34,6 +34,20 @@ function manifest(overrides = {}) {
       secretScanStatus: "PASS",
       commit: "c".repeat(40),
       evidenceId: "github-run-123-1",
+    },
+    replicaSafety: {
+      api: {
+        requested: 1,
+        certifiedMaximum: 1,
+        status: "CERTIFIED_SINGLE_REPLICA",
+      },
+      jobs: {
+        requested: 1,
+        certifiedMaximum: 1,
+        status: "CERTIFIED_SINGLE_REPLICA",
+      },
+      etlConcurrency: "BLOCKED_NO_LEASE_RENEWAL",
+      retentionConcurrency: "BLOCKED_NO_DISTRIBUTED_LOCK",
     },
     deployedAt: "2026-08-28T12:00:00.000Z",
     ...overrides,
@@ -145,4 +159,29 @@ test("rejects malformed release SemVer", () => {
     verifyReleaseManifest(value, "foundation").failures.join("\n"),
     /semantic version/,
   );
+});
+
+test("rejects uncertified replicas and dishonest coordination status", () => {
+  const value = manifest({
+    replicaSafety: {
+      api: {
+        requested: 2,
+        certifiedMaximum: 1,
+        status: "MULTI_REPLICA_NOT_CERTIFIED",
+      },
+      jobs: {
+        requested: 1,
+        certifiedMaximum: 1,
+        status: "CERTIFIED_SINGLE_REPLICA",
+      },
+      etlConcurrency: "CERTIFIED",
+      retentionConcurrency: "CERTIFIED",
+    },
+  });
+  const failures = verifyReleaseManifest(value, "foundation").failures.join(
+    "\n",
+  );
+  assert.match(failures, /MULTI_REPLICA_NOT_CERTIFIED/);
+  assert.match(failures, /BLOCKED_NO_LEASE_RENEWAL/);
+  assert.match(failures, /BLOCKED_NO_DISTRIBUTED_LOCK/);
 });

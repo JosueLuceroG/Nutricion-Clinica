@@ -22,7 +22,21 @@ const REQUIRED = [
   "SECRET_SCAN_COMMIT",
   "SECRET_SCAN_EVIDENCE_ID",
 ];
-const ALLOWED_INPUTS = new Set(REQUIRED);
+const OPTIONAL = ["API_REPLICAS", "JOBS_REPLICAS"];
+const ALLOWED_INPUTS = new Set([...REQUIRED, ...OPTIONAL]);
+
+function replicaCount(input, name, errors) {
+  const raw = String(input[name] ?? "").trim();
+  if (!raw) return 1;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 1) {
+    errors.push(
+      `INVALID_REPLICA_CONFIGURATION: ${name} must be a positive integer`,
+    );
+    return null;
+  }
+  return parsed;
+}
 
 function unsafeRemoteHostname(hostname) {
   const host = hostname.toLowerCase();
@@ -66,6 +80,16 @@ export function validateDeploymentInputs(input) {
   const environment = String(input.DEPLOYMENT_ENVIRONMENT ?? "").trim();
   if (!ENVIRONMENTS.has(environment)) {
     errors.push("DEPLOYMENT_ENVIRONMENT must be TEST, STAGING, or PRODUCTION");
+  }
+  const apiReplicas = replicaCount(input, "API_REPLICAS", errors);
+  const jobsReplicas = replicaCount(input, "JOBS_REPLICAS", errors);
+  if (
+    (environment === "STAGING" || environment === "PRODUCTION") &&
+    ((apiReplicas ?? 1) > 1 || (jobsReplicas ?? 1) > 1)
+  ) {
+    errors.push(
+      `MULTI_REPLICA_NOT_CERTIFIED: API_REPLICAS=${apiReplicas}; JOBS_REPLICAS=${jobsReplicas}; certified maximum=1/1`,
+    );
   }
 
   if (!/^[0-9a-f]{40}$/i.test(String(input.RELEASE_COMMIT ?? ""))) {
@@ -200,6 +224,8 @@ export function buildRuntimeMapping(input) {
     SECRET_SCAN_EVIDENCE_ID: input.SECRET_SCAN_EVIDENCE_ID,
     SECRET_SCAN_STATUS: input.SECRET_SCAN_STATUS,
     SECRET_SCAN_COMMIT: input.SECRET_SCAN_COMMIT,
+    API_REPLICAS: String(input.API_REPLICAS ?? "").trim() || "1",
+    JOBS_REPLICAS: String(input.JOBS_REPLICAS ?? "").trim() || "1",
   };
 }
 

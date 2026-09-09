@@ -46,6 +46,20 @@ describe("deploymentManifest (Build 09.5A §22)", () => {
       web: "UNCONFIGURED",
     });
     expect(manifest.artifacts.api).toEqual({ id: "UNSET", digest: "UNSET" });
+    expect(manifest.replicaSafety).toEqual({
+      api: {
+        requested: 1,
+        certifiedMaximum: 1,
+        status: "CERTIFIED_SINGLE_REPLICA",
+      },
+      jobs: {
+        requested: 1,
+        certifiedMaximum: 1,
+        status: "CERTIFIED_SINGLE_REPLICA",
+      },
+      etlConcurrency: "BLOCKED_NO_LEASE_RENEWAL",
+      retentionConcurrency: "BLOCKED_NO_DISTRIBUTED_LOCK",
+    });
   });
 
   it("manifiesto nunca contiene secretos", () => {
@@ -79,6 +93,25 @@ describe("deploymentManifest (Build 09.5A §22)", () => {
       DESKTOP_RELEASE_VERSION: "0.1.0-rc.2",
     });
     expect(manifest.desktopVersion).toBe("0.1.0-rc.2");
+  });
+
+  it("expone replicas no certificadas sin ocultar los bloqueos de concurrencia", () => {
+    const manifest = buildDeploymentManifest({
+      API_REPLICAS: "2",
+      JOBS_REPLICAS: "invalid",
+    });
+    expect(manifest.replicaSafety.api.status).toBe(
+      "MULTI_REPLICA_NOT_CERTIFIED",
+    );
+    expect(manifest.replicaSafety.jobs.status).toBe(
+      "INVALID_REPLICA_CONFIGURATION",
+    );
+    expect(manifest.replicaSafety.etlConcurrency).toBe(
+      "BLOCKED_NO_LEASE_RENEWAL",
+    );
+    expect(manifest.replicaSafety.retentionConcurrency).toBe(
+      "BLOCKED_NO_DISTRIBUTED_LOCK",
+    );
   });
 
   it("no normaliza credenciales o loopback como endpoints publicos", () => {

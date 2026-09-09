@@ -14,6 +14,8 @@ import {
 } from "@services/api/patientPortalApi";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
 import { getApiBaseUrl } from "@services/api/apiBaseUrl";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 
 function getChatWsUrl(): string {
   const base = getApiBaseUrl().replace(/^http/, "ws");
@@ -22,6 +24,8 @@ function getChatWsUrl(): string {
 
 export function PatientMessagingCard({ patientId }: { patientId: string }) {
   const { t, i18n } = useTranslation();
+  const authToken = useAuthStore((state) => state.token);
+  const sucursalId = useSyncStore((state) => state.sucursalId);
   const [input, setInput] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
@@ -32,6 +36,7 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
   }, [patientId]);
 
   const { messages, send, markAsRead, loading, isRealtime } = useRealtimeChat({
+    identityKey: `professional:${authToken ?? "anonymous"}:${sucursalId ?? "none"}:${patientId}`,
     getWsConnection: buildWsConnection,
     fetchMessages: React.useCallback(
       (signal) => listProfessionalMessages(patientId, signal),

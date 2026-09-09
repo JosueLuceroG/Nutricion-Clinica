@@ -110,6 +110,21 @@ export interface WsTicketResponse {
 
 export const WS_TICKET_PROTOCOL = "nutriclinica-ticket";
 
+export const TURN_CONNECTIVITY_POLICY = "OPTIONAL_DIRECT_ALLOWED" as const;
+
+export interface TurnIceServerDTO {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+
+export interface TurnConfigDTO {
+  policy: typeof TURN_CONNECTIVITY_POLICY;
+  iceServers: TurnIceServerDTO[];
+  /** True only when a credentialed TURN relay is present. */
+  configured: boolean;
+}
+
 export type JwtTokenType = "access" | "pending_2fa";
 
 interface JwtStandardClaims {

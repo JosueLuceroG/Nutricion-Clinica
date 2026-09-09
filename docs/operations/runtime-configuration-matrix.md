@@ -1,6 +1,6 @@
 # Runtime Configuration Matrix
 
-Fecha: 2026-08-29. Alcance: variables leidas por Web, API, jobs, migraciones,
+Fecha: 2026-09-08. Alcance: variables leidas por Web, API, jobs, migraciones,
 DWH, release tooling y deployment package. Fuente de verdad final: codigo y
 tests referenciados; los `.env.example` son plantillas locales sin secretos.
 
@@ -54,6 +54,8 @@ Leyenda scopes: `WEB` build/browser, `API` servidor, `JOBS` runner,
 | `TRUST_PROXY`                                                                                             | `false`; 1-16 hops o IP/CIDR exacto; no universal                                                     | NO     | API                  |
 | `SHUTDOWN_TIMEOUT_MS`                                                                                     | `15000`, rango 1000-120000                                                                            | NO     | API/JOBS validation  |
 | `BACKGROUND_JOBS_ENABLED`                                                                                 | local opcional; STAGING/PRODUCTION exige API `false`, JOBS `true`                                     | NO     | API/JOBS             |
+| `API_REPLICAS`                                                                                            | `1`; entero positivo; STAGING/PRODUCTION rechaza `>1` con `MULTI_REPLICA_NOT_CERTIFIED`                | NO     | API/JOBS/REL/DRV     |
+| `JOBS_REPLICAS`                                                                                           | `1`; entero positivo; STAGING/PRODUCTION rechaza `>1` con `MULTI_REPLICA_NOT_CERTIFIED`                | NO     | API/JOBS/REL/DRV     |
 | `PUBLIC_API_URL`                                                                                          | local opcional; HTTPS remoto exacto requerido para API STAGING/PRODUCTION                             | NO     | API/REL              |
 | `PUBLIC_WEB_URL`                                                                                          | local opcional; HTTPS remoto exacto requerido para API STAGING/PRODUCTION                             | NO     | API/REL              |
 | `CORS_ORIGIN`                                                                                             | HTTPS origins exactos y `tauri://localhost`; sin wildcard, HTTP remoto, paths ni credenciales         | NO     | API                  |
@@ -98,6 +100,12 @@ Leyenda scopes: `WEB` build/browser, `API` servidor, `JOBS` runner,
 | `DWH_CRON_TIMEZONE`          | `UTC`; zona IANA valida                                 | NO           | JOBS             |
 | `DWH_FAIL_INJECTION`         | vacio; test controlado solamente                        | NO           | DWH TEST ONLY    |
 
+El head actual es `dwh-08-003`. El artefacto congelado registrado como
+`dwh-08-002` se aplica primero en instalaciones nuevas y nunca se reescribe;
+`dwh-upgrade-08-003.sql` convierte vigencia SCD2 a `DATETIME2(3)` y usa
+`updated_at` + `ROWVERSION` como orden de captura. ETL sigue limitado a un
+runner con estado `BLOCKED_NO_LEASE_RENEWAL`.
+
 ## 6. Retention jobs
 
 | Variable                               | Default/requirement                                               | Secret            | Scope                 |
@@ -112,6 +120,8 @@ Leyenda scopes: `WEB` build/browser, `API` servidor, `JOBS` runner,
 | `RETENTION_BACKFILL_APPLY`             | `false`; default reporta candidatos con `retention_until IS NULL` | HIGH-RISK CONTROL | MIG                   |
 
 JOBS falla al arrancar si retencion y DWH schedule estan ambos apagados.
+Retencion permanece `BLOCKED_NO_DISTRIBUTED_LOCK`; `noOverlap` solo protege una
+instancia y no certifica multiples runners.
 
 ## 7. Authentication and encryption
 
@@ -148,6 +158,10 @@ JOBS falla al arrancar si retencion y DWH schedule estan ambos apagados.
 Email `SANDBOX` es simulacion sin entrega; envio real exige modo y entorno
 `PRODUCTION`, STARTTLS/TLS y configuracion SMTP completa. ICE `SANDBOX` permite
 solo endpoints explicitamente configurados; `DISABLED` devuelve lista vacia.
+La respuesta autenticada siempre declara la politica server-controlled
+`OPTIONAL_DIRECT_ALLOWED`. Un fallo o respuesta invalida bloquea signaling;
+`configured=false` permite ICE directo y `configured=true` exige un TURN con
+credenciales y scheme `turn:`/`turns:` valido.
 
 ## 9. Release manifest and artifact paths
 
@@ -161,6 +175,7 @@ solo endpoints explicitamente configurados; `DISABLED` devuelve lista vacia.
 | `NUTRICLINICA_REPO_ROOT`                                                                                                             | derivado en source; imagen lo fija en `/app`                                        | NO                | REL/API              |
 | `NUTRICLINICA_MIGRATIONS_DIR`                                                                                                        | derivado; imagen `/app/apps/api/migrations`                                         | NO                | MIG                  |
 | `NUTRICLINICA_DWH_SCHEMA_FILE`                                                                                                       | colocated; imagen `dist-deploy/dwh-schema.sql`                                      | NO                | DWH                  |
+| `NUTRICLINICA_DWH_UPGRADE_FILE`                                                                                                      | colocated; imagen `dist-deploy/dwh-upgrade-08-003.sql`                              | NO                | DWH                  |
 
 ## 10. Destructive-action guards and seed
 
@@ -264,6 +279,11 @@ solo endpoints explicitamente configurados; `DISABLED` devuelve lista vacia.
 Retention telemetry tiene generadores SQL pero no un job programado de purge
 hallado. El target no debe asumir que se ejecuta automaticamente.
 
+Telemetria y persistencia del egress manifest son `FAIL_SOFT`: se intenta
+persistir antes del adapter, pero un intento no afirma escritura exitosa. La
+autorizacion de egreso permanece `FAIL_CLOSED`, y `requiredAuditLog(...)` es un
+control separado `FAIL_CLOSED` para mutaciones que lo declaran.
+
 El startup gate valida los valores `memory / sql`, pero no fuerza todos los
 stores AI a SQL. La topologia permanece en una replica; cualquier requisito de
 durabilidad tras restart exige seleccionar/probar el store SQL correspondiente.
@@ -324,6 +344,7 @@ de evaluacion habilita o certifica un modelo por si sola.
 | `RELEASE_VERSION`, `RELEASE_COMMIT`                                          | semver + SHA completo                                | NO     | DRV/build; se mapean a app release/Git identity |
 | `API_ARTIFACT`, `WEB_ARTIFACT`, `API_ARTIFACT_DIGEST`, `WEB_ARTIFACT_DIGEST` | IDs y digests `sha256:` inmutables, no `latest`      | NO     | DRV                                             |
 | `API_HOST`, `WEB_HOST`                                                       | HTTPS remoto para STAGING/PRODUCTION                 | NO     | DRV                                             |
+| `API_REPLICAS`, `JOBS_REPLICAS`                                             | default `1`; enteros positivos; `>1` bloqueado fuera de TEST | NO | DRV/runtime                                     |
 | `OLTP_TARGET`, `DWH_TARGET`                                                  | identidades distintas                                | NO     | DRV                                             |
 | `SECRET_PROVIDER`                                                            | ID de contrato aprobado, nunca secret value          | NO     | DRV                                             |
 | `STORAGE_TARGET`, `BACKUP_TARGET`                                            | identidades aprobadas                                | NO     | DRV                                             |

@@ -1,5 +1,10 @@
 import * as React from "react";
-import { WS_TICKET_PROTOCOL } from "@nutriclinica/shared";
+import {
+  TURN_CONNECTIVITY_POLICY,
+  WS_TICKET_PROTOCOL,
+  type TurnConfigDTO,
+  type TurnIceServerDTO,
+} from "@nutriclinica/shared";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import { telemedicinaApi } from "@services/api/telemedicinaApi";
@@ -8,17 +13,6 @@ import { getApiBaseUrl } from "@services/api/apiBaseUrl";
 // Stay below the server-enforced 60-second minimum credential lifetime.
 const TURN_CONFIG_CACHE_TTL = 30_000;
 const MAX_PENDING_ICE_CANDIDATES = 256;
-
-interface TurnIceServer {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
-
-interface TurnConfigDTO {
-  iceServers: TurnIceServer[];
-  configured: boolean;
-}
 
 let turnConfigCache: {
   data: TurnConfigDTO;
@@ -41,7 +35,7 @@ interface UseWebRtcReturn {
   remoteStream: MediaStream | null;
   peers: PeerInfo[];
   connected: boolean;
-  startCall: (stream?: MediaStream) => Promise<void>;
+  startCall: (stream?: MediaStream) => Promise<boolean>;
   endCall: () => void;
   error: string | null;
 }
@@ -89,28 +83,58 @@ async function fetchTurnConfig(): Promise<TurnConfigDTO> {
 
 export async function buildRtcConfig(): Promise<RTCConfiguration> {
   const serverConfig = await fetchTurnConfig();
-  return { iceServers: serverConfig.iceServers };
+  return {
+    iceServers: serverConfig.iceServers,
+    iceTransportPolicy: "all",
+  };
 }
 
 function isTurnConfig(value: unknown): value is TurnConfigDTO {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<TurnConfigDTO>;
-  return (
-    typeof candidate.configured === "boolean" &&
-    Array.isArray(candidate.iceServers) &&
-    candidate.iceServers.every(
-      (server) =>
-        server !== null &&
-        typeof server === "object" &&
-        (typeof server.urls === "string" ||
-          (Array.isArray(server.urls) &&
-            server.urls.every((url) => typeof url === "string"))) &&
-        (server.username === undefined ||
-          typeof server.username === "string") &&
-        (server.credential === undefined ||
-          typeof server.credential === "string"),
-    )
-  );
+  if (
+    candidate.policy !== TURN_CONNECTIVITY_POLICY ||
+    typeof candidate.configured !== "boolean" ||
+    !Array.isArray(candidate.iceServers)
+  ) {
+    return false;
+  }
+
+  let credentialedTurnPresent = false;
+  let turnPresent = false;
+  for (const server of candidate.iceServers as TurnIceServerDTO[]) {
+    if (!server || typeof server !== "object") return false;
+    const urls = typeof server.urls === "string" ? [server.urls] : server.urls;
+    if (
+      !Array.isArray(urls) ||
+      urls.length === 0 ||
+      !urls.every(
+        (url) =>
+          typeof url === "string" &&
+          /^(?:stun|stuns|turn|turns):[^/\s,][^\s,]*$/i.test(url),
+      ) ||
+      (server.username !== undefined && typeof server.username !== "string") ||
+      (server.credential !== undefined &&
+        typeof server.credential !== "string")
+    ) {
+      return false;
+    }
+    const serverHasTurn = urls.some((url) => /^turns?:/i.test(url));
+    if (
+      serverHasTurn &&
+      (!server.username?.trim() || !server.credential?.trim())
+    ) {
+      return false;
+    }
+    turnPresent ||= serverHasTurn;
+    credentialedTurnPresent ||=
+      serverHasTurn &&
+      Boolean(server.username?.trim()) &&
+      Boolean(server.credential?.trim());
+  }
+  return candidate.configured
+    ? credentialedTurnPresent
+    : !turnPresent;
 }
 
 export function useWebRTC({
@@ -343,12 +367,12 @@ export function useWebRTC({
     async (stream?: MediaStream) => {
       if (!token) {
         setError("No autenticado");
-        return;
+        return false;
       }
       const currentLocalStream = stream ?? localStreamRef.current;
       if (!currentLocalStream) {
         setError("C\u00e1mara no disponible");
-        return;
+        return false;
       }
 
       localStreamRef.current = currentLocalStream;
@@ -357,7 +381,7 @@ export function useWebRTC({
         rtcConfigRef.current = await buildRtcConfig();
       } catch {
         setError("No se pudo obtener la configuracion de red para la llamada");
-        return;
+        return false;
       }
       let wsTicket: string;
       try {
@@ -365,9 +389,15 @@ export function useWebRTC({
         wsTicket = ticket;
       } catch {
         setError("No se pudo obtener el ticket de conexi\u00f3n");
-        return;
+        return false;
       }
-      const ws = new WebSocket(getWsUrl(), [WS_TICKET_PROTOCOL, wsTicket]);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(getWsUrl(), [WS_TICKET_PROTOCOL, wsTicket]);
+      } catch {
+        setError("No se pudo iniciar la conexi\u00f3n de llamada");
+        return false;
+      }
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -390,6 +420,7 @@ export function useWebRTC({
       ws.onclose = () => {
         setConnected(false);
       };
+      return true;
     },
     [token, salaId, handleSignalingMessage, cleanup],
   );

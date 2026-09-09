@@ -1,6 +1,6 @@
 # Real Staging Requirements
 
-Fecha: 2026-08-29. Estado actual: **REAL STAGING BLOCKED / NOT AVAILABLE**.
+Fecha: 2026-09-08. Estado actual: **REAL STAGING BLOCKED / NOT AVAILABLE**.
 Este es el contrato de entrada a Step 03 y la lista de acciones del operador.
 No selecciona proveedor ni autoriza provisionamiento.
 
@@ -67,6 +67,8 @@ PUBLIC_API_URL=https://<approved-api-or-same-origin-host>
 PUBLIC_WEB_URL=https://<approved-web-host>
 DB_NAME=<non-default-staging-oltp>
 DWH_DATABASE=<different-non-default-staging-dwh>
+API_REPLICAS=1
+JOBS_REPLICAS=1
 EXTERNAL_SIDE_EFFECTS_MODE=DISABLED|SANDBOX
 AI_EGRESS_ENABLED=false
 AI_PATIENT_ENABLED=false
@@ -135,8 +137,11 @@ Before application rollout:
    any non-zero result stops rollout.
 6. Run a verification/idempotency invocation: all checksums match and no file
    is reapplied.
-7. Run one DWH schema workload and verify exactly `dwh-08-002` plus checksum.
-8. Keep ETL disabled until synthetic OLTP fixtures and schema checks pass.
+7. Run one DWH schema workload and verify the immutable `dwh-08-002` base plus
+   the additive `dwh-08-003` head and both recorded checksums.
+8. Verify SCD2 intraday ordering with `updated_at` + `ROWVERSION`, half-open UTC
+   intervals `[valid_from, valid_to)`, idempotent replay and no overlap.
+9. Keep ETL disabled until synthetic OLTP fixtures and schema checks pass.
 
 For legacy recordings with null `retention_until`, run
 `retention-backfill.js` first in its default dry-run mode. Applying one bounded
@@ -175,11 +180,12 @@ production seed is not the acceptance fixture mechanism.
 2. SQL targets, backups and SecretProvider ready.
 3. OLTP migration one-shot PASS.
 4. DWH schema one-shot PASS.
-5. API replica `1`, `BACKGROUND_JOBS_ENABLED=false`; liveness then readiness.
+5. API replica `1`, `API_REPLICAS=1`, `BACKGROUND_JOBS_ENABLED=false`;
+   liveness then readiness.
 6. Web artifact and `/api`/WSS proxy; public HTTPS health.
 7. Synthetic auth/sync/data smokes.
-8. Jobs replica `1`, explicit retention/ETL schedule/timezone; retention begins
-   in dry-run and the first ETL is manually
+8. Jobs replica `1`, `JOBS_REPLICAS=1`, explicit retention/ETL
+   schedule/timezone; retention begins in dry-run and the first ETL is manually
    observed/reconciled.
 9. Desktop staging artifact with exact API URL/CSP, if Desktop remote flow is
    part of the acceptance.
@@ -247,8 +253,10 @@ Frontend (Web and approved Desktop target where applicable)
 - cross-tenant/cross-patient subscription denied;
 - Web chat/telemedicine message flow over WSS;
 - camera/microphone permission policy allows self;
-- TURN config only from authenticated endpoint with ephemeral credentials; no durable credential in
-  frontend artifact;
+- TURN config only from the authenticated server-controlled endpoint, which
+  declares `OPTIONAL_DIRECT_ALLOWED`; endpoint failure blocks signaling,
+  `configured=false` permits direct ICE, and `configured=true` requires valid
+  ephemeral TURN credentials; no durable credential in frontend artifact;
 - reconnect and graceful shutdown close behavior.
 
 ### OLTP
@@ -260,14 +268,18 @@ Frontend (Web and approved Desktop target where applicable)
 
 ### DWH/ETL
 
-- all pipelines complete with version `dwh-08-002`;
+- all pipelines complete with head `dwh-08-003`, preserving the immutable
+  `dwh-08-002` lineage record;
 - watermarks advance only after success;
 - rerun produces no duplicates;
+- multiple same-millisecond changes use source `ROWVERSION` ordering and retain
+  non-overlapping `[valid_from, valid_to)` history;
 - source = inserted/updated + filtered + rejected per reconciliation contract;
 - unexpected row loss = `0`;
 - malformed rows appear in rejects;
 - freshness and semantic analytics match curated expected values;
-- overlapping trigger is refused; exactly one scheduler observed.
+- overlapping trigger is refused; exactly one scheduler observed because ETL
+  remains `BLOCKED_NO_LEASE_RENEWAL` for multi-runner operation.
 
 ### RAG and memory
 
@@ -320,12 +332,12 @@ If no prior compatible artifact exists, record
 | Effect                | Required staging setting                                                                    | Acceptance evidence                                                                     |
 | --------------------- | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
 | Email                 | `DISABLED` or approved sandbox                                                              | synthetic sink only; no recipient/subject in logs                                       |
-| TURN                  | staging-only service/shared secret or documented explicit STUN-only limitation              | authenticated ephemeral config, capacity/connectivity, no bundle secret/public fallback |
+| TURN                  | server-controlled `OPTIONAL_DIRECT_ALLOWED`; staging TURN or explicit direct/STUN limitation | authenticated response, endpoint-failure signaling block, capacity/connectivity, no bundle secret |
 | AI cloud              | `AI_EGRESS_ENABLED=false` unless separately approved synthetic test                         | provider calls `0` by default                                                           |
 | Patient AI            | `AI_PATIENT_ENABLED=false`                                                                  | startup/readiness and route denial                                                      |
 | Professional shadow   | `AI_SHADOW_STATE=DISABLED`                                                                  | readiness honestly `BLOCKED_BY_MODEL`                                                   |
 | Payments/SMS/webhooks | NOT_CONFIGURED                                                                              | no endpoints/credentials/calls                                                          |
-| Retention deletion    | synthetic recordings only; dry-run first, legal-hold review attested, approved UTC schedule | candidates/deleted aggregate result, no patient ID in logs                              |
+| Retention deletion    | synthetic recordings only; dry-run first, legal-hold review attested, approved UTC schedule | one runner because status is `BLOCKED_NO_DISTRIBUTED_LOCK`; aggregate result, no patient ID in logs |
 
 ## 14. Stop conditions
 

@@ -9,6 +9,9 @@ WEB_ARTIFACT=<oci-repository>@sha256:<required-64-char-hex-digest>
 WEB_ARTIFACT_DIGEST=sha256:<required-64-char-hex-digest>
 API_HOST=https://<api-hostname>
 WEB_HOST=https://<web-hostname>
+# Optional, provider-neutral and defaulted to 1. Sensitive targets reject >1.
+API_REPLICAS=1
+JOBS_REPLICAS=1
 OLTP_TARGET=<oltp-database-identity>
 DWH_TARGET=<different-dwh-database-identity>
 SECRET_PROVIDER=<approved-provider-contract-id>

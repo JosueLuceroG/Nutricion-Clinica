@@ -1,4 +1,5 @@
 import { isIP } from "node:net";
+import { assertReplicaConfiguration } from "./replicaSafety.js";
 
 export type TrustProxySetting = false | number | string[];
 
@@ -7,6 +8,8 @@ export interface ServerRuntimeConfig {
   port: number;
   trustProxy: TrustProxySetting;
   backgroundJobsEnabled: boolean;
+  apiReplicas: number;
+  jobsReplicas: number;
   shutdownTimeoutMs: number;
 }
 
@@ -80,6 +83,7 @@ export function readServerRuntimeConfig(
   if (!bindHost || /[\s/]/.test(bindHost)) {
     throw new Error("API_BIND_HOST invalido");
   }
+  const replicas = assertReplicaConfiguration(env);
   return {
     bindHost,
     port: readInteger(env.PORT, 3000, 1, 65535, "PORT"),
@@ -89,6 +93,7 @@ export function readServerRuntimeConfig(
       true,
       "BACKGROUND_JOBS_ENABLED",
     ),
+    ...replicas,
     shutdownTimeoutMs: readInteger(
       env.SHUTDOWN_TIMEOUT_MS,
       15_000,

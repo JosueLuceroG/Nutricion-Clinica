@@ -68,6 +68,25 @@ describe("startupValidation (Build 09.5A §16-18, §35-38, §73)", () => {
     ).toBeGreaterThanOrEqual(3);
   });
 
+  it("bloquea replicas sensibles no certificadas con código estructurado", () => {
+    for (const [environmentClass, variable] of [
+      ["STAGING", "API_REPLICAS"],
+      ["PRODUCTION", "JOBS_REPLICAS"],
+    ] as const) {
+      const issues = validateStartupConfig({
+        ENVIRONMENT_CLASS: environmentClass,
+        [variable]: "2",
+      });
+      expect(
+        issues.some(
+          (issue) =>
+            issue.code === "MULTI_REPLICA_NOT_CERTIFIED" &&
+            issue.message.includes("maximo certificado=1/1"),
+        ),
+      ).toBe(true);
+    }
+  });
+
   it("DWH apuntando al mismo OLTP: error (fail-closed)", () => {
     const issues = validateStartupConfig({
       DWH_ENABLED: "true",

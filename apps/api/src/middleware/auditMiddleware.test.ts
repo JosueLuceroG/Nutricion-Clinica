@@ -44,7 +44,18 @@ describe("audit middleware failure policy", () => {
       {} as Response,
       next,
     );
-    expect(next).toHaveBeenCalledWith(expect.objectContaining({ status: 503 }));
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(next).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 503,
+        message: "Audit log unavailable",
+      }),
+    );
+    expect(
+      (next as unknown as ReturnType<typeof vi.fn>).mock.calls.some(
+        (call) => call.length === 0,
+      ),
+    ).toBe(false);
   });
 
   it("persists only route templates, parameter names, and safe references", async () => {

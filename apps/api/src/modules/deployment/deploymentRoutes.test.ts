@@ -95,5 +95,7 @@ describe("deployment certification routes", () => {
     expect(requalifyAudit?.auditEntityType).toBe("ai_certification");
     expect(registerAudit?.auditRequired).toBe(true);
     expect(requalifyAudit?.auditRequired).toBe(true);
+    expect(routeHandlers("/certification/register")[0]).toBe(registerAudit);
+    expect(routeHandlers("/certification/requalify")[0]).toBe(requalifyAudit);
   });
 });

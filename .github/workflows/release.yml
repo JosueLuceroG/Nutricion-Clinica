@@ -4,6 +4,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: read
+
 env:
   PNPM_VERSION: 11.5.0
   NODE_VERSION: 24
@@ -23,7 +26,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Validate semantic release tag
         id: version
@@ -77,10 +80,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -91,7 +94,7 @@ jobs:
         run: node deployment/scripts/set-desktop-version.mjs
 
       - name: Download portable release evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: portable-deployment-${{ github.sha }}
           path: foundation
@@ -128,10 +131,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -141,7 +144,7 @@ jobs:
         run: node deployment/scripts/set-desktop-version.mjs
 
       - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -151,7 +154,7 @@ jobs:
         run: echo "store-dir=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: ${{ steps.pnpm-cache.outputs.store-dir }}
           key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -162,7 +165,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
 
@@ -212,7 +215,7 @@ jobs:
           codesign -dv --verbose=4 "$app" 2>&1 | grep '^Authority='
 
       - name: Upload Tauri artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: tauri-${{ runner.os }}
           path: src-tauri/target/release/bundle/**
@@ -230,15 +233,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Node.js ${{ env.NODE_VERSION }}
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm ${{ env.PNPM_VERSION }}
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
         with:
           version: ${{ env.PNPM_VERSION }}
 
@@ -246,13 +249,13 @@ jobs:
         run: pnpm install --frozen-lockfile --filter @nutriclinica/api...
 
       - name: Download portable release evidence
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: portable-deployment-${{ github.sha }}
           path: foundation
 
       - name: Download Tauri artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: tauri-*
           path: release-assets
@@ -286,6 +289,8 @@ jobs:
           export SECRET_SCAN_STATUS=PASS
           export SECRET_SCAN_COMMIT="${GITHUB_SHA}"
           export SECRET_SCAN_EVIDENCE_ID="$(node -p "JSON.parse(require('fs').readFileSync('foundation/release-manifest.json','utf8')).securityEvidence.evidenceId")"
+          export API_REPLICAS=1
+          export JOBS_REPLICAS=1
 
           pnpm --filter @nutriclinica/api release:manifest
           pnpm deployment:manifest:verify
@@ -301,7 +306,7 @@ jobs:
           sha256sum "nutriclinica-api-${RELEASE_VERSION}.tar" "nutriclinica-web-${RELEASE_VERSION}.tar" "nutriclinica-desktop-${RELEASE_VERSION}.tar.gz" release-manifest.json >> SHA256SUMS
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           generate_release_notes: true
           fail_on_unmatched_files: true

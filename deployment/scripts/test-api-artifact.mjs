@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { access } from "node:fs/promises";
 import { createServer } from "node:net";
 import { resolve } from "node:path";
 
@@ -282,6 +283,10 @@ if (/BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY/.test(logs)) {
   throw new Error("private key marker leaked to startup logs");
 }
 
+await Promise.all([
+  access(resolve("apps/api/dist-deploy/dwh-schema.sql")),
+  access(resolve("apps/api/dist-deploy/dwh-upgrade-08-003.sql")),
+]);
 await expectGuardedArtifact("apps/api/dist-deploy/migrate.js");
 await expectGuardedArtifact("apps/api/dist-deploy/dwh-schema.js");
 await expectGuardedArtifact("apps/api/dist-deploy/retention-backfill.js");

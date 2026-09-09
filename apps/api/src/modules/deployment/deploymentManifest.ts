@@ -15,6 +15,10 @@ import {
   type EnvironmentIdentity,
 } from "./environmentIdentity.js";
 import { safeEvidenceReference } from "./deploymentEvidence.js";
+import {
+  evaluateReplicaSafety,
+  type ReplicaSafety,
+} from "./replicaSafety.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -154,6 +158,7 @@ export interface DeploymentManifest {
     commit: string;
     evidenceId: string;
   };
+  replicaSafety: ReplicaSafety;
   deployedAt: string;
 }
 
@@ -286,6 +291,7 @@ export function buildDeploymentManifest(
       commit: secretScanVerified ? identity.gitCommit : "UNSET",
       evidenceId: secretScanVerified ? evidenceId : "UNSET",
     },
+    replicaSafety: evaluateReplicaSafety(env),
     deployedAt: new Date().toISOString(),
   };
 }

@@ -1275,6 +1275,7 @@ function MessagingCard({ token }: { token: string }) {
   }, [token]);
 
   const { messages, send, loading, isRealtime } = useRealtimeChat({
+    identityKey: `portal:${token}`,
     getWsConnection: getChatWsConnection,
     fetchMessages: React.useCallback(
       (signal) => listPatientPortalMessages(token, signal),

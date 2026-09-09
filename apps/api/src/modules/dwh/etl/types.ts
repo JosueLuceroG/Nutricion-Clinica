@@ -29,5 +29,5 @@ export interface EtlReject {
   reasonDetail?: string;
 }
 
-export const DWH_CODE_VERSION = 'dwh-etl-b08';
-export const DWH_TRANSFORMATION_VERSION = 'dwh-transform-v1';
+export const DWH_CODE_VERSION = 'dwh-etl-08-003';
+export const DWH_TRANSFORMATION_VERSION = 'dwh-transform-v2';

@@ -33,14 +33,14 @@ try {
 
   $env:DB_USER = $login; $env:DB_PASSWORD = $pw; $env:DB_SERVER = $server; $env:DB_TRUST_CERT = 'true'
 
-  Write-Output '== 2. OLTP FRESH: runner aplica 001-037 en nc_b08_oltp'
+  Write-Output '== 2. OLTP FRESH: runner aplica 001-039 en nc_b08_oltp'
   $env:DB_NAME = $oltp
   Push-Location $apiDir
   $out = & pnpm migrate 2>&1 | Out-String
   Pop-Location
   $out | Select-String -Pattern 'apply 037|resultado|error|fail' | ForEach-Object { $_.Line }
   if ($LASTEXITCODE -ne 0) { throw 'migrate oltp fallo' }
-  if ($out -notmatch 'apply 037-') { throw 'runner no aplico 037 en oltp' }
+  if ($out -notmatch 'apply 039-') { throw 'runner no aplico 039 en oltp' }
   if ($out -match 'fail |error ') { throw 'migrate oltp reporto errores' }
 
   Write-Output '== 3. DWH: schema + fixtures + ETL + metricas + adversarial (vitest real SQL)'
@@ -50,7 +50,7 @@ try {
   $env:AI_REAL_SQL_TEST = '1'
   $env:DWH_STORE = 'sql'
   Push-Location $apiDir
-  $t = & pnpm vitest run src/modules/dwh/etl.realSql.test.ts 2>&1 | Out-String
+  $t = & pnpm vitest run src/modules/dwh/etl.realSql.test.ts --no-color 2>&1 | Out-String
   Pop-Location
   $t | Select-String -Pattern 'Test Files|Tests |FAIL|passed|failed' | ForEach-Object { $_.Line }
   if ($LASTEXITCODE -ne 0) { throw 'vitest real sql fallo' }

@@ -1,6 +1,6 @@
 # Infrastructure Target Requirements
 
-Fecha: 2026-08-27. Estado: operator handoff, provider-agnostic. Este documento
+Fecha: 2026-09-08. Estado: operator handoff, provider-agnostic. Este documento
 define criterios de selección y aceptación; no autoriza compras,
 provisionamiento ni acceso a producción.
 
@@ -185,7 +185,7 @@ Disaster recovery must address independently:
 | Required SQL features | `OPENJSON`, `ISJSON`, `STRING_SPLIT`, `MERGE ... HOLDLOCK`, transactions, lock hints, filtered indexes, `OFFSET/FETCH`, dynamic SQL, `ROWVERSION`, GUID/identity |
 | Not required          | SQL Agent, cross-database queries, linked servers, FILESTREAM, public SQL Browser                                                                                |
 | Migrations            | files `001`-`039`, SHA-256 checksums, ordered `GO` batches; no automatic API migration                                                                           |
-| DWH                   | idempotent schema `dwh-08-002`, checksum/version table, ETL MERGE/watermarks/reconciliation                                                                      |
+| DWH                   | immutable `dwh-08-002` base + additive `dwh-08-003` head, checksum/version chain, SCD2 `DATETIME2(3)`, ETL watermarks/reconciliation                              |
 
 SQL Server Express has database size/CPU/memory and SQL Agent constraints. It
 is valid for local evidence and possibly small staging, but production
@@ -271,6 +271,8 @@ produce a redacted configuration inventory with:
   jobs/one-shot workloads;
 - proof that API has `BACKGROUND_JOBS_ENABLED=false` and the sole jobs process
   has it `true`;
+- `API_REPLICAS=1` and `JOBS_REPLICAS=1`; any higher sensitive-environment
+  value is rejected as `MULTI_REPLICA_NOT_CERTIFIED`;
 - commit-bound secret-scan evidence and `repo@sha256` API/Web references;
 - AI egress off, Patient AI off, shadow disabled and external effects
   disabled/sandbox unless separately authorized.
@@ -280,7 +282,7 @@ produce a redacted configuration inventory with:
 | Integration           | Current implementation                                 | Staging default                                                            | Production prerequisite                                                    |
 | --------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
 | SMTP                  | actual Nodemailer adapter                              | DISABLED or approved sandbox synthetic recipients                          | approved sender, recipient policy, SecretProvider, audit and egress        |
-| TURN/STUN             | authenticated ICE endpoint; no browser/public fallback | approved staging TURN or explicit STUN-only endpoint with known limitation | capacity/region/retention/security assessment, ephemeral credentials       |
+| TURN/STUN             | authenticated server-controlled `OPTIONAL_DIRECT_ALLOWED`; no browser/public fallback | endpoint failure blocks signaling; direct/STUN-only accepted with known limitation | capacity/region/retention/security assessment, ephemeral credentials       |
 | AI OpenAI/Ollama      | adapters with egress/qualification gates               | egress false; eligible model NONE                                          | provider data policy, credential, residency/retention, model certification |
 | Patient AI            | routes/config exist                                    | DISABLED and startup rejects true                                          | separate clinical gate; not granted                                        |
 | Payments/SMS/webhooks | no real provider found                                 | NOT_CONFIGURED                                                             | new design/threat/side-effect contract required                            |
@@ -333,8 +335,8 @@ target is authorized.
 
 | Infrastructure choice             | Required application verification/change                                                  |
 | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| More than one API replica         | BLOCKED: add shared WebSocket broker/routing and externalize in-process state/rate limits |
-| More than one jobs replica        | BLOCKED: add atomic distributed leases for every job, especially retention                |
+| More than one API replica         | `MULTI_REPLICA_NOT_CERTIFIED`: add shared WebSocket broker/routing and externalize in-process state/rate limits |
+| More than one jobs replica        | `MULTI_REPLICA_NOT_CERTIFIED`: ETL is `BLOCKED_NO_LEASE_RENEWAL`; retention is `BLOCKED_NO_DISTRIBUTED_LOCK` |
 | SQL host/port/auth change         | connection/TLS/least-privilege and migration/DWH real-SQL tests                           |
 | Managed SQL without native `.bak` | define equivalent PITR/export and prove isolated restore                                  |
 | CDN/cache                         | verify service worker, HTML no-cache, hashed assets, rollback skew/API v1 compatibility   |

@@ -27,7 +27,9 @@ test.describe("Telemedicina", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("TURN config endpoint responde con ICE servers", async ({ request }) => {
+  test("TURN config endpoint returns the authenticated server-controlled ICE policy", async ({
+    request,
+  }) => {
     const loginResp = await request.post("http://localhost:3000/auth/login", {
       data: { email: ADMIN_EMAIL, password: e2eAdminPassword() },
     });
@@ -43,11 +45,35 @@ test.describe("Telemedicina", () => {
     );
     expect(turnResp.ok()).toBeTruthy();
     const turnBody = (await turnResp.json()) as {
-      iceServers: Array<{ urls: string | string[] }>;
+      policy: string;
+      iceServers: Array<{
+        urls: string | string[];
+        username?: string;
+        credential?: string;
+      }>;
       configured: boolean;
     };
+    expect(turnBody.policy).toBe("OPTIONAL_DIRECT_ALLOWED");
     expect(Array.isArray(turnBody.iceServers)).toBe(true);
-    expect(turnBody.iceServers.length).toBeGreaterThanOrEqual(1);
-    expect(turnBody.iceServers[0]!.urls).toBeDefined();
+    const servers = turnBody.iceServers.map((server) => ({
+      ...server,
+      urls: typeof server.urls === "string" ? [server.urls] : server.urls,
+    }));
+    for (const server of servers) {
+      expect(server.urls.length).toBeGreaterThan(0);
+      expect(
+        server.urls.every((url) => /^(?:stun|stuns|turn|turns):/i.test(url)),
+      ).toBe(true);
+    }
+    if (turnBody.configured) {
+      expect(
+        servers.some(
+          (server) =>
+            server.urls.some((url) => /^turns?:/i.test(url)) &&
+            Boolean(server.username) &&
+            Boolean(server.credential),
+        ),
+      ).toBe(true);
+    }
   });
 });

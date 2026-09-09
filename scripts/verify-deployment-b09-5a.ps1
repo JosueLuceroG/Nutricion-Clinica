@@ -70,7 +70,12 @@ try {
   try {
     Invoke-AdminSql "BACKUP DATABASE [$oltp] TO DISK = N'$bakSql' WITH INIT, COMPRESSION;"
   } catch {
-    throw "BACKUP fallo (revisa permisos del servicio SQL sobre $BackupDir; usa -BackupDir). $($_.Exception.Message)"
+    Write-Output '-- compresion no disponible; reintento portable sin COMPRESSION'
+    try {
+      Invoke-AdminSql "BACKUP DATABASE [$oltp] TO DISK = N'$bakSql' WITH INIT;"
+    } catch {
+      throw "BACKUP fallo (revisa permisos del servicio SQL sobre $BackupDir; usa -BackupDir). $($_.Exception.Message)"
+    }
   }
   Invoke-AdminSql "RESTORE DATABASE [$restoreDb] FROM DISK = N'$bakSql' WITH RECOVERY, MOVE N'$oltp' TO N'$restoreDataSql', MOVE N'${oltp}_log' TO N'$restoreLogSql';"
   Invoke-AdminSql "USE [$restoreDb]; SELECT COUNT(*) AS flag_count FROM ai_requalification_flags; SELECT COUNT(*) AS schema_ok FROM sys.tables WHERE name IN ('ai_certification_records','ai_requalification_flags');"
@@ -101,10 +106,10 @@ try {
 }
 finally {
   Write-Output '== 8. limpieza'
-  try { Invoke-AdminSql "ALTER DATABASE $oltp SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $oltp;" } catch { Write-Output 'cleanup oltp ignorado' }
-  try { Invoke-AdminSql "ALTER DATABASE $restoreDb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $restoreDb;" } catch { Write-Output 'cleanup restore ignorado' }
-  try { Invoke-AdminSql "ALTER DATABASE $dw SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $dw;" } catch { Write-Output 'cleanup dw ignorado' }
-  try { Invoke-AdminSql "DROP LOGIN $login;" } catch { Write-Output 'cleanup login ignorado' }
+  try { Invoke-AdminSql "IF DB_ID('$oltp') IS NOT NULL BEGIN ALTER DATABASE $oltp SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $oltp; END;" } catch { Write-Output 'cleanup oltp ignorado' }
+  try { Invoke-AdminSql "IF DB_ID('$restoreDb') IS NOT NULL BEGIN ALTER DATABASE $restoreDb SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $restoreDb; END;" } catch { Write-Output 'cleanup restore ignorado' }
+  try { Invoke-AdminSql "IF DB_ID('$dw') IS NOT NULL BEGIN ALTER DATABASE $dw SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE $dw; END;" } catch { Write-Output 'cleanup dw ignorado' }
+  try { Invoke-AdminSql "IF SUSER_ID('$login') IS NOT NULL DROP LOGIN $login;" } catch { Write-Output 'cleanup login ignorado' }
   if (Test-Path -LiteralPath $BackupDir) { Remove-Item -LiteralPath $BackupDir -Recurse -Force -ErrorAction SilentlyContinue }
   Remove-Item Env:DB_USER, Env:DB_PASSWORD, Env:DB_SERVER, Env:DB_TRUST_CERT, Env:DB_NAME, Env:DWH_DATABASE, Env:DWH_ENABLED, Env:DWH_SCHEDULED_LOAD_ENABLED, Env:DWH_STORE, Env:AI_REAL_SQL_TEST -ErrorAction SilentlyContinue
 }

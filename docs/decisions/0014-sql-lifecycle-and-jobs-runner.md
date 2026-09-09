@@ -1,6 +1,6 @@
 # ADR-014: Separar ciclos SQL y ejecutar jobs una sola vez
 
-**Estado:** Aceptada · **Contexto:** Release Foundation Step 02 · **Última revisión:** 2026-08-29
+**Estado:** Aceptada · **Contexto:** Release Foundation Step 02.1 · **Última revisión:** 2026-09-08
 
 ## Contexto
 
@@ -16,16 +16,22 @@ competir entre réplicas ni ejecutarse implícitamente al arrancar la API.
 - Las migraciones OLTP `001` a `039` se ejecutan como job one-shot usando
   `node dist-deploy/migrate.js`. Se verifica backup/restore y target antes;
   nunca se ejecutan automáticamente desde la API.
-- El schema DWH `dwh-08-002` se aplica separadamente con
-  `node dist-deploy/dwh-schema.js` antes de habilitar ETL.
+- El schema DWH se aplica separadamente con
+  `node dist-deploy/dwh-schema.js` antes de habilitar ETL. La cadena actual
+  conserva el artefacto base inmutable `dwh-08-002` y aplica el upgrade aditivo
+  `dwh-08-003`.
 - Checksums/versiones son inmutables. Un drift exige una migración/version
   nueva; `--force` no forma parte del procedimiento normal de despliegue.
 - La API canónica usa `BACKGROUND_JOBS_ENABLED=false`. Retención y ETL se
   ejecutan en exactamente un proceso `node dist-deploy/jobs.js`, con
   `BACKGROUND_JOBS_ENABLED=true` y schedules explícitos.
 - `noOverlap` y el lease SQL atómico por pipeline reducen solapamiento ETL,
-  pero no autorizan múltiples runners: el lease expira a los 60 minutos sin
-  renovación y retención no tiene lock cross-instance.
+  pero no autorizan múltiples runners: ETL queda
+  `BLOCKED_NO_LEASE_RENEWAL` porque el lease expira a los 60 minutos sin
+  renovación, y retención queda `BLOCKED_NO_DISTRIBUTED_LOCK`.
+- `API_REPLICAS=1` y `JOBS_REPLICAS=1` son el único perfil certificado;
+  STAGING/PRODUCTION rechazan valores mayores con
+  `MULTI_REPLICA_NOT_CERTIFIED`.
 - La API también se mantiene en una sola réplica hasta externalizar
   broadcast WebSocket y estados/rate limits in-process. Horizontal API y
   horizontal jobs quedan `BLOCKED`.

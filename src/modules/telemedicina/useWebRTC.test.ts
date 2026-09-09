@@ -27,11 +27,18 @@ describe("buildRtcConfig", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ configured: false, iceServers: [] }),
+      json: async () => ({
+        policy: "OPTIONAL_DIRECT_ALLOWED",
+        configured: false,
+        iceServers: [],
+      }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(buildRtcConfig()).resolves.toEqual({ iceServers: [] });
+    await expect(buildRtcConfig()).resolves.toEqual({
+      iceServers: [],
+      iceTransportPolicy: "all",
+    });
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.example.test/telemedicina/turn-config",
       expect.objectContaining({
@@ -73,9 +80,134 @@ describe("buildRtcConfig", () => {
       "Invalid TURN configuration response",
     );
   });
+
+  it("accepts credentialed TURN with only server-approved ICE schemes", async () => {
+    process.env.VITE_API_URL = "https://api.example.test";
+    useAuthStore.setState({ token: "configured-turn-token" });
+    useSyncStore.setState({ sucursalId: "branch-2" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          policy: "OPTIONAL_DIRECT_ALLOWED",
+          configured: true,
+          iceServers: [
+            { urls: ["stun:stun.example.com", "stuns:stun.example.com"] },
+            {
+              urls: ["turn:turn.example.com", "turns:turn.example.com"],
+              username: "user",
+              credential: "credential",
+            },
+          ],
+        }),
+      }),
+    );
+
+    await expect(buildRtcConfig()).resolves.toEqual({
+      iceTransportPolicy: "all",
+      iceServers: [
+        { urls: ["stun:stun.example.com", "stuns:stun.example.com"] },
+        {
+          urls: ["turn:turn.example.com", "turns:turn.example.com"],
+          username: "user",
+          credential: "credential",
+        },
+      ],
+    });
+  });
+
+  it.each([
+    {
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: true,
+      iceServers: [{ urls: ["https://turn.example.com"] }],
+    },
+    {
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: true,
+      iceServers: [{ urls: [] }],
+    },
+    {
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: true,
+      iceServers: [{ urls: ["stun:stun.example.com"] }],
+    },
+    {
+      policy: "OPTIONAL_DIRECT_ALLOWED",
+      configured: false,
+      iceServers: [
+        {
+          urls: ["turn:turn.example.com"],
+          username: "user",
+          credential: "credential",
+        },
+      ],
+    },
+  ])("rejects inconsistent or unsafe ICE payload %#", async (payload) => {
+    process.env.VITE_API_URL = "https://api.example.test";
+    useAuthStore.setState({ token: `invalid-turn-${JSON.stringify(payload)}` });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => payload,
+      }),
+    );
+    await expect(buildRtcConfig()).rejects.toThrow(
+      "Invalid TURN configuration response",
+    );
+  });
+
+  it.each([undefined, "UNKNOWN_POLICY"])(
+    "rejects missing or unknown server connectivity policy: %s",
+    async (policy) => {
+      process.env.VITE_API_URL = "https://api.example.test";
+      useAuthStore.setState({ token: `invalid-policy-${String(policy)}` });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => ({ policy, configured: false, iceServers: [] }),
+        }),
+      );
+      await expect(buildRtcConfig()).rejects.toThrow(
+        "Invalid TURN configuration response",
+      );
+    },
+  );
 });
 
 describe("useWebRTC negotiation", () => {
+  it("blocks ticket and WebSocket creation when turn-config fails", async () => {
+    process.env.VITE_API_URL = "https://api.example.test";
+    useAuthStore.setState({ token: "blocked-call-token" });
+    useSyncStore.setState({ sucursalId: "branch-1" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: false, status: 503 }),
+    );
+    const WebSocketConstructor = vi.fn();
+    vi.stubGlobal("WebSocket", WebSocketConstructor);
+    const stream = { getTracks: () => [] } as unknown as MediaStream;
+    const { result, unmount } = renderHook(() =>
+      useWebRTC({ salaId: "blocked-room", localStream: stream }),
+    );
+
+    await act(async () => {
+      await expect(result.current.startCall()).resolves.toBe(false);
+    });
+    expect(getWsTicket).not.toHaveBeenCalled();
+    expect(WebSocketConstructor).not.toHaveBeenCalled();
+    expect(result.current.error).toBe(
+      "No se pudo obtener la configuracion de red para la llamada",
+    );
+    unmount();
+  });
+
   it("lets only the existing peer create the initial offer", async () => {
     process.env.VITE_API_URL = "https://api.example.test";
     useAuthStore.setState({ token: "negotiation-token" });
@@ -85,7 +217,11 @@ describe("useWebRTC negotiation", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ configured: false, iceServers: [] }),
+        json: async () => ({
+          policy: "OPTIONAL_DIRECT_ALLOWED",
+          configured: false,
+          iceServers: [],
+        }),
       }),
     );
     getWsTicket.mockResolvedValue({ ticket: "a".repeat(64) });
@@ -191,7 +327,11 @@ describe("useWebRTC negotiation", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => ({ configured: false, iceServers: [] }),
+        json: async () => ({
+          policy: "OPTIONAL_DIRECT_ALLOWED",
+          configured: false,
+          iceServers: [],
+        }),
       }),
     );
     getWsTicket.mockResolvedValue({ ticket: "b".repeat(64) });

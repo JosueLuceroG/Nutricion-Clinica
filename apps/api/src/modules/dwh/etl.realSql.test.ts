@@ -3,7 +3,14 @@ import type sql from 'mssql';
 import { getPool } from '../../db/connection.js';
 import { getDwhPool } from './dwhConnection.js';
 import { readDwhConfig, assertDwhDatabaseSeparate } from './config.js';
-import { applyDwhSchema } from './schema/dwhSchema.js';
+import {
+  DWH_PREVIOUS_SCHEMA_VERSION,
+  DWH_SCHEMA_VERSION,
+  applyDwhSchema,
+  dwhDdl,
+  dwhPreviousSchemaChecksum,
+  dwhSchemaChecksum,
+} from './schema/dwhSchema.js';
 import { populateDimDate } from './etl/dimDate.js';
 import { runPipeline, runAllPipelines, PIPELINES, ALL_PIPELINE_IDS } from './etl/engine.js';
 import { computeMetric, comparePeriods } from './semantic/metricService.js';
@@ -39,6 +46,10 @@ const PATIENTS = {
 const PATIENT_LIST = Object.values(PATIENTS);
 
 const ADM = '99999999-9999-4999-8999-999999999999';
+const LEGACY_BRANCH = '44444444-4444-4444-8444-444444444444';
+const LEGACY_PROFESSIONAL = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const SCD2_BRANCH = '33333333-3333-4333-8333-333333333333';
+const SCD2_PROFESSIONAL = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 
 describe.runIf(REAL_SQL)('DWH real SQL Build 08 (nc_b08_oltp + nc_b08_dw)', () => {
   let pool: sql.ConnectionPool;
@@ -48,9 +59,34 @@ describe.runIf(REAL_SQL)('DWH real SQL Build 08 (nc_b08_oltp + nc_b08_dw)', () =
     assertDwhDatabaseSeparate(process.env);
     const config = readDwhConfig();
     expect(config.enabled).toBe(true);
-    expect(config.database).toMatch(/nc_b08_dw/i);
+    const oltpName = (process.env.DB_NAME ?? '').toLowerCase();
+    const dwhName = config.database.toLowerCase();
+    const deploymentPair = /^nc_b09_dw_([0-9a-f]{8})$/.exec(dwhName);
+    expect(
+      (oltpName === 'nc_b08_oltp' && dwhName === 'nc_b08_dw') ||
+        (deploymentPair !== null &&
+          oltpName === `nc_b09_oltp_${deploymentPair[1]}`),
+      'AI_REAL_SQL_TEST solo permite pares OLTP/DWH locales desechables',
+    ).toBe(true);
     pool = await getPool();
     dwh = await getDwhPool();
+    await dwh.request().batch(dwhDdl());
+    await dwh
+      .request()
+      .input('schemaVersion', DWH_PREVIOUS_SCHEMA_VERSION)
+      .input('checksum', dwhPreviousSchemaChecksum())
+      .query(`INSERT INTO dwh_schema_version (schema_version, checksum)
+              VALUES (@schemaVersion, @checksum)`);
+    await dwh.request().batch(`
+      INSERT INTO dim_sucursal
+        (sucursal_natural_id, nombre, activa, valid_from, valid_to, is_current)
+      VALUES
+        (N'${LEGACY_BRANCH}', N'Legacy branch', 0, '2025-01-01', '2025-02-01', 0);
+      INSERT INTO dim_professional
+        (professional_natural_id, nombre_completo, cedula_profesional, rol, activo, valid_from, valid_to, is_current)
+      VALUES
+        (N'${LEGACY_PROFESSIONAL}', N'Legacy professional', N'LEGACY', N'nutriologa', 0, '2025-01-01', '2025-02-01', 0);
+    `);
     await applyDwhSchema(dwh);
   });
 
@@ -149,13 +185,47 @@ describe.runIf(REAL_SQL)('DWH real SQL Build 08 (nc_b08_oltp + nc_b08_dw)', () =
     expect(result.value).toBeNull();
   });
 
-  it('schema aplicado y versionado (dwh-08-002)', async () => {
-    expect(await dwhCount('dwh_schema_version', "schema_version = 'dwh-08-002'")).toBe(1);
+  it('preserva dwh-08-002 y aplica la cadena dwh-08-003', async () => {
+    const versions = await dwh.request().query<{ schema_version: string; checksum: string }>(`
+      SELECT schema_version, checksum FROM dwh_schema_version
+       WHERE schema_version IN ('${DWH_PREVIOUS_SCHEMA_VERSION}', '${DWH_SCHEMA_VERSION}')
+    `);
+    expect(new Map(versions.recordset.map((row) => [row.schema_version, row.checksum]))).toEqual(
+      new Map([
+        [DWH_PREVIOUS_SCHEMA_VERSION, dwhPreviousSchemaChecksum()],
+        [DWH_SCHEMA_VERSION, dwhSchemaChecksum()],
+      ]),
+    );
     const dims = await dwh.request().query<{ name: string }>(`
       SELECT name FROM sys.tables
       WHERE name IN ('fact_consultation','fact_lab','dwh_rejects','dwh_reconciliation','dwh_pipeline_locks','dwh_watermarks','dim_date')
     `);
     expect(dims.recordset).toHaveLength(7);
+    const validityColumns = await dwh.request().query<{ table_name: string; column_name: string; type_name: string; scale: number }>(`
+      SELECT OBJECT_NAME(c.object_id) AS table_name, c.name AS column_name,
+             TYPE_NAME(c.user_type_id) AS type_name, c.scale
+        FROM sys.columns c
+       WHERE OBJECT_NAME(c.object_id) IN ('dim_sucursal', 'dim_professional')
+         AND c.name IN ('valid_from', 'valid_to')
+    `);
+    expect(validityColumns.recordset).toHaveLength(4);
+    expect(validityColumns.recordset.every((column) => column.type_name === 'datetime2' && column.scale === 3)).toBe(true);
+    const legacy = await dwh.request().query<{ name: string; valid_from: Date; valid_to: Date; source_updated_at: Date | null; source_version: Buffer | null }>(`
+      SELECT nombre AS name, valid_from, valid_to, source_updated_at, source_version
+        FROM dim_sucursal WHERE sucursal_natural_id = N'${LEGACY_BRANCH}'
+      UNION ALL
+      SELECT nombre_completo AS name, valid_from, valid_to, source_updated_at, source_version
+        FROM dim_professional WHERE professional_natural_id = N'${LEGACY_PROFESSIONAL}'
+    `);
+    expect(legacy.recordset.map((row) => row.name)).toEqual(['Legacy branch', 'Legacy professional']);
+    for (const row of legacy.recordset) {
+      expect(row.valid_from.toISOString()).toBe('2025-01-01T00:00:00.000Z');
+      expect(row.valid_to.toISOString()).toBe('2025-02-01T00:00:00.000Z');
+      expect(row.source_updated_at).toBeNull();
+      expect(row.source_version).toBeNull();
+    }
+    await expect(applyDwhSchema(dwh)).resolves.toBeUndefined();
+    expect(await dwhCount('dwh_schema_version')).toBe(2);
   });
 
   it('dim_date poblada (2020-01-01 .. 2030-12-31)', async () => {
@@ -336,6 +406,82 @@ describe.runIf(REAL_SQL)('DWH real SQL Build 08 (nc_b08_oltp + nc_b08_dw)', () =
     expect(new Date(wmAfter.recordset[0]!.watermark_at).getTime()).toBe(new Date(wmBefore.recordset[0]!.watermark_at).getTime());
     const recovered = await runPipeline(PIPELINES.fact_lab!, {});
     expect(recovered.status).toBe('succeeded');
+  });
+
+  it('SCD2 INTRADÍA: conserva A/B/C/D, desempata 17:00 por rowversion y replay no duplica', async () => {
+    const loadDimensions = async () => {
+      const branch = await runPipeline(PIPELINES.dim_sucursal!, {});
+      const professional = await runPipeline(PIPELINES.dim_professional!, {});
+      expect(branch.status).toBe('succeeded');
+      expect(professional.status).toBe('succeeded');
+    };
+    await oltpExec(`
+      INSERT INTO sucursales (id, nombre, activa, updated_at)
+      VALUES (N'${SCD2_BRANCH}', N'Branch A', 1, '2026-03-01T09:00:00.000');
+      INSERT INTO profesionales
+        (id, nombre_completo, cedula_profesional, rol, activo, email, password_hash, updated_at)
+      VALUES
+        (N'${SCD2_PROFESSIONAL}', N'Professional A', N'CP-A', N'nutriologa', 1, N'scd2@real.test', N'x', '2026-03-01T09:00:00.000');
+    `);
+    await loadDimensions();
+
+    for (const state of [
+      { label: 'B', at: '2026-03-01T13:00:00.000' },
+      { label: 'C', at: '2026-03-01T17:00:00.000' },
+      { label: 'D', at: '2026-03-01T17:00:00.000' },
+    ]) {
+      await oltpExec(`
+        UPDATE sucursales SET nombre = N'Branch ${state.label}', updated_at = '${state.at}'
+         WHERE id = N'${SCD2_BRANCH}';
+        UPDATE profesionales
+           SET nombre_completo = N'Professional ${state.label}', cedula_profesional = N'CP-${state.label}', updated_at = '${state.at}'
+         WHERE id = N'${SCD2_PROFESSIONAL}';
+      `);
+      await loadDimensions();
+    }
+
+    const branchHistory = await dwh.request().query<{ name: string; valid_from: Date; valid_to: Date | null; is_current: boolean; source_version: Buffer }>(`
+      SELECT nombre AS name, valid_from, valid_to, is_current, source_version
+        FROM dim_sucursal
+       WHERE sucursal_natural_id = N'${SCD2_BRANCH}'
+       ORDER BY valid_from, source_version
+    `);
+    const professionalHistory = await dwh.request().query<{ name: string; valid_from: Date; valid_to: Date | null; is_current: boolean; source_version: Buffer }>(`
+      SELECT nombre_completo AS name, valid_from, valid_to, is_current, source_version
+        FROM dim_professional
+       WHERE professional_natural_id = N'${SCD2_PROFESSIONAL}'
+       ORDER BY valid_from, source_version
+    `);
+    for (const [history, prefix] of [
+      [branchHistory.recordset, 'Branch'],
+      [professionalHistory.recordset, 'Professional'],
+    ] as const) {
+      expect(history.map((row) => row.name)).toEqual([
+        `${prefix} A`, `${prefix} B`, `${prefix} C`, `${prefix} D`,
+      ]);
+      expect(history.map((row) => row.valid_from.toISOString())).toEqual([
+        '2026-03-01T09:00:00.000Z',
+        '2026-03-01T13:00:00.000Z',
+        '2026-03-01T17:00:00.000Z',
+        '2026-03-01T17:00:00.000Z',
+      ]);
+      expect(history.map((row) => row.valid_to?.toISOString() ?? null)).toEqual([
+        '2026-03-01T13:00:00.000Z',
+        '2026-03-01T17:00:00.000Z',
+        '2026-03-01T17:00:00.000Z',
+        null,
+      ]);
+      expect(history.filter((row) => Boolean(row.is_current))).toHaveLength(1);
+      expect(Buffer.compare(history[2]!.source_version, history[3]!.source_version)).toBeLessThan(0);
+      for (let index = 1; index < history.length; index += 1) {
+        expect(history[index - 1]!.valid_to!.getTime()).toBeLessThanOrEqual(history[index]!.valid_from.getTime());
+      }
+    }
+
+    await loadDimensions();
+    expect(await dwhCount('dim_sucursal', `sucursal_natural_id = N'${SCD2_BRANCH}'`)).toBe(4);
+    expect(await dwhCount('dim_professional', `professional_natural_id = N'${SCD2_PROFESSIONAL}'`)).toBe(4);
+    expect(await dwhCount('dwh_load_runs', `target_schema_version = '${DWH_SCHEMA_VERSION}'`)).toBeGreaterThan(0);
   });
 
   it('NARRATIVA: números 200 OK siempre; narrativa ABSTIENE sin modelo APPROVED_ANALYTICS dashboard_analytics', async () => {

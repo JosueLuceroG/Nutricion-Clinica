@@ -2,6 +2,11 @@ import { z } from "zod";
 import { createHmac } from "node:crypto";
 import { readExternalSideEffectMode } from "../deployment/externalSideEffects.js";
 import { readEnvironmentClass } from "../deployment/environmentIdentity.js";
+import {
+  TURN_CONNECTIVITY_POLICY,
+  type TurnConfigDTO,
+  type TurnIceServerDTO,
+} from "@nutriclinica/shared";
 
 const TurnCredentialsSchema = z.object({
   STUN_URLS: z.string().optional(),
@@ -11,17 +16,6 @@ const TurnCredentialsSchema = z.object({
   TURN_SHARED_SECRET: z.string().optional(),
   TURN_CREDENTIAL_TTL_SECONDS: z.string().optional(),
 });
-
-export interface TurnIceServer {
-  urls: string | string[];
-  username?: string;
-  credential?: string;
-}
-
-export interface TurnConfigDTO {
-  iceServers: TurnIceServer[];
-  configured: boolean;
-}
 
 function csv(value: string | undefined): string[] {
   return (
@@ -64,11 +58,19 @@ export function buildTurnConfig(
     mode === "UNKNOWN" ||
     (mode === "PRODUCTION" && environmentClass !== "PRODUCTION")
   ) {
-    return { iceServers: [], configured: false };
+    return {
+      policy: TURN_CONNECTIVITY_POLICY,
+      iceServers: [],
+      configured: false,
+    };
   }
   const parsed = TurnCredentialsSchema.safeParse(env);
   if (!parsed.success) {
-    return { iceServers: [], configured: false };
+    return {
+      policy: TURN_CONNECTIVITY_POLICY,
+      iceServers: [],
+      configured: false,
+    };
   }
 
   const {
@@ -81,7 +83,7 @@ export function buildTurnConfig(
   } = parsed.data;
   const stunUrls = validIceUrls(STUN_URLS, "stun") ? csv(STUN_URLS) : [];
   const turnUrls = validIceUrls(TURN_URLS, "turn") ? csv(TURN_URLS) : [];
-  const iceServers: TurnIceServer[] =
+  const iceServers: TurnIceServerDTO[] =
     stunUrls.length > 0 ? [{ urls: stunUrls }] : [];
   const staticConfigured =
     turnUrls.length > 0 &&
@@ -109,5 +111,5 @@ export function buildTurnConfig(
     });
   }
 
-  return { iceServers, configured };
+  return { policy: TURN_CONNECTIVITY_POLICY, iceServers, configured };
 }

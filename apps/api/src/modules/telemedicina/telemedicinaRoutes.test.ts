@@ -129,6 +129,9 @@ describe("telemedicinaRoutes", () => {
       const res = { setHeader: vi.fn(), json: vi.fn() };
       handler?.({ user: { sub: "user-1" } }, res);
       expect(res.setHeader).toHaveBeenCalledWith("Cache-Control", "no-store");
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ policy: "OPTIONAL_DIRECT_ALLOWED" }),
+      );
     });
   });
 });

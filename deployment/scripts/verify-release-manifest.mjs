@@ -8,7 +8,7 @@ const EXPECTED = {
   syncProtocolVersion: 2,
   dexieSchemaVersion: 33,
   oltpSchemaVersion: "039",
-  dwhSchemaVersion: "dwh-08-002",
+  dwhSchemaVersion: "dwh-08-003",
   desktopChannel: "primary",
   desktopTauriVersion: "2.11.2",
   webChannel: "secondary",
@@ -156,6 +156,31 @@ export function verifyReleaseManifest(
         );
       }
     }
+  }
+
+  const replicaSafety = manifest.replicaSafety;
+  for (const workload of ["api", "jobs"]) {
+    const entry = replicaSafety?.[workload];
+    if (
+      entry?.requested !== 1 ||
+      entry?.certifiedMaximum !== 1 ||
+      entry?.status !== "CERTIFIED_SINGLE_REPLICA"
+    ) {
+      failures.push(
+        `MULTI_REPLICA_NOT_CERTIFIED: ${workload} release manifest must declare one certified replica`,
+      );
+    }
+  }
+  if (replicaSafety?.etlConcurrency !== "BLOCKED_NO_LEASE_RENEWAL") {
+    failures.push("ETL concurrency status must be BLOCKED_NO_LEASE_RENEWAL");
+  }
+  if (
+    replicaSafety?.retentionConcurrency !==
+    "BLOCKED_NO_DISTRIBUTED_LOCK"
+  ) {
+    failures.push(
+      "retention concurrency status must be BLOCKED_NO_DISTRIBUTED_LOCK",
+    );
   }
 
   const json = JSON.stringify(manifest);

@@ -36,6 +36,46 @@ test("accepts a provider-neutral immutable deployment contract", () => {
   });
 });
 
+test("uses safe replica defaults and blocks uncertified sensitive scale-out", () => {
+  assert.deepEqual(validateDeploymentInputs(validInput()), {
+    valid: true,
+    errors: [],
+  });
+  assert.equal(buildRuntimeMapping(validInput()).API_REPLICAS, "1");
+  assert.equal(buildRuntimeMapping(validInput()).JOBS_REPLICAS, "1");
+  const normalized = buildRuntimeMapping(
+    validInput({ API_REPLICAS: " 1 ", JOBS_REPLICAS: " 1 " }),
+  );
+  assert.equal(normalized.API_REPLICAS, "1");
+  assert.equal(normalized.JOBS_REPLICAS, "1");
+
+  for (const [DEPLOYMENT_ENVIRONMENT, override] of [
+    ["STAGING", { API_REPLICAS: "2" }],
+    ["PRODUCTION", { JOBS_REPLICAS: "2" }],
+  ]) {
+    const result = validateDeploymentInputs(
+      validInput({ DEPLOYMENT_ENVIRONMENT, ...override }),
+    );
+    assert.equal(result.valid, false);
+    assert.match(result.errors.join("\n"), /MULTI_REPLICA_NOT_CERTIFIED/);
+  }
+
+  const localSimulation = validateDeploymentInputs(
+    validInput({
+      DEPLOYMENT_ENVIRONMENT: "TEST",
+      API_REPLICAS: "2",
+      JOBS_REPLICAS: "2",
+    }),
+  );
+  assert.equal(localSimulation.valid, true);
+  assert.match(
+    validateDeploymentInputs(validInput({ API_REPLICAS: "1.5" })).errors.join(
+      "\n",
+    ),
+    /INVALID_REPLICA_CONFIGURATION/,
+  );
+});
+
 test("rejects same OLTP/DWH, mutable artifacts, and local staging URLs", () => {
   const result = validateDeploymentInputs(
     validInput({

@@ -85,6 +85,7 @@ describe("AIGateway + egress (Build 03)", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   it("rechaza el provider externo antes del egreso y evalúa el fallback local", async () => {
@@ -195,6 +196,35 @@ describe("AIGateway + egress (Build 03)", () => {
     );
     expect(result.ok).toBe(true);
     expect(openAi.complete).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps egress manifest persistence FAIL_SOFT before invoking an allowed provider", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const save = vi.fn().mockRejectedValue(new Error("manifest unavailable"));
+    const localGateway = new AIGateway({
+      getProviderAdapter: (provider) =>
+        provider === "openai" ? openAi : ollama,
+      env: egressEnv(),
+      egressPolicy: AIDataEgressPolicy.withInMemoryStore({
+        env: egressEnv,
+        manifestStore: { save },
+      }),
+    });
+
+    const result = await localGateway.complete(
+      { model: "gpt-4o-mini", systemPrompt: "sys", userPrompt: "user" },
+      {
+        preferredProvider: "openai",
+        egress: { capability: "generic_assistant" },
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    expect(save).toHaveBeenCalledOnce();
+    expect(openAi.complete).toHaveBeenCalledOnce();
+    expect(save.mock.invocationCallOrder[0]).toBeLessThan(
+      (openAi.complete as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!,
+    );
   });
 
   it("fallback operativo (provider error) re-evalúa la política del siguiente candidato", async () => {
