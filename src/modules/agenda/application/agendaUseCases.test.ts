@@ -7,12 +7,14 @@ import { Block, createAppointmentId, createBlockId } from "../domain";
 import { Schedule } from "../domain/Schedule";
 import { createScheduleId } from "../domain/ScheduleId";
 import type { NewAppointmentFormInput } from "./agendaFormSchema";
+import { useSyncStore } from "@store/syncStore";
 
 describe("agendaUseCases", () => {
   let repo: DexieAgendaRepository;
   let db: NutriClinicaDB;
   const professionalId = crypto.randomUUID();
   const patientId = crypto.randomUUID();
+  const sucursalId = crypto.randomUUID();
 
   const baseInput: NewAppointmentFormInput = {
     patientId,
@@ -26,6 +28,7 @@ describe("agendaUseCases", () => {
   };
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId(sucursalId);
     db = new NutriClinicaDB(`test-ag-uc-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieAgendaRepository(db);

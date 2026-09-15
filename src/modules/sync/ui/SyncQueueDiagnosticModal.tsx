@@ -3,8 +3,7 @@
  *
  * Se abre clickeando "N pendientes" en la StatusBar. Muestra la cola
  * completa (pending + error) con su `lastError` y permite:
- *   - Reintentar: pone los items en `status='pending'` y dispara sync.
- *   - Limpiar: vacía la cola (los datos en Dexie NO se borran).
+ *   - Reintentar errores sin alterar revisiones ni conflictos.
  *   - Copiar al portapapeles: para reportar errores sin DevTools.
  */
 
@@ -12,11 +11,9 @@ import * as React from "react";
 import {
   Clipboard,
   RefreshCw,
-  Trash2,
   X,
   AlertCircle,
   Database,
-  XCircle,
   Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -91,35 +88,14 @@ export function SyncQueueDiagnosticModal({
     if (open) void refresh();
   }, [open, refresh]);
 
-  const handleClearAll = async () => {
-    if (!window.confirm(t("sync.clear_queue_confirm"))) {
-      return;
-    }
-    if (!sucursalId) return;
-    await queue.clearAll(sucursalId);
-    useSyncStore.getState().setPendingChanges(0);
-    toast.success(t("sync.queue_cleared"));
-    void refresh();
-  };
-
   const handleRetryAll = async () => {
     if (!sucursalId) return;
-    const errorItems = items.filter(
-      (i) => i.status === "error" || i.status === "conflict",
-    );
+    const errorItems = items.filter((i) => i.status === "error");
     for (const it of errorItems) {
       await db.sync_queue.update(it.id, { status: "pending", lastError: null });
     }
     toast.info(t("sync.items_pending", { count: errorItems.length }), {
       description: t("sync.retry_hint"),
-    });
-    void refresh();
-  };
-
-  const handleDiscard = async (itemId: string, entity: string) => {
-    await db.sync_queue.delete(itemId);
-    toast.success(t("sync.item_discarded", { entity }), {
-      description: t("sync.discard_desc"),
     });
     void refresh();
   };
@@ -220,7 +196,7 @@ export function SyncQueueDiagnosticModal({
             size="sm"
             variant="outline"
             onClick={handleRetryAll}
-            disabled={errorCount + conflictCount === 0}
+            disabled={errorCount === 0}
           >
             {t("sync.retry_errors")}
           </Button>
@@ -252,17 +228,6 @@ export function SyncQueueDiagnosticModal({
             />
             {t("sync.repair_dates")}
           </Button>
-          <div className="ml-auto">
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={handleClearAll}
-              disabled={items.length === 0}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              {t("sync.clear_queue")}
-            </Button>
-          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto -mx-2 px-2">
@@ -318,14 +283,6 @@ export function SyncQueueDiagnosticModal({
                         {new Date(i.updatedAt).toLocaleString("es-MX")}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleDiscard(i.id, i.entity)}
-                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      title={t("sync.discard_item_title")}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
                   </div>
                 </li>
               ))}

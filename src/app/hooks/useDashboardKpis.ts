@@ -14,6 +14,7 @@ import type { Appointment } from "@modules/agenda/domain/Appointment";
 import { patientRowToDomain } from "@modules/patient/infrastructure/patientMapper";
 import { mealPlanRowToDomain } from "@modules/mealplan/infrastructure/mealPlanMapper";
 import { BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 export interface DashboardKpis {
   totalActivePatients: number;
@@ -146,18 +147,8 @@ const isOperationalAppointment = (appointment: Appointment): boolean => {
 const appointmentMatchesSucursal = (
   appointment: Appointment,
   sucursalId: string | null,
-): boolean => {
-  if (!sucursalId) return true;
-  return !appointment.officeId || appointment.officeId === sucursalId;
-};
-
-const rowMatchesDashboardSucursal = (
-  row: { sucursal_id?: string | null },
-  sucursalId: string | null,
-): boolean => {
-  if (!sucursalId) return true;
-  return !row.sucursal_id || row.sucursal_id === sucursalId;
-};
+): boolean =>
+  rowMatchesSucursal({ sucursal_id: appointment.officeId }, sucursalId);
 
 const weekDayLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -238,7 +229,7 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & {
         .filter(
           (r) =>
             r.deleted_at === null &&
-            rowMatchesDashboardSucursal(r, activeSucursalId),
+            rowMatchesSucursal(r, activeSucursalId),
         )
         .toArray(),
       db.meal_plans
@@ -246,20 +237,23 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & {
           (r) =>
             r.deleted_at === null &&
             r.status === "active" &&
-            rowMatchesDashboardSucursal(r, activeSucursalId),
+            rowMatchesSucursal(r, activeSucursalId),
         )
         .toArray(),
       db.consultations
         .filter(
           (r) =>
-            rowMatchesDashboardSucursal(r, activeSucursalId) && !r.deleted_at,
+            rowMatchesSucursal(r, activeSucursalId) && !r.deleted_at,
         )
         .toArray(),
       agendaService.listByRange(todayDateOnly, upcomingEndDateOnly),
       db.sync_queue
         .filter(
           (r) =>
-            r.sucursalId === activeSucursalId &&
+            rowMatchesSucursal(
+              { sucursal_id: r.sucursalId },
+              activeSucursalId,
+            ) &&
             (r.status === "pending" ||
               r.status === "error" ||
               r.status === "conflict"),

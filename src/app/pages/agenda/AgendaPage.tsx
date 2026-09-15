@@ -39,6 +39,7 @@ import type { Appointment } from "@modules/agenda/domain/Appointment";
 import type { AppointmentStatus } from "@modules/agenda/domain/AppointmentStatus";
 import { appointmentIdFromUnsafe } from "@modules/agenda/domain/AppointmentId";
 import { useAuthStore } from "@store/authStore";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 import "react-day-picker/style.css";
 
 type AgendaView = "day" | "week" | "list";
@@ -117,12 +118,13 @@ export function AgendaPage() {
   }, [appointments, loading, searchParams, setSearchParams]);
 
   const loadedPatients = useLiveQuery(
-    () => db.patients
+    () => activeBranchId
+      ? db.patients
       .filter(
         (row) =>
           row.deleted_at === null &&
           row.status === "active" &&
-          (!activeBranchId || row.sucursal_id === activeBranchId),
+          rowMatchesSucursal(row, activeBranchId),
       )
       .toArray()
       .then((rows) =>
@@ -130,7 +132,8 @@ export function AgendaPage() {
           id: r.id,
           name: `${r.first_name} ${r.last_name}`.trim(),
         })),
-      ),
+      )
+      : Promise.resolve<Array<{ id: string; name: string }>>([]),
     [activeBranchId],
   );
   const patients = loadedPatients ?? [];

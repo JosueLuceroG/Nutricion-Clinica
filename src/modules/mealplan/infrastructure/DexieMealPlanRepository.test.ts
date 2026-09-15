@@ -6,6 +6,7 @@ import { MealPlan } from "../domain/MealPlan";
 import { MealPlanId } from "../domain/MealPlanId";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
+import { useSyncStore } from "@store/syncStore";
 
 const make = (
   patientId: PatientId,
@@ -36,6 +37,7 @@ describe("DexieMealPlanRepository", () => {
   const pid = PatientId.generate();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-mp-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieMealPlanRepository(db);
@@ -49,6 +51,20 @@ describe("DexieMealPlanRepository", () => {
     expect(found?.name).toBe("Plan A");
     expect(found?.kcalTarget).toBe(1500);
     expect(found?.meals).toHaveLength(5);
+  });
+
+  it("no lee, sobrescribe ni elimina un plan de otra sucursal", async () => {
+    const plan = make(pid);
+    await repo.save(plan);
+    await db.meal_plans.update(plan.id.toString(), { sucursal_id: "suc-2" });
+
+    expect(await repo.findById(plan.id)).toBeNull();
+    await expect(repo.save(plan)).rejects.toThrow(/otra sucursal/);
+    await repo.delete(plan.id, true);
+    expect(await db.meal_plans.get(plan.id.toString())).toMatchObject({
+      sucursal_id: "suc-2",
+      deleted_at: null,
+    });
   });
 
   it("preserva los intercambios (exchanges) de cada tiempo", async () => {
@@ -114,14 +130,14 @@ describe("DexieMealPlanRepository", () => {
     const p2 = make(pid, { name: "Plan sucursal 2" });
     await repo.save(p1);
     await repo.save(p2);
-    await db.meal_plans.update(p1.id.toString(), { sucursal_id: "s1" });
-    await db.meal_plans.update(p2.id.toString(), { sucursal_id: "s2" });
+    await db.meal_plans.update(p1.id.toString(), { sucursal_id: "suc-1" });
+    await db.meal_plans.update(p2.id.toString(), { sucursal_id: "suc-2" });
 
-    const results = await repo.findAll({ sucursalId: "s1" });
+    const results = await repo.findAll({ sucursalId: "suc-1" });
 
     expect(results).toHaveLength(1);
     expect(results[0]?.name).toBe("Plan sucursal 1");
-    expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+    expect(await repo.count({ sucursalId: "suc-1" })).toBe(1);
   });
 
   it("excluye soft-deleted por defecto", async () => {

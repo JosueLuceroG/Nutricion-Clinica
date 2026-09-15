@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "@services/db/dexieSchema";
 import { useAuthStore } from "@store/authStore";
 import type { QuickConsultationPatient } from "../../application/quickConsultationTypes";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 const normalizeSearchValue = (value: string): string =>
   value
@@ -29,7 +30,7 @@ export function useQuickConsultationPatients(query: string) {
       const rows = await db.patients
         .filter(
           (row) =>
-            (!row.sucursal_id || row.sucursal_id === branchId) &&
+            rowMatchesSucursal(row, branchId) &&
             !row.deleted_at &&
             row.status === "active",
         )

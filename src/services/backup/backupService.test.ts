@@ -10,6 +10,7 @@ import {
 import { db } from "@services/db/dexieSchema";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import { setSyncRunning } from "@services/sync/syncEnqueuer";
+import { markRemoteTransaction } from "@services/sync/atomicOutbox";
 
 const mocks = vi.hoisted(() => ({
   consume: vi.fn(async () => ({ authorized: true as const })),
@@ -34,6 +35,7 @@ const RESTORE_AUTH = {
 
 const patient: PatientRow = {
   id: "p1",
+  sucursal_id: "11111111-1111-4111-8111-111111111111",
   first_name: "María",
   last_name: "Gómez",
   second_last_name: null,
@@ -81,8 +83,11 @@ beforeEach(async () => {
   mocks.consume.mockResolvedValue({ authorized: true });
   mocks.getAuthState.mockReturnValue({ user: { id: "admin-1", rol: "admin" } });
   setSyncRunning(false);
-  await Promise.all(db.tables.map((table) => table.clear()));
-  await db.patients.put(patient);
+  await db.transaction("rw", db.tables, async () => {
+    markRemoteTransaction();
+    await Promise.all(db.tables.map((table) => table.clear()));
+    await db.patients.put(patient);
+  });
   await db.smae_custom_foods.put({
     id: "custom-test",
     group: "frutas",
@@ -156,7 +161,10 @@ describe("backupService", () => {
   it("round-trips an encrypted backup with the correct password", async () => {
     const exported = await backupService.exportBackup(EXPORT_AUTH, "secret123");
     await db.smae_custom_foods.update("custom-test", { name: "Changed" });
-    await db.patients.update("p1", { first_name: "Server managed" });
+    await db.transaction("rw", db.patients, async () => {
+      markRemoteTransaction();
+      await db.patients.update("p1", { first_name: "Server managed" });
+    });
 
     const result = await backupService.importBackup(
       exported.blob,

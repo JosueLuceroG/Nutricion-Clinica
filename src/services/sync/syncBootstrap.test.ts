@@ -91,7 +91,7 @@ describe("reconcileAllPendingChanges", () => {
     expect(items.length).toBe(2);
     const p2Item = items.find((i) => i.entityId === p2);
     expect(p2Item).toBeDefined();
-    expect(p2Item?.status).toBe("pending");
+    expect(p2Item?.status).toBe("conflict");
   });
 
   it("es idempotente: correrlo 2 veces encola solo la primera vez", async () => {
@@ -144,7 +144,7 @@ describe("reconcileAllPendingChanges", () => {
     expect(result.byEntity).toEqual({});
   });
 
-  it("NO encola filas con deleted_at (soft-deleted localmente)", async () => {
+  it("preserva también tombstones legacy para revisión, sin enviarlos automáticamente", async () => {
     const activeId = uuid();
     const deletedId = uuid();
     await db.patients.bulkAdd([
@@ -159,11 +159,12 @@ describe("reconcileAllPendingChanges", () => {
 
     const result = await reconcileAllPendingChanges(db, "suc-1");
 
-    expect(result.scanned).toBe(1);
-    expect(result.enqueued).toBe(1);
+    expect(result.scanned).toBe(2);
+    expect(result.enqueued).toBe(2);
     const items = await db.sync_queue.toArray();
-    expect(items.length).toBe(1);
-    expect(items[0]!.entityId).toBe(activeId);
+    expect(items.length).toBe(2);
+    expect(items.every((item) => item.status === "conflict")).toBe(true);
+    expect(items.map((item) => item.entityId).sort()).toEqual([activeId, deletedId].sort());
   });
 
   it("solo reconcilia filas y deduplica items de la sucursal indicada", async () => {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { canonicalSyncId } from '@nutriclinica/shared';
 
 export type SyncStatus = 'idle' | 'syncing' | 'offline' | 'error';
 
@@ -30,7 +31,9 @@ export const useSyncStore = create<SyncState>()(
       setPendingChanges: (pendingChanges) => set({ pendingChanges }),
       setLastSync: (lastSyncAt) => set({ lastSyncAt, lastError: null }),
       setLastError: (lastError) => set({ lastError }),
-      setSucursalId: (sucursalId) => set({ sucursalId }),
+      setSucursalId: (sucursalId) => set({
+        sucursalId: sucursalId ? canonicalSyncId(sucursalId) : null,
+      }),
     }),
     {
       name: 'sync-store',

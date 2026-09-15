@@ -92,6 +92,7 @@ import { sendProfessionalMessage } from "@services/api/patientPortalApi";
 import { db } from "@services/db/dexieSchema";
 import {
   closeCsvPreviewWindow,
+  currentPatientRowsForBranch,
   downloadAndOpenCsv,
   patientRowsToCsv,
   prepareCsvPreviewWindow,
@@ -355,8 +356,11 @@ export function PatientsListPage() {
     const previewWindow = prepareCsvPreviewWindow();
     setBusy(true);
     try {
-      const rows = (await db.patients.bulkGet(ids)).filter(
-        (row): row is NonNullable<typeof row> => row !== undefined,
+      const rows = currentPatientRowsForBranch(
+        (await db.patients.bulkGet(ids)).filter(
+          (row): row is NonNullable<typeof row> => row !== undefined,
+        ),
+        branchId,
       );
       const fileName = `pacientes-seleccionados-${new Date().toISOString().slice(0, 10)}.csv`;
       await downloadAndOpenCsv(patientRowsToCsv(rows), fileName, previewWindow);

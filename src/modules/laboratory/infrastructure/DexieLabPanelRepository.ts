@@ -35,7 +35,7 @@ export class DexieLabPanelRepository implements LabPanelRepository {
 
   async findById(id: LabPanelId): Promise<LabPanel | null> {
     const row = await this.dbInstance.lab_panels.get(id.toString());
-    if (!row || !rowMatchesSucursal(row, requireActiveSucursalId()))
+    if (!row || row.deleted_at != null || !rowMatchesSucursal(row, requireActiveSucursalId()))
       return null;
     return labPanelRowToDomain(row);
   }

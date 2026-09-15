@@ -29,7 +29,7 @@ vi.mock('mssql', () => {
   const Bit = () => ({ type: 'Bit' });
   const MAX = { type: 'NVarChar', length: 'max' };
   return {
-    default: { NVarChar, UniqueIdentifier, DateTime2, Date, Int, Decimal, Bit, MAX },
+    default: { NVarChar, UniqueIdentifier, DateTime2, Date, Int, Decimal, Bit, MAX, VarBinary: (n: number) => ({ type: 'VarBinary', length: n }) },
   };
 });
 
@@ -38,12 +38,62 @@ vi.mock('../../../db/connection.js', () => ({
   closePool: vi.fn(),
 }));
 
-import { getManifest, pullChanges, pushBatch } from './syncService.js';
+// This suite isolates column SQL and transaction lifecycle. The durable receipt
+// boundary (including rejected replays/concurrency) is exercised without this
+// mock in syncReceipt.test.ts and syncIntegrity.realSql.test.ts.
+vi.mock('./syncReceipt.js', () => ({
+  applyWithReceipt: async (_session: unknown, _branch: string, _actor: string, _op: unknown, apply: () => Promise<unknown>) => apply(),
+}));
+
+function rowVersion(value: number): Buffer {
+  const buffer = Buffer.alloc(8);
+  buffer.writeBigUInt64BE(BigInt(value));
+  return buffer;
+}
+
+function mockNoActivePatientDescendants(): void {
+  for (let index = 0; index < 5; index++) {
+    mockRequestQuery.mockResolvedValueOnce({ recordset: [] });
+  }
+}
+
+import type { SyncPushBatch, SyncPushOperation } from '@nutriclinica/shared';
+import { getManifest, pullChanges, pushBatch as pushBatchService } from './syncService.js';
+
+const TEST_PULL_ACTOR = {
+  id: '00000000-0000-0000-0000-000000000777',
+  role: 'admin' as const,
+};
+
+type TestSyncPushOperation = Omit<SyncPushOperation, 'operationId'> & {
+  operationId?: string;
+};
+
+function pushBatch(
+  batch: Omit<SyncPushBatch, 'operations'> & { operations: TestSyncPushOperation[] },
+  actor: Parameters<typeof pushBatchService>[1],
+) {
+  return pushBatchService(
+    {
+      ...batch,
+      operations: batch.operations.map((operation, index) => ({
+        ...operation,
+        operationId:
+          operation.operationId ??
+          `00000000-0000-4000-9000-${String(index + 1).padStart(12, '0')}`,
+      })),
+    },
+    actor,
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRequestQuery.mockReset();
   mockRequestInput.mockReturnThis();
-  mockPoolRequest.mockImplementation(() => ({ input: mockRequestInput, query: mockRequestQuery }));
+  mockPoolRequest.mockImplementation(() => ({ input: mockRequestInput, query: vi.fn((text: string) =>
+    text.includes('MIN_ACTIVE_ROWVERSION') ? Promise.resolve({ recordset: [{ fence: rowVersion(10000) }] }) : mockRequestQuery(text)),
+  }));
   // default: empty recordset (avoids contaminating entity queries with time query default)
   mockRequestQuery.mockResolvedValue({ recordset: [] });
 });
@@ -77,11 +127,22 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] }) // entity 6 adherence_records
       .mockResolvedValueOnce(time); // final time
 
-    const r = await pullChanges('s1', { pacientes: 'not-a-date@x' }, null);
+    const r = await pullChanges('s1', { pacientes: 'not-a-date@x' }, null, TEST_PULL_ACTOR);
     expect(r.changes).toEqual([]);
     expect(r.hasMore).toBe(false);
     const pageSql = mockRequestQuery.mock.calls[0]![0] as string;
-    expect(pageSql).toContain('updated_at > @since');
+    expect(pageSql).toContain('row_version > @since_version');
+  });
+
+  it('cursor posterior al horizonte actual cae a replay completo', async () => {
+    mockRequestQuery
+      .mockResolvedValueOnce({ recordset: [] })
+      .mockResolvedValueOnce({ recordset: [{ t: new Date('2026-06-04T00:00:00.000Z') }] });
+
+    await pullChanges('s1', { pacientes: 'rv:ffffffffffffffff' }, ['pacientes'], TEST_PULL_ACTOR);
+
+    const sinceInput = mockRequestInput.mock.calls.find((call) => call[0] === 'since_version');
+    expect(Buffer.from(sinceInput?.[2] as Uint8Array)).toEqual(Buffer.alloc(8));
   });
 
   it('retorna cambios vac\u00edos cuando no hay rows y no avanza cursors', async () => {
@@ -95,7 +156,7 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] }) // entity 6 adherence_records
       .mockResolvedValueOnce(time); // final time
 
-    const r = await pullChanges('s1', null, null);
+    const r = await pullChanges('s1', null, null, TEST_PULL_ACTOR);
     expect(r.changes).toEqual([]);
     expect(r.hasMore).toBe(false);
     expect(r.cursors).toEqual({});
@@ -107,17 +168,15 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({
         // entity 1 pacientes (2 rows)
         recordset: [
-          { id: 'a1', row_version: Buffer.from([1, 2, 3]), updated_at: new Date('2026-06-01'), deleted_at: null },
+          { id: 'a1', nombres: 'Ana', row_version: rowVersion(1), updated_at: new Date('2026-06-01'), deleted_at: null },
           {
             id: 'a2',
-            row_version: Buffer.from([4, 5, 6]),
+            row_version: rowVersion(2),
             updated_at: new Date('2026-06-02'),
             deleted_at: new Date('2026-06-02'),
           },
         ],
       })
-      .mockResolvedValueOnce({ recordset: [{ nombres: 'Ana' }] }) // detail a1
-      .mockResolvedValueOnce({ recordset: [{ nombres: 'Beto' }] }) // detail a2
       .mockResolvedValueOnce({ recordset: [] }) // entity 2 consultas
       .mockResolvedValueOnce({ recordset: [] }) // entity 3 antropometrias
       .mockResolvedValueOnce({ recordset: [] }) // entity 4 lab_panels
@@ -125,13 +184,13 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] }) // entity 6 adherence_records
       .mockResolvedValueOnce(time); // final time
 
-    const r = await pullChanges('s1', null, null);
+    const r = await pullChanges('s1', null, null, TEST_PULL_ACTOR);
     expect(r.changes).toHaveLength(2);
     expect(r.changes[0]!.op).toBe('update');
     expect(r.changes[1]!.op).toBe('delete');
     expect(r.changes[0]!.serverRowVersion).toBeTruthy();
     // cursor por entidad avanzado a la última fila (t@id)
-    expect(r.cursors.pacientes).toBe('2026-06-02T00:00:00.000Z@a2');
+    expect(r.cursors.pacientes).toBe('rv1:s1:pacientes:0000000000000002');
   });
 
   it('usa el cursor por-entidad para paginar sin saltarse filas con mismo updated_at', async () => {
@@ -142,13 +201,13 @@ describe('syncService.pullChanges', () => {
         recordset: [
           ...Array.from({ length: 1000 }, (_, i) => ({
             id: `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa${String(i).padStart(3, '0')}`,
-            row_version: Buffer.from([i]),
+             row_version: rowVersion(i + 1),
             updated_at: new Date('2026-06-01T00:00:00.000Z'),
             deleted_at: null,
           })),
           {
             id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-            row_version: Buffer.from([9]),
+            row_version: rowVersion(1001),
             updated_at: new Date('2026-06-01T00:00:00.000Z'),
             deleted_at: null,
           },
@@ -161,17 +220,18 @@ describe('syncService.pullChanges', () => {
       .mockResolvedValueOnce({ recordset: [] }) // entity 6 adherence_records
       .mockResolvedValueOnce(time); // final time
 
-    const r = await pullChanges('s1', null, null);
+    const r = await pullChanges('s1', null, null, TEST_PULL_ACTOR);
     expect(r.hasMore).toBe(true);
     // el cursor apunta a la última fila de la página con su id (tiebreaker
     // para filas con updated_at idéntico), no solo al timestamp
-    expect(r.cursors.pacientes).toBe('2026-06-01T00:00:00.000Z@aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa999');
+    expect(r.cursors.pacientes).toBe(`rv1:s1:pacientes:${rowVersion(1000).toString('hex')}`);
     expect(r.changes).toHaveLength(1000);
 
     // la query de página incluye el tiebreaker (updated_at = @since AND id > @last_id)
     const pageSql = mockRequestQuery.mock.calls[0]![0] as string;
-    expect(pageSql).toContain('(updated_at > @since OR (updated_at = @since AND id > @last_id))');
-    expect(pageSql).toContain('ORDER BY updated_at ASC, id ASC');
+    expect(pageSql).toContain('row_version > @since_version AND row_version < @safe_upper');
+    expect(pageSql).toContain('ORDER BY row_version ASC, id ASC');
+    expect(pageSql).not.toContain('NOLOCK');
   });
 
   it('avanza el cursor por-entidad y respeta el filtro de entidades', async () => {
@@ -182,22 +242,68 @@ describe('syncService.pullChanges', () => {
         recordset: [
           {
             id: 'a2',
-            row_version: Buffer.from([1]),
+            row_version: rowVersion(2),
             updated_at: new Date('2026-06-02'),
             deleted_at: null,
           },
         ],
       })
-      .mockResolvedValueOnce({ recordset: [{ nombres: 'Ana' }] }) // detail a2
       .mockResolvedValueOnce({ recordset: [] }) // consultas: sin cambios
       .mockResolvedValueOnce(time);
 
-    const r = await pullChanges('s1', { pacientes: '2026-06-01T00:00:00.000Z@a1' }, ['pacientes', 'consultas']);
+    const r = await pullChanges('s1', { pacientes: '2026-06-01T00:00:00.000Z@a1' }, ['pacientes', 'consultas'], TEST_PULL_ACTOR);
     expect(r.hasMore).toBe(false);
     // el cursor de pacientes avanza a la última fila vista
-    expect(r.cursors.pacientes).toBe('2026-06-02T00:00:00.000Z@a2');
+    expect(r.cursors.pacientes).toBe('rv1:s1:pacientes:0000000000000002');
     // consultas no reporta cursor (no hubo rows nuevas; el cliente conserva el suyo)
     expect(r.cursors.consultas).toBeUndefined();
+  });
+
+  it('projects pull rows to billing fields and only queries consultations', async () => {
+    mockRequestQuery
+      .mockResolvedValueOnce({
+        recordset: [{
+           id: '00000000-0000-4000-8000-000000000099',
+           paciente_id: '00000000-0000-4000-8000-000000000098',
+           consultation_date: new Date('2026-06-01'),
+           consultation_number: 4,
+           status: 'completed',
+           reason: 'SENSITIVE_REASON',
+          subjective: 'SENSITIVE_SOAP',
+          payment_status: 'partial',
+          amount_paid: 250,
+          row_version: rowVersion(2),
+          updated_at: new Date('2026-06-02'),
+          deleted_at: null,
+        }],
+      })
+      .mockResolvedValueOnce({ recordset: [{ t: new Date('2026-06-04T00:00:00.000Z') }] });
+
+    const result = await pullChanges('s1', null, null, {
+      id: TEST_PULL_ACTOR.id,
+      role: 'facturacion',
+    });
+
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]!.entity).toBe('consultas');
+    expect(result.changes[0]!.partial).toBe(true);
+    expect(result.changes[0]!.payload).toMatchObject({
+      payment_status: 'partial',
+      amount_paid: 250,
+      patient_id: '00000000-0000-4000-8000-000000000098',
+      consultation_number: 4,
+    });
+    expect(result.changes[0]!.payload).not.toHaveProperty('reason');
+    expect(result.changes[0]!.payload).not.toHaveProperty('subjective');
+    expect(String(mockRequestQuery.mock.calls[0]![0])).toContain('FROM consultas');
+  });
+
+  it('rejects pull for roles without synchronized data access before opening SQL', async () => {
+    await expect(pullChanges('s1', null, null, {
+      id: TEST_PULL_ACTOR.id,
+      role: 'auditor',
+    })).rejects.toMatchObject({ status: 403 });
+    expect(mockGetPool).not.toHaveBeenCalled();
   });
 });
 
@@ -243,6 +349,7 @@ describe('syncService.pushBatch', () => {
   });
 
   it('procesa delete + update y reporta applied', async () => {
+    mockNoActivePatientDescendants();
     mockRequestQuery
       // delete op 1
       .mockResolvedValueOnce({ rowsAffected: [1] })
@@ -264,7 +371,7 @@ describe('syncService.pushBatch', () => {
             entity: 'consultas',
             id: '00000000-0000-0000-0000-000000000020',
             op: 'update',
-            payload: {},
+            payload: { reason: 'updated' },
             clientUpdatedAt: '2026-06-04T00:00:00.000Z',
           },
         ],
@@ -559,9 +666,10 @@ describe('syncService.pushBatch', () => {
     );
 
     expect(r.results[0]!.status).toBe('error');
-    expect(r.results[0]!.error).toContain('Paciente no encontrado');
+    expect(r.results[0]!.error).toBe('SYNC_OPERATION_REJECTED_404');
     const validationSql = mockRequestQuery.mock.calls[1]![0] as string;
     expect(validationSql).toContain('sucursal_id = @sucursal_id');
+    expect(validationSql).toContain('WITH (UPDLOCK, HOLDLOCK)');
   });
 
   it('create: clinical_tags se serializa a JSON string para NVARCHAR(MAX)', async () => {
@@ -641,7 +749,7 @@ describe('syncService.pushBatch', () => {
             op: 'update',
             payload: { first_name: 'Ana' },
             clientUpdatedAt: '2026-06-04T00:00:00.000Z',
-            expectedRowVersion: 'AAA=',
+            expectedRowVersion: 'AAAAAAAAAAE=',
           },
         ],
       },
@@ -698,7 +806,7 @@ describe('syncService.pushBatch', () => {
       TEST_ACTOR,
     );
     expect(r.results[0]!.status).toBe('error');
-    expect(r.results[0]!.error).toContain('DB timeout');
+    expect(r.results[0]!.error).toBe('SYNC_OPERATION_FAILED');
   });
 
   it('update con expectedRowVersion conflictivo devuelve conflict', async () => {
@@ -716,7 +824,7 @@ describe('syncService.pushBatch', () => {
             op: 'update',
             payload: { first_name: 'Ana' },
             clientUpdatedAt: '2026-06-04T00:00:00.000Z',
-            expectedRowVersion: 'AAA=',
+            expectedRowVersion: 'AAAAAAAAAAE=',
           },
         ],
       },
@@ -782,6 +890,44 @@ describe('syncService.pushBatch', () => {
     expect(updateSql).not.toMatch(/WHERE.*deleted_at IS NULL/i);
   });
 
+  it('restore: valida y bloquea el parent persistido aunque el payload no pueda cambiarlo', async () => {
+    const patientId = '00000000-0000-0000-0000-000000000010';
+    mockRequestQuery
+      .mockResolvedValueOnce({
+        recordset: [{
+          id: 'x',
+          deleted_at: new Date('2026-06-01'),
+          patient_id: patientId,
+        }],
+      })
+      .mockResolvedValueOnce({ recordset: [] });
+
+    const r = await pushBatch(
+      {
+        sucursalId: '00000000-0000-0000-0000-000000000001',
+        operations: [{
+          entity: 'consultas',
+          id: '00000000-0000-0000-0000-000000000099',
+          op: 'update',
+          restoreDeleted: true,
+          payload: { reason: 'restored' },
+          clientUpdatedAt: '2026-06-04T00:00:00.000Z',
+        }],
+      },
+      TEST_ACTOR,
+    );
+
+    expect(r.results[0]).toMatchObject({
+      status: 'error',
+      error: 'SYNC_OPERATION_REJECTED_404',
+    });
+    expect(mockRequestInput.mock.calls).toContainEqual([
+      'paciente_id',
+      expect.anything(),
+      patientId,
+    ]);
+  });
+
   it('update sobre fila no existente devuelve applied con error (idempotente)', async () => {
     mockRequestQuery.mockResolvedValueOnce({ recordset: [] }); // exists vacío
     const r = await pushBatch(
@@ -804,6 +950,7 @@ describe('syncService.pushBatch', () => {
   });
 
   it('cada operación corre en transacción: commit al aplicar', async () => {
+    mockNoActivePatientDescendants();
     mockRequestQuery.mockResolvedValueOnce({ rowsAffected: [1] }); // UPDATE delete
 
     const r = await pushBatch(
@@ -856,6 +1003,7 @@ describe('syncService.pushBatch', () => {
   });
 
   it('delete con expectedRowVersion conflictivo devuelve conflict', async () => {
+    mockNoActivePatientDescendants();
     mockRequestQuery.mockResolvedValueOnce({
       recordset: [{ row_version: Buffer.from([9, 9, 9]), updated_at: new Date('2026-06-03') }],
     });
@@ -870,7 +1018,7 @@ describe('syncService.pushBatch', () => {
             op: 'delete',
             payload: null,
             clientUpdatedAt: '2026-06-04T00:00:00.000Z',
-            expectedRowVersion: 'AAA=',
+            expectedRowVersion: 'AAAAAAAAAAE=',
           },
         ],
       },
@@ -884,9 +1032,11 @@ describe('syncService.pushBatch', () => {
   });
 
   it('delete con expectedRowVersion coincidente aplica', async () => {
-    const version = Buffer.from([1, 2, 3]).toString('base64');
+    const serverVersion = rowVersion(0x010203);
+    const version = serverVersion.toString('base64');
+    mockNoActivePatientDescendants();
     mockRequestQuery
-      .mockResolvedValueOnce({ recordset: [{ row_version: Buffer.from([1, 2, 3]), updated_at: new Date('2026-06-03') }] })
+      .mockResolvedValueOnce({ recordset: [{ row_version: serverVersion, updated_at: new Date('2026-06-03') }] })
       .mockResolvedValueOnce({ rowsAffected: [1] });
 
     const r = await pushBatch(

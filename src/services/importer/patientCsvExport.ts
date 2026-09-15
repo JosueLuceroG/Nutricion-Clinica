@@ -1,4 +1,5 @@
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 const EXPORT_HEADERS = [
   "nombre",
@@ -25,7 +26,7 @@ export function currentPatientRowsForBranch(
     .filter(
       (row) =>
         row.deleted_at === null &&
-        (!branchId || !row.sucursal_id || row.sucursal_id === branchId),
+        rowMatchesSucursal(row, branchId),
     )
     .sort((left, right) =>
       `${left.last_name} ${left.first_name}`.localeCompare(

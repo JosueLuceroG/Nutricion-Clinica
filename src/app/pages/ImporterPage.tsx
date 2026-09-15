@@ -61,7 +61,10 @@ import {
   type MappedRow,
 } from "@services/importer";
 import { db } from "@services/db/dexieSchema";
-import { getActiveSucursalId } from "@services/tenancy/sucursalScope";
+import {
+  getActiveSucursalId,
+  rowMatchesSucursal,
+} from "@services/tenancy/sucursalScope";
 import { SexLabel } from "@modules/patient/domain/Sex";
 import "./ImporterPage.css";
 
@@ -194,9 +197,12 @@ export function ImporterPage() {
       let patientCount: number | undefined;
 
       if (kind === "current") {
+        const branchId = getActiveSucursalId();
         const rows = currentPatientRowsForBranch(
-          await db.patients.toArray(),
-          getActiveSucursalId(),
+          await db.patients
+            .filter((row) => rowMatchesSucursal(row, branchId))
+            .toArray(),
+          branchId,
         );
         patientCount = rows.length;
         content = patientRowsToCsv(rows);

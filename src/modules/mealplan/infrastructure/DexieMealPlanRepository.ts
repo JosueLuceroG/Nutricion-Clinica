@@ -6,7 +6,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { MealPlanRow } from "./mealPlanMapper";
 import { mealPlanRowToDomain, mealPlanDomainToRow } from "./mealPlanMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
-import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import { requireActiveSucursalId, rowMatchesSucursal, withSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 100;
@@ -17,13 +17,16 @@ export class DexieMealPlanRepository implements MealPlanRepository {
 
   async save(plan: MealPlan): Promise<void> {
     const row = mealPlanDomainToRow(plan);
+    const sucursalId = requireActiveSucursalId();
     const existing = await this.dbInstance.meal_plans.get(row.id).catch(() => null);
-    await this.dbInstance.meal_plans.put(withCurrentSucursalScope(row, existing));
+    assertOwnedBySucursal(existing, sucursalId);
+    await this.dbInstance.meal_plans.put(withSucursalScope(row, sucursalId));
   }
 
   async findById(id: MealPlanId): Promise<MealPlan | null> {
     const row = await this.dbInstance.meal_plans.get(id.toString());
-    if (!row) return null;
+    if (!row || row.deleted_at != null ||
+      !rowMatchesSucursal(row, requireActiveSucursalId())) return null;
     return mealPlanRowToDomain(row);
   }
 
@@ -53,11 +56,16 @@ export class DexieMealPlanRepository implements MealPlanRepository {
     if (soft) {
       const existing = await this.dbInstance.meal_plans.get(id.toString());
       if (!existing) return;
+      const sucursalId = requireActiveSucursalId();
+      if (!rowMatchesSucursal(existing, sucursalId)) return;
       const domain = mealPlanRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.meal_plans.put(withCurrentSucursalScope(mealPlanDomainToRow(deleted), existing));
+      await this.dbInstance.meal_plans.put(withSucursalScope(mealPlanDomainToRow(deleted), sucursalId));
     } else {
-      await this.dbInstance.meal_plans.delete(id.toString());
+      const existing = await this.dbInstance.meal_plans.get(id.toString());
+      if (existing && rowMatchesSucursal(existing, requireActiveSucursalId())) {
+        await this.dbInstance.meal_plans.delete(id.toString());
+      }
     }
   }
 
@@ -66,6 +74,9 @@ export class DexieMealPlanRepository implements MealPlanRepository {
     query: MealPlanQuery,
   ): Collection<MealPlanRow, string> {
     let collection: Collection<MealPlanRow, string> = source;
+    const activeSucursalId = requireActiveSucursalId();
+    collection = collection.filter((row: MealPlanRow) =>
+      rowMatchesSucursal(row, activeSucursalId));
     if (query.sucursalId) {
       const sucursalId = query.sucursalId;
       collection = collection.filter((row: MealPlanRow) => rowMatchesSucursal(row, sucursalId));
@@ -88,6 +99,15 @@ export class DexieMealPlanRepository implements MealPlanRepository {
       collection = collection.filter((row: MealPlanRow) => row.start_date <= toIso);
     }
     return collection;
+  }
+}
+
+function assertOwnedBySucursal(
+  row: MealPlanRow | null | undefined,
+  sucursalId: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error("El plan pertenece a otra sucursal");
   }
 }
 

@@ -2,6 +2,7 @@ import { Outlet, RouterProvider, createHashRouter, Navigate } from "react-router
 import * as React from "react";
 import { ErrorBoundary } from "@app/ErrorBoundary";
 import { RequireRole } from "@modules/auth/RequireRole";
+import { RequireModule } from "@modules/auth/RequireModule";
 import { BILLING_ROLES, BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
 import { useAuthStore } from "@store/authStore";
 import { dashboardRouteLoaders } from "@app/dashboardRoutePreloaders";
@@ -116,43 +117,129 @@ const router = createHashRouter([
       { index: true, element: <DashboardPage /> },
       {
         path: "pacientes",
+        element: (
+          <RequireModule module="patients">
+            <Outlet />
+          </RequireModule>
+        ),
         children: [
           { index: true, element: <PatientsListPage /> },
-          { path: "nuevo", element: <NewPatientPage /> },
-          { path: "importar", element: <ImporterPage /> },
+          {
+            path: "nuevo",
+            element: (
+              <RequireModule module="patients" action="write">
+                <NewPatientPage />
+              </RequireModule>
+            ),
+          },
+          {
+            path: "importar",
+            element: (
+              <RequireModule module="patients" action="write">
+                <ImporterPage />
+              </RequireModule>
+            ),
+          },
           { path: ":patientId", element: <PatientDetailPage /> },
-          { path: ":patientId/editar", element: <NewPatientPage /> },
+          {
+            path: ":patientId/editar",
+            element: (
+              <RequireModule module="patients" action="write">
+                <NewPatientPage />
+              </RequireModule>
+            ),
+          },
           {
             path: ":patientId/antropometria",
+            element: (
+              <RequireModule module="anthropometry">
+                <Outlet />
+              </RequireModule>
+            ),
             children: [
               { index: true, element: <PatientMeasurementsPage /> },
-              { path: "nueva", element: <NewMeasurementPage /> },
+              {
+                path: "nueva",
+                element: (
+                  <RequireModule module="anthropometry" action="write">
+                    <NewMeasurementPage />
+                  </RequireModule>
+                ),
+              },
             ],
           },
           {
             path: ":patientId/laboratorio",
+            element: (
+              <RequireModule module="laboratory">
+                <Outlet />
+              </RequireModule>
+            ),
             children: [
               { index: true, element: <PatientLabPage /> },
-              { path: "nuevo", element: <NewLabPanelPage /> },
-              { path: "scan", element: <ScanLabPanelPage /> },
+              {
+                path: "nuevo",
+                element: (
+                  <RequireModule module="laboratory" action="write">
+                    <NewLabPanelPage />
+                  </RequireModule>
+                ),
+              },
+              {
+                path: "scan",
+                element: (
+                  <RequireModule module="laboratory" action="write">
+                    <ScanLabPanelPage />
+                  </RequireModule>
+                ),
+              },
             ],
           },
           {
             path: ":patientId/consultas",
+            element: (
+              <RequireModule module="consultations">
+                <Outlet />
+              </RequireModule>
+            ),
             children: [
               { index: true, element: <PatientConsultationsPage /> },
-              { path: "nueva", element: <NewConsultationPage /> },
+              {
+                path: "nueva",
+                element: (
+                  <RequireModule module="consultations" action="write">
+                    <NewConsultationPage />
+                  </RequireModule>
+                ),
+              },
             ],
           },
           {
             path: ":patientId/planes",
+            element: (
+              <RequireModule module="mealplan">
+                <Outlet />
+              </RequireModule>
+            ),
             children: [
               { index: true, element: <PatientMealPlansPage /> },
-              { path: "nuevo", element: <NewMealPlanPage /> },
+              {
+                path: "nuevo",
+                element: (
+                  <RequireModule module="mealplan" action="write">
+                    <NewMealPlanPage />
+                  </RequireModule>
+                ),
+              },
             ],
           },
           {
             path: ":patientId/adherencia",
+            element: (
+              <RequireModule module="adherence">
+                <Outlet />
+              </RequireModule>
+            ),
             children: [
               { index: true, element: <PatientAdherencePage /> },
             ],
@@ -161,13 +248,35 @@ const router = createHashRouter([
       },
       {
         path: "consultas",
+        element: (
+          <RequireRole
+            roles={["admin", "nutriologa", "asistente", "soporte_tecnico", "auditor"]}
+            redirectTo="/"
+          >
+            <Outlet />
+          </RequireRole>
+        ),
         children: [
           { index: true, element: <ConsultationsListPage /> },
-          { path: "nueva", element: <NewConsultationPage /> },
+          {
+            path: "nueva",
+            element: (
+              <RequireModule module="consultations" action="write">
+                <NewConsultationPage />
+              </RequireModule>
+            ),
+          },
           { path: ":consultationId", element: <ConsultationDetailPage /> },
         ],
       },
-      { path: "laboratorio", element: <LaboratoryPage /> },
+      {
+        path: "laboratorio",
+        element: (
+          <RequireModule module="laboratory">
+            <LaboratoryPage />
+          </RequireModule>
+        ),
+      },
       {
         path: "billing",
         children: [
@@ -189,7 +298,11 @@ const router = createHashRouter([
           },
           {
             path: ":consultationId/receipt",
-            element: <ReceiptPage />,
+            element: (
+              <RequireRole roles={BILLING_ROLES} redirectTo="/billing">
+                <ReceiptPage />
+              </RequireRole>
+            ),
           },
           {
             path: "expenses",
@@ -211,22 +324,90 @@ const router = createHashRouter([
       },
       { path: "calculos", element: <CalculationsPage /> },
       { path: "smae", element: <SmaeCatalogPage /> },
-      { path: "recetas", element: <RecipesPage /> },
-      { path: "objetivos", element: <GoalsPage /> },
-      { path: "adherencia", element: <AdherencePage /> },
-      { path: "documentos", element: <DocumentsPage /> },
-      { path: "plan-semanal", element: <MealPlannerPage /> },
-      { path: "importar", element: <ImporterPage /> },
+      {
+        path: "recetas",
+        element: (
+          <RequireModule module="recipes">
+            <RecipesPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "objetivos",
+        element: (
+          <RequireModule module="goals">
+            <GoalsPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "adherencia",
+        element: (
+          <RequireModule module="adherence">
+            <AdherencePage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "documentos",
+        element: (
+          <RequireModule module="documents">
+            <DocumentsPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "plan-semanal",
+        element: (
+          <RequireModule module="meal-planner">
+            <MealPlannerPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "importar",
+        element: (
+          <RequireModule module="patients" action="write">
+            <ImporterPage />
+          </RequireModule>
+        ),
+      },
       {
         path: "planes",
+        element: (
+          <RequireModule module="mealplan">
+            <Outlet />
+          </RequireModule>
+        ),
         children: [
           { index: true, element: <PlansListPage /> },
           { path: ":planId", element: <MealPlanDetailPage /> },
         ],
       },
-      { path: "medicamentos", element: <MedicationsPage /> },
-      { path: "reportes", element: <ReportsPage /> },
-      { path: "agenda", element: <AgendaPage /> },
+      {
+        path: "medicamentos",
+        element: (
+          <RequireModule module="medications">
+            <MedicationsPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "reportes",
+        element: (
+          <RequireModule module="reports">
+            <ReportsPage />
+          </RequireModule>
+        ),
+      },
+      {
+        path: "agenda",
+        element: (
+          <RequireModule module="agenda">
+            <AgendaPage />
+          </RequireModule>
+        ),
+      },
       { path: "notificaciones", element: <NotificationsPage /> },
       { path: "perfil", element: <ProfilePage /> },
       { path: "configuracion", element: <SettingsPage /> },

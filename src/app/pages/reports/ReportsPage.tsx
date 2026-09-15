@@ -149,15 +149,11 @@ async function fetchLocalReportDashboardData(sucursalId: string | null, now = ne
 }
 
 function consultationMatchesScope(row: LocalConsultationMetricRow, sucursalId: string | null | undefined, patientIds: Set<string>): boolean {
-  if (!sucursalId) return true;
-  if (row.sucursal_id === sucursalId) return true;
-  return !row.sucursal_id && patientIds.has(row.patient_id);
+  return rowMatchesSucursal(row, sucursalId) && patientIds.has(row.patient_id);
 }
 
 function adherenceMatchesScope(row: LocalAdherenceMetricRow, sucursalId: string | null | undefined, patientIds: Set<string>): boolean {
-  if (!sucursalId) return true;
-  if (row.sucursal_id === sucursalId) return true;
-  return !row.sucursal_id && patientIds.has(row.patient_id);
+  return rowMatchesSucursal(row, sucursalId) && patientIds.has(row.patient_id);
 }
 
 function buildLocalPathologyCounts(patients: LocalPatientMetricRow[]): Array<{ tag: string; count: number }> {

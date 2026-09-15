@@ -13,6 +13,7 @@ export interface LinkedCounts {
   mealPlans: number;
   labPanels: number;
   anthropometry: number;
+  adherenceRecords: number;
 }
 
 /**
@@ -154,7 +155,7 @@ export class RestorePatientUseCase {
   constructor(private readonly repo: PatientRepository) {}
 
   async execute(id: PatientId): Promise<Patient> {
-    const existing = await this.repo.findById(id);
+    const existing = await this.repo.findById(id, true);
     if (!existing) {
       throw new PatientNotFoundError(id);
     }
@@ -211,7 +212,7 @@ export class RestorePatientUseCase {
 
 /**
  * Soft-delete en cascada: marca el paciente + todas sus consultas +
- * planes + laboratorios + antropometrias como deleted. Cada cambio
+ * planes + laboratorios + antropometrias + adherencia como deleted. Cada cambio
  * se persiste por separado para que el SyncEnqueuer encole cada fila
  * individualmente y el push las borre en el servidor también.
  */

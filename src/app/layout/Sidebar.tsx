@@ -30,6 +30,7 @@ import {
 import { APP_VERSION } from "../../appVersion";
 import { useUIStore } from "@store/uiStore";
 import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
 import { Button } from "@components/ui/button";
 import { Separator } from "@components/ui/separator";
 import { Badge } from "@components/ui/badge";
@@ -40,6 +41,7 @@ import { db } from "@services/db";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useTranslation } from "react-i18next";
 import { isBillingRole } from "@modules/auth/authRoles";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 interface NavItem {
   to: string;
@@ -91,6 +93,9 @@ export function Sidebar({ onUsePremiumLayout }: { onUsePremiumLayout?: () => voi
   const mobileOpen = useUIStore((s) => s.mobileSidebarOpen);
   const setMobileOpen = useUIStore((s) => s.setMobileSidebarOpen);
   const userRole = useAuthStore((s) => s.user?.rol ?? null);
+  const syncSucursalId = useSyncStore((s) => s.sucursalId);
+  const authSucursalId = useAuthStore((s) => s.sucursalActivaId);
+  const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
   const showBilling = isBillingRole(userRole);
 
   const billingNav: NavItem[] = showBilling
@@ -138,21 +143,21 @@ export function Sidebar({ onUsePremiumLayout }: { onUsePremiumLayout?: () => voi
       </div>
 
       <nav className="flex-1 overflow-y-auto p-2">
-        <NavSection title={t("nav.general")} items={primaryNav} collapsed={collapsed} />
+        <NavSection title={t("nav.general")} items={primaryNav} collapsed={collapsed} sucursalId={activeSucursalId} />
         {billingNav.length > 0 && (
           <>
             <Separator className="my-3" />
-            <NavSection title={t("nav.finance")} items={billingNav} collapsed={collapsed} />
+            <NavSection title={t("nav.finance")} items={billingNav} collapsed={collapsed} sucursalId={activeSucursalId} />
           </>
         )}
         <Separator className="my-3" />
-        <NavSection title={t("nav.consultations")} items={clinicalNav} collapsed={collapsed} />
+        <NavSection title={t("nav.consultations")} items={clinicalNav} collapsed={collapsed} sucursalId={activeSucursalId} />
         <Separator className="my-3" />
-        <NavSection title={t("nav.meal_plans")} items={planningNav} collapsed={collapsed} />
+        <NavSection title={t("nav.meal_plans")} items={planningNav} collapsed={collapsed} sucursalId={activeSucursalId} />
         <Separator className="my-3" />
-        <NavSection title={t("nav.reports")} items={reportsNav} collapsed={collapsed} />
+        <NavSection title={t("nav.reports")} items={reportsNav} collapsed={collapsed} sucursalId={activeSucursalId} />
         <Separator className="my-3" />
-        <NavSection title="" items={secondaryNav} collapsed={collapsed} />
+        <NavSection title="" items={secondaryNav} collapsed={collapsed} sucursalId={activeSucursalId} />
       </nav>
 
       <div className="border-t p-2">
@@ -234,10 +239,12 @@ function NavSection({
   title,
   items,
   collapsed,
+  sucursalId,
 }: {
   title: string;
   items: NavItem[];
   collapsed: boolean;
+  sucursalId: string | null;
 }) {
   return (
     <div className="space-y-1">
@@ -247,13 +254,13 @@ function NavSection({
         </h2>
       )}
       {items.map((item) => (
-        <NavItemLink key={item.to} item={item} collapsed={collapsed} />
+        <NavItemLink key={item.to} item={item} collapsed={collapsed} sucursalId={sucursalId} />
       ))}
     </div>
   );
 }
 
-function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolean }) {
+function NavItemLinkImpl({ item, collapsed, sucursalId }: { item: NavItem; collapsed: boolean; sucursalId: string | null }) {
   const { t } = useTranslation();
   const Icon = item.icon;
   const label = t(item.labelKey);
@@ -263,30 +270,39 @@ function NavItemLinkImpl({ item, collapsed }: { item: NavItem; collapsed: boolea
   // count sin filtro incluye filas con deletedAt seteado).
   const count = useLiveQuery(
     async () => {
+      if (!sucursalId) return 0;
       switch (item.liveCountFrom) {
         case "patients":
-          return db.patients.filter((r) => r.deleted_at === null).count();
+          return db.patients.filter((r) => r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count();
         case "consultations":
-          return db.consultations.filter((r) => r.deleted_at === null).count();
+          return db.consultations.filter((r) => r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count();
         case "anthropometry":
-          return db.anthropometry.filter((r) => r.deleted_at === null).count();
+          return db.anthropometry.filter((r) => r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count();
         case "lab_panels":
-          return db.lab_panels.filter((r) => r.deleted_at === null).count();
+          return db.lab_panels.filter((r) => r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count();
         case "meal_plans":
-          return db.meal_plans.filter((r) => r.deleted_at === null).count();
+          return db.meal_plans.filter((r) => r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count();
         case "appointments":
           return db.appointments
-            .filter((r) => r.status === "scheduled" || r.status === "confirmed")
+            .filter((r) =>
+              (r.status === "scheduled" || r.status === "confirmed") &&
+              rowMatchesSucursal({ sucursal_id: r.office_id }, sucursalId),
+            )
             .count();
         case "pending_payments":
           return db.consultations
-            .filter((r) => r.deleted_at === null && !r.paid && r.cost > 0)
+            .filter((r) =>
+              r.deleted_at === null &&
+              !r.paid &&
+              r.cost > 0 &&
+              rowMatchesSucursal(r, sucursalId),
+            )
             .count();
         default:
           return 0;
       }
     },
-    [item.liveCountFrom],
+    [item.liveCountFrom, sucursalId],
     null,
   );
   const badge = count !== null && count !== undefined ? String(count) : undefined;

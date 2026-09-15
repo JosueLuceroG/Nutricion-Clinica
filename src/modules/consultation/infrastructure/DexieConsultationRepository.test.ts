@@ -5,6 +5,7 @@ import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { Consultation } from "../domain/Consultation";
 import { ConsultationId } from "../domain/ConsultationId";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import { useSyncStore } from "@store/syncStore";
 
 const make = (
   patientId: PatientId,
@@ -32,6 +33,7 @@ describe("DexieConsultationRepository", () => {
   const pid = PatientId.generate();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-consult-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieConsultationRepository(db);
@@ -44,6 +46,20 @@ describe("DexieConsultationRepository", () => {
     expect(found).not.toBeNull();
     expect(found?.reason).toBe("Control trimestral");
     expect(found?.patientId.equals(pid)).toBe(true);
+  });
+
+  it("no lee, sobrescribe ni elimina una consulta de otra sucursal", async () => {
+    const consultation = make(pid);
+    await repo.save(consultation);
+    await db.consultations.update(consultation.id.toString(), { sucursal_id: "suc-2" });
+
+    expect(await repo.findById(consultation.id)).toBeNull();
+    await expect(repo.save(consultation)).rejects.toThrow(/otra sucursal/);
+    await repo.delete(consultation.id, true);
+    expect(await db.consultations.get(consultation.id.toString())).toMatchObject({
+      sucursal_id: "suc-2",
+      deleted_at: null,
+    });
   });
 
   it("nextConsultationNumber retorna 1 para paciente sin consultas", async () => {
@@ -92,14 +108,14 @@ describe("DexieConsultationRepository", () => {
     const c2 = make(pid, { number: 2 });
     await repo.save(c1);
     await repo.save(c2);
-    await db.consultations.update(c1.id.toString(), { sucursal_id: "s1" });
-    await db.consultations.update(c2.id.toString(), { sucursal_id: "s2" });
+    await db.consultations.update(c1.id.toString(), { sucursal_id: "suc-1" });
+    await db.consultations.update(c2.id.toString(), { sucursal_id: "suc-2" });
 
-    const results = await repo.findAll({ sucursalId: "s1" });
+    const results = await repo.findAll({ sucursalId: "suc-1" });
 
     expect(results).toHaveLength(1);
     expect(results[0]?.consultationNumber).toBe(1);
-    expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+    expect(await repo.count({ sucursalId: "suc-1" })).toBe(1);
   });
 
   it("excluye soft-deleted por defecto", async () => {
@@ -111,6 +127,8 @@ describe("DexieConsultationRepository", () => {
 
     const items = await repo.findAll({ patientId: pid });
     expect(items).toHaveLength(1);
+    expect(await repo.findById(a.id)).toBeNull();
+    expect((await repo.findById(a.id, true))?.deletedAt).not.toBeNull();
   });
 
   it("count refleja el total sin soft-deleted", async () => {

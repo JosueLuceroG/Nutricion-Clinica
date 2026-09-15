@@ -2,8 +2,10 @@ import sql from "mssql";
 import { getPool } from "../../../db/connection.js";
 import {
   API_VERSION,
+  canonicalSyncId,
   SYNCABLE_ENTITIES,
   SYNC_SCHEMA_VERSION,
+  SYNC_OPERATION_CONTRACT,
   type SyncableEntity,
   type SyncPullChange,
   type SyncPullCursors,
@@ -21,9 +23,12 @@ import {
 } from "../../tenancy/application/tenantGuards.js";
 import {
   authorizeAndNormalizeSyncBatch,
+  authorizeSyncPull,
+  projectSyncServerPayload,
   type SyncActor,
 } from "./syncAuthorization.js";
 import { HttpError } from "../../../middleware/errorHandler.js";
+import { applyWithReceipt, type SyncApplyResult } from "./syncReceipt.js";
 
 const MAX_BATCH_SIZE = 500;
 const PULL_PAGE_SIZE = 1000;
@@ -39,24 +44,23 @@ const ENTITY_TABLES: Record<SyncableEntity, string> = {
 
 /**
  * Cursor de pull por entidad. Cada entidad pagina de forma independiente
- * con su propio `since`; el cursor es `ISO@id` para que filas con el mismo
- * updated_at no se salten entre páginas (la query usa > since OR (= since AND id > lastId)).
+ * con su propio `since`; el cursor es el ROWVERSION de la última fila aplicada.
  */
-function parseCursor(raw: string | undefined): { since: Date; lastId: string } {
-  if (raw) {
-    const at = raw.lastIndexOf("@");
-    if (at > 0) {
-      const t = new Date(raw.slice(0, at));
-      if (!isNaN(t.getTime())) {
-        return { since: t, lastId: raw.slice(at + 1) };
-      }
-    }
-  }
-  return { since: new Date(0), lastId: "" };
-}
-
-function cursorFromRow(updatedAt: Date, id: string): string {
-  return `${updatedAt.toISOString()}@${id}`;
+function parseCursor(
+  raw: string | undefined,
+  fence: Buffer,
+  sucursalId: string,
+  entity: SyncableEntity,
+): Buffer {
+  // Old timestamp cursors require a safe full replay, not a guessed conversion.
+  const match = raw?.match(/^rv1:([^:]+):([^:]+):([0-9a-f]{16})$/i);
+  const scoped = match &&
+    canonicalSyncId(match[1]!) === canonicalSyncId(sucursalId) &&
+    match[2] === entity;
+  const parsed = Buffer.from(scoped ? match[3]! : "0000000000000000", "hex");
+  // A cursor at or beyond the current database horizon can only come from a
+  // different/restored database incarnation or malformed client state.
+  return Buffer.compare(parsed, fence) >= 0 ? Buffer.alloc(8) : parsed;
 }
 
 export async function getManifest(): Promise<SyncManifest> {
@@ -66,6 +70,7 @@ export async function getManifest(): Promise<SyncManifest> {
     .query<{ t: Date }>("SELECT SYSUTCDATETIME() AS t");
   return {
     apiVersion: "v1",
+    operationContract: SYNC_OPERATION_CONTRACT,
     apiContractVersion: API_VERSION,
     syncSchemaVersion: SYNC_SCHEMA_VERSION,
     serverTime: (timeResult.recordset[0]?.t ?? new Date()).toISOString(),
@@ -79,55 +84,54 @@ export async function pullChanges(
   sucursalId: string,
   since: SyncPullCursors | null,
   entityFilter: SyncableEntity[] | null,
+  actor: SyncActor,
 ): Promise<SyncPullResponse> {
+  const entities = authorizeSyncPull(actor, entityFilter);
   const pool = await getPool();
-  const entities =
-    entityFilter && entityFilter.length > 0
-      ? entityFilter
-      : [...SYNCABLE_ENTITIES];
   const allChanges: SyncPullChange[] = [];
   const cursors: SyncPullCursors = {};
   let hasMore = false;
+  // Never advance beyond an uncommitted ROWVERSION. A later-committing writer
+  // must remain visible on a subsequent pull, even if other writers commit first.
+  const fenceResult = await pool.request().query<{ fence: Buffer }>("SELECT MIN_ACTIVE_ROWVERSION() AS fence");
+  const fence = fenceResult.recordset[0]!.fence;
 
   for (const entity of entities) {
     const table = ENTITY_TABLES[entity];
-    const { since: entitySince, lastId } = parseCursor(since?.[entity]);
+    const entitySince = parseCursor(since?.[entity], fence, sucursalId, entity);
     const result = await pool
       .request()
       .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
-      .input("since", sql.DateTime2(), entitySince)
-      .input("last_id", sql.UniqueIdentifier(), lastId || "00000000-0000-0000-0000-000000000000")
-      .query<{
-        id: string;
-        updated_at: Date;
-        deleted_at: Date | null;
-        row_version: Buffer;
-      }>(
-        `SELECT id, updated_at, deleted_at, row_version
-           FROM ${table} WITH (NOLOCK)
-          WHERE sucursal_id = @sucursal_id
-            AND (updated_at > @since OR (updated_at = @since AND id > @last_id))
-          ORDER BY updated_at ASC, id ASC
+      .input("since_version", sql.VarBinary(8), entitySince)
+      .input("safe_upper", sql.VarBinary(8), fence)
+      .query<Record<string, unknown> & { id: string; updated_at: Date; deleted_at: Date | null; row_version: Buffer }>(
+        `SELECT *
+           FROM ${table}
+           WHERE sucursal_id = @sucursal_id
+             AND row_version > @since_version AND row_version < @safe_upper
+           ORDER BY row_version ASC, id ASC
           OFFSET 0 ROWS FETCH NEXT ${PULL_PAGE_SIZE + 1} ROWS ONLY`,
       );
     const rows = result.recordset;
     const truncated = rows.length > PULL_PAGE_SIZE;
     const limited = truncated ? rows.slice(0, PULL_PAGE_SIZE) : rows;
     for (const r of limited) {
-      const detail = await pool
-        .request()
-        .input("id", sql.UniqueIdentifier(), r.id)
-        .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
-        .query<
-          Record<string, unknown>
-        >(`SELECT * FROM ${table} WHERE id = @id AND sucursal_id = @sucursal_id`);
-      const dbRow = detail.recordset[0] ?? null;
-      const clientPayload = dbRow ? dbRowToClient(entity, dbRow) : null;
+      const clientPayload = projectSyncServerPayload(
+        entity,
+        dbRowToClient(entity, r),
+        actor.role,
+      );
+      if (!clientPayload) {
+        throw new HttpError(403, `El rol ${actor.role} no puede leer ${entity}`);
+      }
       allChanges.push({
         entity,
         id: r.id,
         op: r.deleted_at ? "delete" : "update",
         payload: clientPayload,
+        ...(actor.role === "facturacion"
+          ? { partial: true }
+          : {}),
         serverUpdatedAt: r.updated_at.toISOString(),
         serverRowVersion: r.row_version
           ? Buffer.from(r.row_version).toString("base64")
@@ -136,7 +140,7 @@ export async function pullChanges(
     }
     if (limited.length > 0) {
       const last = limited[limited.length - 1]!;
-      cursors[entity] = cursorFromRow(last.updated_at, last.id);
+      cursors[entity] = `rv1:${canonicalSyncId(sucursalId)}:${entity}:${Buffer.from(last.row_version).toString("hex")}`;
     }
     if (truncated) hasMore = true;
   }
@@ -172,11 +176,10 @@ export async function pushBatch(
     const tx = pool.transaction();
     try {
       await tx.begin();
-      const result = await applyOperation(
-        tx,
-        authorizedBatch.sucursalId,
-        actor.id,
-        op,
+      const result = await applyWithReceipt(
+        tx, authorizedBatch.sucursalId, actor, op,
+        () => applyOperation(tx, authorizedBatch.sucursalId, actor.id, op),
+        () => lockSyncDependencies(tx, authorizedBatch.sucursalId, op),
       );
       await tx.commit();
       results.push(result);
@@ -187,10 +190,14 @@ export async function pushBatch(
         // la transacción ya no está activa; el error original es el importante
       }
       results.push({
+        operationId: op.operationId,
         entity: op.entity,
         id: op.id,
         status: "error",
-        error: err instanceof Error ? err.message : String(err),
+        error:
+          err instanceof HttpError && err.status < 500
+            ? `SYNC_OPERATION_REJECTED_${err.status}`
+            : "SYNC_OPERATION_FAILED",
       });
     }
   }
@@ -245,10 +252,11 @@ async function applyOperation(
     clientUpdatedAt: string;
     expectedRowVersion?: string;
   },
-): Promise<SyncPushResultItem> {
+): Promise<SyncApplyResult> {
   const table = ENTITY_TABLES[op.entity];
 
   if (op.op === "delete") {
+    await assertNoActiveSyncDescendants(session, op.entity, op.id, sucursalId);
     if (op.expectedRowVersion) {
       const existing = await session
         .request()
@@ -297,7 +305,7 @@ async function applyCreate(
   sucursalId: string,
   profesionalId: string,
   op: { entity: SyncableEntity; id: string; payload: unknown },
-): Promise<SyncPushResultItem> {
+): Promise<SyncApplyResult> {
   const table = ENTITY_TABLES[op.entity];
   const prepared = prepareColumnsForWrite(op.entity, op.payload);
 
@@ -329,7 +337,13 @@ async function applyCreate(
     }
   }
 
-  await assertSyncReferencesInSucursal(session, op.entity, sucursalId, op.payload);
+  await assertSyncReferencesInSucursal(
+    session,
+    op.entity,
+    op.id,
+    sucursalId,
+    op.payload,
+  );
 
   const cols: string[] = ["id", "sucursal_id"];
   const values: string[] = ["@id", "@sucursal_id"];
@@ -387,7 +401,7 @@ async function applyUpdate(
     payload: unknown;
     expectedRowVersion?: string;
   },
-): Promise<SyncPushResultItem> {
+): Promise<SyncApplyResult> {
   const table = ENTITY_TABLES[op.entity];
   const prepared = prepareColumnsForWrite(op.entity, op.payload);
 
@@ -422,6 +436,15 @@ async function applyUpdate(
   // puesto, esto es una operación de RESTAURAR (cliente revive un
   // paciente/consulta/etc. eliminado) — la revivimos seteando
   // `deleted_at = NULL` y aplicando los valores del payload.
+  const referenceColumns: Partial<Record<SyncableEntity, string>> = {
+    consultas: ", paciente_id AS patient_id",
+    antropometrias: ", paciente_id AS patient_id",
+    lab_panels: ", paciente_id AS patient_id",
+    planes_alimenticios:
+      ", paciente_id AS patient_id, consulta_id AS consultation_id",
+    adherence_records:
+      ", paciente_id AS patient_id, consulta_id AS consultation_id",
+  };
   const exists = await session
     .request()
     .input("id", sql.UniqueIdentifier(), op.id)
@@ -429,7 +452,9 @@ async function applyUpdate(
     .query<{
       id: string;
       deleted_at: Date | null;
-    }>(`SELECT id, deleted_at FROM ${table} WHERE id = @id AND sucursal_id = @sucursal_id`);
+      patient_id?: string;
+      consultation_id?: string;
+    }>(`SELECT id, deleted_at${referenceColumns[op.entity] ?? ""} FROM ${table} WHERE id = @id AND sucursal_id = @sucursal_id`);
 
   if (exists.recordset.length === 0) {
     return {
@@ -443,7 +468,21 @@ async function applyUpdate(
 
   const isReviving = exists.recordset[0]!.deleted_at !== null;
 
-  await assertSyncReferencesInSucursal(session, op.entity, sucursalId, op.payload);
+  const existing = exists.recordset[0]!;
+  const referencePayload = {
+    ...(op.payload as Record<string, unknown>),
+    ...(existing.patient_id ? { patient_id: existing.patient_id } : {}),
+    ...(existing.consultation_id
+      ? { consultation_id: existing.consultation_id }
+      : {}),
+  };
+  await assertSyncReferencesInSucursal(
+    session,
+    op.entity,
+    op.id,
+    sucursalId,
+    referencePayload,
+  );
 
   if (prepared.length === 0 && !isReviving) {
     return { entity: op.entity, id: op.id, status: "applied" };
@@ -487,13 +526,16 @@ function readString(payload: unknown, key: string): string | undefined {
 async function assertSyncReferencesInSucursal(
   session: DbSession,
   entity: SyncableEntity,
+  entityId: string,
   sucursalId: string,
   payload: unknown,
 ): Promise<void> {
   const patientId = readString(payload, "patient_id");
-  const consultaId =
-    readString(payload, "consulta_id") ??
-    readString(payload, "consultation_id");
+  const consultaId = entity === "planes_alimenticios"
+    ? readString(payload, "consulta_id")
+    : entity === "adherence_records"
+      ? readString(payload, "consultation_id")
+      : undefined;
 
   if (
     patientId &&
@@ -513,5 +555,186 @@ async function assertSyncReferencesInSucursal(
     ["planes_alimenticios", "adherence_records"].includes(entity)
   ) {
     await assertConsultaInSucursal(session, consultaId, sucursalId, patientId);
+  }
+
+  if (entity === "consultas") {
+    const anthropometryId = readString(payload, "anthropometry_id");
+    const labPanelId = readString(payload, "lab_panel_id");
+    if ((anthropometryId || labPanelId) && !patientId) {
+      throw new HttpError(400, "La consulta requiere patient_id para validar referencias clínicas");
+    }
+    if (anthropometryId) {
+      await assertPatientOwnedReference(
+        session,
+        "antropometrias",
+        anthropometryId,
+        sucursalId,
+        patientId!,
+      );
+    }
+    if (labPanelId) {
+      await assertPatientOwnedReference(
+        session,
+        "lab_panels",
+        labPanelId,
+        sucursalId,
+        patientId!,
+      );
+    }
+  }
+
+  if (entity === "pacientes") {
+    const consentId = readString(payload, "consentimiento_informado_id");
+    if (consentId) {
+      await assertPatientOwnedReference(
+        session,
+        "consentimientos",
+        consentId,
+        sucursalId,
+        entityId,
+      );
+    }
+  }
+}
+
+async function assertPatientOwnedReference(
+  session: DbSession,
+  table: "antropometrias" | "lab_panels" | "consentimientos",
+  id: string,
+  sucursalId: string,
+  patientId: string,
+): Promise<void> {
+  const result = await session
+    .request()
+    .input("reference_id", sql.UniqueIdentifier(), id)
+    .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+    .input("paciente_id", sql.UniqueIdentifier(), patientId)
+    .query<{ id: string }>(
+      `SELECT id
+         FROM ${table} WITH (UPDLOCK, HOLDLOCK)
+        WHERE id = @reference_id
+          AND sucursal_id = @sucursal_id
+          AND paciente_id = @paciente_id
+          AND deleted_at IS NULL`,
+    );
+  if (result.recordset.length === 0) {
+    throw new HttpError(404, "Referencia clínica no encontrada para el paciente y sucursal activos");
+  }
+}
+
+async function lockSyncDependencies(
+  session: DbSession,
+  sucursalId: string,
+  op: SyncPushBatch["operations"][number],
+): Promise<void> {
+  if (op.entity === "pacientes") return;
+  let payload = op.payload as Record<string, unknown> | null;
+  if (op.op !== "create") {
+    const table = ENTITY_TABLES[op.entity];
+    const references = await session
+      .request()
+      .input("id", sql.UniqueIdentifier(), op.id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .query<{ patient_id?: string; consultation_id?: string }>(
+        `SELECT paciente_id AS patient_id${
+          op.entity === "planes_alimenticios" || op.entity === "adherence_records"
+            ? ", consulta_id AS consultation_id"
+            : ""
+        }
+           FROM ${table}
+          WHERE id = @id AND sucursal_id = @sucursal_id`,
+      );
+    payload = references.recordset[0] ?? null;
+  }
+  const patientId = readString(payload, "patient_id");
+  if (patientId) {
+    if (op.op === "delete") {
+      await lockExistingSyncParent(session, "pacientes", patientId, sucursalId);
+    } else {
+      await assertPacienteInSucursal(session, patientId, sucursalId);
+    }
+  }
+  const consultationId = op.entity === "planes_alimenticios"
+    ? readString(payload, op.op === "create" ? "consulta_id" : "consultation_id")
+    : op.entity === "adherence_records"
+      ? readString(payload, "consultation_id")
+      : undefined;
+  if (consultationId) {
+    if (op.op === "delete") {
+      await lockExistingSyncParent(
+        session,
+        "consultas",
+        consultationId,
+        sucursalId,
+        patientId,
+      );
+    } else {
+      await assertConsultaInSucursal(session, consultationId, sucursalId, patientId);
+    }
+  }
+}
+
+async function lockExistingSyncParent(
+  session: DbSession,
+  table: "pacientes" | "consultas",
+  id: string,
+  sucursalId: string,
+  patientId?: string,
+): Promise<void> {
+  const request = session
+    .request()
+    .input("parent_id", sql.UniqueIdentifier(), id)
+    .input("sucursal_id", sql.UniqueIdentifier(), sucursalId);
+  if (patientId && table === "consultas") {
+    request.input("paciente_id", sql.UniqueIdentifier(), patientId);
+  }
+  const result = await request.query<{ id: string }>(
+    `SELECT id
+       FROM ${table} WITH (UPDLOCK, HOLDLOCK)
+      WHERE id = @parent_id
+        AND sucursal_id = @sucursal_id${
+          patientId && table === "consultas" ? " AND paciente_id = @paciente_id" : ""
+        }`,
+  );
+  if (result.recordset.length === 0) {
+    throw new HttpError(404, "La dependencia de sincronización no existe en la sucursal activa");
+  }
+}
+
+async function assertNoActiveSyncDescendants(
+  session: DbSession,
+  entity: SyncableEntity,
+  id: string,
+  sucursalId: string,
+): Promise<void> {
+  const checks = entity === "pacientes"
+    ? [
+        ["consultas", "paciente_id"],
+        ["antropometrias", "paciente_id"],
+        ["lab_panels", "paciente_id"],
+        ["planes_alimenticios", "paciente_id"],
+        ["adherence_records", "paciente_id"],
+      ] as const
+    : entity === "consultas"
+      ? [
+          ["planes_alimenticios", "consulta_id"],
+          ["adherence_records", "consulta_id"],
+        ] as const
+      : [];
+  for (const [table, foreignKey] of checks) {
+    const result = await session
+      .request()
+      .input("parent_id", sql.UniqueIdentifier(), id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .query<{ id: string }>(
+        `SELECT TOP (1) id
+           FROM ${table} WITH (UPDLOCK, HOLDLOCK)
+          WHERE ${foreignKey} = @parent_id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+    if (result.recordset.length > 0) {
+      throw new HttpError(409, "La entidad padre conserva dependencias activas");
+    }
   }
 }

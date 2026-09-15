@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NextFunction, Request, Response } from 'express';
 
 const mocks = vi.hoisted(() => ({
+  pullChanges: vi.fn(),
   pushBatch: vi.fn(),
 }));
 
 vi.mock('./application/syncService.js', () => ({
   getManifest: vi.fn(),
-  pullChanges: vi.fn(),
+  pullChanges: mocks.pullChanges,
   pushBatch: mocks.pushBatch,
 }));
 
@@ -44,6 +45,16 @@ function pushController() {
   return handlers.at(-1)!;
 }
 
+function pullController() {
+  const stack = (router as unknown as { stack: ExpressLayerLike[] }).stack;
+  const handlers = stack
+    .find((layer) => layer.route?.path === '/pull' && layer.route.methods?.get)
+    ?.route?.stack?.map((layer) => layer.handle)
+    .filter((handler): handler is NonNullable<ExpressLayerLike['handle']> => Boolean(handler));
+  if (!handlers?.length) throw new Error('Missing GET /sync/pull');
+  return handlers.at(-1)!;
+}
+
 function response(): Response {
   const res = { status: vi.fn(), json: vi.fn() };
   res.status.mockReturnValue(res);
@@ -72,6 +83,7 @@ function request(body: unknown): Request {
 describe('POST /sync/push actor context', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pullChanges.mockResolvedValue({ changes: [], cursors: {}, hasMore: false, serverTime: '2026-08-13T12:00:00.000Z' });
     mocks.pushBatch.mockResolvedValue({ results: [], serverTime: '2026-08-13T12:00:00.000Z' });
   });
 
@@ -80,6 +92,7 @@ describe('POST /sync/push actor context', () => {
       sucursalId: '00000000-0000-4000-8000-000000000001',
       operations: [
         {
+          operationId: '00000000-0000-4000-8000-000000000004',
           entity: 'consultas',
           id: '00000000-0000-4000-8000-000000000003',
           op: 'update',
@@ -112,5 +125,41 @@ describe('POST /sync/push actor context', () => {
 
     expect(res.status).toHaveBeenCalledWith(400);
     expect(mocks.pushBatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('GET /sync/pull actor context', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.pullChanges.mockResolvedValue({ changes: [], cursors: {}, hasMore: false, serverTime: '2026-08-13T12:00:00.000Z' });
+  });
+
+  it('passes the authenticated actor and a strict deduplicated entity filter', async () => {
+    const req = request(undefined);
+    req.query = { entities: 'consultas,consultas' };
+    const res = response();
+
+    await pullController()(req, res, vi.fn());
+
+    expect(mocks.pullChanges).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000001',
+      null,
+      ['consultas'],
+      {
+        id: '00000000-0000-4000-8000-000000000002',
+        role: 'facturacion',
+      },
+    );
+  });
+
+  it('rejects unknown entity filters instead of broadening them', async () => {
+    const req = request(undefined);
+    req.query = { entities: 'not_an_entity' };
+    const res = response();
+
+    await pullController()(req, res, vi.fn());
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(mocks.pullChanges).not.toHaveBeenCalled();
   });
 });

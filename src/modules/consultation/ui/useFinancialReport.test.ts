@@ -9,6 +9,7 @@ import { DexiePatientRepository } from "@modules/patient/infrastructure/DexiePat
 import { DexieConsultationRepository } from "@modules/consultation/infrastructure/DexieConsultationRepository";
 import { ScheduleConsultationUseCase, RegisterPaymentUseCase } from "@modules/consultation/application/consultationUseCases";
 import { useFinancialReport } from "./useFinancialReport";
+import { useSyncStore } from "@store/syncStore";
 
 const makePatient = (overrides: { firstName: string; lastName?: string }) =>
   Patient.create({
@@ -28,6 +29,7 @@ describe("useFinancialReport", () => {
   let registerPayment: RegisterPaymentUseCase;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-fin-${Math.random().toString(36).slice(2)}`);
     await db.open();
     await db.consultations.clear();

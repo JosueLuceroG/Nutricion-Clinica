@@ -23,7 +23,7 @@ export interface PatientQuery {
  */
 export interface PatientRepository {
   save(patient: Patient): Promise<void>;
-  findById(id: PatientId): Promise<Patient | null>;
+  findById(id: PatientId, includeDeleted?: boolean): Promise<Patient | null>;
   findAll(query?: PatientQuery): Promise<Patient[]>;
   count(query?: PatientQuery): Promise<number>;
   /**

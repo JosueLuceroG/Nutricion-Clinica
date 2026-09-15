@@ -3,6 +3,7 @@ import "fake-indexeddb/auto";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { SyncQueueRepository } from "@services/sync/syncQueueRepository";
 import { SyncEnqueuer, setSyncApplying } from "@services/sync/syncEnqueuer";
+import { markRemoteTransaction } from "@services/sync/atomicOutbox";
 import { useSyncStore } from "@store/syncStore";
 
 function uuid(): string {
@@ -43,7 +44,7 @@ describe("SyncEnqueuer", () => {
     });
   });
 
-  it("dedupe: si ya hay un item activo para (entity, entityId, op), no encola otro", async () => {
+  it("conserva una nueva mutación aunque una operación legacy esté enviándose", async () => {
     enqueuer.start();
     const id = uuid();
     // Pre-poblamos la cola con un item activo (simula que el engine está
@@ -70,10 +71,9 @@ describe("SyncEnqueuer", () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const items = await db.sync_queue.toArray();
-    // Sigue habiendo un solo item: el dedupe bloqueó el segundo enqueue
-    expect(items.length).toBe(1);
-    expect(items[0]!.entityId).toBe(id);
-    expect(items[0]!.status).toBe("syncing");
+    expect(items.length).toBe(2);
+    expect(items.some((item) => item.status === "syncing")).toBe(true);
+    expect(items.some((item) => item.status === "pending")).toBe(true);
   });
 
   it("captura la sucursal al ocurrir la mutación aunque cambie antes del enqueue", async () => {
@@ -93,7 +93,7 @@ describe("SyncEnqueuer", () => {
     ]);
   });
 
-  it("NO encola cuando __syncApplying=true (round-trip del engine)", async () => {
+  it("un flag global no puede suprimir una escritura de usuario", async () => {
     enqueuer.start();
     setSyncApplying(true);
     try {
@@ -101,7 +101,7 @@ describe("SyncEnqueuer", () => {
       await db.patients.add({ id, first_name: "Beto" } as never);
       await new Promise((r) => setTimeout(r, 30));
       const items = await db.sync_queue.toArray();
-      expect(items.length).toBe(0);
+      expect(items.length).toBe(1);
     } finally {
       setSyncApplying(false);
     }
@@ -110,13 +110,16 @@ describe("SyncEnqueuer", () => {
   it("encola el paciente actualizado y no la versión anterior", async () => {
     enqueuer.start();
     const id = uuid();
-    await db.patients.add({
-      id,
-      first_name: "Ana",
-      general_notes: null,
-    } as never);
-    await new Promise((r) => setTimeout(r, 30));
-    await db.sync_queue.clear();
+    await db.transaction("rw", db.patients, async () => {
+      markRemoteTransaction();
+      await db.patients.add({
+        id,
+        sucursal_id: "suc-1",
+        first_name: "Ana",
+        general_notes: null,
+        row_version: "AAAAAAAAAAE=",
+      } as never);
+    });
 
     await db.patients.update(id, {
       first_name: "Ana María",
@@ -141,13 +144,16 @@ describe("SyncEnqueuer", () => {
   it("consolida actualizaciones pendientes con el estado más reciente", async () => {
     enqueuer.start();
     const id = uuid();
-    await db.patients.add({
-      id,
-      first_name: "Ana",
-      general_notes: null,
-    } as never);
-    await new Promise((r) => setTimeout(r, 30));
-    await db.sync_queue.clear();
+    await db.transaction("rw", db.patients, async () => {
+      markRemoteTransaction();
+      await db.patients.add({
+        id,
+        sucursal_id: "suc-1",
+        first_name: "Ana",
+        general_notes: null,
+        row_version: "AAAAAAAAAAE=",
+      } as never);
+    });
 
     await db.patients.update(id, { first_name: "Ana María" } as never);
     await new Promise((r) => setTimeout(r, 30));
@@ -170,22 +176,24 @@ describe("SyncEnqueuer", () => {
   it("encola un delete cuando se borra un paciente", async () => {
     enqueuer.start();
     const id = uuid();
-    await db.patients.add({ id } as never);
-    await new Promise((r) => setTimeout(r, 20));
+    await db.transaction("rw", db.patients, async () => {
+      markRemoteTransaction();
+      await db.patients.add({ id, sucursal_id: "suc-1", row_version: "AAAAAAAAAAE=" } as never);
+    });
     await db.patients.delete(id);
     await new Promise((r) => setTimeout(r, 20));
     const items = await db.sync_queue.toArray();
     const ops = items.map((i) => i.op).sort();
-    expect(ops).toEqual(["create", "delete"]);
+    expect(ops).toEqual(["delete"]);
   });
 
-  it("stop() desactiva enqueue (no encola más)", async () => {
+  it("stop() no desactiva la garantía durable de escritura", async () => {
     enqueuer.start();
     enqueuer.stop();
     const id = uuid();
     await db.patients.add({ id } as never);
     await new Promise((r) => setTimeout(r, 30));
     const items = await db.sync_queue.toArray();
-    expect(items.length).toBe(0);
+    expect(items.length).toBe(1);
   });
 });

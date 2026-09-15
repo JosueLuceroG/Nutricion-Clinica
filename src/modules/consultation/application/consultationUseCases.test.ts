@@ -15,6 +15,7 @@ import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { ConsultationId } from "../domain/ConsultationId";
 import { ConsultationNotFoundError, type ConsultationRepository } from "../domain/ConsultationRepository";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import { useSyncStore } from "@store/syncStore";
 
 describe("consultationUseCases", () => {
   let repo: DexieConsultationRepository;
@@ -30,6 +31,7 @@ describe("consultationUseCases", () => {
   const pid = PatientId.generate();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-consult-uc-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieConsultationRepository(db);

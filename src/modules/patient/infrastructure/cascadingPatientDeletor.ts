@@ -26,38 +26,48 @@ import { labPanelRowToDomain, labPanelDomainToRow } from "@modules/laboratory/in
 import { anthropometryRowToDomain, anthropometryDomainToRow } from "@modules/anthropometry/infrastructure/anthropometryMapper";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { CascadingPatientDeletor, LinkedCounts, LinkedEntitiesInspector } from "@modules/patient/application/patientUseCases";
+import { requireActiveSucursalId, rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 export class DexieCascadingPatientDeletor implements CascadingPatientDeletor {
   async softDeleteCascade(patientId: PatientId): Promise<void> {
     const pid = patientId.toString();
+    const sucursalId = requireActiveSucursalId();
 
     await this.softDeleteInTable(
       db.consultations,
-      (row) => row.patient_id === pid && row.deleted_at === null,
+      (row) => row.patient_id === pid && row.deleted_at === null && rowMatchesSucursal(row, sucursalId),
       consultationRowToDomain,
       consultationDomainToRow,
     );
 
     await this.softDeleteInTable(
       db.meal_plans,
-      (row) => row.patient_id === pid && row.deleted_at === null,
+      (row) => row.patient_id === pid && row.deleted_at === null && rowMatchesSucursal(row, sucursalId),
       mealPlanRowToDomain,
       mealPlanDomainToRow,
     );
 
     await this.softDeleteInTable(
       db.lab_panels,
-      (row) => row.patient_id === pid && row.deleted_at === null,
+      (row) => row.patient_id === pid && row.deleted_at === null && rowMatchesSucursal(row, sucursalId),
       labPanelRowToDomain,
       labPanelDomainToRow,
     );
 
     await this.softDeleteInTable(
       db.anthropometry,
-      (row) => row.patient_id === pid && row.deleted_at === null,
+      (row) => row.patient_id === pid && row.deleted_at === null && rowMatchesSucursal(row, sucursalId),
       anthropometryRowToDomain,
       anthropometryDomainToRow,
     );
+
+    const adherenceRows = await db.adherence_records
+      .filter((row) => row.patient_id === pid && row.deleted_at == null && rowMatchesSucursal(row, sucursalId))
+      .toArray();
+    for (const row of adherenceRows) {
+      // The atomic outbox turns this delete into a durable local tombstone.
+      await db.adherence_records.delete(row.id);
+    }
   }
 
   private async softDeleteInTable<R, D extends { softDelete(): D }>(
@@ -80,12 +90,14 @@ export class DexieCascadingPatientDeletor implements CascadingPatientDeletor {
 export class DexieLinkedEntitiesInspector implements LinkedEntitiesInspector {
   async countForPatient(patientId: PatientId): Promise<LinkedCounts> {
     const pid = patientId.toString();
-    const [consultations, mealPlans, labPanels, anthropometry] = await Promise.all([
-      db.consultations.filter((r) => r.patient_id === pid && r.deleted_at === null).count(),
-      db.meal_plans.filter((r) => r.patient_id === pid && r.deleted_at === null).count(),
-      db.lab_panels.filter((r) => r.patient_id === pid && r.deleted_at === null).count(),
-      db.anthropometry.filter((r) => r.patient_id === pid && r.deleted_at === null).count(),
+    const sucursalId = requireActiveSucursalId();
+    const [consultations, mealPlans, labPanels, anthropometry, adherenceRecords] = await Promise.all([
+      db.consultations.filter((r) => r.patient_id === pid && r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count(),
+      db.meal_plans.filter((r) => r.patient_id === pid && r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count(),
+      db.lab_panels.filter((r) => r.patient_id === pid && r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count(),
+      db.anthropometry.filter((r) => r.patient_id === pid && r.deleted_at === null && rowMatchesSucursal(r, sucursalId)).count(),
+      db.adherence_records.filter((r) => r.patient_id === pid && r.deleted_at == null && rowMatchesSucursal(r, sucursalId)).count(),
     ]);
-    return { consultations, mealPlans, labPanels, anthropometry };
+    return { consultations, mealPlans, labPanels, anthropometry, adherenceRecords };
   }
 }

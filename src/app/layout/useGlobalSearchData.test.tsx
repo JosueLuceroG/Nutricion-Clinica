@@ -188,6 +188,7 @@ beforeEach(() => {
   database.rows.labPanels.push(
     {
       id: "lab-a",
+      sucursal_id: "branch-a",
       patient_id: "patient-a",
       taken_at: "2026-07-03T00:00:00.000Z",
       lab_name: "Laboratorio Central",
@@ -197,6 +198,7 @@ beforeEach(() => {
     },
     {
       id: "lab-b",
+      sucursal_id: "branch-b",
       patient_id: "patient-b",
       taken_at: "2026-07-03T00:00:00.000Z",
       lab_name: "Otra sucursal",
@@ -257,7 +259,7 @@ describe("useGlobalSearchData", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.results).toHaveLength(8);
+    expect(result.current.results).toHaveLength(6);
     expect(
       result.current.results.some((item) => item.title.includes("Otra")),
     ).toBe(false);
@@ -275,13 +277,13 @@ describe("useGlobalSearchData", () => {
     expect(
       result.current.results.find(
         (item) => item.id === "consultation-consultation-legacy",
-      )?.searchableText,
-    ).toContain("Antecedente relevante");
+      ),
+    ).toBeUndefined();
     expect(
       result.current.results.find(
         (item) => item.id === "patient-patient-legacy",
       ),
-    ).toBeDefined();
+    ).toBeUndefined();
 
     const plan = result.current.results.find((item) => item.kind === "plan");
     expect(plan?.subtitle).toContain("31 jul 2026");
@@ -335,7 +337,6 @@ describe("useGlobalSearchData", () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.results.map((item) => item.kind)).toEqual([
       "consultation",
-      "consultation",
     ]);
     expect(result.current.results[0]?.title).toContain("María López");
   });
@@ -362,7 +363,7 @@ describe("useGlobalSearchData", () => {
         useGlobalSearchData(true, branch, "es-MX", FULL_ACCESS),
       { initialProps: { branch: "branch-a" as string | null } },
     );
-    await waitFor(() => expect(result.current.results).toHaveLength(8));
+    await waitFor(() => expect(result.current.results).toHaveLength(6));
 
     rerender({ branch: "branch-b" });
     expect(result.current.results).toEqual([]);
@@ -370,8 +371,6 @@ describe("useGlobalSearchData", () => {
     await waitFor(() =>
       expect(result.current.results.map((item) => item.id)).toEqual([
         "patient-patient-b",
-        "patient-patient-legacy",
-        "consultation-consultation-legacy",
         "laboratory-lab-b",
         "recipe-recipe-a",
       ]),

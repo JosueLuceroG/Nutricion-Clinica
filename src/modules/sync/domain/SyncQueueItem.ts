@@ -33,4 +33,13 @@ export interface SyncQueueItem {
   expectedRowVersion: string | null;
   enqueuedAt: string;
   updatedAt: string;
+  /** Set before network I/O: an attempted payload can never be coalesced. */
+  attempted?: boolean;
+  createsEntity?: boolean;
+  restoreDeleted?: boolean;
+  /** Previous unacknowledged revision of this entity. */
+  predecessorId?: string;
+  serverPayload?: Record<string, unknown> | null;
+  serverRowVersion?: string;
+  serverDeleted?: boolean;
 }

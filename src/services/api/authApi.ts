@@ -16,6 +16,14 @@ import type {
 import { sensitiveActionApi } from "./sensitiveActionApi.js";
 
 export const authApi = {
+  async prepareLocalSession(): Promise<void> {
+    const [{ db }, { clearLocalContext }] = await Promise.all([
+      import("@services/db"),
+      import("@services/security/localContextBoundary"),
+    ]);
+    await clearLocalContext(db);
+  },
+
   async login(input: LoginRequest): Promise<AuthResponse> {
     return httpRequest<AuthResponse>("/auth/login", {
       method: "POST",
@@ -46,10 +54,17 @@ export const authApi = {
   },
 
   async logout(): Promise<void> {
+    const [{ stopSync }, { db }, { clearLocalContext }] = await Promise.all([
+      import("@services/sync/syncBootstrap"),
+      import("@services/db"),
+      import("@services/security/localContextBoundary"),
+    ]);
+    stopSync();
+    await clearLocalContext(db);
     try {
       await httpRequest("/auth/logout", { method: "POST" });
     } finally {
-      useAuthStore.getState().logout();
+      await useAuthStore.getState().logout({ skipLocalCache: true });
     }
   },
 

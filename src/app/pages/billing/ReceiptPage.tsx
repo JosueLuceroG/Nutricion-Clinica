@@ -15,6 +15,7 @@ import {
 import { formatCurrency } from "@utils/formatCurrency";
 import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
 import { Badge } from "@components/ui/badge";
+import { PAYMENT_CONCEPT_LABELS } from "@modules/consultation/domain/PaymentConcept";
 
 const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
 
@@ -205,13 +206,9 @@ export const ReceiptPage = () => {
                 </h2>
                 <div className="rounded-md border p-3 text-sm">
                   <p>
-                    <span className="text-muted-foreground">{t("consultation.reason")}:</span> {c.reason}
+                    <span className="text-muted-foreground">{t("consultation.payment_concept")}:</span>{" "}
+                    {PAYMENT_CONCEPT_LABELS[c.paymentConcept]}
                   </p>
-                  {c.assessment && (
-                    <p className="mt-1">
-                      <span className="text-muted-foreground">{t("consultation.assessment")}:</span> {c.assessment}
-                    </p>
-                  )}
                 </div>
               </section>
 

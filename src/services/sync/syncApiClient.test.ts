@@ -16,7 +16,10 @@ describe("syncApi", () => {
 
     expect(httpRequestMock).toHaveBeenCalledWith("/sync/pull", {
       query: { since: undefined, entities: undefined },
-      headers: { "X-Sucursal-Id": "suc-captured" },
+      headers: {
+        "X-Sucursal-Id": "suc-captured",
+        "X-Sync-Operation-Contract": "durable-outbox-v1",
+      },
       skipSucursalHeader: true,
     });
   });
@@ -28,7 +31,10 @@ describe("syncApi", () => {
     expect(httpRequestMock).toHaveBeenCalledWith("/sync/push", {
       method: "POST",
       body: batch,
-      headers: { "X-Sucursal-Id": "suc-captured" },
+      headers: {
+        "X-Sucursal-Id": "suc-captured",
+        "X-Sync-Operation-Contract": "durable-outbox-v1",
+      },
       skipSucursalHeader: true,
     });
   });

@@ -6,6 +6,7 @@ import { AdherenceRecord } from "../domain/AdherenceRecord";
 import { AdherenceIndex } from "../domain/AdherenceIndex";
 import { BarrierEvent } from "../domain/BarrierEvent";
 import { createAdherenceId } from "../domain/AdherenceId";
+import { useSyncStore } from "@store/syncStore";
 
 describe("DexieAdherenceRepository", () => {
   let repo: DexieAdherenceRepository;
@@ -13,6 +14,7 @@ describe("DexieAdherenceRepository", () => {
   const patientId = crypto.randomUUID();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
     await db.delete();
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
@@ -44,6 +46,34 @@ describe("DexieAdherenceRepository", () => {
     expect(found?.source).toBe("consulta");
     expect(found?.adherenceMenu).toBe(80);
     expect(found?.adherenceWater).toBe(70);
+  });
+
+  it("no lee, sobrescribe ni elimina adherencia de otra sucursal", async () => {
+    const record = AdherenceRecord.create({
+      id: createAdherenceId(),
+      patientId,
+      date: "2025-01-15",
+      source: "consulta",
+      adherenceMenu: 80,
+      adherenceWater: 70,
+      adherenceActivity: 90,
+      adherenceSupplements: 60,
+      adherenceSleep: 75,
+      notes: "",
+      intercurrentEvents: "",
+      barriers: "",
+      facilitators: "",
+      mealsLogged: "",
+    });
+    await repo.saveRecord(record);
+    await db.adherence_records.update(record.id, { sucursal_id: "suc-2" });
+
+    expect(await repo.findRecordById(record.id)).toBeNull();
+    await expect(repo.saveRecord(record)).rejects.toThrow(/otra sucursal/);
+    await repo.deleteRecord(record.id);
+    const untouched = await db.adherence_records.get(record.id);
+    expect(untouched?.sucursal_id).toBe("suc-2");
+    expect(untouched).not.toHaveProperty("deleted_at");
   });
 
   it("retorna null cuando el record no existe", async () => {
@@ -139,5 +169,17 @@ describe("DexieAdherenceRepository", () => {
 
     const barriers = await repo.findBarriersByPatient(patientId);
     expect(barriers).toHaveLength(0);
+  });
+
+  it("no lee ni elimina barreras de otra sucursal", async () => {
+    const barrier = BarrierEvent.create({
+      patientId, type: "emocional", description: "Ansiedad", date: "2025-01-15", actionTaken: "",
+    });
+    await repo.saveBarrier(barrier);
+    await db.adherence_barriers.update(barrier.id, { sucursal_id: "suc-2" });
+
+    expect(await repo.findBarriersByPatient(patientId)).toHaveLength(0);
+    await repo.deleteBarrier(barrier.id);
+    expect(await db.adherence_barriers.get(barrier.id)).toMatchObject({ sucursal_id: "suc-2" });
   });
 });

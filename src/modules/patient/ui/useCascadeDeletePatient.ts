@@ -79,7 +79,8 @@ export function useCascadeDeletePatient(
       try {
         const c = await patientService.countLinked.execute(patientId);
         setCounts(c);
-        const total = c.consultations + c.mealPlans + c.labPanels + c.anthropometry;
+        const total = c.consultations + c.mealPlans + c.labPanels +
+          c.anthropometry + c.adherenceRecords;
         if (total === 0) {
           await runSafe(
             () => patientService.delete.execute(patientId, true),

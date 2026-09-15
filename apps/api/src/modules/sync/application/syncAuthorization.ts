@@ -4,8 +4,9 @@ import type {
   SyncPushOperation,
   SyncableEntity,
 } from "@nutriclinica/shared";
+import { canonicalSyncId, isSyncRowVersion, SYNCABLE_ENTITIES } from "@nutriclinica/shared";
 import { HttpError } from "../../../middleware/errorHandler.js";
-import { prepareColumnsForWrite } from "./entityColumnMaps.js";
+import { getColumnMap, prepareColumnsForWrite } from "./entityColumnMaps.js";
 
 export interface SyncActor {
   id: string;
@@ -52,6 +53,32 @@ const BILLING_FIELDS = new Set([
   "amount_paid",
 ]);
 
+const BILLING_PULL_FIELDS = new Set([
+  ...BILLING_FIELDS,
+  // Operational context needed to render a billing row without clinical data.
+  "patient_id",
+  "consultation_date",
+  "consultation_number",
+  "status",
+]);
+
+const RECEIPT_SYSTEM_FIELDS = new Set([
+  "id",
+  "sucursal_id",
+  "created_at",
+  "updated_at",
+  "deleted_at",
+]);
+
+const ADHERENCE_SOURCES = new Set(["consulta", "portal", "app", "llamada"]);
+
+const ASSISTANT_PULL_ENTITIES: readonly SyncableEntity[] = [
+  "pacientes",
+  "consultas",
+  "antropometrias",
+  "lab_panels",
+];
+
 const COMMON_SERVER_FIELDS = new Set([
   "id",
   "sucursal_id",
@@ -59,6 +86,27 @@ const COMMON_SERVER_FIELDS = new Set([
   "updated_at",
   "row_version",
 ]);
+
+const SYSTEM_PAYLOAD_FIELDS = new Set([
+  ...COMMON_SERVER_FIELDS,
+  "deleted_at",
+]);
+
+const UUID_PAYLOAD_FIELDS = new Set([
+  "id",
+  "sucursal_id",
+  "patient_id",
+  "consulta_id",
+  "consultation_id",
+  "anthropometry_id",
+  "lab_panel_id",
+  "consentimiento_informado_id",
+  "responsible_professional_id",
+  "profesional_id",
+  "submitted_by_token_id",
+]);
+
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 const ENTITY_SERVER_FIELDS: Record<SyncableEntity, ReadonlySet<string>> = {
   pacientes: new Set(["responsible_professional_id"]),
@@ -96,9 +144,50 @@ function isPayloadObject(payload: unknown): payload is Record<string, unknown> {
 function canPerformOperation(actor: SyncActor, op: SyncPushOperation): boolean {
   if (actor.role === "admin" || actor.role === "nutriologa") return true;
   if (actor.role === "asistente" || actor.role === "facturacion") {
-    return op.entity === "consultas" && op.op === "update";
+    return op.entity === "consultas" && op.op === "update" && !op.restoreDeleted;
   }
   return false;
+}
+
+export function authorizeSyncPull(
+  actor: SyncActor,
+  requested: SyncableEntity[] | null,
+): SyncableEntity[] {
+  const allowed: readonly SyncableEntity[] =
+    actor.role === "admin" || actor.role === "nutriologa"
+      ? SYNCABLE_ENTITIES
+      : actor.role === "asistente"
+        ? ASSISTANT_PULL_ENTITIES
+      : actor.role === "facturacion"
+        ? ["consultas"]
+        : [];
+  if (allowed.length === 0) {
+    throw new HttpError(403, `El rol ${actor.role} no puede leer datos de sincronización`);
+  }
+  const entities = requested ?? [...allowed];
+  if (entities.some((entity) => !allowed.includes(entity))) {
+    throw new HttpError(403, `El rol ${actor.role} no puede leer las entidades solicitadas`);
+  }
+  return [...new Set(entities)];
+}
+
+export function projectSyncServerPayload(
+  entity: SyncableEntity,
+  payload: Record<string, unknown>,
+  role: Role,
+): Record<string, unknown> | null {
+  if (role === "admin" || role === "nutriologa") return payload;
+  if (role === "asistente" && ASSISTANT_PULL_ENTITIES.includes(entity)) {
+    return payload;
+  }
+  if (role === "facturacion" && entity === "consultas") {
+    return Object.fromEntries(
+      Object.entries(payload).filter(
+        ([field]) => BILLING_PULL_FIELDS.has(field) || RECEIPT_SYSTEM_FIELDS.has(field),
+      ),
+    );
+  }
+  return null;
 }
 
 function addViolation(
@@ -125,6 +214,17 @@ function normalizePayload(
   index: number,
   violations: SyncOperationViolation[],
 ): SyncPushOperation | null {
+  if (op.restoreDeleted && op.op !== "update") {
+    addViolation(
+      violations,
+      index,
+      op,
+      "invalid_operation",
+      "restoreDeleted solo es válido para update",
+    );
+    return null;
+  }
+
   if (op.op === "delete") {
     if (op.payload !== null && op.payload !== undefined) {
       addViolation(
@@ -151,7 +251,33 @@ function normalizePayload(
   }
 
   const payload = { ...op.payload };
-  if (typeof payload.id === "string" && payload.id !== op.id) {
+  const allowedFields = getColumnMap(op.entity).byClientField;
+  for (const field of Object.keys(payload)) {
+    if (!(field in allowedFields) && !SYSTEM_PAYLOAD_FIELDS.has(field)) {
+      addViolation(
+        violations,
+        index,
+        op,
+        "invalid_operation",
+        `campo de payload no reconocido: ${field}`,
+      );
+    }
+  }
+  for (const field of UUID_PAYLOAD_FIELDS) {
+    if (!(field in payload) || payload[field] === null || payload[field] === undefined) continue;
+    if (typeof payload[field] !== "string" || !UUID_PATTERN.test(payload[field])) {
+      addViolation(
+        violations,
+        index,
+        op,
+        "invalid_operation",
+        `${field} debe ser UUID`,
+      );
+      continue;
+    }
+    payload[field] = canonicalSyncId(payload[field]);
+  }
+  if (payload.id !== undefined && payload.id !== canonicalSyncId(op.id)) {
     addViolation(
       violations,
       index,
@@ -161,8 +287,8 @@ function normalizePayload(
     );
   }
   if (
-    typeof payload.sucursal_id === "string" &&
-    payload.sucursal_id !== batch.sucursalId
+    payload.sucursal_id !== undefined &&
+    payload.sucursal_id !== canonicalSyncId(batch.sucursalId)
   ) {
     addViolation(
       violations,
@@ -174,16 +300,14 @@ function normalizePayload(
   }
 
   if (payload.deleted_at !== null && payload.deleted_at !== undefined) {
-    if (op.op === "update") {
-      return { ...op, op: "delete", payload: null };
-    }
     addViolation(
       violations,
       index,
       op,
       "invalid_operation",
-      "un create no puede incluir deleted_at",
+      "deleted_at no puede convertir una operación; use op=delete con payload null",
     );
+    return null;
   }
 
   delete payload.deleted_at;
@@ -194,18 +318,29 @@ function normalizePayload(
       delete payload[field];
   }
 
-  if (
-    op.entity === "adherence_records" &&
-    op.op === "create" &&
-    payload.source === "portal"
-  ) {
-    addViolation(
-      violations,
-      index,
-      op,
-      "invalid_operation",
-      "source portal solo puede crearse mediante el portal del paciente",
-    );
+  if (op.entity === "adherence_records" && op.op === "create") {
+    const source = payload.source;
+    if (
+      typeof source !== "string" ||
+      source !== source.trim().toLowerCase() ||
+      !ADHERENCE_SOURCES.has(source)
+    ) {
+      addViolation(
+        violations,
+        index,
+        op,
+        "invalid_operation",
+        "source de adherencia debe ser un valor canónico permitido",
+      );
+    } else if (source === "portal") {
+      addViolation(
+        violations,
+        index,
+        op,
+        "invalid_operation",
+        "source portal solo puede crearse mediante el portal del paciente",
+      );
+    }
   }
 
   if (actor.role === "nutriologa" && op.entity === "consultas") {
@@ -239,9 +374,26 @@ export function authorizeAndNormalizeSyncBatch(
   const violations: SyncOperationViolation[] = [];
   const normalized: SyncPushOperation[] = [];
   const seen = new Set<string>();
+  const seenOperationIds = new Set<string>();
 
-  batch.operations.forEach((op, index) => {
-    const key = `${op.entity}:${op.id}`;
+  const canonicalBatch = { ...batch, sucursalId: canonicalSyncId(batch.sucursalId) };
+  batch.operations.forEach((rawOperation, index) => {
+    const op: SyncPushOperation = {
+      ...rawOperation,
+      id: canonicalSyncId(rawOperation.id),
+      operationId: canonicalSyncId(rawOperation.operationId),
+    };
+    if ((op.op === "create" && op.expectedRowVersion !== undefined) ||
+      (op.expectedRowVersion !== undefined && !isSyncRowVersion(op.expectedRowVersion))) {
+      addViolation(
+        violations,
+        index,
+        op,
+        "invalid_operation",
+        "expectedRowVersion debe ser un ROWVERSION canónico de 8 bytes y no aplica a create",
+      );
+    }
+    const key = `${op.entity}:${canonicalSyncId(op.id)}`;
     if (seen.has(key)) {
       addViolation(
         violations,
@@ -252,9 +404,22 @@ export function authorizeAndNormalizeSyncBatch(
       );
     }
     seen.add(key);
+    if (op.operationId) {
+      const operationId = op.operationId.toLowerCase();
+      if (seenOperationIds.has(operationId)) {
+        addViolation(
+          violations,
+          index,
+          op,
+          "invalid_operation",
+          "operationId está duplicado en el batch",
+        );
+      }
+      seenOperationIds.add(operationId);
+    }
 
     const normalizedOperation = normalizePayload(
-      batch,
+      canonicalBatch,
       actor,
       op,
       index,
@@ -275,10 +440,20 @@ export function authorizeAndNormalizeSyncBatch(
 
     if (normalizedOperation.op !== "delete") {
       try {
-        prepareColumnsForWrite(
+        const prepared = prepareColumnsForWrite(
           normalizedOperation.entity,
           normalizedOperation.payload,
         );
+        if (prepared.length === 0 && !normalizedOperation.restoreDeleted) {
+          addViolation(
+            violations,
+            index,
+            normalizedOperation,
+            "invalid_operation",
+            "el payload no contiene campos escribibles",
+          );
+          return;
+        }
       } catch (error) {
         addViolation(
           violations,
@@ -295,5 +470,5 @@ export function authorizeAndNormalizeSyncBatch(
   });
 
   if (violations.length > 0) throw new SyncBatchPolicyError(violations);
-  return { ...batch, operations: normalized };
+  return { ...canonicalBatch, operations: normalized };
 }

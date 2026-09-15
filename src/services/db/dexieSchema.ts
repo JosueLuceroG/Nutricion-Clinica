@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { installAtomicOutbox } from "@services/sync/atomicOutbox";
 import { DEXIE_SCHEMA_VERSION } from "@nutriclinica/shared";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import type { AnthropometryRow } from "@modules/anthropometry/infrastructure/anthropometryMapper";
@@ -312,6 +313,7 @@ export interface SyncMetaRow {
 }
 
 export class NutriClinicaDB extends Dexie {
+  syncOutboxEnabled = false;
   patients!: Table<PatientRow, string>;
   anthropometry!: Table<AnthropometryRow, string>;
   lab_panels!: Table<LabPanelRow, string>;
@@ -368,6 +370,7 @@ export class NutriClinicaDB extends Dexie {
 
   constructor(name = "nutriclinica") {
     super(name);
+    installAtomicOutbox(this);
 
     this.version(1).stores({
       patients: [
@@ -631,3 +634,4 @@ function payloadSucursalId(payload: string | undefined): string | undefined {
 }
 
 export const db = new NutriClinicaDB();
+db.syncOutboxEnabled = true;

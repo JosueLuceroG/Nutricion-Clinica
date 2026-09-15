@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { db } from "@services/db";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 import { useAuthStore } from "@store/authStore";
 import { usePreferencesStore } from "@store/preferencesStore";
 import {
@@ -19,6 +20,7 @@ import {
 } from "@store/notificationStore";
 import { buildClinicalAlertCandidates } from "../domain/buildClinicalAlerts";
 import { sendDesktopNotification } from "../infrastructure/desktopNotificationService";
+import { canonicalSyncId } from "@nutriclinica/shared";
 
 const ALERT_CLOCK_INTERVAL_MS = 30_000;
 const MAX_IMMEDIATE_POPUPS = 3;
@@ -49,7 +51,8 @@ export function ClinicalAlertController() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const userId = useAuthStore((state) => state.user?.id ?? null);
-  const branchId = useAuthStore((state) => state.sucursalActivaId);
+  const authBranchId = useAuthStore((state) => state.sucursalActivaId);
+  const branchId = authBranchId ? canonicalSyncId(authBranchId) : null;
   const currency = usePreferencesStore((state) => state.currency);
   const preferenceScopeKey = useClinicalAlertPreferencesStore((state) => state.scopeKey);
   const preferenceHydrationStatus = useClinicalAlertPreferencesStore((state) => state.hydrationStatus);
@@ -117,7 +120,7 @@ export function ClinicalAlertController() {
 
     const queryStart = new Date(`${clockDateKey}T00:00:00`);
     const [patients, appointments, mealPlans, consultations] = await Promise.all([
-      db.patients.where("sucursal_id").equals(branchId).toArray(),
+      db.patients.filter((row) => row.deleted_at === null && rowMatchesSucursal(row, branchId)).toArray(),
       db.appointments
         .where("date")
         .between(
@@ -126,9 +129,10 @@ export function ClinicalAlertController() {
           true,
           true,
         )
+        .filter((row) => rowMatchesSucursal({ sucursal_id: row.office_id }, branchId))
         .toArray(),
-      db.meal_plans.where("sucursal_id").equals(branchId).toArray(),
-      db.consultations.where("sucursal_id").equals(branchId).toArray(),
+      db.meal_plans.filter((row) => row.deleted_at === null && rowMatchesSucursal(row, branchId)).toArray(),
+      db.consultations.filter((row) => row.deleted_at === null && rowMatchesSucursal(row, branchId)).toArray(),
     ]);
     return { patients, appointments, mealPlans, consultations };
   }, [branchId, clockDateKey, maximumAppointmentLeadDays, preferences.enabled, scopesReady]);

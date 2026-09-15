@@ -3,6 +3,7 @@ import { isBillingReportRole } from "@modules/auth/authRoles";
 import { patientRowToDomain } from "@modules/patient/infrastructure/patientMapper";
 import { db } from "@services/db/dexieSchema";
 import { useAuthStore } from "@store/authStore";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 import type {
   PatientClinicalSummary,
   PatientClinicalSummaryAlert,
@@ -79,9 +80,14 @@ export function usePatientClinicalSummary(patientId: string | null) {
   const canViewFinancial = isBillingReportRole(role);
 
   const result = useLiveQuery(async () => {
-    if (!patientId) return { summary: null, error: null };
+    if (!patientId || !branchId) return { summary: null, error: null };
 
     try {
+      const patientRow = await db.patients.get(patientId);
+      if (!patientRow || !rowMatchesSucursal(patientRow, branchId)) {
+        return { summary: null, error: null };
+      }
+
       const [
         consultations,
         plans,
@@ -89,7 +95,6 @@ export function usePatientClinicalSummary(patientId: string | null) {
         allergies,
         intolerances,
         appointments,
-        patientRow,
         measurements,
       ] = await Promise.all([
         db.consultations
@@ -98,7 +103,7 @@ export function usePatientClinicalSummary(patientId: string | null) {
           .filter(
             (row) =>
               row.deleted_at === null &&
-              (!branchId || !row.sucursal_id || row.sucursal_id === branchId),
+              rowMatchesSucursal(row, branchId),
           )
           .toArray(),
         db.meal_plans
@@ -108,18 +113,26 @@ export function usePatientClinicalSummary(patientId: string | null) {
             (row) =>
               row.deleted_at === null &&
               row.status === "active" &&
-              (!branchId || !row.sucursal_id || row.sucursal_id === branchId),
+              rowMatchesSucursal(row, branchId),
           )
           .toArray(),
         db.goals.where("patient_id").equals(patientId).toArray(),
         db.allergies.where("patient_id").equals(patientId).toArray(),
         db.intolerances.where("patient_id").equals(patientId).toArray(),
-        db.appointments.where("patient_id").equals(patientId).toArray(),
-        db.patients.get(patientId),
+        db.appointments
+          .where("patient_id")
+          .equals(patientId)
+          .filter((row) =>
+            rowMatchesSucursal({ sucursal_id: row.office_id }, branchId),
+          )
+          .toArray(),
         db.anthropometry
           .where("patient_id")
           .equals(patientId)
-          .filter((row) => row.deleted_at === null)
+          .filter(
+            (row) =>
+              row.deleted_at === null && rowMatchesSucursal(row, branchId),
+          )
           .toArray(),
       ]);
 

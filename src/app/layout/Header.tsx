@@ -19,6 +19,7 @@ import { useCommandPaletteStore } from "@store/commandPaletteStore";
 import { useNotificationStore } from "@store/notificationStore";
 import { authApi } from "@services/api/authApi";
 import { getGlobalSearchShortcutLabel } from "./globalSearchEngine";
+import { toast } from "sonner";
 
 const THEME_LONG_PRESS_MS = 1000;
 const headerThemeOptions = [
@@ -247,8 +248,9 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               onClick={() => {
-                void authApi.logout().catch(() => undefined);
-                navigate("/login", { replace: true });
+                void authApi.logout()
+                  .then(() => navigate("/login", { replace: true }))
+                  .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cerrar sesión"));
               }}
             >
               {t("nav.logout")}

@@ -113,7 +113,7 @@ export class RegisterPaymentUseCase {
   constructor(private readonly repo: ConsultationRepository) {}
 
   async execute(id: ConsultationId, input: RegisterPaymentInput): Promise<Consultation> {
-    const existing = await this.repo.findById(id);
+    const existing = await this.repo.findById(id, true);
     if (!existing) throw new ConsultationNotFoundError(id);
     const updated = existing.withPayment(input);
     await this.repo.save(updated);
@@ -137,7 +137,7 @@ export class RegisterPaymentsBulkUseCase {
     if (entries.length === 0) return [];
     const updated: Consultation[] = [];
     for (const { id, input } of entries) {
-      const existing = await this.repo.findById(id);
+      const existing = await this.repo.findById(id, true);
       if (!existing) throw new ConsultationNotFoundError(id);
       const consultation = existing.withPayment(input);
       await this.repo.save(consultation);

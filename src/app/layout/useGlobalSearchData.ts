@@ -33,6 +33,7 @@ import type {
   GlobalSearchPlanFood,
   GlobalSearchResult,
 } from "./globalSearchTypes";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 interface GlobalSearchDataState {
   results: GlobalSearchResult[];
@@ -327,13 +328,6 @@ function scopeKey(
   ].join(":");
 }
 
-function belongsToBranch(
-  row: { sucursal_id?: string | null },
-  activeSucursalId: string,
-): boolean {
-  return !row.sucursal_id || row.sucursal_id === activeSucursalId;
-}
-
 export function useGlobalSearchData(
   open: boolean,
   activeSucursalId: string | null,
@@ -362,7 +356,7 @@ export function useGlobalSearchData(
         ? db.patients
             .filter(
               (row) =>
-                belongsToBranch(row, activeSucursalId) &&
+                rowMatchesSucursal(row, activeSucursalId) &&
                 row.deleted_at === null,
             )
             .toArray()
@@ -371,7 +365,7 @@ export function useGlobalSearchData(
         ? db.consultations
             .filter(
               (row) =>
-                belongsToBranch(row, activeSucursalId) &&
+                rowMatchesSucursal(row, activeSucursalId) &&
                 row.deleted_at === null,
             )
             .toArray()
@@ -380,18 +374,28 @@ export function useGlobalSearchData(
         ? db.meal_plans
             .filter(
               (row) =>
-                belongsToBranch(row, activeSucursalId) &&
+                rowMatchesSucursal(row, activeSucursalId) &&
                 row.deleted_at === null,
             )
             .toArray()
         : Promise.resolve([]),
       access.laboratory
-        ? db.lab_panels.filter((row) => row.deleted_at === null).toArray()
+        ? db.lab_panels
+            .filter(
+              (row) =>
+                rowMatchesSucursal(row, activeSucursalId) &&
+                row.deleted_at === null,
+            )
+            .toArray()
         : Promise.resolve([]),
       access.agenda
         ? db.appointments
             .filter(
-              (row) => !row.office_id || row.office_id === activeSucursalId,
+              (row) =>
+                rowMatchesSucursal(
+                  { sucursal_id: row.office_id },
+                  activeSucursalId,
+                ),
             )
             .toArray()
         : Promise.resolve([]),

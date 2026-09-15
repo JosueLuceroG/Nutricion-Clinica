@@ -1,10 +1,11 @@
-import type {
-  SyncManifest,
-  SyncPullResponse,
-  SyncPullChange,
-  SyncPullCursors,
-  SyncPushBatch,
-  SyncPushResponse,
+import {
+  SYNC_OPERATION_CONTRACT,
+  type SyncManifest,
+  type SyncPullResponse,
+  type SyncPullChange,
+  type SyncPullCursors,
+  type SyncPushBatch,
+  type SyncPushResponse,
 } from "@nutriclinica/shared";
 import { httpRequest } from "../api/httpClient.js";
 
@@ -24,7 +25,10 @@ export const syncApi = {
         since: params.since ? JSON.stringify(params.since) : undefined,
         entities: params.entities?.join(","),
       },
-      headers: { "X-Sucursal-Id": params.sucursalId },
+      headers: {
+        "X-Sucursal-Id": params.sucursalId,
+        "X-Sync-Operation-Contract": SYNC_OPERATION_CONTRACT,
+      },
       skipSucursalHeader: true,
     });
   },
@@ -32,7 +36,10 @@ export const syncApi = {
     return httpRequest<SyncPushResponse>("/sync/push", {
       method: "POST",
       body: batch,
-      headers: { "X-Sucursal-Id": batch.sucursalId },
+      headers: {
+        "X-Sucursal-Id": batch.sucursalId,
+        "X-Sync-Operation-Contract": SYNC_OPERATION_CONTRACT,
+      },
       skipSucursalHeader: true,
     });
   },

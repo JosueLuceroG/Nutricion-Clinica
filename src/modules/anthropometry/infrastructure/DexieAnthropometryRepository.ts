@@ -38,7 +38,7 @@ export class DexieAnthropometryRepository implements AnthropometryRepository {
 
   async findById(id: AnthropometryId): Promise<Anthropometry | null> {
     const row = await this.dbInstance.anthropometry.get(id.toString());
-    if (!row || !rowMatchesSucursal(row, requireActiveSucursalId()))
+    if (!row || row.deleted_at != null || !rowMatchesSucursal(row, requireActiveSucursalId()))
       return null;
     return anthropometryRowToDomain(row);
   }

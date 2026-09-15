@@ -26,6 +26,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 0,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
 
     const onComplete = vi.fn();
@@ -40,6 +41,27 @@ describe("useCascadeDeletePatient", () => {
     expect(archiveSpy).not.toHaveBeenCalled();
     expect(result.current.dialogOpen).toBe(false);
     expect(onComplete).toHaveBeenCalledWith("deleted");
+  });
+
+  it("abre el modal cuando solo existen registros de adherencia", async () => {
+    const deleteSpy = vi
+      .spyOn(patientService.delete, "execute")
+      .mockResolvedValue(undefined);
+    vi.spyOn(patientService.countLinked, "execute").mockResolvedValue({
+      consultations: 0,
+      mealPlans: 0,
+      labPanels: 0,
+      anthropometry: 0,
+      adherenceRecords: 1,
+    });
+
+    const { result } = renderHook(() => useCascadeDeletePatient());
+    await act(async () => {
+      await result.current.requestDelete(P1);
+    });
+
+    expect(result.current.dialogOpen).toBe(true);
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
   it("abre el modal cuando hay entidades vinculadas", async () => {
@@ -57,6 +79,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 1,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
 
     const onComplete = vi.fn();
@@ -75,6 +98,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 1,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
     expect(onComplete).not.toHaveBeenCalled();
   });
@@ -85,6 +109,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 0,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
     const archiveSpy = vi
       .spyOn(patientService.archive, "execute")
@@ -117,6 +142,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 0,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
     vi.spyOn(patientService.archive, "execute").mockResolvedValue({} as never);
     const cascadeSpy = vi
@@ -145,6 +171,7 @@ describe("useCascadeDeletePatient", () => {
       mealPlans: 0,
       labPanels: 0,
       anthropometry: 0,
+      adherenceRecords: 0,
     });
     vi.spyOn(patientService.archive, "execute").mockResolvedValue({} as never);
     vi.spyOn(patientService.deleteCascade, "execute").mockResolvedValue(undefined);

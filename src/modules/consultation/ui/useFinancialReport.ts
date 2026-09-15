@@ -3,6 +3,9 @@ import { db as defaultDb, type NutriClinicaDB } from "@services/db/dexieSchema";
 import { consultationRowToDomain } from "@modules/consultation/infrastructure/consultationMapper";
 import { expenseRowToDomain } from "@modules/expense/infrastructure/expenseMapper";
 import i18n from "@i18n/config";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 export interface MonthlyBucket {
   monthKey: string;
@@ -89,14 +92,20 @@ export const useFinancialReport = (
   topN = 5,
   dbInstance: NutriClinicaDB = defaultDb,
 ): FinancialReport | null => {
+  const syncSucursalId = useSyncStore((state) => state.sucursalId);
+  const authSucursalId = useAuthStore((state) => state.sucursalActivaId);
+  const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
+
   return useLiveQuery<FinancialReport | null, FinancialReport | null>(
     async () => {
+      if (!activeSucursalId) return null;
       const fromMs = from.getTime();
       const toMs = to.getTime();
 
       const consultationRows = await dbInstance.consultations
         .filter((r) => {
           if (r.deleted_at) return false;
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           const t = new Date(r.consultation_date).getTime();
           if (t < fromMs || t > toMs) return false;
           if (!(r.cost > 0)) return false;
@@ -107,6 +116,7 @@ export const useFinancialReport = (
       const expenseRows = await dbInstance.expenses
         .filter((r) => {
           if (r.deleted_at) return false;
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           const t = new Date(r.expense_date).getTime();
           return t >= fromMs && t <= toMs;
         })
@@ -182,7 +192,8 @@ export const useFinancialReport = (
 
       const patientIds = Array.from(patientTotals.keys());
       const patientDbRows = patientIds.length
-        ? await dbInstance.patients.where("id").anyOf(patientIds).toArray()
+        ? (await dbInstance.patients.where("id").anyOf(patientIds).toArray())
+            .filter((row) => rowMatchesSucursal(row, activeSucursalId))
         : [];
       const nameById = new Map(patientDbRows.map((p) => [p.id, `${p.first_name} ${p.last_name}`]));
       const topPatients: PatientTopRow[] = Array.from(patientTotals.entries())
@@ -246,7 +257,7 @@ export const useFinancialReport = (
       };
       return result;
     },
-    [dbInstance, from.getTime(), to.getTime(), topN],
+    [dbInstance, from.getTime(), to.getTime(), topN, activeSucursalId],
     null,
   );
 };

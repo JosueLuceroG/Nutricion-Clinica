@@ -6,6 +6,7 @@ import { Patient } from "../domain/Patient";
 import { PatientId } from "../domain/PatientId";
 import { Email, Phone } from "../domain/Contact";
 import type { Sex } from "../domain/Sex";
+import { useSyncStore } from "@store/syncStore";
 
 const makePatient = (
   overrides: Partial<{
@@ -33,6 +34,7 @@ describe("DexiePatientRepository", () => {
   let db: NutriClinicaDB;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("s1");
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
     await db.delete();
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
@@ -119,6 +121,20 @@ describe("DexiePatientRepository", () => {
     expect(results).toHaveLength(1);
     expect(results[0]?.firstName).toBe("SucursalUno");
     expect(await repo.count({ sucursalId: "s1" })).toBe(1);
+  });
+
+  it("no lee, sobrescribe ni elimina un paciente de otra sucursal", async () => {
+    const patient = makePatient();
+    await repo.save(patient);
+    await db.patients.update(patient.id.toString(), { sucursal_id: "s2" });
+
+    expect(await repo.findById(patient.id)).toBeNull();
+    await expect(repo.save(patient)).rejects.toThrow(/otra sucursal/);
+    await repo.delete(patient.id, true);
+    expect(await db.patients.get(patient.id.toString())).toMatchObject({
+      sucursal_id: "s2",
+      deleted_at: null,
+    });
   });
 
   it("filtra por sexo", async () => {
@@ -465,7 +481,8 @@ describe("DexiePatientRepository", () => {
     await repo.save(p);
     await repo.delete(p.id, true);
 
-    const found = await repo.findById(p.id);
+    expect(await repo.findById(p.id)).toBeNull();
+    const found = await repo.findById(p.id, true);
     expect(found?.deletedAt).not.toBeNull();
     expect(found?.status).toBe("inactive");
   });
@@ -497,7 +514,7 @@ describe("DexiePatientRepository", () => {
     // en campos requeridos y a `null` en opcionales, en vez de lanzar.
     await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
 
-    const found = await repo.findById(p.id);
+    const found = await repo.findById(p.id, true);
     expect(found).not.toBeNull();
     expect(found?.deletedAt).not.toBeNull();
     expect(found?.status).toBe("inactive");
@@ -520,7 +537,7 @@ describe("DexiePatientRepository", () => {
 
     await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
 
-    const found = await repo.findById(p.id);
+    const found = await repo.findById(p.id, true);
     expect(found?.status).toBe("inactive");
   });
 

@@ -151,7 +151,9 @@ export interface Pending2faTokenPayload extends JwtStandardClaims {
 }
 
 export const SYNC_SCHEMA_VERSION = 2;
+export { canonicalSyncId, isSyncRowVersion, toApiPayload, toLocalPayload } from "./syncPayloadMapping.js";
 export const API_VERSION = "v1";
+export const SYNC_OPERATION_CONTRACT = "durable-outbox-v1" as const;
 /** Versión del esquema Dexie del cliente (fuente única: src/services/db/dexieSchema.ts, cadena final). */
 export const DEXIE_SCHEMA_VERSION = 33;
 
@@ -167,6 +169,10 @@ export const SYNCABLE_ENTITIES = [
 export type SyncableEntity = (typeof SYNCABLE_ENTITIES)[number];
 
 export interface SyncPushOperation {
+  /** Stable identity of the exact revision, preserved across retries. */
+  operationId: string;
+  /** Explicit user restoration based on an observed tombstone version. */
+  restoreDeleted?: boolean;
   entity: SyncableEntity;
   id: string;
   op: "create" | "update" | "delete";
@@ -181,12 +187,15 @@ export interface SyncPushBatch {
 }
 
 export interface SyncPushResultItem {
+  operationId: string;
   entity: SyncableEntity;
   id: string;
   status: "applied" | "skipped" | "conflict" | "error";
   serverUpdatedAt?: string;
   serverRowVersion?: string;
   error?: string;
+  serverPayload?: Record<string, unknown> | null;
+  serverDeleted?: boolean;
 }
 
 export interface SyncPushResponse {
@@ -212,11 +221,14 @@ export interface SyncPullChange {
   id: string;
   op: "create" | "update" | "delete";
   payload: unknown;
+  /** Reduced role-specific projection; it may only patch an existing local row. */
+  partial?: boolean;
   serverUpdatedAt: string;
   serverRowVersion: string;
 }
 
 export interface SyncManifest {
+  operationContract: typeof SYNC_OPERATION_CONTRACT;
   apiVersion: string;
   apiContractVersion: string;
   syncSchemaVersion: number;

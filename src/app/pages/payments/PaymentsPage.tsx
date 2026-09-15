@@ -27,6 +27,7 @@ import {
 import { EmptyState } from "@components/layout/EmptyState";
 import { usePaymentsHistory } from "@modules/consultation/ui/useBillingHooks";
 import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
+import { PAYMENT_CONCEPT_LABELS } from "@modules/consultation/domain/PaymentConcept";
 import { formatCurrency } from "@utils/formatCurrency";
 
 const MXN = (n: number) => formatCurrency(n, "MXN", i18n.language);
@@ -61,7 +62,7 @@ export const PaymentsPage = () => {
     if (items.length === 0) return;
     const lines = [
       [
-        t("billing.column_date"), t("billing.column_patient"), t("consultation.reason"),
+        t("billing.column_date"), t("billing.column_patient"), t("consultation.payment_concept"),
         t("consultation.payment_concept"), t("billing.column_status"), t("billing.column_cost"),
         t("consultation.amount_paid"),
       ].join(","),
@@ -69,7 +70,7 @@ export const PaymentsPage = () => {
         [
           it.consultation.consultationDate.toISOString().slice(0, 10),
           `"${it.patientName.replace(/"/g, '""')}"`,
-          `"${it.consultation.reason.replace(/"/g, '""')}"`,
+          `"${PAYMENT_CONCEPT_LABELS[it.consultation.paymentConcept].replace(/"/g, '""')}"`,
           it.paymentConcept,
           it.paymentStatus,
           it.consultation.cost.toFixed(2),
@@ -179,7 +180,7 @@ export const PaymentsPage = () => {
                 <TableRow>
                   <TableHead>{t("billing.column_date")}</TableHead>
                   <TableHead>{t("billing.column_patient")}</TableHead>
-                  <TableHead>{t("consultation.reason")}</TableHead>
+                  <TableHead>{t("consultation.payment_concept")}</TableHead>
                   <TableHead>{t("consultation.payment_concept")}</TableHead>
                   <TableHead>{t("billing.column_status")}</TableHead>
                   <TableHead className="text-right">{t("billing.column_cost")}</TableHead>
@@ -202,8 +203,8 @@ export const PaymentsPage = () => {
                           {it.patientName}
                         </Link>
                       </TableCell>
-                      <TableCell className="max-w-xs truncate" title={it.consultation.reason}>
-                        {it.consultation.reason}
+                      <TableCell className="max-w-xs truncate">
+                        {PAYMENT_CONCEPT_LABELS[it.consultation.paymentConcept]}
                       </TableCell>
                       <TableCell>
                         {t(`consultation.concept_${it.paymentConcept}`)}

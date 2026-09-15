@@ -20,8 +20,8 @@ export async function assertPacienteInSucursal(
     .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
     .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
     .query<{ id: string }>(
-      `SELECT id
-         FROM pacientes
+       `SELECT id
+          FROM pacientes WITH (UPDLOCK, HOLDLOCK)
         WHERE id = @paciente_id
           AND sucursal_id = @sucursal_id
           AND deleted_at IS NULL`,
@@ -44,7 +44,7 @@ export async function assertConsultaInSucursal(
     .input('sucursal_id', sql.UniqueIdentifier(), sucursalId);
 
   let query = `SELECT id
-                 FROM consultas
+                 FROM consultas WITH (UPDLOCK, HOLDLOCK)
                 WHERE id = @consulta_id
                   AND sucursal_id = @sucursal_id
                   AND deleted_at IS NULL`;

@@ -17,6 +17,7 @@ import type { Consultation } from "@modules/consultation/domain/Consultation";
 import type { ConsultationStatus } from "@modules/consultation/domain/ConsultationStatus";
 import { clinicalRecordService } from "@services/clinicalRecordService";
 import { recordClinicalAudit } from "@services/audit/clinicalAudit";
+import { requireActiveSucursalId, rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 const repository: ConsultationRepository = new DexieConsultationRepository(db);
 const scheduleConsultation = new ScheduleConsultationUseCase(repository);
@@ -94,7 +95,25 @@ export const consultationService = {
   delete: {
     async execute(id: Parameters<typeof deleteConsultation.execute>[0], soft = true): ReturnType<typeof deleteConsultation.execute> {
       const existing = await repository.findById(id);
-      await deleteConsultation.execute(id, soft);
+      const consultationId = id.toString();
+      const sucursalId = requireActiveSucursalId();
+      await db.transaction(
+        "rw",
+        [db.consultations, db.meal_plans, db.adherence_records],
+        async () => {
+          const [plans, adherenceRecords] = await Promise.all([
+            db.meal_plans
+              .filter((row) => row.consultation_id === consultationId && row.deleted_at == null && rowMatchesSucursal(row, sucursalId))
+              .toArray(),
+            db.adherence_records
+              .filter((row) => row.consultation_id === consultationId && row.deleted_at == null && rowMatchesSucursal(row, sucursalId))
+              .toArray(),
+          ]);
+          for (const plan of plans) await db.meal_plans.delete(plan.id);
+          for (const record of adherenceRecords) await db.adherence_records.delete(record.id);
+          await deleteConsultation.execute(id, soft);
+        },
+      );
       await recordClinicalAudit({
         module: "consultations",
         action: soft ? "soft_delete" : "remove",

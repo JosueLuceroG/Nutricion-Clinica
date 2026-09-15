@@ -8,7 +8,7 @@ import { useSyncStore } from "@store/syncStore";
 void useAuthStore;
 void useSyncStore;
 import { HttpError, NetworkError } from "../api/httpClient.js";
-import { API_VERSION, SYNC_SCHEMA_VERSION, type SyncPullCursors } from "@nutriclinica/shared";
+import { API_VERSION, SYNC_SCHEMA_VERSION, type SyncPullCursors, type SyncPushBatch, type SyncPushResultItem } from "@nutriclinica/shared";
 import { setSyncApplying } from "./syncEnqueuer.js";
 
 const { mockManifest, mockPull, mockPush } = vi.hoisted(() => ({
@@ -16,6 +16,13 @@ const { mockManifest, mockPull, mockPush } = vi.hoisted(() => ({
   mockPull: vi.fn(),
   mockPush: vi.fn(),
 }));
+
+const RV_A = "AAAAAAAAAAE=";
+const RV_B = "AAAAAAAAAAI=";
+const SERVER_TIME = "2026-06-04T00:00:01.000Z";
+const SERVER_TIME_2 = "2026-06-04T00:00:02.000Z";
+const cursor = (entity: string, revision: string, branch = "suc-1") =>
+  `rv1:${branch}:${entity}:${revision}`;
 
 vi.mock("./syncApiClient.js", () => ({
   syncApi: {
@@ -56,7 +63,15 @@ describe("SyncEngine", () => {
   let queue: SyncQueueRepository;
   let engine: SyncEngine;
   let lastPullAtBySucursal: Record<string, SyncPullCursors | null>;
-  const api = { manifest: mockManifest, pull: mockPull, push: mockPush };
+  // Legacy scenario fixtures describe business results; this adapter supplies
+  // the new transport receipt envelope. Adversarial envelopes have dedicated tests.
+  const api = { manifest: mockManifest, pull: mockPull, push: async (batch: SyncPushBatch) => {
+    const response = await mockPush(batch);
+    return { ...response, results: response.results.map((result: SyncPushResultItem) => ({
+      ...result, operationId: batch.operations.find((op) => op.entity === result.entity && op.id === result.id)?.operationId,
+      serverRowVersion: result.serverRowVersion ?? "AAAAAAAAAAE=",
+    })) };
+  } };
 
   beforeEach(async () => {
     vi.resetAllMocks();
@@ -83,6 +98,7 @@ describe("SyncEngine", () => {
     engine = new SyncEngine(deps);
 
     mockManifest.mockResolvedValue({
+      operationContract: "durable-outbox-v1",
       apiVersion: "v1",
       apiContractVersion: API_VERSION,
       syncSchemaVersion: SYNC_SCHEMA_VERSION,
@@ -147,11 +163,11 @@ describe("SyncEngine", () => {
           op: "update",
           payload: { id: "p1", first_name: "Ana" },
           serverUpdatedAt: "2026-06-04T00:00:01.000Z",
-          serverRowVersion: "AAA",
+          serverRowVersion: RV_A,
         },
       ],
       hasMore: false,
-      cursors: { pacientes: "2026-06-04T00:00:01.000Z@p1" },
+      cursors: { pacientes: cursor("pacientes", "0000000000000001") },
     });
     mockPush.mockResolvedValueOnce({
       results: [],
@@ -166,9 +182,9 @@ describe("SyncEngine", () => {
     );
     expect(
       (stored as unknown as { row_version: string | null }).row_version,
-    ).toBe("AAA");
+    ).toBe(RV_A);
     expect(lastPullAtBySucursal["suc-1"]).toEqual({
-      pacientes: "2026-06-04T00:00:01.000Z@p1",
+      pacientes: cursor("pacientes", "0000000000000001"),
     });
   });
 
@@ -208,12 +224,12 @@ describe("SyncEngine", () => {
           id: "p9",
           op: "update",
           payload: { id: "p9", first_name: "Página 1" },
-          serverUpdatedAt: "t",
-          serverRowVersion: "AAA",
+          serverUpdatedAt: SERVER_TIME,
+          serverRowVersion: RV_A,
         },
       ],
       hasMore: true,
-      cursors: { pacientes: "t@p9" },
+      cursors: { pacientes: cursor("pacientes", "0000000000000001") },
     });
     mockPull.mockResolvedValueOnce({
       serverTime: "t2",
@@ -223,12 +239,12 @@ describe("SyncEngine", () => {
           id: "c1",
           op: "update",
           payload: { id: "c1", reason: "segunda página" },
-          serverUpdatedAt: "t2",
-          serverRowVersion: "BBB",
+          serverUpdatedAt: SERVER_TIME_2,
+          serverRowVersion: RV_B,
         },
       ],
       hasMore: false,
-      cursors: { consultas: "t2@c1" },
+      cursors: { consultas: cursor("consultas", "0000000000000002") },
     });
     mockPush.mockResolvedValueOnce({
       results: [],
@@ -242,12 +258,12 @@ describe("SyncEngine", () => {
       sucursalId: "suc-1",
     });
     expect(mockPull).toHaveBeenNthCalledWith(2, {
-      since: { pacientes: "t@p9" },
+      since: { pacientes: cursor("pacientes", "0000000000000001") },
       sucursalId: "suc-1",
     });
     expect(lastPullAtBySucursal["suc-1"]).toEqual({
-      pacientes: "t@p9",
-      consultas: "t2@c1",
+      pacientes: cursor("pacientes", "0000000000000001"),
+      consultas: cursor("consultas", "0000000000000002"),
     });
     const c = await db.consultations.get("c1");
     expect(c).toBeTruthy();
@@ -262,27 +278,27 @@ describe("SyncEngine", () => {
           id: "p1",
           op: "update",
           payload: { id: "p1", first_name: "Ana" },
-          serverUpdatedAt: "t",
-          serverRowVersion: "AAA",
+          serverUpdatedAt: SERVER_TIME,
+          serverRowVersion: RV_A,
         },
         {
           entity: "pacientes",
           id: "p2",
           op: "update",
           payload: { id: "p2", first_name: "Beto" },
-          serverUpdatedAt: "t",
-          serverRowVersion: "BBB",
+          serverUpdatedAt: SERVER_TIME,
+          serverRowVersion: RV_B,
         },
       ],
       hasMore: false,
-      cursors: { pacientes: "t@p2" },
+      cursors: { pacientes: cursor("pacientes", "0000000000000002") },
     });
     mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
 
     const txSpy = vi.spyOn(db, "transaction");
     await engine.sync();
 
-    expect(txSpy).toHaveBeenCalledTimes(1);
+    expect(txSpy).toHaveBeenCalledTimes(2); // atomic pull plus atomic outbox claim
     expect(await db.patients.get("p1")).toBeTruthy();
     expect(await db.patients.get("p2")).toBeTruthy();
   });
@@ -306,6 +322,7 @@ describe("SyncEngine", () => {
       syncGetState.mockReturnValue({ sucursalId: "suc-2" });
       authGetState.mockReturnValue({ token: "tok", sucursalActivaId: "suc-2" });
       return {
+        operationContract: "durable-outbox-v1",
         apiVersion: "v1",
         apiContractVersion: API_VERSION,
         syncSchemaVersion: SYNC_SCHEMA_VERSION,
@@ -353,11 +370,11 @@ describe("SyncEngine", () => {
           op: "delete",
           payload: null,
           serverUpdatedAt: "2026-06-04T00:00:01.000Z",
-          serverRowVersion: "AAA",
+          serverRowVersion: RV_A,
         },
       ],
       hasMore: false,
-      cursors: { pacientes: "2026-06-04T00:00:01.000Z@p1" },
+      cursors: { pacientes: cursor("pacientes", "0000000000000001") },
     });
     mockPush.mockResolvedValueOnce({
       results: [],
@@ -379,17 +396,110 @@ describe("SyncEngine", () => {
           op: "delete",
           payload: null,
           serverUpdatedAt: "2026-06-04T00:00:01.000Z",
-          serverRowVersion: "AAA",
+          serverRowVersion: RV_A,
         },
       ],
       hasMore: false,
-      cursors: { pacientes: "2026-06-04T00:00:01.000Z@p-doesnt-exist" },
+      cursors: { pacientes: cursor("pacientes", "0000000000000001") },
     });
     mockPush.mockResolvedValueOnce({
       results: [],
       serverTime: "2026-06-04T00:00:02.000Z",
     });
     await expect(engine.sync()).resolves.toBeUndefined();
+  });
+
+  it("pull parcial: fusiona billing sin borrar datos clínicos y no fabrica filas incompletas", async () => {
+    authGetState.mockReturnValue({
+      token: "tok",
+      sucursalActivaId: "suc-1",
+      user: { rol: "facturacion" },
+    });
+    await db.consultations.put({
+      id: "c-existing",
+      sucursal_id: "suc-1",
+      patient_id: "p1",
+      reason: "Motivo clínico",
+      subjective: "Dato sensible",
+      paid: false,
+      payment_status: "pending",
+      deleted_at: null,
+    } as never);
+    mockPull.mockResolvedValueOnce({
+      serverTime: SERVER_TIME,
+      changes: [
+        {
+          entity: "consultas",
+          id: "c-existing",
+          op: "update",
+          partial: true,
+          payload: { id: "c-existing", paid: true, payment_status: "paid" },
+          serverUpdatedAt: SERVER_TIME,
+          serverRowVersion: RV_A,
+        },
+        {
+          entity: "consultas",
+          id: "c-unknown",
+          op: "update",
+          partial: true,
+          payload: { id: "c-unknown", paid: true, payment_status: "paid" },
+          serverUpdatedAt: SERVER_TIME,
+          serverRowVersion: RV_A,
+        },
+      ],
+      hasMore: false,
+      cursors: { consultas: cursor("consultas", "0000000000000001") },
+    });
+    mockPush.mockResolvedValueOnce({ results: [], serverTime: SERVER_TIME_2 });
+
+    await engine.sync();
+
+    expect(await db.consultations.get("c-existing")).toMatchObject({
+      reason: "Motivo clínico",
+      subjective: "Dato sensible",
+      paid: true,
+      payment_status: "paid",
+      row_version: RV_A,
+    });
+    expect(await db.consultations.get("c-unknown")).toBeUndefined();
+    expect(lastPullAtBySucursal["suc-1:billing"]).toEqual({
+      consultas: cursor("consultas", "0000000000000001"),
+    });
+    expect(lastPullAtBySucursal["suc-1"]).toBeNull();
+  });
+
+  it("pull fail-closed: no persiste cambios con ROWVERSION o identidad de sucursal inválidos", async () => {
+    mockPull.mockResolvedValueOnce({
+      serverTime: SERVER_TIME,
+      changes: [{
+        entity: "pacientes",
+        id: "p-invalid",
+        op: "update",
+        payload: { id: "p-invalid", sucursal_id: "suc-2", first_name: "Cross branch" },
+        serverUpdatedAt: SERVER_TIME,
+        serverRowVersion: "not-a-row-version",
+      }],
+      hasMore: false,
+      cursors: { pacientes: cursor("pacientes", "0000000000000001") },
+    });
+
+    await expect(engine.sync()).rejects.toThrow("INVALID_SYNC_PULL_CHANGE");
+    expect(await db.patients.get("p-invalid")).toBeUndefined();
+    expect(lastPullAtBySucursal["suc-1"]).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("pull fail-closed: rechaza cursores de otra sucursal sin avanzar estado local", async () => {
+    mockPull.mockResolvedValueOnce({
+      serverTime: SERVER_TIME,
+      changes: [],
+      hasMore: false,
+      cursors: { pacientes: cursor("pacientes", "0000000000000001", "suc-2") },
+    });
+
+    await expect(engine.sync()).rejects.toThrow("INVALID_SYNC_PULL_CURSOR");
+    expect(lastPullAtBySucursal["suc-1"]).toBeNull();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   it("push: items pending se envían y marcan applied", async () => {
@@ -432,7 +542,7 @@ describe("SyncEngine", () => {
       entityId: "p1",
       op: "update",
       payload: { id: "p1", first_name: "Ana" },
-      expectedRowVersion: "V-LOCAL",
+      expectedRowVersion: RV_A,
     });
     mockPull.mockResolvedValueOnce({
       serverTime: "t",
@@ -447,7 +557,7 @@ describe("SyncEngine", () => {
           id: "p1",
           status: "conflict",
           error: "row_version mismatch",
-          serverRowVersion: "V-SERVER",
+          serverRowVersion: RV_B,
         },
       ],
       serverTime: "t2",
@@ -457,12 +567,13 @@ describe("SyncEngine", () => {
 
     expect(mockPush).toHaveBeenCalledWith({
       sucursalId: "suc-1",
-      operations: [expect.objectContaining({ expectedRowVersion: "V-LOCAL" })],
+      operations: [expect.objectContaining({ expectedRowVersion: RV_A })],
     });
     const item = (await queue.listAll()).find((i) => i.entityId === "p1");
     expect(item?.status).toBe("conflict");
     // Al resolver "mantener local", el re-push llevará la versión fresca del server.
-    expect(item?.expectedRowVersion).toBe("V-SERVER");
+    expect(item?.expectedRowVersion).toBe(RV_A);
+    expect(item?.serverRowVersion).toBe(RV_B);
   });
 
   it("push: items syncing atascados (>5 min) vuelven a pending y se reintentan", async () => {
@@ -576,6 +687,8 @@ describe("SyncEngine", () => {
     });
     await engine.sync();
     expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush.mock.calls[0]![0].operations[0]!.operationId)
+      .toBe(mockPush.mock.calls[1]![0].operations[0]!.operationId);
   });
 
   it("push: 5xx reintenta, 4xx no", async () => {
@@ -609,6 +722,7 @@ describe("SyncEngine", () => {
     });
     mockManifest.mockResolvedValue({
       apiVersion: "v1",
+      operationContract: "durable-outbox-v1",
       apiContractVersion: API_VERSION,
       syncSchemaVersion: SYNC_SCHEMA_VERSION,
       serverTime: "t",
@@ -727,12 +841,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { consultas: "t1@c1" },
+        cursors: { consultas: cursor("consultas", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();
@@ -790,12 +904,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { consultas: "t1@c2" },
+        cursors: { consultas: cursor("consultas", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();
@@ -824,12 +938,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { pacientes: "t1@p-tag" },
+        cursors: { pacientes: cursor("pacientes", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();
@@ -859,12 +973,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { pacientes: "t1@p-empty" },
+        cursors: { pacientes: cursor("pacientes", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();
@@ -907,12 +1021,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t1",
             },
-            serverUpdatedAt: "t1",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { pacientes: "t1@p-preserved" },
+        cursors: { pacientes: cursor("pacientes", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
 
@@ -971,12 +1085,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { planes_alimenticios: "t1@mp1" },
+        cursors: { planes_alimenticios: cursor("planes_alimenticios", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();
@@ -1028,12 +1142,12 @@ describe("SyncEngine", () => {
               created_at: "t0",
               updated_at: "t0",
             },
-            serverUpdatedAt: "t0",
-            serverRowVersion: "AAA",
+            serverUpdatedAt: SERVER_TIME,
+            serverRowVersion: RV_A,
           },
         ],
         hasMore: false,
-        cursors: { lab_panels: "t1@lp1" },
+        cursors: { lab_panels: cursor("lab_panels", "0000000000000001") },
       });
       mockPush.mockResolvedValueOnce({ results: [], serverTime: "t2" });
       await engine.sync();

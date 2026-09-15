@@ -10,8 +10,9 @@ import { DexiePatientRepository } from "@modules/patient/infrastructure/DexiePat
 import { DexieConsultationRepository } from "@modules/consultation/infrastructure/DexieConsultationRepository";
 import { Consultation } from "@modules/consultation/domain/Consultation";
 import { ScheduleConsultationUseCase, RegisterPaymentUseCase, DeleteConsultationUseCase } from "@modules/consultation/application/consultationUseCases";
-import { consultationDomainToRow } from "@modules/consultation/infrastructure/consultationMapper";
 import { usePendingPayments, usePatientPaymentSummary, useConsultationLive } from "./useBillingHooks";
+import { useSyncStore } from "@store/syncStore";
+import { useAuthStore } from "@store/authStore";
 
 const makePatient = (overrides: { firstName: string; lastName?: string }) =>
   Patient.create({
@@ -22,6 +23,11 @@ const makePatient = (overrides: { firstName: string; lastName?: string }) =>
     email: Email.from(`${overrides.firstName.toLowerCase()}@b.com`),
     phone: Phone.from("+52 55 1234 5678"),
   });
+
+beforeEach(() => {
+  useSyncStore.getState().setSucursalId("suc-1");
+  useAuthStore.setState({ user: null });
+});
 
 describe("usePendingPayments", () => {
   let db: NutriClinicaDB;
@@ -161,6 +167,24 @@ describe("usePendingPayments", () => {
     });
     await waitFor(() => expect(result.current.items.length).toBe(0));
   });
+
+  it("excluye consultas y pacientes de otra sucursal", async () => {
+    const patient = makePatient({ firstName: "Otra" });
+    await patientRepo.save(patient);
+    const consultation = await schedule.execute({
+      patientId: patient.id,
+      consultationDate: new Date("2026-06-01"),
+      consultationNumber: 1,
+      reason: "No visible",
+      cost: 500,
+    });
+    await db.consultations.update(consultation.id.toString(), {
+      sucursal_id: "suc-2",
+    });
+
+    const { result } = renderHook(() => usePendingPayments({}, db));
+    await waitFor(() => expect(result.current.items).toEqual([]));
+  });
 });
 
 describe("usePatientPaymentSummary", () => {
@@ -292,10 +316,37 @@ describe("useConsultationLive", () => {
       reason: "Control inicial",
     });
     await repo.save(c);
-    await db.consultations.put(consultationDomainToRow(c));
 
     const { result } = renderHook(() => useConsultationLive(c.id.toString(), db));
     await waitFor(() => expect(result.current).not.toBeNull());
     expect(result.current?.id.toString()).toBe(c.id.toString());
+  });
+
+  it("redacta datos clínicos para el rol de facturación", async () => {
+    useAuthStore.setState({ user: { rol: "facturacion" } as never });
+    const db = new NutriClinicaDB(`test-clv3-${Math.random().toString(36).slice(2)}`);
+    await db.open();
+    const repo = new DexieConsultationRepository(db);
+    const consultation = Consultation.create({
+      patientId: PatientId.generate(),
+      consultationDate: new Date("2026-06-01"),
+      consultationNumber: 1,
+      reason: "Diagnóstico sensible",
+      subjective: "Síntoma sensible",
+      assessment: "Evaluación sensible",
+      cost: 500,
+    });
+    await repo.save(consultation);
+
+    const { result } = renderHook(() =>
+      useConsultationLive(consultation.id.toString(), db),
+    );
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current).toMatchObject({
+      reason: "",
+      subjective: null,
+      assessment: null,
+      cost: 500,
+    });
   });
 });

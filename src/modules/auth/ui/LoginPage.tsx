@@ -89,6 +89,7 @@ export function LoginPage() {
         setSucursales(response.sucursales);
       } else {
         const sucursalActivaId = response.sucursalActivaId ?? response.sucursales[0]?.id ?? null;
+        await authApi.prepareLocalSession();
         setSession({
           token: response.token,
           user: response.profesional,
@@ -123,6 +124,7 @@ export function LoginPage() {
     try {
       const response = await authApi.login({ email, password, totpCode, pending2faToken });
       const sucursalActivaId = response.sucursalActivaId ?? response.sucursales[0]?.id ?? null;
+      await authApi.prepareLocalSession();
       setSession({
         token: response.token,
         user: response.profesional,
@@ -148,17 +150,22 @@ export function LoginPage() {
     }
   };
 
-  const handleSucursalPick = (id: string) => {
+  const handleSucursalPick = async (id: string) => {
     if (!pendingSession) return;
-    setSession({
-      token: pendingSession.token,
-      user: pendingSession.user,
-      sucursales: sucursales ?? [],
-      sucursalActivaId: id,
-    });
-    setSucursalId(id);
-    toast.success(`Bienvenido/a, ${pendingSession.user.nombreCompleto}`);
-    navigate("/", { replace: true });
+    try {
+      await authApi.prepareLocalSession();
+      setSession({
+        token: pendingSession.token,
+        user: pendingSession.user,
+        sucursales: sucursales ?? [],
+        sucursalActivaId: id,
+      });
+      setSucursalId(id);
+      toast.success(`Bienvenido/a, ${pendingSession.user.nombreCompleto}`);
+      navigate("/", { replace: true });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No fue posible preparar la sesión local");
+    }
   };
 
   return (

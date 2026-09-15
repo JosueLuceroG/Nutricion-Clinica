@@ -7,6 +7,8 @@ import {
 import type { PatientRow } from "../infrastructure/patientMapper";
 import { db } from "@services/db/dexieSchema";
 import { usePatientDirectory } from "./usePatientDirectory";
+import { markRemoteTransaction } from "@services/sync/atomicOutbox";
+import { useSyncStore } from "@store/syncStore";
 
 const makePatient = (
   index: number,
@@ -74,6 +76,9 @@ const isoFromToday = (days: number): string =>
   `${dateFromToday(days)}T12:00:00.000Z`;
 
 beforeEach(async () => {
+  useSyncStore.getState().setSucursalId("branch-1");
+  await db.transaction("rw", db.tables, async () => {
+  markRemoteTransaction();
   await Promise.all([
     db.patients.clear(),
     db.meal_plans.clear(),
@@ -105,10 +110,14 @@ beforeEach(async () => {
       deleted_at: "2026-01-10T12:00:00.000Z",
     }),
   ]);
+  });
 });
 
 afterEach(async () => {
-  await db.patients.clear();
+  await db.transaction("rw", db.patients, async () => {
+    markRemoteTransaction();
+    await db.patients.clear();
+  });
 });
 
 describe("usePatientDirectory", () => {
@@ -119,7 +128,7 @@ describe("usePatientDirectory", () => {
     );
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data?.filteredTotal).toBe(13);
+    expect(result.current.data?.filteredTotal).toBe(12);
     expect(result.current.data?.items).toHaveLength(10);
     expect(result.current.data?.counts.deleted).toBe(1);
     expect(
@@ -130,7 +139,7 @@ describe("usePatientDirectory", () => {
 
     await act(async () => rerender({ page: 2 }));
     await waitFor(() => expect(result.current.data?.page).toBe(2));
-    expect(result.current.data?.items).toHaveLength(3);
+    expect(result.current.data?.items).toHaveLength(2);
   });
 
   it("searches without accents and by phone or record number", async () => {
@@ -362,10 +371,10 @@ describe("usePatientDirectory", () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.data?.clinicalCounts).toEqual({
-      all: 13,
+      all: 12,
       onTrack: 1,
       followUp: 0,
-      atRisk: 12,
+      atRisk: 11,
       new: 0,
     });
     expect(result.current.data?.insights).toEqual({
@@ -373,7 +382,7 @@ describe("usePatientDirectory", () => {
       advancingToGoal: 1,
       patientsWithGoal: 1,
       appointmentsThisWeek: 1,
-      requiresContact: 11,
+      requiresContact: 10,
       expiringPlans: 1,
     });
 

@@ -4,7 +4,7 @@ import type { PatientId } from "../domain/PatientId";
 import type { PatientRow } from "./patientMapper";
 import { patientRowToDomain, patientDomainToRow } from "./patientMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
-import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import { requireActiveSucursalId, rowMatchesSucursal, withSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 50;
@@ -15,13 +15,16 @@ export class DexiePatientRepository implements PatientRepository {
 
   async save(patient: Patient): Promise<void> {
     const row = patientDomainToRow(patient);
+    const sucursalId = requireActiveSucursalId();
     const existing = await this.dbInstance.patients.get(row.id).catch(() => null);
-    await this.dbInstance.patients.put(withCurrentSucursalScope(row, existing));
+    assertOwnedBySucursal(existing, sucursalId);
+    await this.dbInstance.patients.put(withSucursalScope(row, sucursalId));
   }
 
-  async findById(id: PatientId): Promise<Patient | null> {
+  async findById(id: PatientId, includeDeleted = false): Promise<Patient | null> {
     const row = await this.dbInstance.patients.get(id.toString());
-    if (!row) return null;
+    if (!row || !rowMatchesSucursal(row, requireActiveSucursalId()) ||
+      (!includeDeleted && row.deleted_at != null)) return null;
     return patientRowToDomain(row);
   }
 
@@ -55,8 +58,10 @@ export class DexiePatientRepository implements PatientRepository {
   async findDeleted(query: { limit?: number; offset?: number } = {}): Promise<Patient[]> {
     const limit = Math.min(query.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
     const offset = query.offset ?? 0;
+    const sucursalId = requireActiveSucursalId();
     const rows = await this.dbInstance.patients
-      .filter((row: PatientRow) => row.deleted_at !== null)
+      .filter((row: PatientRow) => row.deleted_at !== null &&
+        rowMatchesSucursal(row, sucursalId))
       .toArray();
     return rows
       .sort((a, b) => {
@@ -69,18 +74,26 @@ export class DexiePatientRepository implements PatientRepository {
   }
 
   async countDeleted(): Promise<number> {
-    return this.dbInstance.patients.filter((row: PatientRow) => row.deleted_at !== null).count();
+    const sucursalId = requireActiveSucursalId();
+    return this.dbInstance.patients
+      .filter((row: PatientRow) => row.deleted_at !== null && rowMatchesSucursal(row, sucursalId))
+      .count();
   }
 
   async delete(id: PatientId, soft = true): Promise<void> {
     if (soft) {
       const existing = await this.dbInstance.patients.get(id.toString());
       if (!existing) return;
+      const sucursalId = requireActiveSucursalId();
+      if (!rowMatchesSucursal(existing, sucursalId)) return;
       const domain = patientRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.patients.put(withCurrentSucursalScope(patientDomainToRow(deleted), existing));
+      await this.dbInstance.patients.put(withSucursalScope(patientDomainToRow(deleted), sucursalId));
     } else {
-      await this.dbInstance.patients.delete(id.toString());
+      const existing = await this.dbInstance.patients.get(id.toString());
+      if (existing && rowMatchesSucursal(existing, requireActiveSucursalId())) {
+        await this.dbInstance.patients.delete(id.toString());
+      }
     }
   }
 
@@ -89,6 +102,9 @@ export class DexiePatientRepository implements PatientRepository {
     query: PatientQuery,
   ): Collection<PatientRow, string> {
     let collection: Collection<PatientRow, string> = source;
+    const activeSucursalId = requireActiveSucursalId();
+    collection = collection.filter((row: PatientRow) =>
+      rowMatchesSucursal(row, activeSucursalId));
     if (query.sucursalId) {
       const sucursalId = query.sucursalId;
       collection = collection.filter((row: PatientRow) => rowMatchesSucursal(row, sucursalId));
@@ -112,5 +128,14 @@ export class DexiePatientRepository implements PatientRepository {
       );
     }
     return collection;
+  }
+}
+
+function assertOwnedBySucursal(
+  row: PatientRow | null | undefined,
+  sucursalId: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error("El paciente pertenece a otra sucursal");
   }
 }

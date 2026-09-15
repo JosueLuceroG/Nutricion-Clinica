@@ -465,7 +465,7 @@ describe("patientCsvExport", () => {
     expect(toPatientCreate(preview.valid[0]).whatsappEnabled).toBe(true);
   });
 
-  it("incluye pacientes actuales de la sucursal y registros heredados", () => {
+  it("excluye registros sin sucursal y registros de otra sucursal", () => {
     const rows = [
       makePatientRow("current"),
       makePatientRow("legacy", { sucursal_id: null }),
@@ -475,6 +475,6 @@ describe("patientCsvExport", () => {
 
     expect(
       currentPatientRowsForBranch(rows, "branch-1").map((row) => row.id),
-    ).toEqual(["current", "legacy"]);
+    ).toEqual(["current"]);
   });
 });

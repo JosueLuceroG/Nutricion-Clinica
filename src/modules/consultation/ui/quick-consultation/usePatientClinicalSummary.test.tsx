@@ -2,6 +2,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 import { db } from "@services/db/dexieSchema";
+import { useSyncStore } from "@store/syncStore";
+import { markRemoteTransaction } from "@services/sync/atomicOutbox";
 
 vi.mock("@store/authStore", () => ({
   useAuthStore: (
@@ -67,6 +69,9 @@ const renderSummary = async () => {
 };
 
 beforeEach(async () => {
+  useSyncStore.getState().setSucursalId("branch-1");
+  await db.transaction("rw", db.tables, async () => {
+  markRemoteTransaction();
   await Promise.all([
     db.patients.clear(),
     db.consultations.clear(),
@@ -77,6 +82,7 @@ beforeEach(async () => {
     db.appointments.clear(),
     db.anthropometry.clear(),
   ]);
+  });
 });
 
 describe("usePatientClinicalSummary alerts", () => {
@@ -234,6 +240,7 @@ describe("usePatientClinicalSummary alerts", () => {
     await db.anthropometry.bulkPut([
       {
         id: "measurement-1",
+        sucursal_id: "branch-1",
         patient_id: PATIENT_ID,
         measured_at: "2026-02-01T12:00:00.000Z",
         weight_kg: 88,
@@ -248,6 +255,7 @@ describe("usePatientClinicalSummary alerts", () => {
       },
       {
         id: "measurement-2",
+        sucursal_id: "branch-1",
         patient_id: PATIENT_ID,
         measured_at: "2026-07-01T12:00:00.000Z",
         weight_kg: 88.6,
@@ -296,7 +304,7 @@ describe("usePatientClinicalSummary alerts", () => {
         id: `appointment-${index}`,
         patient_id: PATIENT_ID,
         professional_id: "professional-1",
-        office_id: null,
+        office_id: "branch-1",
         date: `2026-0${index + 1}-15`,
         start_time: "10:00",
         end_time: "11:00",

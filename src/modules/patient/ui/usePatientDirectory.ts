@@ -9,6 +9,7 @@ import {
 } from "../application/patientDirectoryTypes";
 import { patientRowToDomain } from "../infrastructure/patientMapper";
 import { db } from "@services/db/dexieSchema";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 const normalizeText = (value: string): string =>
   value
@@ -24,11 +25,6 @@ const matchesBooleanFilter = (
   value: boolean,
   filter: PatientDirectoryBooleanFilter,
 ): boolean => filter === "all" || (filter === "with" ? value : !value);
-
-const rowMatchesBranch = (
-  row: { sucursal_id?: string | null },
-  branchId: string,
-): boolean => !row.sucursal_id || row.sucursal_id === branchId;
 
 const getInitials = (firstName: string, lastName: string): string =>
   `${firstName.charAt(0)}${lastName.charAt(0)}`.toLocaleUpperCase();
@@ -99,12 +95,12 @@ export function usePatientDirectory(query: PatientDirectoryQuery) {
         goalRows,
       ] = await Promise.all([
         db.patients
-          .filter((row) => rowMatchesBranch(row, query.branchId!))
+          .filter((row) => rowMatchesSucursal(row, query.branchId))
           .toArray(),
         db.meal_plans
           .filter(
             (row) =>
-              rowMatchesBranch(row, query.branchId!) &&
+              rowMatchesSucursal(row, query.branchId) &&
               !row.deleted_at &&
               row.status === "active",
           )
@@ -112,7 +108,10 @@ export function usePatientDirectory(query: PatientDirectoryQuery) {
         db.appointments
           .filter(
             (row) =>
-              (!row.office_id || row.office_id === query.branchId) &&
+              rowMatchesSucursal(
+                { sucursal_id: row.office_id },
+                query.branchId,
+              ) &&
               row.date >= new Date().toISOString().slice(0, 10) &&
               ["scheduled", "confirmed", "in_progress", "rescheduled"].includes(
                 row.status,
@@ -121,10 +120,15 @@ export function usePatientDirectory(query: PatientDirectoryQuery) {
           .toArray(),
         db.consultations
           .filter(
-            (row) => rowMatchesBranch(row, query.branchId!) && !row.deleted_at,
+            (row) => rowMatchesSucursal(row, query.branchId) && !row.deleted_at,
           )
           .toArray(),
-        db.anthropometry.filter((row) => !row.deleted_at).toArray(),
+        db.anthropometry
+          .filter(
+            (row) =>
+              rowMatchesSucursal(row, query.branchId) && !row.deleted_at,
+          )
+          .toArray(),
         db.goals.toArray(),
       ]);
 

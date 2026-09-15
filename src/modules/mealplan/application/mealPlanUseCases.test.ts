@@ -18,6 +18,7 @@ import { MealPlanId } from "../domain/MealPlanId";
 import { MealPlanNotFoundError, MealPlanRequiresConsultationError } from "../domain/MealPlanRepository";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { MEAL_SLOT_ORDER } from "../domain/MealSlot";
+import { useSyncStore } from "@store/syncStore";
 
 describe("mealPlanUseCases", () => {
   let repo: DexieMealPlanRepository;
@@ -34,6 +35,7 @@ describe("mealPlanUseCases", () => {
   const pid = PatientId.generate();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-mp-uc-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieMealPlanRepository(db);

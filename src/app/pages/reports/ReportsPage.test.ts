@@ -60,6 +60,7 @@ describe("ReportsPage metric builders", () => {
 
   it("buildLocalReportDashboardData aggregates offline fallback data", () => {
     const local = buildLocalReportDashboardData({
+      sucursalId: "s1",
       now: new Date("2026-06-12T12:00:00.000Z"),
       patients: [
         { id: "p1", sucursal_id: "s1", status: "active", deleted_at: null, created_at: "2026-06-02T00:00:00.000Z", clinical_tags: JSON.stringify(["Diabetes", "Hipertension"]) },

@@ -19,7 +19,7 @@ import type { SyncOp } from "@modules/sync/domain/SyncQueueItem";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import { toast } from "sonner";
-import type { SyncableEntity, SyncPullCursors } from "@nutriclinica/shared";
+import { canonicalSyncId, type SyncableEntity, type SyncPullCursors } from "@nutriclinica/shared";
 import { requireActiveSucursalId } from "@services/tenancy/sucursalScope";
 
 const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
@@ -34,18 +34,24 @@ const TABLE_TO_ENTITY: Record<string, SyncableEntity> = {
 const LAST_PULL_AT_PREFIX = "lastPullAt:";
 
 function lastPullAtKey(sucursalId: string): string {
-  return `${LAST_PULL_AT_PREFIX}${sucursalId}`;
+  return `${LAST_PULL_AT_PREFIX}${canonicalSyncId(sucursalId)}`;
 }
 
-function getLastPullAt(
+async function getLastPullAt(
   db: NutriClinicaDB,
   sucursalId: string,
 ): Promise<SyncPullCursors | null> {
-  return db.sync_meta
-    .get(lastPullAtKey(sucursalId))
-    .then((row) => {
+  const canonical = canonicalSyncId(sucursalId);
+  const keys = [...new Set([
+    lastPullAtKey(canonical),
+    `${LAST_PULL_AT_PREFIX}${sucursalId}`,
+    `${LAST_PULL_AT_PREFIX}${canonical.toUpperCase()}`,
+  ])];
+  for (const key of keys) {
+    try {
+      const row = await db.sync_meta.get(key);
       const value = row?.value;
-      if (typeof value !== "string") return null;
+      if (typeof value !== "string") continue;
       try {
         const parsed: unknown = JSON.parse(value);
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -55,8 +61,11 @@ function getLastPullAt(
         // formato legacy (ISO único) o corrupto: primer pull completo
       }
       return null;
-    })
-    .catch(() => null);
+    } catch {
+      // Try the next legacy casing before falling back to a full pull.
+    }
+  }
+  return null;
 }
 
 function setLastPullAt(
@@ -122,8 +131,9 @@ export function startSync(
     useAuthStore.subscribe((state) => {
       const newId = state.sucursalActivaId;
       const prevId = useSyncStore.getState().sucursalId;
-      if (newId !== prevId) {
-        useSyncStore.getState().setSucursalId(newId);
+      const canonicalNewId = newId ? canonicalSyncId(newId) : null;
+      if (canonicalNewId !== (prevId ? canonicalSyncId(prevId) : null)) {
+        useSyncStore.getState().setSucursalId(canonicalNewId);
       }
     }),
   );
@@ -196,11 +206,9 @@ export interface ReconcileResult {
 }
 
 /**
- * Reconciliación: escanea todas las tablas sincronizables y encola como
- * `create` cualquier fila que no tenga ya un item pendiente en
- * `sync_queue`. Útil para empujar datos creados ANTES de montar el
- * SyncEnqueuer (e.g. al primer login tras una sesión offline larga, o
- * tras un bug del enqueuer que dejó filas sin encolar).
+ * Legacy safety net: retain snapshots with unknown mutation history in an
+ * explicit conflict state. This cannot reconstruct lost updates/deletes.
+ * Normal writes already have their durable outbox in the entity transaction.
  *
  * No encola duplicados: si ya hay un item (entity, entityId) en
  * cualquier estado (`pending`, `syncing`, `error`, `conflict`) para esa
@@ -212,12 +220,14 @@ export async function reconcileAllPendingChanges(
   db: NutriClinicaDB,
   sucursalId = requireActiveSucursalId(),
 ): Promise<ReconcileResult> {
+  sucursalId = canonicalSyncId(sucursalId);
   const queue = new SyncQueueRepository(db.sync_queue);
   const result: ReconcileResult = { scanned: 0, enqueued: 0, byEntity: {} };
+  return db.transaction("rw", [...Object.keys(TABLE_TO_ENTITY).map((name) => db.table(name)), db.sync_queue], async () => {
 
   // 1) Indexar lo que ya está en sync_queue por (entity, entityId).
   const allQueueItems = await queue.listAll(sucursalId);
-  const known = new Set(allQueueItems.map((i) => `${i.entity}::${i.entityId}`));
+  const known = new Set(allQueueItems.map((i) => `${i.entity}::${canonicalSyncId(i.entityId)}`));
 
   // 2) Recorrer cada tabla sincronizable.
   for (const [tableName, entity] of Object.entries(TABLE_TO_ENTITY)) {
@@ -231,22 +241,27 @@ export async function reconcileAllPendingChanges(
         id: unknown;
         sucursal_id?: string | null;
         deleted_at?: string | null;
+        row_version?: string | null;
+        _syncHead?: string;
+        _syncNeverSynced?: boolean;
       };
-      // Saltar filas soft-deleted: el usuario las borró localmente,
-      // no tiene sentido empujar el create al server.
-      if (r.deleted_at) continue;
-      if (r.sucursal_id !== sucursalId) continue;
+      // Include legacy tombstones as evidence; never infer an outbound create.
+      if (typeof r.sucursal_id !== "string" || canonicalSyncId(r.sucursal_id) !== sucursalId) continue;
+      // A known server version or acknowledged atomic revision is not a
+      // missing create. Legacy records have no evidence of their last mutation.
+      if (r.row_version || r._syncHead || r._syncNeverSynced) continue;
       result.scanned++;
       const id = String(r.id);
-      const key = `${entity}::${id}`;
+      const key = `${entity}::${canonicalSyncId(id)}`;
       if (known.has(key)) continue;
-      await queue.enqueue({
+      const recovered = await queue.enqueue({
         sucursalId,
         entity,
         entityId: id,
         op: "create" as SyncOp,
         payload: row,
       });
+      await queue.markConflict(recovered.id, "LEGACY_BASELINE_REQUIRES_REVIEW: mutation history cannot be reconstructed");
       known.add(key);
       result.enqueued++;
       result.byEntity[entity] = (result.byEntity[entity] ?? 0) + 1;
@@ -254,4 +269,5 @@ export async function reconcileAllPendingChanges(
   }
 
   return result;
+  });
 }

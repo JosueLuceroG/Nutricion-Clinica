@@ -11,6 +11,7 @@ import { DexieAdherenceRepository } from "../infrastructure/DexieAdherenceReposi
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import { createAdherenceId } from "../domain/AdherenceId";
 import { AdherenceRecord } from "../domain/AdherenceRecord";
+import { useSyncStore } from "@store/syncStore";
 
 describe("adherenceUseCases", () => {
   let repo: DexieAdherenceRepository;
@@ -18,6 +19,7 @@ describe("adherenceUseCases", () => {
   const patientId = crypto.randomUUID();
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-ad-uc-${Math.random().toString(36).slice(2)}`);
     await db.open();
     repo = new DexieAdherenceRepository(db);

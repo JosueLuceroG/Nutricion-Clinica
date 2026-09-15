@@ -45,6 +45,7 @@ import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
 import { DashboardQuickAccessButton } from "@modules/dashboard-quick-access/ui";
 import { NewConsultationQuickDialog } from "@modules/consultation/ui/quick-consultation";
 import { authApi } from "@services/api/authApi";
+import { toast } from "sonner";
 import type {
   QuickConsultationAction,
   QuickConsultationPatient,
@@ -842,8 +843,9 @@ export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: Dashboard
                 <DropdownMenuItem
                   className="nc-dashboard-avatar-menu__item nc-dashboard-avatar-menu__item--danger"
                   onClick={() => {
-                    void authApi.logout().catch(() => undefined);
-                    navigate("/login", { replace: true });
+                    void authApi.logout()
+                      .then(() => navigate("/login", { replace: true }))
+                      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cerrar sesión"));
                   }}
                 >
                   <LogOut size={14} strokeWidth={1.85} aria-hidden="true" />
