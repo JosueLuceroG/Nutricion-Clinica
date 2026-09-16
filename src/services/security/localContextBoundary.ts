@@ -16,6 +16,7 @@ const PRESERVED_TABLES = new Set([
   "bia_devices",
   "indicators",
 ]);
+const LOCAL_DRAFT_PREFIX = "draft:";
 
 export { isLocalContextTransitioning } from "./localContextState";
 
@@ -42,8 +43,22 @@ export async function clearLocalContext(db: NutriClinicaDB): Promise<void> {
         markRemoteTransaction();
         for (const table of tables) await table.clear();
       });
+      clearLocalDrafts();
     });
   } finally {
     leaveLocalContextTransition();
+  }
+}
+
+function clearLocalDrafts(): void {
+  if (typeof localStorage === "undefined") return;
+
+  try {
+    for (let index = localStorage.length - 1; index >= 0; index -= 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(LOCAL_DRAFT_PREFIX)) localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
   }
 }

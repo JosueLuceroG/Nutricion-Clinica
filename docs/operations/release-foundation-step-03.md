@@ -1,6 +1,6 @@
 # NUTRICLÍNICA — RELEASE FOUNDATION STEP 03 REPORT
 
-Fecha: 2026-09-09. Modo: BUILD / OPERATIONS. Alcance: selección de target de
+Fecha inicial: 2026-09-09. Addendum local: 2026-09-16. Modo: BUILD / OPERATIONS. Alcance: selección de target de
 infraestructura y staging real, provider-agnostic, Desktop-first y Web
 secundario.
 
@@ -34,7 +34,7 @@ Esto no es un PASS de Step 03 ni autorización para Step 04.
   `bf2816dab1928da600197ed8897fae04f2a9f3e0`.
 - Branch de trabajo Step 03: `infra/release-foundation-step-03`.
 - Worktree al iniciar: limpio.
-- Source code modificado en Step 03: ninguno.
+- Source code modificado en la inspección inicial de staging: ninguno.
 - Production al iniciar y finalizar: no tocado.
 - `v0.1.0-rc.2`: no existe y no se creó.
 
@@ -481,6 +481,46 @@ The unchanged Step 02.1 source already had full local evidence of frontend
 identify the last full regression at the exact code lineage; they were not
 rerun or represented as staging E2E in Step 03.
 
+## Local Verification Addendum (2026-09-16)
+
+La continuación local verificó los contratos de sesión, aislamiento por
+sucursal, sincronización y logout sin cambiar la clasificación de Step 03:
+`REAL STAGING = BLOCKED_BY_INFRASTRUCTURE` permanece vigente. La evidencia
+siguiente es local y no equivale a CI remoto, OCI, staging ni producción.
+
+| GATE | RESULT | EVIDENCE |
+| --- | --- | --- |
+| Tracked secret scan | PASS | `git grep` del patrón CI: 0 hallazgos |
+| Frontend typecheck | PASS | `pnpm typecheck` |
+| Frontend full tests | PASS | 158 archivos; 2136 passed, 1 skipped |
+| API typecheck | PASS | `pnpm --filter @nutriclinica/api typecheck` |
+| API full tests | PASS | 158 archivos; 1313 passed, 70 skipped por suites SQL condicionales |
+| Lint | PASS | 0 errores; 6 warnings conocidos de Fast Refresh/hooks |
+| Frontend build | PASS | `CI=true`, `VITE_API_URL=/api`, `pnpm build` |
+| API build | PASS | `pnpm --filter @nutriclinica/api build` |
+| Deployment contracts | PASS | `pnpm deployment:test`: 40/40 |
+| API deployment artifact | PASS | `pnpm deployment:api-artifact:test` |
+| Web deployment artifact | PASS | `pnpm deployment:web-artifact:verify`: 156 archivos |
+| Portable UI E2E | PASS | `pnpm e2e:portable`: 60/60 |
+| Local sync integrity | PASS | migraciones 39/39, segunda ejecución idempotente 39/39, real SQL sync 15/15 |
+
+El primer portable E2E encontró seis fixtures antiguos sin scope de sucursal
+(pacientes legacy y antropometrías). Se corrigieron únicamente esos fixtures en
+`e2e/patient-directory.spec.ts` y `e2e/quick-consultation.spec.ts`; la
+repetición completa quedó en 60/60 sin relajar el filtro de producción.
+
+Como cierre de la brecha de sesión detectada, `clearLocalContext` elimina los
+borradores `draft:*` de `localStorage` después de limpiar correctamente las
+tablas locales. Si existen cambios pendientes en el outbox, la operación sigue
+siendo fail-closed y los borradores no se eliminan. La cobertura está en
+`src/services/security/localContextBoundary.test.ts` y
+`src/services/api/authApi.test.ts`.
+
+El gate SQL creó una base y login aleatorios en `localhost\SQLEXPRESS`, ejecutó
+las migraciones dos veces y limpió ambos recursos. No hubo conexión a SQL de
+staging. El secret scan local tampoco constituye una attestation CI ligada a un
+SHA remoto.
+
 ## Operations Not Executed
 
 - No resource purchase or account creation.
@@ -589,10 +629,10 @@ OLTP REAL SQL:
 BLOCKED
 
 OLTP MIGRATIONS:
-0/39
+0/39 staging; 39/39 local disposable
 
 OLTP IDEMPOTENCY:
-FAIL
+BLOCKED staging; PASS local disposable
 
 DWH VERSION:
 dwh-08-003
@@ -664,10 +704,10 @@ v0.1.0-rc.2 TAG:
 NOT_CREATED
 
 FRONTEND TESTS:
-2019/2020
+2136 passed + 1 skipped (local)
 
 API TESTS:
-1281/1336
+1313 passed + 70 skipped (local)
 
 WORKTREE CLEAN:
 YES

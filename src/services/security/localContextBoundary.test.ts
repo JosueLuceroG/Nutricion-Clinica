@@ -16,6 +16,9 @@ describe("localContextBoundary", () => {
 
   afterEach(async () => {
     await db.delete();
+    localStorage.removeItem("draft:consultation:patient-1");
+    localStorage.removeItem("draft:mealplan:patient-1");
+    localStorage.removeItem("unrelated-state");
   });
 
   it("refuses to clear a context with unresolved outbox work", async () => {
@@ -34,9 +37,11 @@ describe("localContextBoundary", () => {
       enqueuedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     } as never);
+    localStorage.setItem("draft:consultation:patient-1", "{}");
 
     await expect(clearLocalContext(db)).rejects.toThrow(/cambios pendientes/);
     expect(await db.patients.get("patient-1")).toBeDefined();
+    expect(localStorage.getItem("draft:consultation:patient-1")).toBe("{}");
     expect(isLocalContextTransitioning()).toBe(false);
   });
 
@@ -44,12 +49,16 @@ describe("localContextBoundary", () => {
     await db.patients.put({ id: "patient-1", sucursal_id: "branch-1" } as never);
     await db.sync_meta.put({ key: "lastPullAt:branch-1", value: "{}" });
     await db.recipes.put({ id: "recipe-1", name: "Shared recipe" } as never);
+    localStorage.setItem("draft:mealplan:patient-1", "{}");
+    localStorage.setItem("unrelated-state", "keep");
 
     await clearLocalContext(db);
 
     expect(await db.patients.get("patient-1")).toBeUndefined();
     expect(await db.sync_meta.get("lastPullAt:branch-1")).toBeUndefined();
     expect(await db.recipes.get("recipe-1")).toBeDefined();
+    expect(localStorage.getItem("draft:mealplan:patient-1")).toBeNull();
+    expect(localStorage.getItem("unrelated-state")).toBe("keep");
     expect(isLocalContextTransitioning()).toBe(false);
   });
 });

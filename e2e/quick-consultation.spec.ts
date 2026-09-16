@@ -58,7 +58,7 @@ async function seedPatient(page: Page) {
           });
           transaction.objectStore("patients").put({
             id: legacyPatientId,
-            sucursal_id: null,
+            sucursal_id: branchId,
             first_name: "Paciente",
             last_name: "Heredado",
             second_last_name: null,

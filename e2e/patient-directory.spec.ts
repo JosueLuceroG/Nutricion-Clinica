@@ -75,9 +75,7 @@ async function seedDirectory(page: Page) {
               ),
             );
           }
-          patients.put(
-            makePatient(13, { id: "legacy-directory", sucursal_id: null }),
-          );
+          patients.put(makePatient(13, { id: "legacy-directory" }));
           patients.put(
             makePatient(14, {
               id: "deleted-directory",
@@ -124,6 +122,7 @@ async function seedClinicalDrawerData(page: Page) {
           measuredWeights.forEach((weight, index) => {
             transaction.objectStore("anthropometry").put({
               id: `directory-measurement-${index}`,
+              sucursal_id: branchId,
               patient_id: patientId,
               measured_at: `2026-0${index + 2}-01T12:00:00.000Z`,
               weight_kg: weight,
