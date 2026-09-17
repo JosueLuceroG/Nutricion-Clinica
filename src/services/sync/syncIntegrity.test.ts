@@ -287,3 +287,26 @@ it("promotes a successor to conflict when pull evidence is newer than a replayed
   expect(remaining[0]).not.toHaveProperty("predecessorId");
   expect(await db.patients.get(row.id)).toMatchObject({ first_name: "Revision N+1", row_version: versionC });
 });
+
+it("retains all six entity operations across a multi-day offline restart and converges", async () => {
+  const ids = new Map<string, string>();
+  for (const [table] of Object.entries(SYNC_TABLES)) {
+    const id = crypto.randomUUID();
+    ids.set(table, id);
+    await db.table(table).put({ id, sucursal_id: branch, notes: "offline snapshot" } as never);
+  }
+
+  const offlineSince = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString();
+  await db.sync_queue.toCollection().modify({ enqueuedAt: offlineSince, updatedAt: offlineSince });
+  db.close();
+  await db.open();
+  await engine.sync();
+  expect(push).toHaveBeenCalledTimes(1);
+  expect(new Set(push.mock.calls[0]![0].operations.map((op) => op.entity))).toEqual(new Set(Object.values(SYNC_TABLES)));
+  expect(await db.sync_queue.count()).toBe(0);
+  expect(useSyncStore.getState().status).toBe("idle");
+  expect(useSyncStore.getState().pendingChanges).toBe(0);
+  for (const [table, id] of ids) {
+    expect((await db.table(table).get(id))?.row_version).toBe(versionB);
+  }
+});
