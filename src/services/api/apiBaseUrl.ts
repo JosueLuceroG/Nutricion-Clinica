@@ -19,3 +19,20 @@ export function getApiBaseUrl(): string {
 
   throw new Error("VITE_API_URL es obligatorio en builds de produccion");
 }
+
+/** Builds an absolute WebSocket URL, including when the API base is `/api`. */
+export function getApiWebSocketUrl(path: string): string {
+  const base = getApiBaseUrl();
+  let baseUrl: URL;
+  try {
+    baseUrl = new URL(base);
+  } catch {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    if (!origin || origin === "null" || !base.startsWith("/")) {
+      throw new Error("No se puede resolver la URL WebSocket del API");
+    }
+    baseUrl = new URL(base, origin);
+  }
+  baseUrl.protocol = baseUrl.protocol === "https:" ? "wss:" : "ws:";
+  return `${baseUrl.toString().replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+}

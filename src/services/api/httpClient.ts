@@ -9,9 +9,9 @@
  * - Base URL configurable via VITE_API_URL.
  */
 
-import { useAuthStore } from '@store/authStore';
-import { useSyncStore } from '@store/syncStore';
-import { getApiBaseUrl } from './apiBaseUrl.js';
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
+import { getApiBaseUrl } from "./apiBaseUrl.js";
 
 export class HttpError extends Error {
   constructor(
@@ -20,19 +20,22 @@ export class HttpError extends Error {
     public readonly body?: unknown,
   ) {
     super(message);
-    this.name = 'HttpError';
+    this.name = "HttpError";
   }
 }
 
 export class NetworkError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
     super(message);
-    this.name = 'NetworkError';
+    this.name = "NetworkError";
   }
 }
 
 export interface HttpClientOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   query?: Record<string, string | number | boolean | undefined>;
   headers?: Record<string, string>;
@@ -41,8 +44,38 @@ export interface HttpClientOptions {
   signal?: AbortSignal;
 }
 
-function buildUrl(base: string, path: string, query?: HttpClientOptions['query']): string {
-  const url = new URL(path.startsWith('http') ? path : `${base.replace(/\/$/, '')}/${path.replace(/^\//, '')}`);
+function browserOrigin(): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  if (!origin || origin === "null") {
+    throw new Error(
+      "No se puede resolver una URL relativa fuera de un origen de navegador",
+    );
+  }
+  return origin;
+}
+
+function absoluteBase(base: string): string {
+  try {
+    return new URL(base).toString().replace(/\/$/, "");
+  } catch {
+    if (!base.startsWith("/")) {
+      throw new Error(`Base API invalida: ${base}`);
+    }
+    return new URL(base, browserOrigin()).toString().replace(/\/$/, "");
+  }
+}
+
+function buildUrl(
+  base: string,
+  path: string,
+  query?: HttpClientOptions["query"],
+): string {
+  let url: URL;
+  try {
+    url = new URL(path);
+  } catch {
+    url = new URL(`${absoluteBase(base)}/${path.replace(/^\//, "")}`);
+  }
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined) url.searchParams.set(k, String(v));
@@ -51,36 +84,43 @@ function buildUrl(base: string, path: string, query?: HttpClientOptions['query']
   return url.toString();
 }
 
-export async function httpRequest<T = unknown>(path: string, options: HttpClientOptions = {}): Promise<T> {
+export async function httpRequest<T = unknown>(
+  path: string,
+  options: HttpClientOptions = {},
+): Promise<T> {
   const base = getApiBaseUrl();
   const url = buildUrl(base, path, options.query);
 
   const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'Accept-Encoding': 'gzip',
+    Accept: "application/json",
+    "Accept-Encoding": "gzip",
     ...(options.headers ?? {}),
   };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  if (options.body !== undefined) headers["Content-Type"] = "application/json";
 
   if (!options.skipAuth) {
     const token = useAuthStore.getState().token;
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+    if (token) headers["Authorization"] = `Bearer ${token}`;
   }
   if (!options.skipSucursalHeader) {
     const sucId = useSyncStore.getState().sucursalId;
-    if (sucId) headers['X-Sucursal-Id'] = sucId;
+    if (sucId) headers["X-Sucursal-Id"] = sucId;
   }
 
   let response: Response;
   try {
     response = await fetch(url, {
-      method: options.method ?? 'GET',
+      method: options.method ?? "GET",
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body:
+        options.body !== undefined ? JSON.stringify(options.body) : undefined,
       signal: options.signal,
     });
   } catch (err) {
-    throw new NetworkError(err instanceof Error ? err.message : 'Network failure', err);
+    throw new NetworkError(
+      err instanceof Error ? err.message : "Network failure",
+      err,
+    );
   }
 
   const text = await response.text();
@@ -88,7 +128,10 @@ export async function httpRequest<T = unknown>(path: string, options: HttpClient
 
   if (!response.ok) {
     const message =
-      body && typeof body === 'object' && 'error' in body && typeof (body as { error: unknown }).error === 'string'
+      body &&
+      typeof body === "object" &&
+      "error" in body &&
+      typeof (body as { error: unknown }).error === "string"
         ? (body as { error: string }).error
         : `HTTP ${response.status}`;
     throw new HttpError(response.status, message, body);

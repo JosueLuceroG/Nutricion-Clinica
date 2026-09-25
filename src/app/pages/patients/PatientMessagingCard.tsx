@@ -2,7 +2,13 @@ import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { MessageCircle, Send, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { Textarea } from "@components/ui/textarea";
 import { Badge } from "@components/ui/badge";
@@ -13,13 +19,12 @@ import {
   getProfessionalChatWsTicket,
 } from "@services/api/patientPortalApi";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
-import { getApiBaseUrl } from "@services/api/apiBaseUrl";
+import { getApiWebSocketUrl } from "@services/api/apiBaseUrl";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 
 function getChatWsUrl(): string {
-  const base = getApiBaseUrl().replace(/^http/, "ws");
-  return `${base}/ws/chat`;
+  return getApiWebSocketUrl("/ws/chat");
 }
 
 export function PatientMessagingCard({ patientId }: { patientId: string }) {
@@ -43,13 +48,14 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
       [patientId],
     ),
     sendMessage: React.useCallback(
-      async (content: string) => { await sendProfessionalMessage(patientId, content); },
+      async (content: string) => {
+        await sendProfessionalMessage(patientId, content);
+      },
       [patientId],
     ),
-    markAsRead: React.useCallback(
-      async (messageId: string) => { await markMessageAsRead(messageId); },
-      [],
-    ),
+    markAsRead: React.useCallback(async (messageId: string) => {
+      await markMessageAsRead(messageId);
+    }, []),
   });
 
   React.useEffect(() => {
@@ -57,7 +63,12 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
       .filter((m) => m.direction === "patient_to_professional" && !m.readAt)
       .map((m) => m.id);
     for (const id of unreadIds) {
-      markAsRead(id).catch((err) => { console.error("[PatientMessagingCard] Failed to mark message as read", err); });
+      markAsRead(id).catch((err) => {
+        console.error(
+          "[PatientMessagingCard] Failed to mark message as read",
+          err,
+        );
+      });
     }
   }, [messages, markAsRead]);
 
@@ -105,18 +116,26 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
           <MessageCircle className="h-4 w-4 text-primary" />
           {t("patient_portal.messages_pro_title")}
           {isRealtime ? (
-            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+            <Badge
+              variant="outline"
+              className="ml-auto gap-1 px-1.5 py-0 text-[10px]"
+            >
               <Wifi className="h-3 w-3 text-success" />
               {t("sync.connected")}
             </Badge>
           ) : (
-            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+            <Badge
+              variant="outline"
+              className="ml-auto gap-1 px-1.5 py-0 text-[10px]"
+            >
               <WifiOff className="h-3 w-3 text-warning" />
               {t("sync.disconnected")}
             </Badge>
           )}
         </CardTitle>
-        <CardDescription>{t("patient_portal.messages_pro_desc")}</CardDescription>
+        <CardDescription>
+          {t("patient_portal.messages_pro_desc")}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -149,7 +168,9 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
                       }`}
                     >
                       {formatTime(msg.createdAt)}
-                      {msg.direction === "patient_to_professional" && msg.readAt && " · Leído"}
+                      {msg.direction === "patient_to_professional" &&
+                        msg.readAt &&
+                        " · Leído"}
                     </p>
                   </div>
                 </div>
@@ -176,7 +197,10 @@ export function PatientMessagingCard({ patientId }: { patientId: string }) {
               {sending ? (
                 t("patient_portal.messages_sending")
               ) : (
-                <><Send className="mr-1 h-3 w-3" />{t("patient_portal.messages_send")}</>
+                <>
+                  <Send className="mr-1 h-3 w-3" />
+                  {t("patient_portal.messages_send")}
+                </>
               )}
             </Button>
           </div>

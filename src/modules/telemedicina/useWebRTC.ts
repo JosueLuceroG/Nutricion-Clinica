@@ -8,7 +8,7 @@ import {
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import { telemedicinaApi } from "@services/api/telemedicinaApi";
-import { getApiBaseUrl } from "@services/api/apiBaseUrl";
+import { getApiBaseUrl, getApiWebSocketUrl } from "@services/api/apiBaseUrl";
 
 // Stay below the server-enforced 60-second minimum credential lifetime.
 const TURN_CONFIG_CACHE_TTL = 30_000;
@@ -41,8 +41,7 @@ interface UseWebRtcReturn {
 }
 
 function getWsUrl(): string {
-  const base = getApiBaseUrl().replace(/^http/, "ws");
-  return `${base}/ws/telemedicina`;
+  return getApiWebSocketUrl("/ws/telemedicina");
 }
 
 async function fetchTurnConfig(): Promise<TurnConfigDTO> {
@@ -114,8 +113,7 @@ function isTurnConfig(value: unknown): value is TurnConfigDTO {
           /^(?:stun|stuns|turn|turns):[^/\s,][^\s,]*$/i.test(url),
       ) ||
       (server.username !== undefined && typeof server.username !== "string") ||
-      (server.credential !== undefined &&
-        typeof server.credential !== "string")
+      (server.credential !== undefined && typeof server.credential !== "string")
     ) {
       return false;
     }
@@ -132,9 +130,7 @@ function isTurnConfig(value: unknown): value is TurnConfigDTO {
       Boolean(server.username?.trim()) &&
       Boolean(server.credential?.trim());
   }
-  return candidate.configured
-    ? credentialedTurnPresent
-    : !turnPresent;
+  return candidate.configured ? credentialedTurnPresent : !turnPresent;
 }
 
 export function useWebRTC({

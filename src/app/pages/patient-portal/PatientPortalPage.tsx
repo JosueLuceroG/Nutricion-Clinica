@@ -42,7 +42,7 @@ import {
 import { getSystemFoodById } from "@modules/smae/domain";
 import { MEAL_SLOT_ORDER } from "@modules/mealplan/domain/MealSlot";
 import { useRealtimeChat } from "@hooks/useRealtimeChat";
-import { getApiBaseUrl } from "@services/api/apiBaseUrl";
+import { getApiWebSocketUrl } from "@services/api/apiBaseUrl";
 import {
   flushPendingPortalAdherenceSubmissions,
   getDocumentDownloadUrl,
@@ -231,7 +231,7 @@ function PortalContent({
             <CardDescription className="text-primary-foreground/80">
               {t("patient_portal.patient_summary")}
             </CardDescription>
-        <CardTitle className="break-words text-3xl sm:text-4xl">
+            <CardTitle className="break-words text-3xl sm:text-4xl">
               {t("patient_portal.hello", { name: patientFirstName })}
             </CardTitle>
           </CardHeader>
@@ -310,7 +310,9 @@ function PortalContent({
         <ActivePlanCard plan={data.activePlan} locale={locale} />
         <div className="space-y-4">
           {canSubmitAdherence && <AdherenceSubmissionCard token={token} />}
-          {canSubmitMealPhotos && <MealPhotosCard token={token} locale={locale} />}
+          {canSubmitMealPhotos && (
+            <MealPhotosCard token={token} locale={locale} />
+          )}
           {canSendMessages && <MessagingCard token={token ?? ""} />}
           <AppointmentsCard
             token={token ?? ""}
@@ -665,7 +667,9 @@ function ActivePlanCard({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <CardDescription>{t("patient_portal.plan_title")}</CardDescription>
-            <CardTitle className="mt-1 break-words text-2xl">{plan.name}</CardTitle>
+            <CardTitle className="mt-1 break-words text-2xl">
+              {plan.name}
+            </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(plan.startDate, locale)}
               {plan.endDate ? ` - ${formatDate(plan.endDate, locale)}` : ""}
@@ -868,7 +872,9 @@ function NotificationsCard({ token }: { token: string }) {
         setNotifications(result.notifications);
         setCacheState({ source: result.source, cachedAt: result.cachedAt });
       })
-      .catch((err) => { console.error("[PatientPortalPage] Failed to load notifications", err); })
+      .catch((err) => {
+        console.error("[PatientPortalPage] Failed to load notifications", err);
+      })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
@@ -1009,7 +1015,12 @@ function DocumentsCard({
                     </div>
                   </div>
                   <div className="flex w-full shrink-0 flex-col gap-1.5 sm:w-auto">
-                    <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                    >
                       <a
                         href={getDocumentPreviewUrl(token, document.id)}
                         target="_blank"
@@ -1019,7 +1030,12 @@ function DocumentsCard({
                         {t("patient_portal.document_preview")}
                       </a>
                     </Button>
-                    <Button asChild variant="default" size="sm" className="w-full sm:w-auto">
+                    <Button
+                      asChild
+                      variant="default"
+                      size="sm"
+                      className="w-full sm:w-auto"
+                    >
                       <a
                         href={getDocumentDownloadUrl(token, document.id)}
                         download={document.fileName}
@@ -1046,7 +1062,8 @@ function fileToDataUrl(file: File): Promise<string> {
       if (typeof reader.result === "string") resolve(reader.result);
       else reject(new Error("Invalid file result"));
     };
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read file"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read file"));
     reader.readAsDataURL(file);
   });
 }
@@ -1054,8 +1071,12 @@ function fileToDataUrl(file: File): Promise<string> {
 function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
   const { t } = useTranslation();
   const [photos, setPhotos] = React.useState<PortalMealPhoto[]>([]);
-  const [mealDate, setMealDate] = React.useState(() => new Date().toISOString().slice(0, 10));
-  const [mealSlot, setMealSlot] = React.useState<string>(MEAL_SLOT_ORDER[0] ?? "breakfast");
+  const [mealDate, setMealDate] = React.useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
+  const [mealSlot, setMealSlot] = React.useState<string>(
+    MEAL_SLOT_ORDER[0] ?? "breakfast",
+  );
   const [caption, setCaption] = React.useState("");
   const [adherenceRating, setAdherenceRating] = React.useState(3);
   const [file, setFile] = React.useState<File | null>(null);
@@ -1125,7 +1146,11 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
       if (fileInputRef.current) fileInputRef.current.value = "";
       setMessage(t("patient_portal.meal_photos_success"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("patient_portal.meal_photos_error"));
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("patient_portal.meal_photos_error"),
+      );
     } finally {
       setSaving(false);
     }
@@ -1138,13 +1163,17 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
           <Camera className="h-4 w-4 text-primary" aria-hidden />
           {t("patient_portal.meal_photos_title")}
         </CardTitle>
-        <CardDescription>{t("patient_portal.meal_photos_desc")}</CardDescription>
+        <CardDescription>
+          {t("patient_portal.meal_photos_desc")}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 rounded-lg border bg-muted/20 p-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="portal-meal-photo-date">{t("patient_portal.meal_photos_date")}</Label>
+              <Label htmlFor="portal-meal-photo-date">
+                {t("patient_portal.meal_photos_date")}
+              </Label>
               <Input
                 id="portal-meal-photo-date"
                 type="date"
@@ -1153,7 +1182,9 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="portal-meal-photo-slot">{t("patient_portal.meal_photos_slot")}</Label>
+              <Label htmlFor="portal-meal-photo-slot">
+                {t("patient_portal.meal_photos_slot")}
+              </Label>
               <select
                 id="portal-meal-photo-slot"
                 value={mealSlot}
@@ -1170,7 +1201,9 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portal-meal-photo-file">{t("patient_portal.meal_photos_file")}</Label>
+            <Label htmlFor="portal-meal-photo-file">
+              {t("patient_portal.meal_photos_file")}
+            </Label>
             <Input
               ref={fileInputRef}
               id="portal-meal-photo-file"
@@ -1186,22 +1219,30 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portal-meal-photo-rating">{t("patient_portal.meal_photos_rating")}</Label>
+            <Label htmlFor="portal-meal-photo-rating">
+              {t("patient_portal.meal_photos_rating")}
+            </Label>
             <Input
               id="portal-meal-photo-rating"
               type="range"
               min={1}
               max={5}
               value={adherenceRating}
-              onChange={(event) => setAdherenceRating(Number(event.target.value))}
+              onChange={(event) =>
+                setAdherenceRating(Number(event.target.value))
+              }
             />
             <p className="text-xs text-muted-foreground">
-              {t("patient_portal.meal_photos_rating_value", { count: adherenceRating })}
+              {t("patient_portal.meal_photos_rating_value", {
+                count: adherenceRating,
+              })}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="portal-meal-photo-caption">{t("patient_portal.meal_photos_caption")}</Label>
+            <Label htmlFor="portal-meal-photo-caption">
+              {t("patient_portal.meal_photos_caption")}
+            </Label>
             <Textarea
               id="portal-meal-photo-caption"
               value={caption}
@@ -1213,13 +1254,20 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
 
           {error && <p className="text-sm text-destructive">{error}</p>}
           {message && <p className="text-sm text-success">{message}</p>}
-          <Button onClick={() => void handleSubmit()} disabled={!file || saving}>
-            {saving ? t("patient_portal.meal_photos_saving") : t("patient_portal.meal_photos_submit")}
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={!file || saving}
+          >
+            {saving
+              ? t("patient_portal.meal_photos_saving")
+              : t("patient_portal.meal_photos_submit")}
           </Button>
         </div>
 
         <div className="space-y-3">
-          <p className="text-sm font-medium">{t("patient_portal.meal_photos_recent")}</p>
+          <p className="text-sm font-medium">
+            {t("patient_portal.meal_photos_recent")}
+          </p>
           {loading ? (
             <Skeleton className="h-24 w-full rounded-lg" />
           ) : photos.length === 0 ? (
@@ -1229,16 +1277,23 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
           ) : (
             <ul className="space-y-3">
               {photos.map((photo) => (
-                <li key={photo.id} className="overflow-hidden rounded-lg border bg-card">
+                <li
+                  key={photo.id}
+                  className="overflow-hidden rounded-lg border bg-card"
+                >
                   <img
                     src={getMealPhotoImageUrl(token, photo.id)}
-                    alt={photo.caption || t("patient_portal.meal_photos_image_alt")}
+                    alt={
+                      photo.caption || t("patient_portal.meal_photos_image_alt")
+                    }
                     className="h-44 w-full object-cover"
                     loading="lazy"
                   />
                   <div className="space-y-1 p-3 text-sm">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <p className="font-medium">{mealSlotLabel(t, photo.mealSlot)}</p>
+                      <p className="font-medium">
+                        {mealSlotLabel(t, photo.mealSlot)}
+                      </p>
                       {photo.reviewedAt && (
                         <Badge variant="success" className="shrink-0">
                           {t("patient_portal.meal_photos_reviewed")}
@@ -1246,9 +1301,16 @@ function MealPhotosCard({ token, locale }: { token: string; locale: string }) {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {formatDate(photo.mealDate ?? photo.createdAt, locale)} · {t("patient_portal.meal_photos_rating_value", { count: photo.adherenceRating })}
+                      {formatDate(photo.mealDate ?? photo.createdAt, locale)} ·{" "}
+                      {t("patient_portal.meal_photos_rating_value", {
+                        count: photo.adherenceRating,
+                      })}
                     </p>
-                    {photo.caption && <p className="break-words text-muted-foreground">{photo.caption}</p>}
+                    {photo.caption && (
+                      <p className="break-words text-muted-foreground">
+                        {photo.caption}
+                      </p>
+                    )}
                   </div>
                 </li>
               ))}
@@ -1269,7 +1331,7 @@ function MessagingCard({ token }: { token: string }) {
   const getChatWsConnection = React.useCallback(async () => {
     const { ticket } = await getPatientPortalChatWsTicket(token);
     return {
-      url: `${getApiBaseUrl().replace(/^http/, "ws")}/ws/chat`,
+      url: getApiWebSocketUrl("/ws/chat"),
       ticket,
     };
   }, [token]);
@@ -1282,7 +1344,9 @@ function MessagingCard({ token }: { token: string }) {
       [token],
     ),
     sendMessage: React.useCallback(
-      async (content: string) => { await sendPatientPortalMessage(token, content); },
+      async (content: string) => {
+        await sendPatientPortalMessage(token, content);
+      },
       [token],
     ),
     markAsRead: React.useCallback(async () => {}, []),
@@ -1320,7 +1384,10 @@ function MessagingCard({ token }: { token: string }) {
           <MessageCircle className="h-4 w-4 text-primary" aria-hidden />
           {t("patient_portal.messages_title")}
           {isRealtime ? (
-            <Badge variant="outline" className="ml-auto gap-1 px-1.5 py-0 text-[10px]">
+            <Badge
+              variant="outline"
+              className="ml-auto gap-1 px-1.5 py-0 text-[10px]"
+            >
               <Wifi className="h-3 w-3 text-success" />
               {t("sync.online")}
             </Badge>
@@ -1359,7 +1426,9 @@ function MessagingCard({ token }: { token: string }) {
                       }`}
                     >
                       {formatDateTime(msg.createdAt, i18n.language)}
-                      {msg.direction === "professional_to_patient" && msg.readAt && " · Leído"}
+                      {msg.direction === "professional_to_patient" &&
+                        msg.readAt &&
+                        " · Leído"}
                     </p>
                   </div>
                 </div>
