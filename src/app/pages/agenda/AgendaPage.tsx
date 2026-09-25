@@ -7,7 +7,7 @@ import {
   User, FileText, Clock, Settings, CheckCircle2, RotateCcw, Stethoscope,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Button } from "@components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@components/ui/card";
@@ -38,12 +38,21 @@ import { db } from "@services/db";
 import type { Appointment } from "@modules/agenda/domain/Appointment";
 import type { AppointmentStatus } from "@modules/agenda/domain/AppointmentStatus";
 import { appointmentIdFromUnsafe } from "@modules/agenda/domain/AppointmentId";
+import { useAuthStore } from "@store/authStore";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 import "react-day-picker/style.css";
 
 type AgendaView = "day" | "week" | "list";
 
 function toDateStr(d: Date): string {
   return format(d, "yyyy-MM-dd");
+}
+
+function parseDateStr(value: string | null): Date | null {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
+  return toDateStr(date) === value ? date : null;
 }
 
 const statusLabelKey: Record<string, string> = {
@@ -59,16 +68,22 @@ const statusLabelKey: Record<string, string> = {
 export function AgendaPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeBranchId = useAuthStore((state) => state.sucursalActivaId);
   const today = new Date();
-  const [currentMonth, setCurrentMonth] = React.useState(today);
-  const [selectedDate, setSelectedDate] = React.useState(today);
+  const requestedDate = parseDateStr(searchParams.get("date"));
+  const initialDate = requestedDate ?? today;
+  const [currentMonth, setCurrentMonth] = React.useState(initialDate);
+  const [selectedDate, setSelectedDate] = React.useState(initialDate);
   const [dialogOpen, setDialogOpen] = React.useState(false);
+  const [initialPatientId, setInitialPatientId] = React.useState<string>();
   const [availabilityOpen, setAvailabilityOpen] = React.useState(false);
   const [detailTarget, setDetailTarget] = React.useState<Appointment | null>(null);
   const [detailBusy, setDetailBusy] = React.useState(false);
   const [view, setView] = React.useState<AgendaView>("day");
   const [statusFilter, setStatusFilter] = React.useState<AppointmentStatus | "">("");
   const [rescheduleTarget, setRescheduleTarget] = React.useState<Appointment | null>(null);
+  const createRequestConsumed = React.useRef(false);
 
   const monthStart = toDateStr(startOfMonth(currentMonth));
   const monthEnd = toDateStr(endOfMonth(currentMonth));
@@ -83,19 +98,67 @@ export function AgendaPage() {
   const { complete } = useCompleteAppointment();
   const { reschedule } = useRescheduleAppointment();
 
-  const patients = useLiveQuery(
-    () => db.patients
-      .filter((r) => r.deleted_at === null)
+  React.useEffect(() => {
+    const date = parseDateStr(searchParams.get("date"));
+    if (!date) return;
+    setSelectedDate(date);
+    setCurrentMonth(date);
+    setView("day");
+  }, [searchParams]);
+
+  React.useEffect(() => {
+    const appointmentId = searchParams.get("appointmentId");
+    if (!appointmentId || loading) return;
+    const appointment = appointments.find((item) => item.id === appointmentId);
+    if (!appointment) return;
+    setDetailTarget(appointment);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("appointmentId");
+    setSearchParams(nextParams, { replace: true });
+  }, [appointments, loading, searchParams, setSearchParams]);
+
+  const loadedPatients = useLiveQuery(
+    () => activeBranchId
+      ? db.patients
+      .filter(
+        (row) =>
+          row.deleted_at === null &&
+          row.status === "active" &&
+          rowMatchesSucursal(row, activeBranchId),
+      )
       .toArray()
       .then((rows) =>
         rows.map((r) => ({
           id: r.id,
           name: `${r.first_name} ${r.last_name}`.trim(),
         })),
-      ),
-    [],
-    [],
+      )
+      : Promise.resolve<Array<{ id: string; name: string }>>([]),
+    [activeBranchId],
   );
+  const patients = loadedPatients ?? [];
+
+  React.useEffect(() => {
+    if (searchParams.get("create") !== "1") {
+      createRequestConsumed.current = false;
+      return;
+    }
+    if (!loadedPatients || createRequestConsumed.current) return;
+
+    createRequestConsumed.current = true;
+    const requestedPatientId = searchParams.get("patientId");
+    const validPatientId = loadedPatients.some((patient) => patient.id === requestedPatientId)
+      ? requestedPatientId ?? undefined
+      : undefined;
+
+    setInitialPatientId(validPatientId);
+    setDialogOpen(true);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("create");
+    nextParams.delete("patientId");
+    setSearchParams(nextParams, { replace: true });
+  }, [loadedPatients, searchParams, setSearchParams]);
 
   const dayAppointments = React.useMemo(
     () => appointments.filter((a) => a.date === selectedDayStr),
@@ -125,6 +188,16 @@ export function AgendaPage() {
 
   const handleAppointmentClick = (appt: Appointment) => {
     setDetailTarget(appt);
+  };
+
+  const openAppointmentDialog = () => {
+    setInitialPatientId(undefined);
+    setDialogOpen(true);
+  };
+
+  const handleAppointmentDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) setInitialPatientId(undefined);
   };
 
   const handleConfirm = async () => {
@@ -273,7 +346,7 @@ export function AgendaPage() {
             <Settings className="mr-1 h-4 w-4" />
             {t("agenda.availability")}
           </Button>
-          <Button className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
+          <Button className="w-full sm:w-auto" onClick={openAppointmentDialog}>
             <Plus className="mr-1 h-4 w-4" />
             {t("agenda.new_appointment")}
           </Button>
@@ -330,7 +403,7 @@ export function AgendaPage() {
             ) : dayAppointments.length === 0 ? (
               <div className="py-8 text-center">
                 <p className="text-sm text-muted-foreground">{t("agenda.no_appointments")}</p>
-                <Button variant="link" onClick={() => setDialogOpen(true)}>
+                <Button variant="link" onClick={openAppointmentDialog}>
                   {t("agenda.new_appointment")}
                 </Button>
               </div>
@@ -363,8 +436,9 @@ export function AgendaPage() {
 
       <AppointmentDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={handleAppointmentDialogOpenChange}
         selectedDate={selectedDayStr}
+        initialPatientId={initialPatientId}
         patients={patients}
         loadAvailableSlots={loadAvailableSlots}
         onSubmit={handleCreate}

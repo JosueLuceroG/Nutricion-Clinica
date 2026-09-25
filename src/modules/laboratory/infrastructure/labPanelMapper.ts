@@ -12,6 +12,7 @@ export interface LabResultRow {
 
 export interface LabPanelRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   taken_at: string;
   lab_name: string | null;
@@ -44,16 +45,32 @@ export const labPanelRowToDomain = (row: LabPanelRow): LabPanel => {
   });
 };
 
-export const labPanelDomainToRow = (panel: LabPanel): LabPanelRow => {
+export const labPanelDomainToRow = (
+  panel: LabPanel,
+  sucursalId?: string | null,
+): LabPanelRow => {
   return {
     id: panel.id.toString(),
+    sucursal_id: sucursalId,
     patient_id: panel.patientId.toString(),
-    taken_at: toIsoStringSafe(panel.takenAt, new Date().toISOString(), "lab_panel.taken_at")!,
+    taken_at: toIsoStringSafe(
+      panel.takenAt,
+      new Date().toISOString(),
+      "lab_panel.taken_at",
+    )!,
     lab_name: panel.labName,
     notes: panel.notes,
     results: resultsToRows(panel.results),
-    created_at: toIsoStringSafe(panel.createdAt, new Date().toISOString(), "lab_panel.created_at")!,
-    updated_at: toIsoStringSafe(panel.updatedAt, new Date().toISOString(), "lab_panel.updated_at")!,
+    created_at: toIsoStringSafe(
+      panel.createdAt,
+      new Date().toISOString(),
+      "lab_panel.created_at",
+    )!,
+    updated_at: toIsoStringSafe(
+      panel.updatedAt,
+      new Date().toISOString(),
+      "lab_panel.updated_at",
+    )!,
     deleted_at: toIsoStringSafe(panel.deletedAt, null, "lab_panel.deleted_at"),
   };
 };

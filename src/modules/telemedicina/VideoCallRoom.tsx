@@ -99,9 +99,14 @@ export function VideoCallRoom({ salaId, onEndCall }: VideoCallRoomProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      setInCall(true);
       setMediaError(null);
-      startSignaling(stream);
+      const signalingStarted = await startSignaling(stream);
+      if (!signalingStarted) {
+        stream.getTracks().forEach((track) => track.stop());
+        setLocalStream(null);
+        return;
+      }
+      setInCall(true);
     } catch (err) {
       setMediaError(err instanceof Error ? err.message : "Error al acceder a c\u00e1mara/micr\u00f3fono");
     }

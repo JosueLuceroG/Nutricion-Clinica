@@ -7,6 +7,7 @@ import { Input } from "@components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@components/ui/select";
 import { Loader2 } from "lucide-react";
 import type { ReportService } from "./useReportHooks";
+import { escapeHtml, sanitizeHtml } from "@utils/domSanitize";
 
 const REPORT_TYPES = [
   { value: "operativo", label: "reports.type_operative" },
@@ -49,13 +50,14 @@ export function ReportGeneratorDialog({ service, open, onOpenChange }: ReportGen
     try {
       const selectedType = REPORT_TYPES.find((rt) => rt.value === type);
       const typeLabel = selectedType ? t(selectedType.label) : type;
-      const contentHtml = `<h1>${title}</h1><p>${t("common.type")}: ${typeLabel}</p><p>${t("reports.period")}: ${dateFrom || "N/A"} - ${dateTo || "N/A"}</p><p>${t("reports.generated_on", { date: new Date().toLocaleDateString("es-MX") })}</p>`;
-      setPreview(contentHtml);
+      const contentHtml = `<h1>${escapeHtml(title)}</h1><p>${t("common.type")}: ${escapeHtml(typeLabel)}</p><p>${t("reports.period")}: ${escapeHtml(dateFrom || "N/A")} - ${escapeHtml(dateTo || "N/A")}</p><p>${t("reports.generated_on", { date: new Date().toLocaleDateString("es-MX") })}</p>`;
+      const safeContentHtml = sanitizeHtml(contentHtml);
+      setPreview(safeContentHtml);
       await service.generateReport({
         title: title.trim(),
         type: type as "operativo" | "financiero" | "kpi" | "regulatorio",
         generatedBy: "current-user",
-        contentHtml,
+        contentHtml: safeContentHtml,
       });
       onOpenChange(false);
     } catch (e) {

@@ -41,6 +41,7 @@ import {
 import { MarkAsPaidDialog } from "@modules/consultation/ui/MarkAsPaidDialog";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
 import { PAYMENT_STATUS_LABELS, PAYMENT_STATUS_COLORS } from "@modules/consultation/domain/PaymentStatus";
+import { PAYMENT_CONCEPT_LABELS } from "@modules/consultation/domain/PaymentConcept";
 import { formatCurrency } from "@utils/formatCurrency";
 import { consultationService } from "@services/consultationService";
 
@@ -109,16 +110,19 @@ export const BillingPage = () => {
     if (selected.length === 0) return;
     setBulkPaying(true);
     try {
-      await Promise.all(
-        selected.map((it) =>
-          consultationService.payment.register(it.consultation.id, {
+      // Atómico (una transacción) e idempotente: un doble click reutiliza
+      // la misma ejecución en curso.
+      await consultationService.payment.registerMany(
+        selected.map((it) => ({
+          id: it.consultation.id,
+          input: {
             paid: true,
             paymentStatus: "paid",
             paymentMethod: "cash",
             paidAt: new Date(),
             amountPaid: it.consultation.cost,
-          }),
-        ),
+          },
+        })),
       );
       toast.success(t("billing.bulk_paid", { count: selected.length }));
       setSelectedIds(new Set());
@@ -159,7 +163,7 @@ export const BillingPage = () => {
     }
     const headerRow = [
       t("common.date"), t("common.patient"), t("billing.csv_consultation_number"),
-      t("consultation.reason"), t("billing.column_status"), t("billing.column_cost"),
+      t("consultation.payment_concept"), t("billing.column_status"), t("billing.column_cost"),
       t("billing.remaining"),
     ];
     const lines = [
@@ -169,7 +173,7 @@ export const BillingPage = () => {
           it.consultation.consultationDate.toISOString().slice(0, 10),
           `"${it.patientName.replace(/"/g, '""')}"`,
           it.consultation.consultationNumber,
-          `"${it.consultation.reason.replace(/"/g, '""')}"`,
+          `"${PAYMENT_CONCEPT_LABELS[it.consultation.paymentConcept].replace(/"/g, '""')}"`,
           it.paymentStatus,
           it.consultation.cost.toFixed(2),
           it.remainingAmount.toFixed(2),
@@ -305,7 +309,7 @@ export const BillingPage = () => {
                   </TableHead>
                   <TableHead>{t("billing.column_date")}</TableHead>
                   <TableHead>{t("billing.column_patient")}</TableHead>
-                  <TableHead>{t("consultation.reason")}</TableHead>
+                  <TableHead>{t("consultation.payment_concept")}</TableHead>
                   <TableHead>{t("billing.column_status")}</TableHead>
                   <TableHead className="text-right">{t("billing.column_cost")}</TableHead>
                   <TableHead className="text-right">{t("billing.remaining")}</TableHead>
@@ -406,8 +410,8 @@ const PendingRow = ({
       )}
     </TableCell>
     <TableCell>{item.patientName}</TableCell>
-    <TableCell className="max-w-md truncate" title={item.consultation.reason}>
-      {item.consultation.reason}
+    <TableCell className="max-w-md truncate">
+      {PAYMENT_CONCEPT_LABELS[item.consultation.paymentConcept]}
     </TableCell>
     <TableCell>
       <Badge variant={statusColor}>{statusLabel}</Badge>

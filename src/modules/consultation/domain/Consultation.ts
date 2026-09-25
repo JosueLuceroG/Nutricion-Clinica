@@ -8,6 +8,9 @@ import type { PaymentStatus } from "./PaymentStatus";
 import type { PaymentConcept } from "./PaymentConcept";
 import { Vitals } from "./Vitals";
 
+/** Redondeo monetario: los montos se persisten con 2 decimales máx. */
+const round2 = (n: number): number => Math.round((n + Number.EPSILON) * 100) / 100;
+
 /**
  * Consulta nutricional. Snapshot inmutable de una visita.
  *
@@ -162,9 +165,13 @@ export class Consultation {
     const inv = invTrim ? invTrim.slice(0, 40) : null;
     const notesTrim = input.billingNotes?.trim();
     const notes = notesTrim ? notesTrim.slice(0, 500) : null;
+    const cost = round2(input.cost !== undefined ? input.cost : this.cost);
+    const amountPaid = round2(
+      input.amountPaid ?? (input.paid ? cost : 0),
+    );
     return Consultation.reconstitute({
       ...this.toProps(),
-      cost: input.cost !== undefined ? input.cost : this.cost,
+      cost,
       paid: input.paid,
       paymentStatus: input.paymentStatus ?? (input.paid ? "paid" : "pending"),
       paymentConcept: input.paymentConcept ?? this.paymentConcept,
@@ -173,7 +180,7 @@ export class Consultation {
       reference: input.paid ? ref : null,
       invoiceNumber: input.paid ? inv : null,
       billingNotes: notes,
-      amountPaid: input.amountPaid ?? (input.paid ? (input.cost ?? this.cost) : 0),
+      amountPaid,
       updatedAt: now,
     });
   }

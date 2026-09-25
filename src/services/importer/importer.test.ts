@@ -10,8 +10,13 @@ import {
   PatientRowImportError,
 } from "./patientImporter";
 import { PatientImporterService } from "./importerService";
+import {
+  currentPatientRowsForBranch,
+  patientRowsToCsv,
+} from "./patientCsvExport";
 import type { PatientRepository } from "@modules/patient/domain/PatientRepository";
 import type { Patient } from "@modules/patient/domain/Patient";
+import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 
 describe("csvParser", () => {
   it("parsea CSV simple con encabezados y filas", () => {
@@ -19,7 +24,10 @@ describe("csvParser", () => {
     const result = parseCsv(csv);
     expect(result.headers).toEqual(["nombre", "apellido"]);
     expect(result.totalRows).toBe(2);
-    expect(result.rows).toEqual([["Mar\u00eda", "G\u00f3mez"], ["Juan", "P\u00e9rez"]]);
+    expect(result.rows).toEqual([
+      ["Mar\u00eda", "G\u00f3mez"],
+      ["Juan", "P\u00e9rez"],
+    ]);
   });
 
   it("ignora BOM al inicio del archivo", () => {
@@ -30,15 +38,15 @@ describe("csvParser", () => {
   });
 
   it("maneja campos entrecomillados con comas dentro", () => {
-    const csv = "nombre,direccion\nMar\u00eda,\"Calle A, #123\"\n";
+    const csv = 'nombre,direccion\nMar\u00eda,"Calle A, #123"\n';
     const result = parseCsv(csv);
     expect(result.rows[0]).toEqual(["Mar\u00eda", "Calle A, #123"]);
   });
 
-  it("maneja comillas escapadas como \"\"", () => {
-    const csv = "nombre,notas\nMar\u00eda,\"Dice \"\"hola\"\" siempre\"\n";
+  it('maneja comillas escapadas como ""', () => {
+    const csv = 'nombre,notas\nMar\u00eda,"Dice ""hola"" siempre"\n';
     const result = parseCsv(csv);
-    expect(result.rows[0]).toEqual(["Mar\u00eda", "Dice \"hola\" siempre"]);
+    expect(result.rows[0]).toEqual(["Mar\u00eda", 'Dice "hola" siempre']);
   });
 
   it("ignora l\u00edneas vac\u00edas", () => {
@@ -54,12 +62,12 @@ describe("csvParser", () => {
   });
 
   it("lanza CsvParseError si una comilla no cierra", () => {
-    const csv = "a,b\n1,\"2\n";
+    const csv = 'a,b\n1,"2\n';
     expect(() => parseCsv(csv)).toThrow(CsvParseError);
   });
 
   it("lanza CsvParseError si comilla aparece en medio de un campo sin abrir", () => {
-    const csv = "a,b\n1x\"2,3\n";
+    const csv = 'a,b\n1x"2,3\n';
     expect(() => parseCsv(csv)).toThrow(CsvParseError);
   });
 
@@ -71,7 +79,7 @@ describe("csvParser", () => {
   });
 
   it("maneja saltos de l\u00ednea dentro de campos entrecomillados", () => {
-    const csv = "a,b\n1,\"l\u00ednea 1\nl\u00ednea 2\"\n";
+    const csv = 'a,b\n1,"l\u00ednea 1\nl\u00ednea 2"\n';
     const result = parseCsv(csv);
     expect(result.rows[0][1]).toBe("l\u00ednea 1\nl\u00ednea 2");
   });
@@ -79,7 +87,12 @@ describe("csvParser", () => {
 
 describe("mapHeaders", () => {
   it("mapea encabezados en espa\u00f1ol a campos del dominio", () => {
-    const map = mapHeaders(["Nombre", "Apellido", "Fecha de nacimiento", "Sexo"]);
+    const map = mapHeaders([
+      "Nombre",
+      "Apellido",
+      "Fecha de nacimiento",
+      "Sexo",
+    ]);
     expect(map.get(0)).toBe("firstName");
     expect(map.get(1)).toBe("lastName");
     expect(map.get(2)).toBe("birthDate");
@@ -93,11 +106,18 @@ describe("mapHeaders", () => {
   });
 
   it("mapea encabezados con tildes, snake_case y kebab-case", () => {
-    const map = mapHeaders(["Correo", "Tel\u00e9fono", "telefono_secundario", "emergency_phone"]);
+    const map = mapHeaders([
+      "Correo",
+      "Tel\u00e9fono",
+      "telefono_secundario",
+      "emergency_phone",
+      "whatsapp_enabled",
+    ]);
     expect(map.get(0)).toBe("email");
     expect(map.get(1)).toBe("phone");
     expect(map.get(2)).toBe("secondaryPhone");
     expect(map.get(3)).toBe("emergencyContactPhone");
+    expect(map.get(4)).toBe("whatsappEnabled");
   });
 
   it("ignora encabezados desconocidos", () => {
@@ -138,7 +158,12 @@ describe("parseDate", () => {
 
 describe("validateRequiredHeaders", () => {
   it("ok=true si todos los requeridos est\u00e1n presentes", () => {
-    const result = validateRequiredHeaders(["Nombre", "Apellido", "Fecha de nacimiento", "Sexo"]);
+    const result = validateRequiredHeaders([
+      "Nombre",
+      "Apellido",
+      "Fecha de nacimiento",
+      "Sexo",
+    ]);
     expect(result.ok).toBe(true);
     expect(result.missing).toEqual([]);
   });
@@ -152,11 +177,29 @@ describe("validateRequiredHeaders", () => {
 });
 
 describe("mapRow", () => {
-  const headers = ["Nombre", "Apellido", "Fecha de nacimiento", "Sexo", "Correo", "Tel\u00e9fono"];
+  const headers = [
+    "Nombre",
+    "Apellido",
+    "Fecha de nacimiento",
+    "Sexo",
+    "Correo",
+    "Tel\u00e9fono",
+  ];
   const map = mapHeaders(headers);
 
   it("mapea fila v\u00e1lida sin errores", () => {
-    const result = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "maria@x.com", "5512345678"], map);
+    const result = mapRow(
+      0,
+      [
+        "Mar\u00eda",
+        "G\u00f3mez",
+        "15/05/1990",
+        "F",
+        "maria@x.com",
+        "5512345678",
+      ],
+      map,
+    );
     expect(result.errors).toEqual([]);
     expect(result.mapped?.firstName).toBe("Mar\u00eda");
     expect(result.mapped?.birthDate).toBe("15/05/1990");
@@ -173,23 +216,74 @@ describe("mapRow", () => {
   });
 
   it("rechaza fecha inv\u00e1lida", () => {
-    const result = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "no-fecha", "F"], map);
-    expect(result.errors.some((e) => e.includes("Fecha de nacimiento inv\u00e1lida"))).toBe(true);
+    const result = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "no-fecha", "F"],
+      map,
+    );
+    expect(
+      result.errors.some((e) =>
+        e.includes("Fecha de nacimiento inv\u00e1lida"),
+      ),
+    ).toBe(true);
   });
 
   it("rechaza sexo no reconocido", () => {
-    const result = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "X"], map);
-    expect(result.errors.some((e) => e.toLowerCase().includes("sexo"))).toBe(true);
+    const result = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "X"],
+      map,
+    );
+    expect(result.errors.some((e) => e.toLowerCase().includes("sexo"))).toBe(
+      true,
+    );
   });
 
   it("rechaza email inv\u00e1lido", () => {
-    const result = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "no-es-email"], map);
-    expect(result.errors.some((e) => e.includes("Email inv\u00e1lido"))).toBe(true);
+    const result = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "no-es-email"],
+      map,
+    );
+    expect(result.errors.some((e) => e.includes("Email inv\u00e1lido"))).toBe(
+      true,
+    );
   });
 
   it("rechaza tel\u00e9fono inv\u00e1lido", () => {
-    const result = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "", "abc"], map);
-    expect(result.errors.some((e) => e.includes("Tel\u00e9fono inv\u00e1lido"))).toBe(true);
+    const result = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "", "abc"],
+      map,
+    );
+    expect(
+      result.errors.some((e) => e.includes("Tel\u00e9fono inv\u00e1lido")),
+    ).toBe(true);
+  });
+
+  it("acepta valores booleanos de WhatsApp y rechaza valores desconocidos", () => {
+    const whatsappMap = mapHeaders([
+      "Nombre",
+      "Apellido",
+      "Fecha de nacimiento",
+      "Sexo",
+      "WhatsApp",
+    ]);
+    const valid = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "15/05/1990", "F", "S\u00ed"],
+      whatsappMap,
+    );
+    const invalid = mapRow(
+      1,
+      ["Juan", "P\u00e9rez", "15/05/1990", "M", "quiz\u00e1"],
+      whatsappMap,
+    );
+
+    expect(toPatientCreate(valid).whatsappEnabled).toBe(true);
+    expect(invalid.errors.some((error) => error.includes("WhatsApp"))).toBe(
+      true,
+    );
   });
 });
 
@@ -198,7 +292,11 @@ describe("tryCreatePatient", () => {
   const map = mapHeaders(headers);
 
   it("crea Patient cuando la fila mapea correctamente", () => {
-    const mapped = mapRow(0, ["Mar\u00eda", "G\u00f3mez", "1990-05-15", "femenino"], map);
+    const mapped = mapRow(
+      0,
+      ["Mar\u00eda", "G\u00f3mez", "1990-05-15", "femenino"],
+      map,
+    );
     const p = tryCreatePatient(mapped);
     expect(p).not.toBeNull();
     expect(p!.firstName).toBe("Mar\u00eda");
@@ -213,7 +311,13 @@ describe("tryCreatePatient", () => {
 });
 
 describe("toPatientCreate", () => {
-  const headers = ["Nombre", "Apellido", "Fecha de nacimiento", "Sexo", "Notas"];
+  const headers = [
+    "Nombre",
+    "Apellido",
+    "Fecha de nacimiento",
+    "Sexo",
+    "Notas",
+  ];
   const map = mapHeaders(headers);
 
   it("lanza PatientRowImportError si la fila no est\u00e1 mapeada", () => {
@@ -253,9 +357,15 @@ describe("PatientImporterService", () => {
   it("preview clasifica filas en valid/invalid", () => {
     const repo = makeFakeRepo();
     const svc = new PatientImporterService(repo);
-    const csv = "Nombre,Apellido,Fecha de nacimiento,Sexo\nMar\u00eda,G\u00f3mez,1990-05-15,femenino\n,Sin,no-fecha,X\n";
+    const csv =
+      "Nombre,Apellido,Fecha de nacimiento,Sexo\nMar\u00eda,G\u00f3mez,1990-05-15,femenino\n,Sin,no-fecha,X\n";
     const preview = svc.preview(csv);
-    expect(preview.headers).toEqual(["Nombre", "Apellido", "Fecha de nacimiento", "Sexo"]);
+    expect(preview.headers).toEqual([
+      "Nombre",
+      "Apellido",
+      "Fecha de nacimiento",
+      "Sexo",
+    ]);
     expect(preview.valid.length + preview.invalid.length).toBe(2);
     expect(preview.valid.length).toBe(1);
     expect(preview.invalid.length).toBe(1);
@@ -266,7 +376,8 @@ describe("PatientImporterService", () => {
   it("apply persiste solo filas v\u00e1lidas y reporta fallidas", async () => {
     const repo = makeFakeRepo();
     const svc = new PatientImporterService(repo);
-    const csv = "Nombre,Apellido,Fecha de nacimiento,Sexo\nMar\u00eda,G\u00f3mez,1990-05-15,femenino\nJuan,P\u00e9rez,1985-10-20,masculino\n,Sin,no-fecha,X\n";
+    const csv =
+      "Nombre,Apellido,Fecha de nacimiento,Sexo\nMar\u00eda,G\u00f3mez,1990-05-15,femenino\nJuan,P\u00e9rez,1985-10-20,masculino\n,Sin,no-fecha,X\n";
     const result = await svc.apply(csv);
     expect(result.imported).toBe(2);
     expect(result.failed.length).toBe(1);
@@ -286,5 +397,84 @@ describe("PatientImporterService", () => {
     const csv = "foo,bar\n1,2\n";
     const preview = svc.preview(csv);
     expect(preview.missingRequiredColumns.length).toBeGreaterThan(0);
+  });
+});
+
+function makePatientRow(
+  id: string,
+  overrides: Partial<PatientRow> = {},
+): PatientRow {
+  return {
+    id,
+    sucursal_id: "branch-1",
+    first_name: "María",
+    last_name: "Gómez",
+    second_last_name: null,
+    birth_date: "1990-05-15T00:00:00.000Z",
+    sex: "female",
+    gender: null,
+    marital_status: null,
+    occupation: "Ingeniera",
+    education: null,
+    email: "maria@example.com",
+    phone: "+52 55 1234 5678",
+    secondary_phone: null,
+    whatsapp_enabled: true,
+    emergency_contact_name: null,
+    emergency_contact_relationship: null,
+    emergency_contact_phone: null,
+    record_status: "active",
+    record_opened_at: "2025-01-01T00:00:00.000Z",
+    general_notes: "Seguimiento, mensual",
+    consentimiento_informado_id: null,
+    fecha_firma_consentimiento: null,
+    version_politica_privacidad: null,
+    clinical_tags: "[]",
+    clave_interna: null,
+    birth_place: null,
+    address: null,
+    nationality: null,
+    id_type: null,
+    id_number: null,
+    discharge_reason: null,
+    responsible_professional_id: null,
+    external_record_number: null,
+    photo_url: null,
+    status: "active",
+    created_at: "2025-01-01T00:00:00.000Z",
+    updated_at: "2025-01-01T00:00:00.000Z",
+    deleted_at: null,
+    ...overrides,
+  };
+}
+
+describe("patientCsvExport", () => {
+  it("exporta un CSV que el importador puede volver a leer", () => {
+    const csv = patientRowsToCsv([
+      makePatientRow("patient-1", {
+        first_name: 'María "Luz"',
+        general_notes: "Seguimiento, mensual",
+      }),
+    ]);
+    const preview = new PatientImporterService(makeFakeRepo()).preview(csv);
+
+    expect(preview.valid).toHaveLength(1);
+    expect(preview.invalid).toHaveLength(0);
+    expect(preview.valid[0].mapped?.firstName).toBe('María "Luz"');
+    expect(preview.valid[0].mapped?.generalNotes).toBe("Seguimiento, mensual");
+    expect(toPatientCreate(preview.valid[0]).whatsappEnabled).toBe(true);
+  });
+
+  it("excluye registros sin sucursal y registros de otra sucursal", () => {
+    const rows = [
+      makePatientRow("current"),
+      makePatientRow("legacy", { sucursal_id: null }),
+      makePatientRow("other", { sucursal_id: "branch-2" }),
+      makePatientRow("deleted", { deleted_at: "2026-01-01T00:00:00.000Z" }),
+    ];
+
+    expect(
+      currentPatientRowsForBranch(rows, "branch-1").map((row) => row.id),
+    ).toEqual(["current"]);
   });
 });

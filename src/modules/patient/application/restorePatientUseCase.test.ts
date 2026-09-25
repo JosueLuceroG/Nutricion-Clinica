@@ -9,6 +9,7 @@ import {
   RestorePatientUseCase,
   ListDeletedPatientsUseCase,
 } from "@modules/patient/application/patientUseCases";
+import { useSyncStore } from "@store/syncStore";
 
 const makePatient = (overrides: { firstName: string; lastName?: string; status?: "active" }) => {
   return Patient.create({
@@ -29,6 +30,7 @@ describe("RestorePatientUseCase", () => {
   let db: NutriClinicaDB;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-restore-${Date.now()}-${Math.random()}`);
     await db.open();
     await db.patients.clear();

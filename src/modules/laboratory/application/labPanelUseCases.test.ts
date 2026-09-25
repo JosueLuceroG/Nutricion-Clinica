@@ -7,6 +7,7 @@ import { LabPanelId } from "../domain/LabPanelId";
 import { LabResult } from "../domain/LabResult";
 import { LabPanelNotFoundError } from "../domain/LabPanelRepository";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import { useSyncStore } from "@store/syncStore";
 
 describe("labPanelUseCases", () => {
   let repo: DexieLabPanelRepository;
@@ -21,6 +22,7 @@ describe("labPanelUseCases", () => {
   beforeEach(async () => {
     db = new NutriClinicaDB(`test-lab-uc-${Math.random().toString(36).slice(2)}`);
     await db.open();
+    useSyncStore.getState().setSucursalId("suc-1");
     repo = new DexieLabPanelRepository(db);
     create = new CreateLabPanelUseCase(repo);
     get = new GetLabPanelUseCase(repo);

@@ -19,6 +19,7 @@ interface RecipeCardProps {
   fatG?: number;
   costTotal?: number;
   currency?: string;
+  highlighted?: boolean;
   onClick?: () => void;
 }
 
@@ -40,11 +41,16 @@ const difficultyLabelKey: Record<string, string> = {
   dificil: "recipes.difficulty_hard",
 };
 
-export function RecipeCard({ name, category, difficulty, servings, totalTimeMin, status, ingredientCount, kcal, proteinG, carbsG, fatG, costTotal, currency, onClick }: RecipeCardProps) {
+export function RecipeCard({ id, name, category, difficulty, servings, totalTimeMin, status, ingredientCount, kcal, proteinG, carbsG, fatG, costTotal, currency, highlighted, onClick }: RecipeCardProps) {
   const { t } = useTranslation();
   return (
-    <button type="button" onClick={onClick} className="w-full text-left">
-      <Card className="transition-colors hover:bg-accent">
+    <button
+      id={`recipe-${id}`}
+      type="button"
+      onClick={onClick}
+      className="w-full rounded-lg text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Card className={`transition-colors hover:bg-accent ${highlighted ? "ring-2 ring-primary ring-offset-2" : ""}`}>
         <CardHeader className="pb-2">
           <div className="flex items-start justify-between">
             <CardTitle className="text-sm font-medium">{name}</CardTitle>
@@ -78,10 +84,14 @@ export function RecipeCard({ name, category, difficulty, servings, totalTimeMin,
             </span>
           </div>
           {kcal !== undefined && (
-            <div className="mt-2 flex items-center gap-3 border-t pt-2 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-wrap items-center gap-3 border-t pt-2 text-xs text-muted-foreground">
               <span className="flex items-center gap-1" title={t("recipes.kcal")}>
                 <Flame className="h-3 w-3 text-orange-500" />
-                {Math.round(kcal)} kcal
+                {Math.round(kcal)} {t("recipes.kcal_total")}
+              </span>
+              <span className="flex items-center gap-1" title={t("recipes.kcal_per_serving")}>
+                <Flame className="h-3 w-3 text-amber-500" />
+                {Math.round(kcal / servings)} {t("recipes.kcal_per_serving")}
               </span>
               <span className="flex items-center gap-1" title={t("recipes.protein")}>
                 <Beef className="h-3 w-3 text-red-500" />

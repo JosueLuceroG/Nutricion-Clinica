@@ -9,6 +9,7 @@ import { DexiePatientRepository } from "@modules/patient/infrastructure/DexiePat
 import { DexieConsultationRepository } from "@modules/consultation/infrastructure/DexieConsultationRepository";
 import { ScheduleConsultationUseCase, RegisterPaymentUseCase } from "@modules/consultation/application/consultationUseCases";
 import { useFinancialReport } from "./useFinancialReport";
+import { useSyncStore } from "@store/syncStore";
 
 const makePatient = (overrides: { firstName: string; lastName?: string }) =>
   Patient.create({
@@ -28,6 +29,7 @@ describe("useFinancialReport", () => {
   let registerPayment: RegisterPaymentUseCase;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("suc-1");
     db = new NutriClinicaDB(`test-fin-${Math.random().toString(36).slice(2)}`);
     await db.open();
     await db.consultations.clear();
@@ -101,6 +103,51 @@ describe("useFinancialReport", () => {
     expect(result.current!.paidCount).toBe(3);
     expect(result.current!.pendingCount).toBe(1);
     expect(result.current!.activePatients).toBe(2);
+  });
+
+  it("refunded/cancelled NO suman ingresos ni pendientes", async () => {
+    const p = makePatient({ firstName: "Gaby" });
+    await patientRepo.save(p);
+    const now = new Date();
+    const refunded = await schedule.execute({
+      patientId: p.id,
+      consultationDate: now,
+      consultationNumber: 1,
+      reason: "Reembolsada",
+      cost: 900,
+    });
+    const cancelled = await schedule.execute({
+      patientId: p.id,
+      consultationDate: now,
+      consultationNumber: 2,
+      reason: "Cancelada",
+      cost: 400,
+    });
+    await registerPayment.execute(refunded.id, {
+      paid: true,
+      paymentStatus: "refunded",
+      paymentMethod: "cash",
+      paidAt: new Date(),
+    });
+    await registerPayment.execute(cancelled.id, {
+      paid: false,
+      paymentStatus: "cancelled",
+      paymentMethod: null,
+      paidAt: null,
+    });
+
+    const to = new Date();
+    const from = new Date(to);
+    from.setMonth(from.getMonth() - 6);
+    const { result } = renderHook(() => useFinancialReport(from, to, 5, db));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current!.totalIncome).toBe(0);
+    expect(result.current!.totalPending).toBe(0);
+    expect(result.current!.paidCount).toBe(0);
+    expect(result.current!.pendingCount).toBe(0);
+    expect(result.current!.conceptBreakdown).toHaveLength(0);
+    expect(result.current!.methodBreakdown).toHaveLength(0);
+    expect(result.current!.activePatients).toBe(1);
   });
 
   it("top patients ordenado por totalPaid desc, limitado a topN", async () => {

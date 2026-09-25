@@ -9,25 +9,36 @@ import {
   barrierEventToRow, rowToBarrierEvent,
 } from "./adherenceMapper";
 import type { NutriClinicaDB } from "@services/db/dexieSchema";
-import { withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import {
+  requireActiveSucursalId,
+  rowMatchesSucursal,
+  withSucursalScope,
+} from "@services/tenancy/sucursalScope";
 
 export class DexieAdherenceRepository implements AdherenceRepository {
   constructor(private readonly db: NutriClinicaDB) {}
 
   async saveRecord(record: AdherenceRecord): Promise<void> {
     const row = adherenceRecordToRow(record);
+    const sucursalId = requireActiveSucursalId();
     const existing = await this.db.adherence_records.get(row.id).catch(() => null);
-    await this.db.adherence_records.put(withCurrentSucursalScope(row, existing));
+    assertOwnedBySucursal(existing, sucursalId, "El registro de adherencia");
+    await this.db.adherence_records.put(withSucursalScope(row, sucursalId));
   }
 
   async findRecordById(id: AdherenceId): Promise<AdherenceRecord | null> {
     const row = await this.db.adherence_records.get(id);
-    return row ? rowToAdherenceRecord(row) : null;
+    return row && !row.deleted_at && rowMatchesSucursal(row, requireActiveSucursalId())
+      ? rowToAdherenceRecord(row)
+      : null;
   }
 
   async findRecordsByPatient(patientId: string): Promise<AdherenceRecord[]> {
     const rows = await this.db.adherence_records.where("patient_id").equals(patientId).toArray();
-    return rows.map(rowToAdherenceRecord);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => !row.deleted_at && rowMatchesSucursal(row, sucursalId))
+      .map(rowToAdherenceRecord);
   }
 
   async findRecordsByPatientAndRange(patientId: string, start: string, end: string): Promise<AdherenceRecord[]> {
@@ -35,34 +46,63 @@ export class DexieAdherenceRepository implements AdherenceRepository {
       .where("[patient_id+date]")
       .between([patientId, start], [patientId, end], true, true)
       .toArray();
-    return rows.map(rowToAdherenceRecord);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => !row.deleted_at && rowMatchesSucursal(row, sucursalId))
+      .map(rowToAdherenceRecord);
   }
 
   async deleteRecord(id: AdherenceId): Promise<void> {
-    await this.db.adherence_records.delete(id);
+    const row = await this.db.adherence_records.get(id);
+    if (row && rowMatchesSucursal(row, requireActiveSucursalId())) {
+      await this.db.adherence_records.delete(id);
+    }
   }
 
   async saveIndex(index: AdherenceIndex): Promise<void> {
     const row = adherenceIndexToRow(index);
+    const sucursalId = requireActiveSucursalId();
     const existing = await this.db.adherence_indexes.get(row.id).catch(() => null);
-    await this.db.adherence_indexes.put(withCurrentSucursalScope(row, existing));
+    assertOwnedBySucursal(existing, sucursalId, "El índice de adherencia");
+    await this.db.adherence_indexes.put(withSucursalScope(row, sucursalId));
   }
 
   async findIndexesByPatient(patientId: string): Promise<AdherenceIndex[]> {
     const rows = await this.db.adherence_indexes.where("patient_id").equals(patientId).toArray();
-    return rows.map(rowToAdherenceIndex);
+    const sucursalId = requireActiveSucursalId();
+    return rows.filter((row) => rowMatchesSucursal(row, sucursalId)).map(rowToAdherenceIndex);
   }
 
   async saveBarrier(barrier: BarrierEvent): Promise<void> {
-    await this.db.adherence_barriers.put(barrierEventToRow(barrier));
+    const row = barrierEventToRow(barrier);
+    const sucursalId = requireActiveSucursalId();
+    const existing = await this.db.adherence_barriers.get(row.id).catch(() => null);
+    assertOwnedBySucursal(existing, sucursalId, "La barrera de adherencia");
+    await this.db.adherence_barriers.put(withSucursalScope(row, sucursalId));
   }
 
   async findBarriersByPatient(patientId: string): Promise<BarrierEvent[]> {
     const rows = await this.db.adherence_barriers.where("patient_id").equals(patientId).toArray();
-    return rows.map(rowToBarrierEvent);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => rowMatchesSucursal(row, sucursalId))
+      .map(rowToBarrierEvent);
   }
 
   async deleteBarrier(id: string): Promise<void> {
-    await this.db.adherence_barriers.delete(id);
+    const row = await this.db.adherence_barriers.get(id);
+    if (row && rowMatchesSucursal(row, requireActiveSucursalId())) {
+      await this.db.adherence_barriers.delete(id);
+    }
+  }
+}
+
+function assertOwnedBySucursal(
+  row: { sucursal_id?: string | null } | null | undefined,
+  sucursalId: string,
+  label: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error(`${label} pertenece a otra sucursal`);
   }
 }

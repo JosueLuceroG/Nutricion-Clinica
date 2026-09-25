@@ -12,6 +12,18 @@ function getPatientId(context: Record<string, unknown>): string | undefined {
   return context.patientId as string | undefined;
 }
 
+const EGRESS_CAPABILITY_BY_CLIENT: Record<CapabilityId, string> = {
+  summarizeConsultation: "clinical_summary",
+  interpretLabResults: "lab_interpretation",
+  suggestSubstitutions: "meal_substitution",
+  generateEducationContent: "patient_education",
+  draftClinicalNotes: "clinical_notes_draft",
+  generateGoalSuggestions: "goal_suggestion",
+  explainDiagnosisToPatient: "patient_education",
+  generateMealPlanInitial: "meal_plan_generation",
+  generateDashboardKpi: "dashboard_analytics",
+};
+
 export interface AIExecuteOptions {
   signal?: AbortSignal;
   skipCache?: boolean;
@@ -126,18 +138,18 @@ class AIService {
 
     const store = usePreferencesStore.getState();
     const provider = store.aiProvider;
-    const apiKey = provider === "openai" ? store.openAiApiKey : undefined;
 
     try {
       const response = await aiClient.complete(
         {
-          model: def.model,
           systemPrompt,
           userPrompt,
           temperature: def.temperature,
           maxTokens: def.maxTokens,
           provider,
-          apiKey,
+          responseFormat: capability === "generateDashboardKpi" ? "json" : undefined,
+          capability: EGRESS_CAPABILITY_BY_CLIENT[capability],
+          patientId: getPatientId(context),
         },
         { signal: options?.signal },
       );

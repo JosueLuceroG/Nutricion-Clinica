@@ -6,7 +6,8 @@ export type CapabilityId =
   | "draftClinicalNotes"
   | "generateGoalSuggestions"
   | "explainDiagnosisToPatient"
-  | "generateMealPlanInitial";
+  | "generateMealPlanInitial"
+  | "generateDashboardKpi";
 
 export interface PromptContext {
   language: string;
@@ -79,6 +80,17 @@ export interface GenerateMealPlanInitialContext extends PromptContext {
   diagnosis: string;
 }
 
+export interface GenerateDashboardKpiContext extends PromptContext {
+  request: string;
+  availableFields: Array<{
+    source: string;
+    valueField: string;
+    label: string;
+    allowedMetrics: string[];
+    format: string;
+  }>;
+}
+
 const SYSTEM_PROMPTS: Record<CapabilityId, string> = {
   summarizeConsultation: `Eres un asistente de redacción clínica especializado en nutrición. Genera un resumen narrativo de la consulta en máximo 400 palabras. Estructura: motivo de consulta, hallazgos subjetivos y objetivos, evaluación, plan. Usa lenguaje profesional pero conciso. Responde solo el resumen, sin prefacios.`,
 
@@ -99,6 +111,26 @@ Sé específico pero evita diagnósticos definitivos. Responde en máximo 300 pa
   explainDiagnosisToPatient: `Eres un comunicador en salud. Explica el diagnóstico nutricional al paciente en lenguaje accesible. Incluye: qué significa el diagnóstico, cómo afecta su salud, y qué puede esperar del tratamiento. Evita terminología médica. Máximo 250 palabras.`,
 
   generateMealPlanInitial: `Eres un nutriólogo experto en el sistema SMAE de equivalentes. Genera un menú borrador de 24 horas (desayuno, colación matutina, comida, colación vespertina, cena) basado en el perfil del paciente y objetivo calórico. Cada tiempo debe especificar: grupo de equivalente, cantidad, y ejemplo de alimentos.`,
+
+  generateDashboardKpi: `Eres un asistente de configuración de dashboards para un consultorio de nutrición. Convierte la petición del usuario en UN KPI usando exclusivamente un valueField y una métrica incluidos en availableFields. No inventes fuentes, campos, filtros, cálculos, SQL ni datos clínicos. Responde únicamente un objeto JSON, sin Markdown ni texto adicional, con estas claves exactas: name, description, source, valueField, metric, comparison, visualization, tone, iconKey, category, size, precision, notation, prefix, suffix, trendDirection, reasoning.
+
+Usa estrictamente estos valores:
+- source: patients | consultations | payments | plans | agenda | system
+- metric: count | sum | average | percentage, y debe estar incluido en allowedMetrics del valueField
+- comparison: none | previousPeriod; ante cualquier duda usa none
+- visualization: largeNumber | percentage | progress | simpleCard. Si el usuario pide barra usa progress, NUNCA uses bar. percentage y progress requieren metric percentage
+- tone: green | blue | purple | orange | cyan | rose | slate
+- iconKey: users | calendar | clipboard | money | mealPlan | sync | sparkles
+- category: general | patients | consultations | payments | agenda | plans | finance | system | custom
+- size: small | wide
+- precision: número entero 0 | 1 | 2 que indica la cantidad de decimales. Para un decimal devuelve 1, NUNCA 0.1; para dos devuelve 2, NUNCA 0.01
+- notation: standard | compact
+- prefix y suffix: texto, pueden ser cadenas vacías
+- trendDirection: increaseIsPositive | decreaseIsPositive | neutral
+
+No traduzcas, anotes ni combines los valores enum. Por ejemplo, devuelve blue y no azul; progress y no bar, barra ni "simpleCard (barra)".
+
+reasoning debe explicar brevemente qué se eligió para que el usuario pueda confirmarlo.`,
 
 };
 

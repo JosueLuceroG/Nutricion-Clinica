@@ -12,6 +12,23 @@ function makeReq(overrides: Partial<Request & { user?: JwtPayload }> = {}): Requ
   } as unknown as Request;
 }
 
+function user(overrides: Partial<JwtPayload> = {}): JwtPayload {
+  return {
+    tokenType: 'access',
+    sub: '00000000-0000-4000-8000-000000000001',
+    email: 'a@example.com',
+    rol: 'nutriologa',
+    sucursalIds: [],
+    totpVerified: false,
+    ver: 1,
+    iat: 1,
+    exp: 2,
+    iss: 'nutriclinica-api',
+    aud: 'nutriclinica-web',
+    ...overrides,
+  };
+}
+
 const next = vi.fn();
 
 describe('requireSucursalAccess', () => {
@@ -22,14 +39,14 @@ describe('requireSucursalAccess', () => {
   });
 
   it('rechaza si falta header y query', () => {
-    const req = makeReq({ user: { sub: 'p1', email: 'a', rol: 'admin', sucursalIds: [], iat: 0, exp: 0 } });
+    const req = makeReq({ user: user({ rol: 'admin' }) });
     requireSucursalAccess(req, {} as never, next);
     expect(next).toHaveBeenCalledWith(expect.any(ForbiddenError));
   });
 
   it('extrae sucursalId del header X-Sucursal-Id', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'nutriologa', sucursalIds: ['s1'], iat: 0, exp: 0 },
+      user: user({ sucursalIds: ['s1'] }),
       header: vi.fn().mockReturnValue('s1'),
     });
     requireSucursalAccess(req, {} as never, next);
@@ -39,7 +56,7 @@ describe('requireSucursalAccess', () => {
 
   it('extrae sucursalId del query param como fallback', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'nutriologa', sucursalIds: ['s2'], iat: 0, exp: 0 },
+      user: user({ sucursalIds: ['s2'] }),
       query: { sucursalId: 's2' },
     });
     requireSucursalAccess(req, {} as never, next);
@@ -49,7 +66,7 @@ describe('requireSucursalAccess', () => {
 
   it('admin puede acceder a cualquier sucursal (incluso no listada)', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'admin', sucursalIds: ['s1'], iat: 0, exp: 0 },
+      user: user({ rol: 'admin', sucursalIds: ['s1'] }),
       header: vi.fn().mockReturnValue('s-other'),
     });
     requireSucursalAccess(req, {} as never, next);
@@ -59,7 +76,7 @@ describe('requireSucursalAccess', () => {
 
   it('no-admin es Forbidden si la sucursal no est\u00e1 en su lista', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'nutriologa', sucursalIds: ['s1'], iat: 0, exp: 0 },
+      user: user({ sucursalIds: ['s1'] }),
       header: vi.fn().mockReturnValue('s-otra'),
     });
     requireSucursalAccess(req, {} as never, next);
@@ -68,7 +85,7 @@ describe('requireSucursalAccess', () => {
 
   it('ignora header vac\u00edo y cae a query', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'nutriologa', sucursalIds: ['s1'], iat: 0, exp: 0 },
+      user: user({ sucursalIds: ['s1'] }),
       header: vi.fn().mockReturnValue('   '),
       query: { sucursalId: 's1' },
     });
@@ -93,14 +110,14 @@ describe('getRequestSucursalId', () => {
 describe('isCrossTenantAllowed', () => {
   it('admin \u2192 true', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'admin', sucursalIds: [], iat: 0, exp: 0 },
+      user: user({ rol: 'admin' }),
     });
     expect(isCrossTenantAllowed(req)).toBe(true);
   });
 
   it('nutriologa \u2192 false', () => {
     const req = makeReq({
-      user: { sub: 'p1', email: 'a', rol: 'nutriologa', sucursalIds: ['s1'], iat: 0, exp: 0 },
+      user: user({ sucursalIds: ['s1'] }),
     });
     expect(isCrossTenantAllowed(req)).toBe(false);
   });

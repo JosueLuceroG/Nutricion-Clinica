@@ -459,6 +459,10 @@ export class ListGiSymptomsUseCase {
 export class CreateSnapshotExpedienteUseCase {
   constructor(private readonly repo: SnapshotExpedienteRepository) {}
   async execute(input: SnapshotExpedienteCreate): Promise<SnapshotExpediente> {
+    // Idempotente: una consulta tiene exactamente un snapshot. Un doble
+    // disparo (e.g. doble click en "completar consulta") no duplica.
+    const existing = await this.repo.findByConsultaId(input.consultaId);
+    if (existing) return SnapshotExpediente.reconstitute(existing);
     const snapshot = await SnapshotExpediente.create(input);
     await this.repo.save(snapshot.toProps());
     return snapshot;

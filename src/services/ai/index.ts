@@ -13,5 +13,6 @@ export type {
   GenerateGoalSuggestionsContext,
   ExplainDiagnosisToPatientContext,
   GenerateMealPlanInitialContext,
+  GenerateDashboardKpiContext,
 } from "./AIPrompts";
 export type { ParsedResponse } from "./AIResponseParser";

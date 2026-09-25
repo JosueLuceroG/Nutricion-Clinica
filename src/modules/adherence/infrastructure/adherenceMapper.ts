@@ -4,6 +4,8 @@ import { BarrierEvent, type BarrierEventProps } from "../domain/BarrierEvent";
 import { AdherenceIndex, type AdherenceIndexProps } from "../domain/AdherenceIndex";
 
 export interface AdherenceRecordRow {
+  deleted_at?: string | null;
+  row_version?: string | null;
   id: string;
   sucursal_id?: string | null;
   patient_id: string;
@@ -44,6 +46,7 @@ export interface AdherenceIndexRow {
 }
 export interface BarrierEventRow {
   id: string;
+  sucursal_id?: string | null;
   patient_id: string;
   type: string;
   description: string;

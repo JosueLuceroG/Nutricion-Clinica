@@ -15,7 +15,7 @@ export interface ConsultationQuery {
 
 export interface ConsultationRepository {
   save(consultation: Consultation): Promise<void>;
-  findById(id: ConsultationId): Promise<Consultation | null>;
+  findById(id: ConsultationId, includeDeleted?: boolean): Promise<Consultation | null>;
   findAll(query?: ConsultationQuery): Promise<Consultation[]>;
   count(query?: ConsultationQuery): Promise<number>;
   delete(id: ConsultationId, soft?: boolean): Promise<void>;

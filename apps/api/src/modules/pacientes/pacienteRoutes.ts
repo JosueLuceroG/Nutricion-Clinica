@@ -1,20 +1,567 @@
-import { Router as ExpressRouter, type Router, type Request, type Response, type NextFunction } from 'express';
-import { z } from 'zod';
-import sql from 'mssql';
-import { getPool } from '../../db/connection.js';
-import { requireAuth } from '../auth/middleware/requireAuth.js';
-import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
-import { ForbiddenError } from '../../middleware/errorHandler.js';
-import pacienteSubstitutionRouter from './pacienteSubstitutionRoutes.js';
+import {
+  Router as ExpressRouter,
+  type Router,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
+import { z } from "zod";
+import sql from "mssql";
+import { getPool } from "../../db/connection.js";
+import { requireAuth } from "../auth/middleware/requireAuth.js";
+import { requireSucursalAccess } from "../tenancy/middleware/requireSucursalAccess.js";
+import { ForbiddenError } from "../../middleware/errorHandler.js";
+import pacienteSubstitutionRouter from "./pacienteSubstitutionRoutes.js";
+import { validatePatientPhotoValue } from "./patientPhoto.js";
 
 const router: Router = ExpressRouter();
 
 router.use(requireAuth, requireSucursalAccess);
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const SEXO_VALUES = ['female', 'male', 'intersex', 'undisclosed'] as const;
-const ESTADO_VALUES = ['active', 'inactive', 'archived'] as const;
+const SEXO_VALUES = ["female", "male", "intersex", "undisclosed"] as const;
+const ESTADO_VALUES = ["active", "inactive", "archived"] as const;
+
+const PatientPhotoSchema = z.string().superRefine((value, context) => {
+  try {
+    validatePatientPhotoValue(value);
+  } catch (error) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: error instanceof Error ? error.message : "Imagen inválida",
+    });
+  }
+});
+
+const FamilyRelationshipSchema = z.enum([
+  "none",
+  "mother",
+  "father",
+  "maternalGrandparents",
+  "paternalGrandparents",
+  "siblings",
+]);
+
+const FamilyHistoryDetailsSchema = z
+  .object({
+    diabetes: z.array(FamilyRelationshipSchema).max(6),
+    hypertension: z.array(FamilyRelationshipSchema).max(6),
+    obesity: z.array(FamilyRelationshipSchema).max(6),
+    cardiovascularDisease: z.array(FamilyRelationshipSchema).max(6),
+    dyslipidemia: z.array(FamilyRelationshipSchema).max(6),
+    kidneyDisease: z.array(FamilyRelationshipSchema).max(6),
+    thyroidDisease: z.array(FamilyRelationshipSchema).max(6),
+    otherConditions: z.string().max(500).nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict();
+
+const MedicationFrequencySchema = z.enum([
+  "daily",
+  "twiceDaily",
+  "weekly",
+  "asNeeded",
+  "other",
+]);
+
+const SupplementDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    dose: z.string().min(1).max(500),
+    frequency: MedicationFrequencySchema,
+    objective: z.string().min(1).max(500),
+  })
+  .strict();
+
+const MedicationAllergyDetailSchema = z
+  .object({
+    medication: z.string().min(1).max(500),
+    reaction: z.string().min(1).max(500),
+    severity: z.enum(["mild", "moderate", "severe"]),
+    requiredMedicalAttention: z.boolean(),
+  })
+  .strict();
+
+const DailyMedicationDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    dose: z.string().min(1).max(500),
+    frequency: MedicationFrequencySchema,
+    schedule: z.string().min(1).max(500),
+    reason: z.string().min(1).max(500),
+    prescribedByProfessional: z.boolean(),
+  })
+  .strict();
+
+const OptionalClinicalYearSchema = z
+  .number()
+  .int()
+  .min(1900)
+  .max(new Date().getFullYear())
+  .nullable();
+
+const DiagnosedConditionDetailSchema = z
+  .object({
+    diagnosis: z.string().min(1).max(500),
+    diagnosisYear: OptionalClinicalYearSchema,
+    status: z.enum(["active", "controlled", "resolved"]),
+    treatment: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const PreviousSurgeryDetailSchema = z
+  .object({
+    procedure: z.string().min(1).max(500),
+    year: OptionalClinicalYearSchema,
+    reason: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const CurrentTreatmentDetailSchema = z
+  .object({
+    name: z.string().min(1).max(500),
+    reason: z.string().min(1).max(500),
+    frequency: z.string().min(1).max(500),
+    professional: z.string().max(500).nullable(),
+  })
+  .strict();
+
+const IntoleranceDetailSchema = z
+  .object({
+    substance: z.string().min(1).max(500),
+    reaction: z.string().min(1).max(500),
+    severity: z.enum(["mild", "moderate", "severe"]),
+  })
+  .strict();
+
+const MealTimeSchema = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Invalid meal time");
+
+const MealRoutineSchema = z
+  .object({
+    breakfastTime: MealTimeSchema,
+    mainMealTime: MealTimeSchema,
+    dinnerTime: MealTimeSchema,
+    snackTimes: z.array(MealTimeSchema).max(4),
+    mealsPerDay: z.number().int().min(1).max(8),
+    skipsMeals: z.boolean(),
+    mostSkippedMeal: z
+      .enum(["breakfast", "mainMeal", "dinner", "snack"])
+      .nullable(),
+    scheduleVaries: z.boolean(),
+    scheduleVariation: z
+      .enum([
+        "weekendsLater",
+        "weekendsEarlier",
+        "workdays",
+        "rotatingShifts",
+        "irregular",
+      ])
+      .nullable(),
+    mealDuration: z.enum([
+      "lessThan15",
+      "15To20",
+      "20To30",
+      "30To45",
+      "moreThan45",
+    ]),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.skipsMeals && !value.mostSkippedMeal) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["mostSkippedMeal"],
+        message: "Required when meals are skipped",
+      });
+    }
+    if (value.scheduleVaries && !value.scheduleVariation) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["scheduleVariation"],
+        message: "Required when meal schedules vary",
+      });
+    }
+  });
+
+const EatingPatternsSchema = z
+  .object({
+    eatingOutFrequency: z.enum([
+      "never",
+      "rarely",
+      "oneToTwoPerWeek",
+      "threeToFourPerWeek",
+      "daily",
+    ]),
+    snacksBetweenMeals: z.boolean(),
+    eatsLateAtNight: z.boolean(),
+    frequentCravings: z.boolean(),
+    cravingTime: z
+      .enum(["morning", "afternoon", "evening", "night", "variable"])
+      .nullable(),
+    mealPreparer: z.enum([
+      "self",
+      "partner",
+      "family",
+      "householdHelp",
+      "preparedFood",
+      "varies",
+    ]),
+    primaryMealLocation: z
+      .enum(["home", "work", "school", "restaurant", "street", "varies"])
+      .nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.frequentCravings && !value.cravingTime) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["cravingTime"],
+        message: "Required when frequent cravings are reported",
+      });
+    }
+  });
+
+const FoodPreferencesSchema = z
+  .object({
+    usualDietType: z.enum([
+      "omnivore",
+      "vegetarian",
+      "vegan",
+      "pescatarian",
+      "mediterranean",
+      "lowCarb",
+      "other",
+    ]),
+    otherDietDescription: z.string().max(500).nullable(),
+    avoidsFoods: z.boolean(),
+    avoidedFoods: z.string().max(500).nullable(),
+    followsFoodRestrictions: z.boolean(),
+    foodRestrictionDetails: z.string().max(500).nullable(),
+    hasFoodDiscomfort: z.boolean(),
+    discomfortFoods: z.string().max(500).nullable(),
+    specialPreference: z.enum([
+      "none",
+      "lowSodium",
+      "lowSugar",
+      "lowFat",
+      "softTextures",
+      "temperatureSensitive",
+      "other",
+    ]),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.usualDietType === "other" &&
+      !value.otherDietDescription?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherDietDescription"],
+        message: "Required when another diet type is reported",
+      });
+    }
+    if (value.avoidsFoods && !value.avoidedFoods?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["avoidedFoods"],
+        message: "Required when avoided foods are reported",
+      });
+    }
+    if (
+      value.followsFoodRestrictions &&
+      !value.foodRestrictionDetails?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["foodRestrictionDetails"],
+        message: "Required when food restrictions are reported",
+      });
+    }
+    if (value.hasFoodDiscomfort && !value.discomfortFoods?.trim()) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["discomfortFoods"],
+        message: "Required when food discomfort is reported",
+      });
+    }
+  });
+
+const HydrationHabitsSchema = z
+  .object({
+    waterIntake: z.enum([
+      "lessThanOneLiter",
+      "oneToOneAndHalfLiters",
+      "oneAndHalfToTwoLiters",
+      "twoToThreeLiters",
+      "moreThanThreeLiters",
+    ]),
+    drinksWaterThroughoutDay: z.boolean(),
+    carriesWaterBottle: z.boolean(),
+    coffeeTeaFrequency: z.enum([
+      "never",
+      "occasional",
+      "onePerDay",
+      "oneToTwoPerDay",
+      "threeOrMorePerDay",
+    ]),
+    sugaryDrinkFrequency: z.enum([
+      "never",
+      "oneToTwoPerWeek",
+      "threeToFourPerWeek",
+      "daily",
+      "multiplePerDay",
+    ]),
+    consumesEnergyDrinks: z.boolean(),
+    otherBeverage: z.enum([
+      "none",
+      "infusions",
+      "flavoredWater",
+      "juice",
+      "sportsDrinks",
+      "other",
+    ]),
+    alcoholFrequency: z
+      .enum([
+        "never",
+        "monthlyOrLess",
+        "twoToFourPerMonth",
+        "twoToThreePerWeek",
+        "fourOrMorePerWeek",
+      ])
+      .nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict();
+
+const DigestiveHealthSchema = z
+  .object({
+    appetiteLevel: z.enum(["low", "normal", "high", "variable"]),
+    earlySatiety: z.boolean(),
+    hasDigestiveDiscomfort: z.boolean(),
+    symptoms: z
+      .array(
+        z.enum([
+          "reflux",
+          "bloating",
+          "gas",
+          "nausea",
+          "constipation",
+          "diarrhea",
+          "abdominalPain",
+          "heartburn",
+          "vomiting",
+          "belching",
+          "abdominalCramps",
+          "other",
+        ]),
+      )
+      .max(12),
+    otherSymptomDescription: z.string().max(500).nullable(),
+    symptomTiming: z
+      .enum(["duringMeals", "afterMeals", "morning", "night", "variable"])
+      .nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.hasDigestiveDiscomfort && value.symptoms.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["symptoms"],
+        message: "Select at least one digestive symptom",
+      });
+    }
+    if (value.hasDigestiveDiscomfort && !value.symptomTiming) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["symptomTiming"],
+        message: "Required when digestive discomfort is reported",
+      });
+    }
+    if (
+      value.hasDigestiveDiscomfort &&
+      value.symptoms.includes("other") &&
+      !value.otherSymptomDescription?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["otherSymptomDescription"],
+        message: "Required when another digestive symptom is reported",
+      });
+    }
+  });
+
+const NutritionIntakeSchema = z
+  .object({
+    routine: MealRoutineSchema.nullable(),
+    patterns: EatingPatternsSchema.nullable().optional(),
+    preferences: FoodPreferencesSchema.nullable().optional(),
+    hydration: HydrationHabitsSchema.nullable().optional(),
+    digestive: DigestiveHealthSchema.nullable().optional(),
+  })
+  .strict();
+
+const PhysicalActivityTypeSchema = z.enum([
+  "walking",
+  "running",
+  "gym",
+  "cycling",
+  "swimming",
+  "yoga",
+  "dance",
+  "sport",
+  "other",
+]);
+
+const PhysicalActivityProfileSchema = z
+  .object({
+    level: z.enum(["sedentary", "light", "moderate", "intense"]),
+    daysPerWeek: z.number().int().min(0).max(7),
+    sessionDurationMinutes: z.number().int().min(1).max(600).nullable(),
+    activityTypes: z
+      .array(PhysicalActivityTypeSchema)
+      .max(9)
+      .refine((types) => new Set(types).size === types.length, {
+        message: "Activity types must be unique",
+      }),
+    primaryGoal: z
+      .enum([
+        "weightManagement",
+        "health",
+        "performance",
+        "muscleGain",
+        "stressManagement",
+        "mobility",
+        "other",
+      ])
+      .nullable(),
+    hasPhysicalLimitation: z.boolean(),
+    physicalLimitationDetails: z.string().max(500).nullable(),
+    notes: z.string().max(1000).nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.daysPerWeek > 0 && value.sessionDurationMinutes === null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sessionDurationMinutes"],
+        message: "Required when physical activity is reported",
+      });
+    }
+    if (value.daysPerWeek > 0 && value.activityTypes.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activityTypes"],
+        message: "Select at least one physical activity type",
+      });
+    }
+    if (value.daysPerWeek === 0 && value.sessionDurationMinutes !== null) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sessionDurationMinutes"],
+        message: "Must be null when no physical activity is reported",
+      });
+    }
+    if (value.daysPerWeek === 0 && value.activityTypes.length > 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["activityTypes"],
+        message: "Must be empty when no physical activity is reported",
+      });
+    }
+    if (
+      value.hasPhysicalLimitation &&
+      !value.physicalLimitationDetails?.trim()
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["physicalLimitationDetails"],
+        message: "Required when a physical limitation is reported",
+      });
+    }
+  });
+
+const DailyActivitySchema = z
+  .object({
+    sedentaryTime: z.enum([
+      "lessThan4",
+      "fourToSix",
+      "sixToEight",
+      "moreThan8",
+      "varies",
+    ]),
+    usualTransportation: z.enum([
+      "walking",
+      "car",
+      "publicTransport",
+      "bicycle",
+      "motorcycle",
+      "mixed",
+    ]),
+    usesStairsFrequently: z.boolean(),
+    activeBreakFrequency: z.enum(["frequently", "sometimes", "almostNever"]),
+    routineType: z.enum(["seated", "standing", "mixed", "moving"]),
+    notes: z.string().trim().max(1000).nullable(),
+  })
+  .strict();
+
+const PhysicalActivityIntakeSchema = z
+  .object({
+    activity: PhysicalActivityProfileSchema.nullable(),
+    dailyActivity: DailyActivitySchema.nullable(),
+  })
+  .strict();
+
+export const MedicalIntakeSchema = z
+  .object({
+    diagnosedConditions: z.boolean().nullable().optional(),
+    previousSurgeries: z.boolean().nullable().optional(),
+    currentTreatments: z.boolean().nullable().optional(),
+    intolerances: z.boolean().nullable().optional(),
+    diagnosedConditionDetails: z
+      .array(DiagnosedConditionDetailSchema)
+      .max(12)
+      .optional(),
+    previousSurgeryDetails: z
+      .array(PreviousSurgeryDetailSchema)
+      .max(12)
+      .optional(),
+    currentTreatmentDetails: z
+      .array(CurrentTreatmentDetailSchema)
+      .max(12)
+      .optional(),
+    intoleranceDetails: z.array(IntoleranceDetailSchema).max(12).optional(),
+    familyHistory: z.boolean().nullable().optional(),
+    familyHistoryMode: z
+      .enum(["none", "unknown", "recorded"])
+      .nullable()
+      .optional(),
+    familyHistoryDetails: FamilyHistoryDetailsSchema.nullable().optional(),
+    medications: z.boolean().nullable().optional(),
+    supplements: z.boolean().nullable().optional(),
+    medicationAllergies: z.boolean().nullable().optional(),
+    adverseMedicationOrSupplementEffects: z.boolean().nullable().optional(),
+    supplementDetails: z.array(SupplementDetailSchema).max(12).optional(),
+    medicationAllergyDetails: z
+      .array(MedicationAllergyDetailSchema)
+      .max(12)
+      .optional(),
+    dailyMedicationDetails: z
+      .array(DailyMedicationDetailSchema)
+      .max(12)
+      .optional(),
+    adverseEffectDetails: z.string().max(1000).nullable().optional(),
+    nutritionIntake: NutritionIntakeSchema.nullable().optional(),
+    physicalActivity: z.boolean().nullable().optional(),
+    physicalActivityIntake: PhysicalActivityIntakeSchema.nullable().optional(),
+  })
+  .strict();
 
 const PacienteCreateBody = z.object({
   nombres: z.string().min(1).max(120),
@@ -29,6 +576,11 @@ const PacienteCreateBody = z.object({
   email: z.string().email().max(200).optional().nullable(),
   telefono: z.string().max(40).optional().nullable(),
   telefonoSecundario: z.string().max(40).optional().nullable(),
+  whatsappHabilitado: z.boolean().optional().nullable(),
+  numeroExpedienteExterno: z.string().max(100).optional().nullable(),
+  motivoIngreso: z.string().max(500).optional().nullable(),
+  fotoUrl: PatientPhotoSchema.optional().nullable(),
+  tamizajeMedico: MedicalIntakeSchema.optional().nullable(),
   contactoEmergenciaNombre: z.string().max(200).optional().nullable(),
   contactoEmergenciaParentesco: z.string().max(60).optional().nullable(),
   contactoEmergenciaTelefono: z.string().max(40).optional().nullable(),
@@ -56,6 +608,11 @@ interface PacienteRow {
   email: string | null;
   telefono: string | null;
   telefono_secundario: string | null;
+  whatsapp_habilitado: boolean | null;
+  numero_expediente_externo: string | null;
+  motivo_ingreso: string | null;
+  foto_url: string | null;
+  tamizaje_medico_json: string | null;
   contacto_emergencia_nombre: string | null;
   contacto_emergencia_parentesco: string | null;
   contacto_emergencia_telefono: string | null;
@@ -83,6 +640,11 @@ function rowToPaciente(row: PacienteRow): Record<string, unknown> {
     email: row.email,
     telefono: row.telefono,
     telefonoSecundario: row.telefono_secundario,
+    whatsappHabilitado: row.whatsapp_habilitado,
+    numeroExpedienteExterno: row.numero_expediente_externo,
+    motivoIngreso: row.motivo_ingreso,
+    fotoUrl: row.foto_url,
+    tamizajeMedico: parseJsonObject(row.tamizaje_medico_json),
     contactoEmergenciaNombre: row.contacto_emergencia_nombre,
     contactoEmergenciaParentesco: row.contacto_emergencia_parentesco,
     contactoEmergenciaTelefono: row.contacto_emergencia_telefono,
@@ -94,47 +656,65 @@ function rowToPaciente(row: PacienteRow): Record<string, unknown> {
 }
 
 function canMutate(rol: string): boolean {
-  return ['admin', 'nutriologa', 'asistente'].includes(rol);
+  return ["admin", "nutriologa", "asistente"].includes(rol);
+}
+
+function parseJsonObject(value: string | null): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 const SELECT_PACIENTE = `
   SELECT id, sucursal_id, profesional_titular_id, nombres, apellido_paterno, apellido_materno,
          fecha_nacimiento, sexo, genero, estado_civil, ocupacion, escolaridad, email, telefono,
-         telefono_secundario, contacto_emergencia_nombre, contacto_emergencia_parentesco,
+         telefono_secundario, whatsapp_habilitado, numero_expediente_externo, motivo_ingreso, foto_url,
+         tamizaje_medico_json,
+         contacto_emergencia_nombre, contacto_emergencia_parentesco,
          contacto_emergencia_telefono, notas_generales, status, created_at, updated_at, row_version
     FROM pacientes
    WHERE deleted_at IS NULL`;
 
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const sucursalId = String(req.sucursalId);
     const pool = await getPool();
     const result = await pool
       .request()
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<PacienteRow>(`${SELECT_PACIENTE} AND sucursal_id = @sucursal_id ORDER BY apellido_paterno, apellido_materno, nombres`);
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .query<PacienteRow>(
+        `${SELECT_PACIENTE} AND sucursal_id = @sucursal_id ORDER BY apellido_paterno, apellido_materno, nombres`,
+      );
     res.json({ pacientes: result.recordset.map(rowToPaciente) });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = String(req.params.id);
     if (!UUID_REGEX.test(id)) {
-      res.status(400).json({ error: 'id debe ser UUID' });
+      res.status(400).json({ error: "id debe ser UUID" });
       return;
     }
     const sucursalId = String(req.sucursalId);
     const pool = await getPool();
     const result = await pool
       .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<PacienteRow>(`${SELECT_PACIENTE} AND id = @id AND sucursal_id = @sucursal_id`);
+      .input("id", sql.UniqueIdentifier(), id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .query<PacienteRow>(
+        `${SELECT_PACIENTE} AND id = @id AND sucursal_id = @sucursal_id`,
+      );
     if (result.recordset.length === 0) {
-      res.status(404).json({ error: 'Paciente no encontrado' });
+      res.status(404).json({ error: "Paciente no encontrado" });
       return;
     }
     res.json(rowToPaciente(result.recordset[0]!));
@@ -143,47 +723,92 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user || !canMutate(req.user.rol)) {
-      throw new ForbiddenError('Rol sin permisos para crear pacientes');
+      throw new ForbiddenError("Rol sin permisos para crear pacientes");
     }
     const body = PacienteCreateBody.parse(req.body);
     const sucursalId = String(req.sucursalId);
-    const { randomUUID } = await import('node:crypto');
+    const { randomUUID } = await import("node:crypto");
     const id = randomUUID();
     const pool = await getPool();
     await pool
       .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .input('profesional_titular_id', sql.UniqueIdentifier(), body.profesionalTitularId ?? req.user.sub)
-      .input('nombres', sql.NVarChar(120), body.nombres)
-      .input('apellido_paterno', sql.NVarChar(80), body.apellidoPaterno)
-      .input('apellido_materno', sql.NVarChar(80), body.apellidoMaterno ?? null)
-      .input('fecha_nacimiento', sql.Date(), body.fechaNacimiento)
-      .input('sexo', sql.NVarChar(20), body.sexo)
-      .input('genero', sql.NVarChar(80), body.genero ?? null)
-      .input('estado_civil', sql.NVarChar(40), body.estadoCivil ?? null)
-      .input('ocupacion', sql.NVarChar(120), body.ocupacion ?? null)
-      .input('escolaridad', sql.NVarChar(80), body.escolaridad ?? null)
-      .input('email', sql.NVarChar(200), body.email ?? null)
-      .input('telefono', sql.NVarChar(40), body.telefono ?? null)
-      .input('telefono_secundario', sql.NVarChar(40), body.telefonoSecundario ?? null)
-      .input('contacto_emergencia_nombre', sql.NVarChar(200), body.contactoEmergenciaNombre ?? null)
-      .input('contacto_emergencia_parentesco', sql.NVarChar(60), body.contactoEmergenciaParentesco ?? null)
-      .input('contacto_emergencia_telefono', sql.NVarChar(40), body.contactoEmergenciaTelefono ?? null)
-      .input('notas_generales', sql.NVarChar(sql.MAX), body.notasGenerales ?? null)
+      .input("id", sql.UniqueIdentifier(), id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .input(
+        "profesional_titular_id",
+        sql.UniqueIdentifier(),
+        body.profesionalTitularId ?? req.user.sub,
+      )
+      .input("nombres", sql.NVarChar(120), body.nombres)
+      .input("apellido_paterno", sql.NVarChar(80), body.apellidoPaterno)
+      .input("apellido_materno", sql.NVarChar(80), body.apellidoMaterno ?? null)
+      .input("fecha_nacimiento", sql.Date(), body.fechaNacimiento)
+      .input("sexo", sql.NVarChar(20), body.sexo)
+      .input("genero", sql.NVarChar(80), body.genero ?? null)
+      .input("estado_civil", sql.NVarChar(40), body.estadoCivil ?? null)
+      .input("ocupacion", sql.NVarChar(120), body.ocupacion ?? null)
+      .input("escolaridad", sql.NVarChar(80), body.escolaridad ?? null)
+      .input("email", sql.NVarChar(200), body.email ?? null)
+      .input("telefono", sql.NVarChar(40), body.telefono ?? null)
+      .input(
+        "telefono_secundario",
+        sql.NVarChar(40),
+        body.telefonoSecundario ?? null,
+      )
+      .input("whatsapp_habilitado", sql.Bit(), body.whatsappHabilitado ?? null)
+      .input(
+        "numero_expediente_externo",
+        sql.NVarChar(100),
+        body.numeroExpedienteExterno ?? null,
+      )
+      .input("motivo_ingreso", sql.NVarChar(500), body.motivoIngreso ?? null)
+      .input(
+        "foto_url",
+        sql.NVarChar(sql.MAX),
+        validatePatientPhotoValue(body.fotoUrl),
+      )
+      .input(
+        "tamizaje_medico_json",
+        sql.NVarChar(sql.MAX),
+        body.tamizajeMedico ? JSON.stringify(body.tamizajeMedico) : null,
+      )
+      .input(
+        "contacto_emergencia_nombre",
+        sql.NVarChar(200),
+        body.contactoEmergenciaNombre ?? null,
+      )
+      .input(
+        "contacto_emergencia_parentesco",
+        sql.NVarChar(60),
+        body.contactoEmergenciaParentesco ?? null,
+      )
+      .input(
+        "contacto_emergencia_telefono",
+        sql.NVarChar(40),
+        body.contactoEmergenciaTelefono ?? null,
+      )
+      .input(
+        "notas_generales",
+        sql.NVarChar(sql.MAX),
+        body.notasGenerales ?? null,
+      )
       .query(
         `INSERT INTO pacientes
            (id, sucursal_id, profesional_titular_id, nombres, apellido_paterno, apellido_materno,
             fecha_nacimiento, sexo, genero, estado_civil, ocupacion, escolaridad, email, telefono,
-            telefono_secundario, contacto_emergencia_nombre, contacto_emergencia_parentesco,
+             telefono_secundario, whatsapp_habilitado, numero_expediente_externo, motivo_ingreso, foto_url,
+             tamizaje_medico_json,
+            contacto_emergencia_nombre, contacto_emergencia_parentesco,
             contacto_emergencia_telefono, notas_generales)
          VALUES
            (@id, @sucursal_id, @profesional_titular_id, @nombres, @apellido_paterno, @apellido_materno,
             @fecha_nacimiento, @sexo, @genero, @estado_civil, @ocupacion, @escolaridad, @email, @telefono,
-            @telefono_secundario, @contacto_emergencia_nombre, @contacto_emergencia_parentesco,
+             @telefono_secundario, @whatsapp_habilitado, @numero_expediente_externo, @motivo_ingreso, @foto_url,
+             @tamizaje_medico_json,
+            @contacto_emergencia_nombre, @contacto_emergencia_parentesco,
             @contacto_emergencia_telefono, @notas_generales)`,
       );
     res.status(201).json({ id });
@@ -192,83 +817,121 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-router.get('/:id/expediente', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const pacienteId = String(req.params.id);
-    if (!UUID_REGEX.test(pacienteId)) {
-      res.status(400).json({ error: 'id debe ser UUID' });
-      return;
+router.get(
+  "/:id/expediente",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const pacienteId = String(req.params.id);
+      if (!UUID_REGEX.test(pacienteId)) {
+        res.status(400).json({ error: "id debe ser UUID" });
+        return;
+      }
+      const sucursalId = String(req.sucursalId);
+      const pool = await getPool();
+      const pacienteResult = await pool
+        .request()
+        .input("id", sql.UniqueIdentifier(), pacienteId)
+        .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+        .query<PacienteRow>(
+          `${SELECT_PACIENTE} AND id = @id AND sucursal_id = @sucursal_id`,
+        );
+      if (pacienteResult.recordset.length === 0) {
+        res.status(404).json({ error: "Paciente no encontrado" });
+        return;
+      }
+      const [
+        consultas,
+        antropometrias,
+        planes,
+        labs,
+        adherencia,
+        consentimientos,
+        messages,
+        mealPhotos,
+      ] = await Promise.all([
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, fecha_consulta, subjective, objective, assessment, [plan], created_at FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_consulta DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, fecha, peso, talla, imc, cintura, cadera, porcentaje_grasa, created_at FROM antropometrias WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, nombre, tipo, objetivo_calorico, created_at FROM planes WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, panel, fecha, created_at FROM lab_panels WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, fecha, source, puntuacion FROM adherence_records WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, tipo, titulo, version, aceptado, fecha_aceptacion, created_at FROM consentimientos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, remitente, contenido, leido, created_at FROM patient_portal_messages WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`,
+          ),
+        pool
+          .request()
+          .input("paciente_id", sql.UniqueIdentifier(), pacienteId)
+          .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+          .query(
+            `SELECT id, meal_date, meal_slot, caption, adherence_rating, mime_type, created_at FROM patient_portal_meal_photos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY meal_date DESC`,
+          ),
+      ]);
+      res.json({
+        paciente: rowToPaciente(pacienteResult.recordset[0]),
+        consultas: consultas.recordset,
+        antropometrias: antropometrias.recordset,
+        planes: planes.recordset,
+        laboratorios: labs.recordset,
+        adherencia: adherencia.recordset,
+        consentimientos: consentimientos.recordset,
+        mensajesPortal: messages.recordset,
+        fotosComidasPortal: mealPhotos.recordset,
+        exportadoEn: new Date().toISOString(),
+      });
+    } catch (err) {
+      next(err);
     }
-    const sucursalId = String(req.sucursalId);
-    const pool = await getPool();
-    const pacienteResult = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), pacienteId)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<PacienteRow>(`${SELECT_PACIENTE} AND id = @id AND sucursal_id = @sucursal_id`);
-    if (pacienteResult.recordset.length === 0) {
-      res.status(404).json({ error: 'Paciente no encontrado' });
-      return;
-    }
-    const [consultas, antropometrias, planes, labs, adherencia, consentimientos, messages, mealPhotos] = await Promise.all([
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, fecha_consulta, subjective, objective, assessment, plan, created_at FROM consultas WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha_consulta DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, fecha, peso, talla, imc, cintura, cadera, porcentaje_grasa, created_at FROM antropometrias WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, nombre, tipo, objetivo_calorico, created_at FROM planes WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, panel, fecha, created_at FROM lab_panels WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, fecha, source, puntuacion FROM adherence_records WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY fecha DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, tipo, titulo, version, aceptado, fecha_aceptacion, created_at FROM consentimientos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, remitente, contenido, leido, created_at FROM patient_portal_messages WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY created_at DESC`),
-      pool.request()
-        .input('paciente_id', sql.UniqueIdentifier(), pacienteId)
-        .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-        .query(`SELECT id, meal_date, meal_slot, caption, adherence_rating, mime_type, created_at FROM patient_portal_meal_photos WHERE paciente_id = @paciente_id AND sucursal_id = @sucursal_id AND deleted_at IS NULL ORDER BY meal_date DESC`),
-    ]);
-    res.json({
-      paciente: rowToPaciente(pacienteResult.recordset[0]),
-      consultas: consultas.recordset,
-      antropometrias: antropometrias.recordset,
-      planes: planes.recordset,
-      laboratorios: labs.recordset,
-      adherencia: adherencia.recordset,
-      consentimientos: consentimientos.recordset,
-      mensajesPortal: messages.recordset,
-      fotosComidasPortal: mealPhotos.recordset,
-      exportadoEn: new Date().toISOString(),
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
-router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.put("/:id", async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.user || !canMutate(req.user.rol)) {
-      throw new ForbiddenError('Rol sin permisos para actualizar pacientes');
+      throw new ForbiddenError("Rol sin permisos para actualizar pacientes");
     }
     const id = String(req.params.id);
     if (!UUID_REGEX.test(id)) {
-      res.status(400).json({ error: 'id debe ser UUID' });
+      res.status(400).json({ error: "id debe ser UUID" });
       return;
     }
     const body = PacienteUpdateBody.parse(req.body);
@@ -276,33 +939,118 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
     const pool = await getPool();
     const existing = await pool
       .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query<{ id: string }>(`SELECT id FROM pacientes WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`);
+      .input("id", sql.UniqueIdentifier(), id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+      .query<{
+        id: string;
+      }>(`SELECT id FROM pacientes WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`);
     if (existing.recordset.length === 0) {
-      res.status(404).json({ error: 'Paciente no encontrado' });
+      res.status(404).json({ error: "Paciente no encontrado" });
       return;
     }
     const sets: string[] = [];
-    const r = pool.request().input('id', sql.UniqueIdentifier(), id).input('sucursal_id', sql.UniqueIdentifier(), sucursalId);
-    const map: Record<string, { col: string; type: sql.ISqlType; val: unknown }> = {
-      nombres: { col: 'nombres', type: sql.NVarChar(120), val: body.nombres },
-      apellidoPaterno: { col: 'apellido_paterno', type: sql.NVarChar(80), val: body.apellidoPaterno },
-      apellidoMaterno: { col: 'apellido_materno', type: sql.NVarChar(80), val: body.apellidoMaterno },
-      fechaNacimiento: { col: 'fecha_nacimiento', type: sql.Date(), val: body.fechaNacimiento },
-      sexo: { col: 'sexo', type: sql.NVarChar(20), val: body.sexo },
-      genero: { col: 'genero', type: sql.NVarChar(80), val: body.genero },
-      estadoCivil: { col: 'estado_civil', type: sql.NVarChar(40), val: body.estadoCivil },
-      ocupacion: { col: 'ocupacion', type: sql.NVarChar(120), val: body.ocupacion },
-      escolaridad: { col: 'escolaridad', type: sql.NVarChar(80), val: body.escolaridad },
-      email: { col: 'email', type: sql.NVarChar(200), val: body.email },
-      telefono: { col: 'telefono', type: sql.NVarChar(40), val: body.telefono },
-      telefonoSecundario: { col: 'telefono_secundario', type: sql.NVarChar(40), val: body.telefonoSecundario },
-      contactoEmergenciaNombre: { col: 'contacto_emergencia_nombre', type: sql.NVarChar(200), val: body.contactoEmergenciaNombre },
-      contactoEmergenciaParentesco: { col: 'contacto_emergencia_parentesco', type: sql.NVarChar(60), val: body.contactoEmergenciaParentesco },
-      contactoEmergenciaTelefono: { col: 'contacto_emergencia_telefono', type: sql.NVarChar(40), val: body.contactoEmergenciaTelefono },
-      notasGenerales: { col: 'notas_generales', type: sql.NVarChar(sql.MAX), val: body.notasGenerales },
-      status: { col: 'status', type: sql.NVarChar(20), val: body.status },
+    const r = pool
+      .request()
+      .input("id", sql.UniqueIdentifier(), id)
+      .input("sucursal_id", sql.UniqueIdentifier(), sucursalId);
+    const map: Record<
+      string,
+      { col: string; type: sql.ISqlType; val: unknown }
+    > = {
+      nombres: { col: "nombres", type: sql.NVarChar(120), val: body.nombres },
+      apellidoPaterno: {
+        col: "apellido_paterno",
+        type: sql.NVarChar(80),
+        val: body.apellidoPaterno,
+      },
+      apellidoMaterno: {
+        col: "apellido_materno",
+        type: sql.NVarChar(80),
+        val: body.apellidoMaterno,
+      },
+      fechaNacimiento: {
+        col: "fecha_nacimiento",
+        type: sql.Date(),
+        val: body.fechaNacimiento,
+      },
+      sexo: { col: "sexo", type: sql.NVarChar(20), val: body.sexo },
+      genero: { col: "genero", type: sql.NVarChar(80), val: body.genero },
+      estadoCivil: {
+        col: "estado_civil",
+        type: sql.NVarChar(40),
+        val: body.estadoCivil,
+      },
+      ocupacion: {
+        col: "ocupacion",
+        type: sql.NVarChar(120),
+        val: body.ocupacion,
+      },
+      escolaridad: {
+        col: "escolaridad",
+        type: sql.NVarChar(80),
+        val: body.escolaridad,
+      },
+      email: { col: "email", type: sql.NVarChar(200), val: body.email },
+      telefono: { col: "telefono", type: sql.NVarChar(40), val: body.telefono },
+      telefonoSecundario: {
+        col: "telefono_secundario",
+        type: sql.NVarChar(40),
+        val: body.telefonoSecundario,
+      },
+      whatsappHabilitado: {
+        col: "whatsapp_habilitado",
+        type: sql.Bit(),
+        val: body.whatsappHabilitado,
+      },
+      numeroExpedienteExterno: {
+        col: "numero_expediente_externo",
+        type: sql.NVarChar(100),
+        val: body.numeroExpedienteExterno,
+      },
+      motivoIngreso: {
+        col: "motivo_ingreso",
+        type: sql.NVarChar(500),
+        val: body.motivoIngreso,
+      },
+      fotoUrl: {
+        col: "foto_url",
+        type: sql.NVarChar(sql.MAX),
+        val:
+          body.fotoUrl == null ? null : validatePatientPhotoValue(body.fotoUrl),
+      },
+      tamizajeMedico: {
+        col: "tamizaje_medico_json",
+        type: sql.NVarChar(sql.MAX),
+        val: body.tamizajeMedico
+          ? JSON.stringify(body.tamizajeMedico)
+          : body.tamizajeMedico,
+      },
+      profesionalTitularId: {
+        col: "profesional_titular_id",
+        type: sql.UniqueIdentifier(),
+        val: body.profesionalTitularId,
+      },
+      contactoEmergenciaNombre: {
+        col: "contacto_emergencia_nombre",
+        type: sql.NVarChar(200),
+        val: body.contactoEmergenciaNombre,
+      },
+      contactoEmergenciaParentesco: {
+        col: "contacto_emergencia_parentesco",
+        type: sql.NVarChar(60),
+        val: body.contactoEmergenciaParentesco,
+      },
+      contactoEmergenciaTelefono: {
+        col: "contacto_emergencia_telefono",
+        type: sql.NVarChar(40),
+        val: body.contactoEmergenciaTelefono,
+      },
+      notasGenerales: {
+        col: "notas_generales",
+        type: sql.NVarChar(sql.MAX),
+        val: body.notasGenerales,
+      },
+      status: { col: "status", type: sql.NVarChar(20), val: body.status },
     };
     for (const [key, def] of Object.entries(map)) {
       if ((body as Record<string, unknown>)[key] !== undefined) {
@@ -314,39 +1062,48 @@ router.put('/:id', async (req: Request, res: Response, next: NextFunction) => {
       res.json({ updated: 0 });
       return;
     }
-    await r.query(`UPDATE pacientes SET ${sets.join(', ')} WHERE id = @id AND sucursal_id = @sucursal_id`);
+    await r.query(
+      `UPDATE pacientes SET ${sets.join(", ")}, updated_at = SYSUTCDATETIME() WHERE id = @id AND sucursal_id = @sucursal_id`,
+    );
     res.json({ updated: 1 });
   } catch (err) {
     next(err);
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user || !['admin', 'nutriologa'].includes(req.user.rol)) {
-      throw new ForbiddenError('Solo admin o nutriologa pueden archivar pacientes');
+router.delete(
+  "/:id",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.user || !["admin", "nutriologa"].includes(req.user.rol)) {
+        throw new ForbiddenError(
+          "Solo admin o nutriologa pueden archivar pacientes",
+        );
+      }
+      const id = String(req.params.id);
+      if (!UUID_REGEX.test(id)) {
+        res.status(400).json({ error: "id debe ser UUID" });
+        return;
+      }
+      const sucursalId = String(req.sucursalId);
+      const pool = await getPool();
+      const result = await pool
+        .request()
+        .input("id", sql.UniqueIdentifier(), id)
+        .input("sucursal_id", sql.UniqueIdentifier(), sucursalId)
+        .query(
+          `UPDATE pacientes SET deleted_at = SYSUTCDATETIME(), status = 'archived' WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`,
+        );
+      res.json({ archived: result.rowsAffected[0] ?? 0 });
+    } catch (err) {
+      next(err);
     }
-    const id = String(req.params.id);
-    if (!UUID_REGEX.test(id)) {
-      res.status(400).json({ error: 'id debe ser UUID' });
-      return;
-    }
-    const sucursalId = String(req.sucursalId);
-    const pool = await getPool();
-    const result = await pool
-      .request()
-      .input('id', sql.UniqueIdentifier(), id)
-      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
-      .query(`UPDATE pacientes SET deleted_at = SYSUTCDATETIME(), status = 'archived' WHERE id = @id AND sucursal_id = @sucursal_id AND deleted_at IS NULL`);
-    res.json({ archived: result.rowsAffected[0] ?? 0 });
-  } catch (err) {
-    next(err);
-  }
-});
+  },
+);
 
-import consentimientoRouter from './consentimientoRoutes.js';
+import consentimientoRouter from "./consentimientoRoutes.js";
 
-router.use('/:pacienteId/substitutions', pacienteSubstitutionRouter);
-router.use('/:pacienteId/consentimientos', consentimientoRouter);
+router.use("/:pacienteId/substitutions", pacienteSubstitutionRouter);
+router.use("/:pacienteId/consentimientos", consentimientoRouter);
 
 export default router;

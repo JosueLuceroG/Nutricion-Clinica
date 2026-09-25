@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import router, {
+  buildProfessionalPatientUrl,
   generatePortalToken,
   hashPortalToken,
   isUuid,
@@ -24,6 +25,21 @@ describe('patientPortalRoutes utilities', () => {
     const token = generatePortalToken();
     expect(token).toMatch(/^[a-f0-9]{64}$/);
     expect(generatePortalToken()).not.toBe(token);
+  });
+
+  it('construye enlaces profesionales solo desde PUBLIC_WEB_URL, nunca desde Host', () => {
+    const patientId = '18be803d-d16e-48cc-a2f1-c442da1c41af';
+    expect(
+      buildProfessionalPatientUrl(patientId, {
+        PUBLIC_WEB_URL: 'https://web.staging.nutriclinica.mx/',
+        HOST: 'attacker.example',
+      }),
+    ).toBe(
+      'https://web.staging.nutriclinica.mx/#/pacientes/18be803d-d16e-48cc-a2f1-c442da1c41af',
+    );
+    expect(buildProfessionalPatientUrl(patientId, { HOST: 'attacker.example' })).toBe(
+      'https://app.invalid/#/pacientes/18be803d-d16e-48cc-a2f1-c442da1c41af',
+    );
   });
 
   it('isUuid acepta UUID estandar 8-4-4-4-12', () => {

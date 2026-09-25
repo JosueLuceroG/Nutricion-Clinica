@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import { preloadDashboardRoute } from "@app/dashboardRoutePreloaders";
 import { dashboardNavItems } from "./DashboardSidebar";
 
 export function DashboardMobileNav() {
@@ -15,6 +16,9 @@ export function DashboardMobileNav() {
               className={({ isActive }) =>
                 `nc-dashboard-mobile-nav__item${isActive ? " nc-dashboard-mobile-nav__item--active" : ""}`
               }
+              onPointerEnter={() => preloadDashboardRoute(item.to)}
+              onPointerDown={() => preloadDashboardRoute(item.to)}
+              onFocus={() => preloadDashboardRoute(item.to)}
             >
               <Icon size={18} strokeWidth={2} aria-hidden="true" />
               <span>{item.label}</span>

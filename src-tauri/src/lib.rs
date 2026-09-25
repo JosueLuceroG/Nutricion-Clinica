@@ -12,6 +12,8 @@ pub enum AppError {
     Database(#[from] rusqlite::Error),
     #[error("Error de serialización: {0}")]
     Serialization(#[from] serde_json::Error),
+    #[error("Error de archivo: {0}")]
+    Io(#[from] std::io::Error),
     #[error("Entidad no encontrada: {0}")]
     NotFound(String),
     #[error("Validación: {0}")]
@@ -39,10 +41,12 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(db::DbState::default())
         .invoke_handler(tauri::generate_handler![
             commands::health_check,
             commands::app_version,
+            commands::save_and_open_csv,
         ])
         .run(tauri::generate_context!())
         .expect("Error fatal al iniciar la aplicación");

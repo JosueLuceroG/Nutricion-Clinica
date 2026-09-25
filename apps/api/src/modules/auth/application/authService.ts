@@ -2,17 +2,10 @@ import argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
 import sql from 'mssql';
 import { getPool } from '../../../db/connection.js';
-import {
-  InvalidCredentialsError,
-  EmailAlreadyExistsError,
-  InactiveAccountError,
-} from '../domain/errors.js';
+import { InvalidCredentialsError, EmailAlreadyExistsError, InactiveAccountError, InvalidTokenError } from '../domain/errors.js';
 import { validatePasswordStrength } from '../domain/passwordPolicy.js';
-import type {
-  Role,
-  AuthResponse,
-  JwtPayload,
-} from '@nutriclinica/shared';
+import type { Role, AuthResponse, JwtPayload, Pending2faTokenPayload } from '@nutriclinica/shared';
+import { z } from 'zod';
 
 const ARGON2_OPTIONS = {
   type: 2 as const,
@@ -29,6 +22,7 @@ export interface ProfesionalRow {
   rol: Role;
   activo: boolean;
   email_verificado: boolean;
+  token_version: number;
 }
 
 export interface SucursalAsignada {
@@ -55,7 +49,7 @@ export async function findProfesionalByEmail(email: string): Promise<Profesional
     .request()
     .input('email', sql.NVarChar(200), email.toLowerCase().trim())
     .query<ProfesionalRow>(
-      `SELECT TOP 1 id, email, password_hash, nombre_completo, rol, activo, email_verificado
+      `SELECT TOP 1 id, email, password_hash, nombre_completo, rol, activo, email_verificado, token_version
          FROM profesionales
         WHERE LOWER(email) = LOWER(@email) AND deleted_at IS NULL`,
     );
@@ -68,7 +62,7 @@ export async function findProfesionalById(id: string): Promise<ProfesionalRow | 
     .request()
     .input('id', sql.UniqueIdentifier, id)
     .query<ProfesionalRow>(
-      `SELECT TOP 1 id, email, password_hash, nombre_completo, rol, activo, email_verificado
+      `SELECT TOP 1 id, email, password_hash, nombre_completo, rol, activo, email_verificado, token_version
          FROM profesionales
         WHERE id = @id AND deleted_at IS NULL`,
     );
@@ -117,6 +111,7 @@ export async function login(email: string, password: string): Promise<AuthRespon
     email: prof.email,
     rol: prof.rol,
     sucursalIds: sucursales.map((s) => s.id),
+    ver: prof.token_version,
   });
 
   await markLastLogin(prof.id);
@@ -197,6 +192,7 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     email: prof.email,
     rol: prof.rol,
     sucursalIds: sucursales.map((s) => s.id),
+    ver: prof.token_version,
   });
 
   return {
@@ -216,23 +212,65 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
   };
 }
 
-export async function signToken(payload: Omit<JwtPayload, 'iat' | 'exp'>): Promise<string> {
+const RoleSchema = z.enum(['admin', 'nutriologa', 'asistente', 'soporte_tecnico', 'auditor', 'facturacion']);
+const StandardClaimsSchema = {
+  sub: z.string().uuid(),
+  email: z.string().email().max(200),
+  iat: z.number().int().nonnegative(),
+  exp: z.number().int().positive(),
+  iss: z.string().min(1),
+  aud: z.union([z.string().min(1), z.array(z.string().min(1)).min(1)]),
+};
+
+const AccessTokenSchema = z
+  .object({
+    ...StandardClaimsSchema,
+    tokenType: z.literal('access'),
+    rol: RoleSchema,
+    sucursalIds: z.array(z.string().uuid()),
+    totpVerified: z.boolean(),
+    ver: z.number().int().nonnegative(),
+  })
+  .strict();
+
+const Pending2faTokenSchema = z
+  .object({
+    ...StandardClaimsSchema,
+    tokenType: z.literal('pending_2fa'),
+  })
+  .strict();
+
+type AccessTokenInput = Omit<JwtPayload, 'tokenType' | 'totpVerified' | 'iat' | 'exp' | 'iss' | 'aud'> & {
+  totpVerified?: boolean;
+};
+
+export async function signToken(payload: AccessTokenInput): Promise<string> {
   const { default: jwt } = await import('jsonwebtoken');
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET no configurado');
   const expiresIn = (process.env.JWT_EXPIRES_IN ?? '8h') as `${number}${'s' | 'm' | 'h' | 'd'}`;
-  return jwt.sign(payload, secret, {
-    expiresIn,
-    issuer: process.env.JWT_ISSUER ?? 'nutriclinica-api',
-    audience: process.env.JWT_AUDIENCE ?? 'nutriclinica-web',
-  });
+  return jwt.sign(
+    {
+      ...payload,
+      tokenType: 'access',
+      totpVerified: payload.totpVerified ?? false,
+    },
+    secret,
+    {
+      algorithm: 'HS256',
+      expiresIn,
+      issuer: process.env.JWT_ISSUER ?? 'nutriclinica-api',
+      audience: process.env.JWT_AUDIENCE ?? 'nutriclinica-web',
+    },
+  );
 }
 
 export async function signPending2faToken(payload: { sub: string; email: string }): Promise<string> {
   const { default: jwt } = await import('jsonwebtoken');
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET no configurado');
-  return jwt.sign(payload, secret, {
+  return jwt.sign({ ...payload, tokenType: 'pending_2fa' }, secret, {
+    algorithm: 'HS256',
     expiresIn: '5m',
     issuer: process.env.JWT_ISSUER ?? 'nutriclinica-api',
     audience: process.env.JWT_AUDIENCE ?? 'nutriclinica-web',
@@ -240,13 +278,44 @@ export async function signPending2faToken(payload: { sub: string; email: string 
 }
 
 export async function verifyToken(token: string): Promise<JwtPayload> {
+  const payload = AccessTokenSchema.parse(await verifyJwt(token));
+  const pool = await getPool();
+  const result = await pool
+    .request()
+    .input('id', sql.UniqueIdentifier, payload.sub)
+    .query<{ token_version: number; activo: boolean }>(
+      `SELECT TOP 1 token_version, activo
+         FROM profesionales
+        WHERE id = @id AND deleted_at IS NULL`,
+    );
+  const row = result.recordset[0];
+  if (!row || !row.activo || row.token_version !== payload.ver) {
+    throw new InvalidTokenError('Sesión revocada o token desactualizado');
+  }
+  return payload;
+}
+
+export async function revokeProfesionalSessions(profesionalId: string): Promise<void> {
+  const pool = await getPool();
+  await pool
+    .request()
+    .input('id', sql.UniqueIdentifier, profesionalId)
+    .query('UPDATE profesionales SET token_version = token_version + 1 WHERE id = @id');
+}
+
+export async function verifyPending2faToken(token: string): Promise<Pending2faTokenPayload> {
+  return Pending2faTokenSchema.parse(await verifyJwt(token));
+}
+
+async function verifyJwt(token: string): Promise<unknown> {
   const { default: jwt } = await import('jsonwebtoken');
   const secret = process.env.JWT_SECRET;
   if (!secret) throw new Error('JWT_SECRET no configurado');
   return jwt.verify(token, secret, {
+    algorithms: ['HS256'],
     issuer: process.env.JWT_ISSUER ?? 'nutriclinica-api',
     audience: process.env.JWT_AUDIENCE ?? 'nutriclinica-web',
-  }) as JwtPayload;
+  });
 }
 
 async function markLastLogin(profesionalId: string): Promise<void> {

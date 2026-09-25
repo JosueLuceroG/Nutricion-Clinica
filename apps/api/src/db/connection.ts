@@ -15,7 +15,9 @@ const trusted = process.env.DB_TRUSTED === "true";
 // Solo incluir `port` cuando DB_PORT est\u00e1 expl\u00edcitamente seteado.
 // Si no, dejar que el driver consulte al SQL Browser (UDP 1434) para
 // resolver instancias nombradas (e.g. localhost\SQLEXPRESS).
-const explicitPort = process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined;
+const explicitPort = process.env.DB_PORT
+  ? Number(process.env.DB_PORT)
+  : undefined;
 
 const baseOptions = {
   encrypt: process.env.DB_ENCRYPT === "true",
@@ -86,29 +88,56 @@ const config: sql.config = trusted
     };
 
 let pool: sql.ConnectionPool | null = null;
+let poolPromise: Promise<sql.ConnectionPool> | null = null;
+let closePromise: Promise<void> | null = null;
 
 export async function getPool(): Promise<sql.ConnectionPool> {
+  if (closePromise) await closePromise;
   if (pool) return pool;
-  pool = await sql.connect(config);
-  return pool;
+  if (!poolPromise) {
+    poolPromise = new sql.ConnectionPool(config).connect().then(
+      (connectedPool) => {
+        pool = connectedPool;
+        return connectedPool;
+      },
+      (error: unknown) => {
+        poolPromise = null;
+        throw error;
+      },
+    );
+  }
+  return poolPromise;
 }
 
-export async function testConnection(): Promise<boolean> {
+export async function testConnection(logFailure = true): Promise<boolean> {
   try {
     const p = await getPool();
     await p.request().query("SELECT 1 AS ok");
     return true;
   } catch (err) {
-    console.error("[db] connection failed:", err instanceof Error ? err.message : err);
+    if (logFailure) {
+      console.error(
+        "[db] connection failed:",
+        err instanceof Error ? err.message : err,
+      );
+    }
     return false;
   }
 }
 
 export async function closePool(): Promise<void> {
-  if (pool) {
-    await pool.close();
+  if (closePromise) return closePromise;
+  closePromise = (async () => {
+    const pending = poolPromise;
+    const activePool =
+      pool ?? (pending ? await pending.catch(() => null) : null);
     pool = null;
-  }
+    poolPromise = null;
+    if (activePool) await activePool.close();
+  })().finally(() => {
+    closePromise = null;
+  });
+  return closePromise;
 }
 
 export const connectionMode = trusted ? "windows" : "sql";

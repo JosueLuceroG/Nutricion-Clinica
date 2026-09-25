@@ -1,26 +1,42 @@
 import type { LabPanel } from "../domain/LabPanel";
 import type { LabPanelId } from "../domain/LabPanelId";
-import type { LabPanelQuery, LabPanelRepository } from "../domain/LabPanelRepository";
+import type {
+  LabPanelQuery,
+  LabPanelRepository,
+} from "../domain/LabPanelRepository";
 import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { LabPanelRow } from "./labPanelMapper";
 import { labPanelRowToDomain, labPanelDomainToRow } from "./labPanelMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
 import type { Collection } from "dexie";
+import {
+  requireActiveSucursalId,
+  rowMatchesSucursal,
+  withSucursalScope,
+} from "@services/tenancy/sucursalScope";
 
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
 
 export class DexieLabPanelRepository implements LabPanelRepository {
-  constructor(private readonly dbInstance: NutriClinicaDB = new NutriClinicaDB()) {}
+  constructor(
+    private readonly dbInstance: NutriClinicaDB = new NutriClinicaDB(),
+  ) {}
 
   async save(panel: LabPanel): Promise<void> {
     const row = labPanelDomainToRow(panel);
-    await this.dbInstance.lab_panels.put(row);
+    const sucursalId = requireActiveSucursalId();
+    const existing = await this.dbInstance.lab_panels
+      .get(row.id)
+      .catch(() => null);
+    assertOwnedBySucursal(existing, sucursalId);
+    await this.dbInstance.lab_panels.put(withSucursalScope(row, sucursalId));
   }
 
   async findById(id: LabPanelId): Promise<LabPanel | null> {
     const row = await this.dbInstance.lab_panels.get(id.toString());
-    if (!row) return null;
+    if (!row || row.deleted_at != null || !rowMatchesSucursal(row, requireActiveSucursalId()))
+      return null;
     return labPanelRowToDomain(row);
   }
 
@@ -50,11 +66,18 @@ export class DexieLabPanelRepository implements LabPanelRepository {
     if (soft) {
       const existing = await this.dbInstance.lab_panels.get(id.toString());
       if (!existing) return;
+      const sucursalId = requireActiveSucursalId();
+      if (!rowMatchesSucursal(existing, sucursalId)) return;
       const domain = labPanelRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.lab_panels.put(labPanelDomainToRow(deleted));
+      await this.dbInstance.lab_panels.put(
+        withSucursalScope(labPanelDomainToRow(deleted), sucursalId),
+      );
     } else {
-      await this.dbInstance.lab_panels.delete(id.toString());
+      const existing = await this.dbInstance.lab_panels.get(id.toString());
+      if (existing && rowMatchesSucursal(existing, requireActiveSucursalId())) {
+        await this.dbInstance.lab_panels.delete(id.toString());
+      }
     }
   }
 
@@ -63,19 +86,38 @@ export class DexieLabPanelRepository implements LabPanelRepository {
     query: LabPanelQuery,
   ): Collection<LabPanelRow, string> {
     let collection: Collection<LabPanelRow, string> = source;
+    const sucursalId = requireActiveSucursalId();
+    collection = collection.filter((row) =>
+      rowMatchesSucursal(row, sucursalId),
+    );
     if (query.patientId) {
       const pid = query.patientId.toString();
-      collection = collection.filter((row: LabPanelRow) => row.patient_id === pid);
+      collection = collection.filter(
+        (row: LabPanelRow) => row.patient_id === pid,
+      );
     }
     if (query.from) {
       const fromIso = query.from.toISOString();
-      collection = collection.filter((row: LabPanelRow) => row.taken_at >= fromIso);
+      collection = collection.filter(
+        (row: LabPanelRow) => row.taken_at >= fromIso,
+      );
     }
     if (query.to) {
       const toIso = query.to.toISOString();
-      collection = collection.filter((row: LabPanelRow) => row.taken_at <= toIso);
+      collection = collection.filter(
+        (row: LabPanelRow) => row.taken_at <= toIso,
+      );
     }
     return collection;
+  }
+}
+
+function assertOwnedBySucursal(
+  row: LabPanelRow | null | undefined,
+  sucursalId: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error("El panel pertenece a otra sucursal");
   }
 }
 

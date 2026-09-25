@@ -3,13 +3,19 @@
  *
  * Se abre clickeando "N pendientes" en la StatusBar. Muestra la cola
  * completa (pending + error) con su `lastError` y permite:
- *   - Reintentar: pone los items en `status='pending'` y dispara sync.
- *   - Limpiar: vacía la cola (los datos en Dexie NO se borran).
+ *   - Reintentar errores sin alterar revisiones ni conflictos.
  *   - Copiar al portapapeles: para reportar errores sin DevTools.
  */
 
 import * as React from "react";
-import { Clipboard, RefreshCw, Trash2, X, AlertCircle, Database, XCircle, Wrench } from "lucide-react";
+import {
+  Clipboard,
+  RefreshCw,
+  X,
+  AlertCircle,
+  Database,
+  Wrench,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "react-i18next";
 import {
@@ -53,11 +59,12 @@ export function SyncQueueDiagnosticModal({
   const { t } = useTranslation();
   const [items, setItems] = React.useState<QueueItemView[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const sucursalId = useSyncStore((s) => s.sucursalId);
 
   const refresh = React.useCallback(async () => {
     setLoading(true);
     try {
-      const all = await queue.listAll();
+      const all = sucursalId ? await queue.listAll(sucursalId) : [];
       all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
       setItems(
         all.map((i) => ({
@@ -75,37 +82,20 @@ export function SyncQueueDiagnosticModal({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [sucursalId]);
 
   React.useEffect(() => {
     if (open) void refresh();
   }, [open, refresh]);
 
-  const handleClearAll = async () => {
-    if (!window.confirm(t("sync.clear_queue_confirm"))) {
-      return;
-    }
-    await db.sync_queue.clear();
-    useSyncStore.getState().setPendingChanges(0);
-    toast.success(t("sync.queue_cleared"));
-    void refresh();
-  };
-
   const handleRetryAll = async () => {
-    const errorItems = items.filter((i) => i.status === "error" || i.status === "conflict");
+    if (!sucursalId) return;
+    const errorItems = items.filter((i) => i.status === "error");
     for (const it of errorItems) {
       await db.sync_queue.update(it.id, { status: "pending", lastError: null });
     }
     toast.info(t("sync.items_pending", { count: errorItems.length }), {
       description: t("sync.retry_hint"),
-    });
-    void refresh();
-  };
-
-  const handleDiscard = async (itemId: string, entity: string) => {
-    await db.sync_queue.delete(itemId);
-    toast.success(t("sync.item_discarded", { entity }), {
-      description: t("sync.discard_desc"),
     });
     void refresh();
   };
@@ -121,7 +111,9 @@ export function SyncQueueDiagnosticModal({
       await navigator.clipboard.writeText(text || "(cola vacía)");
       toast.success(t("sync.clipboard_copied"));
     } catch {
-      toast.error(t("sync.copy_error"), { description: t("sync.copy_manually") });
+      toast.error(t("sync.copy_error"), {
+        description: t("sync.copy_manually"),
+      });
     }
   };
 
@@ -142,7 +134,10 @@ export function SyncQueueDiagnosticModal({
       const result = await repairCorruptDateRows();
       if (result.repaired === 0) {
         toast.info(t("sync.no_corrupt_dates"), {
-          description: t("sync.rows_scanned", { count: result.scanned, tables: Object.keys(result.byTable).length }),
+          description: t("sync.rows_scanned", {
+            count: result.scanned,
+            tables: Object.keys(result.byTable).length,
+          }),
         });
       } else {
         const byTable = Object.entries(result.byTable)
@@ -176,37 +171,63 @@ export function SyncQueueDiagnosticModal({
           </DialogTitle>
           <DialogDescription>
             {t("sync.queue_total", { total: items.length })}
-            {pendingCount > 0 && ` · ${t("sync.queue_pending", { count: pendingCount })}`}
-            {errorCount > 0 && ` · ${t("sync.queue_errors", { count: errorCount })}`}
-            {conflictCount > 0 && ` · ${t("sync.queue_conflicts", { count: conflictCount })}`}
+            {pendingCount > 0 &&
+              ` · ${t("sync.queue_pending", { count: pendingCount })}`}
+            {errorCount > 0 &&
+              ` · ${t("sync.queue_errors", { count: errorCount })}`}
+            {conflictCount > 0 &&
+              ` · ${t("sync.queue_conflicts", { count: conflictCount })}`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-wrap items-center gap-2 border-b pb-3">
-          <Button size="sm" variant="default" onClick={handleSyncNow} disabled={loading}>
-            <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} />
+          <Button
+            size="sm"
+            variant="default"
+            onClick={handleSyncNow}
+            disabled={loading}
+          >
+            <RefreshCw
+              className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")}
+            />
             {t("sync.sync_now")}
           </Button>
-          <Button size="sm" variant="outline" onClick={handleRetryAll} disabled={errorCount + conflictCount === 0}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRetryAll}
+            disabled={errorCount === 0}
+          >
             {t("sync.retry_errors")}
           </Button>
-          <Button size="sm" variant="outline" onClick={handleCopy} disabled={items.length === 0}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleCopy}
+            disabled={items.length === 0}
+          >
             <Clipboard className="h-3.5 w-3.5 mr-1.5" />
             {t("sync.copy")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={refresh} disabled={loading}>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={refresh}
+            disabled={loading}
+          >
             {t("sync.refresh")}
           </Button>
-          <Button size="sm" variant="outline" onClick={handleRepairDates} disabled={repairing}>
-            <Wrench className={cn("h-3.5 w-3.5 mr-1.5", repairing && "animate-spin")} />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRepairDates}
+            disabled={repairing}
+          >
+            <Wrench
+              className={cn("h-3.5 w-3.5 mr-1.5", repairing && "animate-spin")}
+            />
             {t("sync.repair_dates")}
           </Button>
-          <div className="ml-auto">
-            <Button size="sm" variant="destructive" onClick={handleClearAll} disabled={items.length === 0}>
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              {t("sync.clear_queue")}
-            </Button>
-          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto -mx-2 px-2">
@@ -221,45 +242,47 @@ export function SyncQueueDiagnosticModal({
                   key={i.id}
                   className={cn(
                     "rounded-md border p-3 text-xs",
-                    i.status === "error" && "border-destructive/40 bg-destructive/5",
+                    i.status === "error" &&
+                      "border-destructive/40 bg-destructive/5",
                     i.status === "conflict" && "border-warning/40 bg-warning/5",
                     i.status === "pending" && "border-border bg-muted/30",
-                    i.status === "applied" && "border-success/40 bg-success/5 opacity-60",
+                    i.status === "applied" &&
+                      "border-success/40 bg-success/5 opacity-60",
                   )}
                 >
                   <div className="flex items-start gap-2">
                     <StatusBadge status={i.status} />
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="font-mono font-medium">{i.entity}</span>
-                        <span className="text-muted-foreground">#{i.entityId.slice(0, 8)}…</span>
+                        <span className="font-mono font-medium">
+                          {i.entity}
+                        </span>
+                        <span className="text-muted-foreground">
+                          #{i.entityId.slice(0, 8)}…
+                        </span>
                         <span className="text-muted-foreground">·</span>
                         <span className="text-muted-foreground">op={i.op}</span>
                         {i.retryCount > 0 && (
                           <>
                             <span className="text-muted-foreground">·</span>
-                            <span className="text-muted-foreground">retry={i.retryCount}</span>
+                            <span className="text-muted-foreground">
+                              retry={i.retryCount}
+                            </span>
                           </>
                         )}
                       </div>
                       {i.lastError && (
                         <div className="mt-1.5 flex gap-1.5 text-destructive">
                           <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
-                          <span className="font-mono break-all whitespace-pre-wrap">{i.lastError}</span>
+                          <span className="font-mono break-all whitespace-pre-wrap">
+                            {i.lastError}
+                          </span>
                         </div>
                       )}
                       <div className="mt-1 text-muted-foreground">
                         {new Date(i.updatedAt).toLocaleString("es-MX")}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleDiscard(i.id, i.entity)}
-                      className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                      title={t("sync.discard_item_title")}
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </button>
                   </div>
                 </li>
               ))}
@@ -279,7 +302,10 @@ export function SyncQueueDiagnosticModal({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const variants: Record<string, "default" | "secondary" | "destructive" | "warning" | "success" | "info"> = {
+  const variants: Record<
+    string,
+    "default" | "secondary" | "destructive" | "warning" | "success" | "info"
+  > = {
     pending: "info",
     syncing: "secondary",
     applied: "success",
@@ -287,7 +313,10 @@ function StatusBadge({ status }: { status: string }) {
     conflict: "warning",
   };
   return (
-    <Badge variant={variants[status] ?? "secondary"} className="shrink-0 text-[10px]">
+    <Badge
+      variant={variants[status] ?? "secondary"}
+      className="shrink-0 text-[10px]"
+    >
       {status}
     </Badge>
   );

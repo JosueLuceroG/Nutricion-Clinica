@@ -6,13 +6,17 @@ import { Patient } from "../domain/Patient";
 import { PatientId } from "../domain/PatientId";
 import { Email, Phone } from "../domain/Contact";
 import type { Sex } from "../domain/Sex";
+import { useSyncStore } from "@store/syncStore";
 
-const makePatient = (overrides: Partial<{
-  firstName: string;
-  lastName: string;
-  email: string | null;
-  status: "active" | "inactive" | "archived" | "deceased";
-}> = {}) => {
+const makePatient = (
+  overrides: Partial<{
+    firstName: string;
+    lastName: string;
+    email: string | null;
+    whatsappEnabled: boolean | null;
+    status: "active" | "inactive" | "archived" | "deceased";
+  }> = {},
+) => {
   return Patient.create({
     firstName: overrides.firstName ?? "Ana",
     lastName: overrides.lastName ?? "Pérez",
@@ -20,6 +24,7 @@ const makePatient = (overrides: Partial<{
     sex: "female" as Sex,
     email: overrides.email ? Email.from(overrides.email) : null,
     phone: overrides.email ? Phone.from("+52 55 1234 5678") : null,
+    whatsappEnabled: overrides.whatsappEnabled,
     status: overrides.status,
   });
 };
@@ -29,6 +34,7 @@ describe("DexiePatientRepository", () => {
   let db: NutriClinicaDB;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId("s1");
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
     await db.delete();
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
@@ -86,7 +92,10 @@ describe("DexiePatientRepository", () => {
 
     const results = await repo.findAll({ search: "mar" });
     expect(results).toHaveLength(2);
-    expect(results.map((p) => p.firstName).sort()).toEqual(["Marisol", "María"]);
+    expect(results.map((p) => p.firstName).sort()).toEqual([
+      "Marisol",
+      "María",
+    ]);
   });
 
   it("filtra por status", async () => {
@@ -114,6 +123,20 @@ describe("DexiePatientRepository", () => {
     expect(await repo.count({ sucursalId: "s1" })).toBe(1);
   });
 
+  it("no lee, sobrescribe ni elimina un paciente de otra sucursal", async () => {
+    const patient = makePatient();
+    await repo.save(patient);
+    await db.patients.update(patient.id.toString(), { sucursal_id: "s2" });
+
+    expect(await repo.findById(patient.id)).toBeNull();
+    await expect(repo.save(patient)).rejects.toThrow(/otra sucursal/);
+    await repo.delete(patient.id, true);
+    expect(await db.patients.get(patient.id.toString())).toMatchObject({
+      sucursal_id: "s2",
+      deleted_at: null,
+    });
+  });
+
   it("filtra por sexo", async () => {
     await repo.save(makePatient({ firstName: "Ana" }));
     await repo.save(
@@ -139,7 +162,9 @@ describe("DexiePatientRepository", () => {
     const second = await repo.findAll({ limit: 3, offset: 3 });
     expect(first).toHaveLength(3);
     expect(second).toHaveLength(3);
-    expect(first[0]?.id.equals(second[0]?.id ?? PatientId.generate())).toBe(false);
+    expect(first[0]?.id.equals(second[0]?.id ?? PatientId.generate())).toBe(
+      false,
+    );
   });
 
   it("preserva datos a través de save/findById roundtrip", async () => {
@@ -150,13 +175,305 @@ describe("DexiePatientRepository", () => {
       sex: "female" as Sex,
       email: Email.from("lucia@example.com"),
       phone: Phone.from("+52 55 9876 5432"),
+      whatsappEnabled: false,
+      externalRecordNumber: "EXP-2026-001",
+      admissionReason: "Primera valoración nutricional",
+      photoUrl: "data:image/png;base64,AAAA",
+      medicalIntake: {
+        diagnosedConditions: true,
+        previousSurgeries: false,
+        diagnosedConditionDetails: [
+          {
+            diagnosis: "Diabetes mellitus tipo 2",
+            diagnosisYear: 2020,
+            status: "controlled",
+            treatment: "Metformina",
+          },
+        ],
+        previousSurgeryDetails: [],
+        currentTreatmentDetails: [
+          {
+            name: "Terapia física",
+            reason: "Dolor lumbar",
+            frequency: "Semanal",
+            professional: "Dra. Laura Martínez",
+          },
+        ],
+        intoleranceDetails: [
+          {
+            substance: "Lactosa",
+            reaction: "Distensión abdominal",
+            severity: "moderate",
+          },
+        ],
+        medicationAllergies: true,
+        adverseMedicationOrSupplementEffects: false,
+        supplementDetails: [
+          {
+            name: "Omega 3",
+            dose: "1000 mg",
+            frequency: "daily",
+            objective: "Salud cardiovascular",
+          },
+        ],
+        medicationAllergyDetails: [
+          {
+            medication: "Penicilina",
+            reaction: "Urticaria",
+            severity: "moderate",
+            requiredMedicalAttention: true,
+          },
+        ],
+        dailyMedicationDetails: [
+          {
+            name: "Metformina",
+            dose: "850 mg",
+            frequency: "twiceDaily",
+            schedule: "08:00",
+            reason: "Diabetes",
+            prescribedByProfessional: true,
+          },
+        ],
+        familyHistory: true,
+        familyHistoryMode: "recorded",
+        familyHistoryDetails: {
+          diabetes: ["mother", "siblings"],
+          hypertension: ["father"],
+          obesity: ["none"],
+          cardiovascularDisease: ["maternalGrandparents"],
+          dyslipidemia: ["none"],
+          kidneyDisease: ["none"],
+          thyroidDisease: ["paternalGrandparents"],
+          otherConditions: null,
+          notes: "Antecedente materno relevante",
+        },
+        nutritionIntake: {
+          routine: {
+            breakfastTime: "08:00",
+            mainMealTime: "13:30",
+            dinnerTime: "20:00",
+            snackTimes: ["10:30"],
+            mealsPerDay: 4,
+            skipsMeals: false,
+            mostSkippedMeal: null,
+            scheduleVaries: false,
+            scheduleVariation: null,
+            mealDuration: "20To30",
+          },
+          patterns: {
+            eatingOutFrequency: "rarely",
+            snacksBetweenMeals: false,
+            eatsLateAtNight: false,
+            frequentCravings: false,
+            cravingTime: null,
+            mealPreparer: "family",
+            primaryMealLocation: null,
+          },
+          preferences: {
+            usualDietType: "vegetarian",
+            otherDietDescription: null,
+            avoidsFoods: false,
+            avoidedFoods: null,
+            followsFoodRestrictions: true,
+            foodRestrictionDetails: "Vegetariana por elección",
+            hasFoodDiscomfort: false,
+            discomfortFoods: null,
+            specialPreference: "none",
+            notes: null,
+          },
+          hydration: {
+            waterIntake: "twoToThreeLiters",
+            drinksWaterThroughoutDay: true,
+            carriesWaterBottle: true,
+            coffeeTeaFrequency: "onePerDay",
+            sugaryDrinkFrequency: "never",
+            consumesEnergyDrinks: false,
+            otherBeverage: "none",
+            alcoholFrequency: null,
+            notes: null,
+          },
+          digestive: {
+            appetiteLevel: "normal",
+            earlySatiety: false,
+            hasDigestiveDiscomfort: false,
+            symptoms: [],
+            otherSymptomDescription: null,
+            symptomTiming: null,
+            notes: null,
+          },
+        },
+        physicalActivity: true,
+        physicalActivityIntake: {
+          activity: {
+            level: "moderate",
+            daysPerWeek: 4,
+            sessionDurationMinutes: 60,
+            activityTypes: ["walking", "gym"],
+            primaryGoal: "health",
+            hasPhysicalLimitation: true,
+            physicalLimitationDetails: "Molestia de rodilla",
+            notes: "Entrena por la mañana",
+          },
+          dailyActivity: {
+            sedentaryTime: "sixToEight",
+            usualTransportation: "publicTransport",
+            usesStairsFrequently: false,
+            activeBreakFrequency: "sometimes",
+            routineType: "seated",
+            notes: "Trabajo de oficina",
+          },
+        },
+      },
     });
     await repo.save(p);
 
     const found = await repo.findById(p.id);
     expect(found?.email?.toString()).toBe("lucia@example.com");
     expect(found?.phone?.toString()).toBe("+52 55 9876 5432");
-    expect(found?.birthDate.toISOString()).toBe(new Date("1992-08-20").toISOString());
+    expect(found?.whatsappEnabled).toBe(false);
+    expect(found?.externalRecordNumber).toBe("EXP-2026-001");
+    expect(found?.admissionReason).toBe("Primera valoración nutricional");
+    expect(found?.photoUrl).toBe("data:image/png;base64,AAAA");
+    expect(found?.medicalIntake.diagnosedConditions).toBe(true);
+    expect(found?.medicalIntake.previousSurgeries).toBe(false);
+    expect(found?.medicalIntake.diagnosedConditionDetails[0]).toEqual({
+      diagnosis: "Diabetes mellitus tipo 2",
+      diagnosisYear: 2020,
+      status: "controlled",
+      treatment: "Metformina",
+    });
+    expect(found?.medicalIntake.currentTreatmentDetails[0]).toEqual({
+      name: "Terapia física",
+      reason: "Dolor lumbar",
+      frequency: "Semanal",
+      professional: "Dra. Laura Martínez",
+    });
+    expect(found?.medicalIntake.intoleranceDetails[0]).toEqual({
+      substance: "Lactosa",
+      reaction: "Distensión abdominal",
+      severity: "moderate",
+    });
+    expect(found?.medicalIntake.medicationAllergies).toBe(true);
+    expect(found?.medicalIntake.adverseMedicationOrSupplementEffects).toBe(
+      false,
+    );
+    expect(found?.medicalIntake.supplementDetails[0]).toEqual({
+      name: "Omega 3",
+      dose: "1000 mg",
+      frequency: "daily",
+      objective: "Salud cardiovascular",
+    });
+    expect(found?.medicalIntake.medicationAllergyDetails[0]).toEqual({
+      medication: "Penicilina",
+      reaction: "Urticaria",
+      severity: "moderate",
+      requiredMedicalAttention: true,
+    });
+    expect(found?.medicalIntake.dailyMedicationDetails[0]).toEqual({
+      name: "Metformina",
+      dose: "850 mg",
+      frequency: "twiceDaily",
+      schedule: "08:00",
+      reason: "Diabetes",
+      prescribedByProfessional: true,
+    });
+    expect(found?.medicalIntake.physicalActivity).toBe(true);
+    expect(found?.medicalIntake.physicalActivityIntake).toEqual({
+      activity: {
+        level: "moderate",
+        daysPerWeek: 4,
+        sessionDurationMinutes: 60,
+        activityTypes: ["walking", "gym"],
+        primaryGoal: "health",
+        hasPhysicalLimitation: true,
+        physicalLimitationDetails: "Molestia de rodilla",
+        notes: "Entrena por la mañana",
+      },
+      dailyActivity: {
+        sedentaryTime: "sixToEight",
+        usualTransportation: "publicTransport",
+        usesStairsFrequently: false,
+        activeBreakFrequency: "sometimes",
+        routineType: "seated",
+        notes: "Trabajo de oficina",
+      },
+    });
+    expect(found?.medicalIntake.familyHistoryDetails?.diabetes).toEqual([
+      "mother",
+      "siblings",
+    ]);
+    expect(found?.medicalIntake.familyHistoryDetails?.notes).toBe(
+      "Antecedente materno relevante",
+    );
+    expect(found?.medicalIntake.familyHistoryMode).toBe("recorded");
+    expect(found?.medicalIntake.nutritionIntake?.routine).toEqual({
+      breakfastTime: "08:00",
+      mainMealTime: "13:30",
+      dinnerTime: "20:00",
+      snackTimes: ["10:30"],
+      mealsPerDay: 4,
+      skipsMeals: false,
+      mostSkippedMeal: null,
+      scheduleVaries: false,
+      scheduleVariation: null,
+      mealDuration: "20To30",
+    });
+    expect(found?.medicalIntake.nutritionIntake?.patterns).toEqual({
+      eatingOutFrequency: "rarely",
+      snacksBetweenMeals: false,
+      eatsLateAtNight: false,
+      frequentCravings: false,
+      cravingTime: null,
+      mealPreparer: "family",
+      primaryMealLocation: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.preferences).toEqual({
+      usualDietType: "vegetarian",
+      otherDietDescription: null,
+      avoidsFoods: false,
+      avoidedFoods: null,
+      followsFoodRestrictions: true,
+      foodRestrictionDetails: "Vegetariana por elección",
+      hasFoodDiscomfort: false,
+      discomfortFoods: null,
+      specialPreference: "none",
+      notes: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.hydration).toEqual({
+      waterIntake: "twoToThreeLiters",
+      drinksWaterThroughoutDay: true,
+      carriesWaterBottle: true,
+      coffeeTeaFrequency: "onePerDay",
+      sugaryDrinkFrequency: "never",
+      consumesEnergyDrinks: false,
+      otherBeverage: "none",
+      alcoholFrequency: null,
+      notes: null,
+    });
+    expect(found?.medicalIntake.nutritionIntake?.digestive).toEqual({
+      appetiteLevel: "normal",
+      earlySatiety: false,
+      hasDigestiveDiscomfort: false,
+      symptoms: [],
+      otherSymptomDescription: null,
+      symptomTiming: null,
+      notes: null,
+    });
+    expect(found?.birthDate.toISOString()).toBe(
+      new Date("1992-08-20").toISOString(),
+    );
+  });
+
+  it("carga como null una fila heredada sin whatsapp_enabled", async () => {
+    const patient = makePatient({ whatsappEnabled: true });
+    await repo.save(patient);
+    const row = await db.patients.get(patient.id.toString());
+    expect(row).toBeDefined();
+    delete row!.whatsapp_enabled;
+    await db.patients.put(row!);
+
+    const found = await repo.findById(patient.id);
+    expect(found?.whatsappEnabled).toBeNull();
   });
 
   it("soft delete actualiza deletedAt y status", async () => {
@@ -164,7 +481,8 @@ describe("DexiePatientRepository", () => {
     await repo.save(p);
     await repo.delete(p.id, true);
 
-    const found = await repo.findById(p.id);
+    expect(await repo.findById(p.id)).toBeNull();
+    const found = await repo.findById(p.id, true);
     expect(found?.deletedAt).not.toBeNull();
     expect(found?.status).toBe("inactive");
   });
@@ -196,7 +514,7 @@ describe("DexiePatientRepository", () => {
     // en campos requeridos y a `null` en opcionales, en vez de lanzar.
     await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
 
-    const found = await repo.findById(p.id);
+    const found = await repo.findById(p.id, true);
     expect(found).not.toBeNull();
     expect(found?.deletedAt).not.toBeNull();
     expect(found?.status).toBe("inactive");
@@ -219,7 +537,7 @@ describe("DexiePatientRepository", () => {
 
     await expect(repo.delete(p.id, true)).resolves.toBeUndefined();
 
-    const found = await repo.findById(p.id);
+    const found = await repo.findById(p.id, true);
     expect(found?.status).toBe("inactive");
   });
 

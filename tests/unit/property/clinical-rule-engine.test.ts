@@ -11,7 +11,9 @@ import { PatientId } from "@modules/patient/domain/PatientId";
 import { ConsentId } from "@modules/patient/domain/ConsentId";
 import type { PatientRepository } from "@modules/patient/domain/PatientRepository";
 
-const makeFakeClinicalRepo = (overrides: Partial<ClinicalRecordRepository> = {}): ClinicalRecordRepository => ({
+const makeFakeClinicalRepo = (
+  overrides: Partial<ClinicalRecordRepository> = {},
+): ClinicalRecordRepository => ({
   findAllergies: async () => [],
   addAllergy: async () => {},
   updateAllergy: async () => {},
@@ -69,7 +71,9 @@ const makeFakeClinicalRepo = (overrides: Partial<ClinicalRecordRepository> = {})
   ...overrides,
 });
 
-const makeFakeFoodRepo = (overrides: Partial<FoodRepository> = {}): FoodRepository => ({
+const makeFakeFoodRepo = (
+  overrides: Partial<FoodRepository> = {},
+): FoodRepository => ({
   save: async () => {},
   findById: async () => null,
   findAllCustom: async () => [],
@@ -77,7 +81,9 @@ const makeFakeFoodRepo = (overrides: Partial<FoodRepository> = {}): FoodReposito
   ...overrides,
 });
 
-const makeFakePatientRepo = (overrides: Partial<PatientRepository> = {}): PatientRepository => ({
+const makeFakePatientRepo = (
+  overrides: Partial<PatientRepository> = {},
+): PatientRepository => ({
   save: async () => {},
   findById: async () => null,
   findAll: async () => [],
@@ -91,17 +97,26 @@ const makeFakePatientRepo = (overrides: Partial<PatientRepository> = {}): Patien
 describe("ClinicalRuleEngine", () => {
   describe("generateClinicalTags", () => {
     it("retorna tags vacíos para paciente sin historial", async () => {
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo());
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+      );
       const tags = await engine.generateClinicalTags("pat-1");
       expect(tags).toEqual([]);
     });
 
     it("genera tag diabetico para paciente con diabetes tipo 2", async () => {
       const ph: PersonalHistoryProps = {
-        id: "ph-1", patientId: "pat-1", condition: "diabetes_tipo_2",
-        diagnosisDate: null, status: "activo",
-        treatingPhysician: null, treatment: null, notes: null,
-        createdAt: "", updatedAt: "",
+        id: "ph-1",
+        patientId: "pat-1",
+        condition: "diabetes_tipo_2",
+        diagnosisDate: null,
+        status: "activo",
+        treatingPhysician: null,
+        treatment: null,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findPersonalHistories: async () => [ph],
@@ -113,9 +128,14 @@ describe("ClinicalRuleEngine", () => {
 
     it("genera tag de antecedente familiar para diabetes", async () => {
       const fh: FamilyHistoryProps = {
-        id: "fh-1", patientId: "pat-1", relationship: "padre",
-        condition: "diabetes", diagnosisAge: null, notes: null,
-        createdAt: "", updatedAt: "",
+        id: "fh-1",
+        patientId: "pat-1",
+        relationship: "padre",
+        condition: "diabetes",
+        diagnosisAge: null,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findFamilyHistories: async () => [fh],
@@ -127,15 +147,26 @@ describe("ClinicalRuleEngine", () => {
 
     it("combina tags de personal y family history sin duplicados", async () => {
       const ph: PersonalHistoryProps = {
-        id: "ph-1", patientId: "pat-1", condition: "diabetes_tipo_2",
-        diagnosisDate: null, status: "activo",
-        treatingPhysician: null, treatment: null, notes: null,
-        createdAt: "", updatedAt: "",
+        id: "ph-1",
+        patientId: "pat-1",
+        condition: "diabetes_tipo_2",
+        diagnosisDate: null,
+        status: "activo",
+        treatingPhysician: null,
+        treatment: null,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const fh: FamilyHistoryProps = {
-        id: "fh-1", patientId: "pat-1", relationship: "padre",
-        condition: "diabetes", diagnosisAge: null, notes: null,
-        createdAt: "", updatedAt: "",
+        id: "fh-1",
+        patientId: "pat-1",
+        relationship: "padre",
+        condition: "diabetes",
+        diagnosisAge: null,
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findPersonalHistories: async () => [ph],
@@ -151,17 +182,25 @@ describe("ClinicalRuleEngine", () => {
 
   describe("getBlockedFoodIds", () => {
     it("retorna lista vacía si no hay alergias", async () => {
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo());
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+      );
       const blocked = await engine.getBlockedFoodIds("pat-1");
       expect(blocked).toEqual([]);
     });
 
     it("bloquea alimentos que contienen el alérgeno por nombre", async () => {
       const allergy: AllergyProps = {
-        id: "a-1", patientId: "pat-1",
-        allergen: "huevo", reaction: "urticaria",
-        severity: "moderada", diagnosis: "clinico",
-        notes: null, createdAt: "", updatedAt: "",
+        id: "a-1",
+        patientId: "pat-1",
+        allergen: "huevo",
+        reaction: "urticaria",
+        severity: "moderada",
+        diagnosis: "clinico",
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findAllergies: async () => [allergy],
@@ -173,10 +212,15 @@ describe("ClinicalRuleEngine", () => {
 
     it("bloquea múltiples alimentos para gluten", async () => {
       const allergy: AllergyProps = {
-        id: "a-1", patientId: "pat-1",
-        allergen: "gluten", reaction: "distensión",
-        severity: "severa", diagnosis: "clinico",
-        notes: null, createdAt: "", updatedAt: "",
+        id: "a-1",
+        patientId: "pat-1",
+        allergen: "gluten",
+        reaction: "distensión",
+        severity: "severa",
+        diagnosis: "clinico",
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findAllergies: async () => [allergy],
@@ -195,28 +239,53 @@ describe("ClinicalRuleEngine", () => {
     it("retorna valid=true si paciente tiene consentimiento firmado", async () => {
       const patient = Patient.reconstitute({
         id: PatientId.fromUnsafe("pat-1"),
-        firstName: "Test", lastName: "Patient", secondLastName: null,
-        birthDate: new Date("1990-01-01"), sex: "female", gender: null,
-        maritalStatus: null, occupation: null, education: null,
-        email: null, phone: null, secondaryPhone: null,
-        emergencyContactName: null, emergencyContactRelationship: null,
+        firstName: "Test",
+        lastName: "Patient",
+        secondLastName: null,
+        birthDate: new Date("1990-01-01"),
+        sex: "female",
+        gender: null,
+        maritalStatus: null,
+        occupation: null,
+        education: null,
+        email: null,
+        phone: null,
+        secondaryPhone: null,
+        whatsappEnabled: null,
+        emergencyContactName: null,
+        emergencyContactRelationship: null,
         emergencyContactPhone: null,
-        recordStatus: "active", recordOpenedAt: new Date(),
+        recordStatus: "active",
+        recordOpenedAt: new Date(),
         generalNotes: null,
         consentimientoInformadoId: ConsentId.fromUnsafe("consent-123"),
         fechaFirmaConsentimiento: new Date("2026-01-15"),
         versionPoliticaPrivacidad: null,
         clinicalTags: [],
-        claveInterna: null, birthPlace: null, address: null, nationality: null,
-        idType: null, idNumber: null, dischargeReason: null,
-        responsibleProfessionalId: null, externalRecordNumber: null, photoUrl: null,
+        claveInterna: null,
+        birthPlace: null,
+        address: null,
+        nationality: null,
+        idType: null,
+        idNumber: null,
+        dischargeReason: null,
+        responsibleProfessionalId: null,
+        externalRecordNumber: null,
+        admissionReason: null,
+        photoUrl: null,
         status: "active",
-        createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
       });
       const patientRepo = makeFakePatientRepo({
         findById: async () => patient,
       });
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo(), patientRepo);
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+        patientRepo,
+      );
       const result = await engine.validateConsent("pat-1");
       expect(result.valid).toBe(true);
       expect(result.reason).toBeNull();
@@ -225,42 +294,74 @@ describe("ClinicalRuleEngine", () => {
     it("retorna valid=false si paciente no tiene consentimientoInformadoId", async () => {
       const patient = Patient.reconstitute({
         id: PatientId.fromUnsafe("pat-1"),
-        firstName: "Test", lastName: "Patient", secondLastName: null,
-        birthDate: new Date("1990-01-01"), sex: "female", gender: null,
-        maritalStatus: null, occupation: null, education: null,
-        email: null, phone: null, secondaryPhone: null,
-        emergencyContactName: null, emergencyContactRelationship: null,
+        firstName: "Test",
+        lastName: "Patient",
+        secondLastName: null,
+        birthDate: new Date("1990-01-01"),
+        sex: "female",
+        gender: null,
+        maritalStatus: null,
+        occupation: null,
+        education: null,
+        email: null,
+        phone: null,
+        secondaryPhone: null,
+        whatsappEnabled: null,
+        emergencyContactName: null,
+        emergencyContactRelationship: null,
         emergencyContactPhone: null,
-        recordStatus: "active", recordOpenedAt: new Date(),
+        recordStatus: "active",
+        recordOpenedAt: new Date(),
         generalNotes: null,
         consentimientoInformadoId: null,
         fechaFirmaConsentimiento: null,
         versionPoliticaPrivacidad: null,
         clinicalTags: [],
-        claveInterna: null, birthPlace: null, address: null, nationality: null,
-        idType: null, idNumber: null, dischargeReason: null,
-        responsibleProfessionalId: null, externalRecordNumber: null, photoUrl: null,
+        claveInterna: null,
+        birthPlace: null,
+        address: null,
+        nationality: null,
+        idType: null,
+        idNumber: null,
+        dischargeReason: null,
+        responsibleProfessionalId: null,
+        externalRecordNumber: null,
+        admissionReason: null,
+        photoUrl: null,
         status: "active",
-        createdAt: new Date(), updatedAt: new Date(), deletedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        deletedAt: null,
       });
       const patientRepo = makeFakePatientRepo({
         findById: async () => patient,
       });
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo(), patientRepo);
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+        patientRepo,
+      );
       const result = await engine.validateConsent("pat-1");
       expect(result.valid).toBe(false);
       expect(result.reason).toContain("RN-EXP-01");
     });
 
     it("retorna valid=false si el paciente no existe", async () => {
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo(), makeFakePatientRepo());
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+        makeFakePatientRepo(),
+      );
       const result = await engine.validateConsent("pat-not-found");
       expect(result.valid).toBe(false);
       expect(result.reason).toContain("no encontrado");
     });
 
     it("retorna valid=true si no hay patientRepo (graceful degradation)", async () => {
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo());
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+      );
       const result = await engine.validateConsent("pat-1");
       expect(result.valid).toBe(true);
       expect(result.reason).toBeNull();
@@ -269,18 +370,26 @@ describe("ClinicalRuleEngine", () => {
 
   describe("getFoodWarnings", () => {
     it("retorna lista vacía si no hay intolerancias", async () => {
-      const engine = new ClinicalRuleEngine(makeFakeClinicalRepo(), makeFakeFoodRepo());
+      const engine = new ClinicalRuleEngine(
+        makeFakeClinicalRepo(),
+        makeFakeFoodRepo(),
+      );
       const warnings = await engine.getFoodWarnings("pat-1");
       expect(warnings).toEqual([]);
     });
 
     it("advertida alimentos que coinciden con la intolerancia", async () => {
       const intolerance: IntoleranceProps = {
-        id: "i-1", patientId: "pat-1",
-        food: "leche", symptom: "distensión",
-        severity: "moderada", thresholdDose: null,
-        mechanism: "lactosa", notes: null,
-        createdAt: "", updatedAt: "",
+        id: "i-1",
+        patientId: "pat-1",
+        food: "leche",
+        symptom: "distensión",
+        severity: "moderada",
+        thresholdDose: null,
+        mechanism: "lactosa",
+        notes: null,
+        createdAt: "",
+        updatedAt: "",
       };
       const repo = makeFakeClinicalRepo({
         findIntolerances: async () => [intolerance],

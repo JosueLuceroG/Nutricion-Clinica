@@ -2,6 +2,13 @@ import type { ConsultationRow } from "@modules/consultation/infrastructure/consu
 import type { AdherenceIndexRow } from "@modules/adherence/infrastructure/adherenceMapper";
 import type { PatientRow } from "@modules/patient/infrastructure/patientMapper";
 
+function parseLocalDate(value: string): Date {
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value);
+}
+
 export function calculateConsultationsPerWeek(consultations: ConsultationRow[]): number {
   if (consultations.length === 0) return 0;
   const dates = consultations
@@ -40,7 +47,7 @@ export function calculateConsultationsThisMonth(consultations: ConsultationRow[]
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
   return consultations.filter((c) => {
-    const d = new Date(c.consultation_date);
+    const d = parseLocalDate(c.consultation_date);
     return d >= startOfMonth && d <= endOfMonth;
   }).length;
 }

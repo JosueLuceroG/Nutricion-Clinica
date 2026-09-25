@@ -1,0 +1,1 @@
+export { NewConsultationQuickDialog } from "./NewConsultationQuickDialog";

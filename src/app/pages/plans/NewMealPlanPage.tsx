@@ -4,13 +4,20 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, ClipboardList, User } from "lucide-react";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@components/ui/card";
 import { Skeleton } from "@components/ui/skeleton";
 import { ErrorState } from "@components/layout/EmptyState";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import { usePatientConsultations } from "@modules/consultation/ui/useConsultationHooks";
 import { MealPlanForm } from "@modules/mealplan/ui/MealPlanForm";
+import { toPatientClinicalContext } from "@modules/patient/application/patientClinicalContext";
 
 export function NewMealPlanPage() {
   const { t } = useTranslation();
@@ -20,8 +27,17 @@ export function NewMealPlanPage() {
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
   );
-  const { data: patient, loading: patientLoading, error: patientError } = usePatient(id);
-  const { data: consultations, loading: consLoading } = usePatientConsultations(id);
+  const {
+    data: patient,
+    loading: patientLoading,
+    error: patientError,
+  } = usePatient(id);
+  const { data: consultations, loading: consLoading } =
+    usePatientConsultations(id);
+  const patientClinicalContext = React.useMemo(
+    () => (patient ? toPatientClinicalContext(patient) : null),
+    [patient],
+  );
 
   const loading = patientLoading || consLoading;
 
@@ -52,7 +68,9 @@ export function NewMealPlanPage() {
 
   const latestCons = consultations?.items?.length
     ? consultations.items.reduce((latest, c) =>
-        c.consultationDate.getTime() > latest.consultationDate.getTime() ? c : latest,
+        c.consultationDate.getTime() > latest.consultationDate.getTime()
+          ? c
+          : latest,
       )
     : null;
 
@@ -84,7 +102,9 @@ export function NewMealPlanPage() {
             </CardHeader>
             <CardContent>
               <Button asChild>
-                <Link to={`/pacientes/${patient.id.toString()}/consultas/nueva`}>
+                <Link
+                  to={`/pacientes/${patient.id.toString()}/consultas/nueva`}
+                >
                   {t("mealplan.go_new_consultation")}
                 </Link>
               </Button>
@@ -116,10 +136,15 @@ export function NewMealPlanPage() {
           <span className="font-medium">{patient.fullName}</span>
           <span className="text-xs text-muted-foreground">·</span>
           <span className="text-xs text-muted-foreground">
-            {t("patient.age_value", { age: patient.age })} · {patient.email?.toString() ?? t("patient.no_email")}
+            {t("patient.age_value", { age: patient.age })} ·{" "}
+            {patient.email?.toString() ?? t("patient.no_email")}
           </span>
         </div>
-        <MealPlanForm patientId={id} consultationId={latestCons.id} />
+        <MealPlanForm
+          patientId={id}
+          consultationId={latestCons.id}
+          patientContext={patientClinicalContext ?? undefined}
+        />
       </PageContent>
     </>
   );

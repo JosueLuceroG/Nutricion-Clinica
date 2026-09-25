@@ -10,6 +10,10 @@ import { ConsultationWizard } from "@modules/consultation/ui/ConsultationWizard"
 import type { ConsultationFormValues } from "@modules/consultation/application/consultationFormSchema";
 import { usePatient } from "@modules/patient/ui/usePatientHooks";
 import { PatientId } from "@modules/patient/domain/PatientId";
+import {
+  buildConsultationPrefill,
+  toPatientClinicalContext,
+} from "@modules/patient/application/patientClinicalContext";
 
 export function NewConsultationPage() {
   const { t } = useTranslation();
@@ -19,18 +23,24 @@ export function NewConsultationPage() {
   const prefillReason = searchParams.get("reason") || "";
   const prefillDate = searchParams.get("appointmentDate") || "";
 
-  const initialValues = React.useMemo<Partial<ConsultationFormValues> | undefined>(() => {
-    const vals: Partial<ConsultationFormValues> = {};
-    if (prefillReason) vals.reason = prefillReason;
-    if (prefillDate) vals.consultationDate = prefillDate;
-    return Object.keys(vals).length > 0 ? vals : undefined;
-  }, [prefillReason, prefillDate]);
-
   const id = React.useMemo(
     () => (patientId ? PatientId.fromUnsafe(patientId) : null),
     [patientId],
   );
   const { data: patient, loading, error, reload } = usePatient(id);
+  const initialValues = React.useMemo<
+    Partial<ConsultationFormValues> | undefined
+  >(() => {
+    const values: Partial<ConsultationFormValues> = {};
+    if (prefillReason) values.reason = prefillReason;
+    if (prefillDate) values.consultationDate = prefillDate;
+    if (patient) {
+      values.subjective = buildConsultationPrefill(
+        toPatientClinicalContext(patient),
+      );
+    }
+    return Object.keys(values).length > 0 ? values : undefined;
+  }, [patient, prefillReason, prefillDate]);
 
   if (loading) {
     return (
@@ -57,7 +67,13 @@ export function NewConsultationPage() {
   if (!patient || !id) {
     return (
       <>
-        <PageHeader title={t("patient.title_single") + " " + t("common.no_results").toLowerCase()} />
+        <PageHeader
+          title={
+            t("patient.title_single") +
+            " " +
+            t("common.no_results").toLowerCase()
+          }
+        />
         <PageContent>{null}</PageContent>
       </>
     );

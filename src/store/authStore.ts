@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { AuthProfesionalDTO, AuthSucursalDTO, Role } from '@nutriclinica/shared';
+import { canonicalSyncId, type AuthProfesionalDTO, type AuthSucursalDTO, type Role } from '@nutriclinica/shared';
+import { useSyncStore } from './syncStore';
 
 /**
  * Auth store con JWT real.
@@ -27,7 +28,7 @@ interface AuthState {
     sucursalActivaId: string | null;
   }) => void;
   setSucursalActiva: (sucursalId: string | null) => void;
-  logout: () => void;
+  logout: (options?: { skipLocalCache?: boolean }) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -43,18 +44,29 @@ export const useAuthStore = create<AuthState>()(
           token,
           user,
           sucursales,
-          sucursalActivaId,
+          sucursalActivaId: sucursalActivaId ? canonicalSyncId(sucursalActivaId) : null,
           isAuthenticated: true,
         }),
-      setSucursalActiva: (sucursalId) => set({ sucursalActivaId: sucursalId }),
-      logout: () =>
+      setSucursalActiva: (sucursalId) => set({
+        sucursalActivaId: sucursalId ? canonicalSyncId(sucursalId) : null,
+      }),
+      logout: async (options) => {
+        const [{ stopSync }, { db }, { clearLocalContext }] = await Promise.all([
+          import('@services/sync/syncBootstrap'),
+          import('@services/db'),
+          import('@services/security/localContextBoundary'),
+        ]);
+        stopSync();
+        if (!options?.skipLocalCache) await clearLocalContext(db);
+        useSyncStore.getState().setSucursalId(null);
         set({
           token: null,
           user: null,
           sucursales: [],
           sucursalActivaId: null,
           isAuthenticated: false,
-        }),
+        });
+      },
     }),
     {
       name: 'auth-store',

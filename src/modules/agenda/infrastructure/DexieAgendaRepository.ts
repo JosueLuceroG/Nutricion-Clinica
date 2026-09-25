@@ -9,18 +9,33 @@ import type { BlockId } from "../domain/BlockId";
 import type { AppointmentStatus } from "../domain/AppointmentStatus";
 import { appointmentDomainToRow, appointmentRowToDomain, scheduleDomainToRow, scheduleRowToDomain, blockDomainToRow, blockRowToDomain } from "./agendaMapper";
 import type { NutriClinicaDB } from "@services/db/dexieSchema";
+import {
+  requireActiveSucursalId,
+  rowMatchesSucursal,
+} from "@services/tenancy/sucursalScope";
+
+const appointmentMatchesSucursal = (
+  row: { office_id?: string | null },
+  sucursalId: string,
+): boolean =>
+  rowMatchesSucursal({ sucursal_id: row.office_id }, sucursalId);
 
 export class DexieAgendaRepository implements AgendaRepository {
   constructor(private readonly db: NutriClinicaDB) {}
 
   async saveAppointment(appointment: Appointment): Promise<void> {
     const row = appointmentDomainToRow(appointment);
+    const sucursalId = requireActiveSucursalId();
+    if (row.office_id && !appointmentMatchesSucursal(row, sucursalId)) {
+      throw new Error("APPOINTMENT_BRANCH_MISMATCH");
+    }
+    row.office_id = sucursalId;
     await this.db.appointments.put(row);
   }
 
   async findAppointmentById(id: AppointmentId): Promise<Appointment | null> {
     const row = await this.db.appointments.get(id);
-    if (!row) return null;
+    if (!row || !appointmentMatchesSucursal(row, requireActiveSucursalId())) return null;
     return appointmentRowToDomain(row);
   }
 
@@ -29,7 +44,10 @@ export class DexieAgendaRepository implements AgendaRepository {
       .where("date")
       .equals(date)
       .toArray();
-    return rows.map(appointmentRowToDomain);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => appointmentMatchesSucursal(row, sucursalId))
+      .map(appointmentRowToDomain);
   }
 
   async listAppointmentsByRange(startDate: string, endDate: string): Promise<Appointment[]> {
@@ -37,7 +55,10 @@ export class DexieAgendaRepository implements AgendaRepository {
       .where("date")
       .between(startDate, endDate, true, true)
       .toArray();
-    return rows.map(appointmentRowToDomain);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => appointmentMatchesSucursal(row, sucursalId))
+      .map(appointmentRowToDomain);
   }
 
   async listAppointmentsByPatient(patientId: string): Promise<Appointment[]> {
@@ -45,7 +66,10 @@ export class DexieAgendaRepository implements AgendaRepository {
       .where("patient_id")
       .equals(patientId)
       .toArray();
-    return rows.map(appointmentRowToDomain);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => appointmentMatchesSucursal(row, sucursalId))
+      .map(appointmentRowToDomain);
   }
 
   async listAppointmentsByStatus(status: AppointmentStatus): Promise<Appointment[]> {
@@ -53,12 +77,17 @@ export class DexieAgendaRepository implements AgendaRepository {
       .where("status")
       .equals(status)
       .toArray();
-    return rows.map(appointmentRowToDomain);
+    const sucursalId = requireActiveSucursalId();
+    return rows
+      .filter((row) => appointmentMatchesSucursal(row, sucursalId))
+      .map(appointmentRowToDomain);
   }
 
   async deleteAppointment(id: AppointmentId): Promise<void> {
     const existing = await this.db.appointments.get(id);
-    if (!existing) throw new AppointmentNotFoundError(id);
+    if (!existing || !appointmentMatchesSucursal(existing, requireActiveSucursalId())) {
+      throw new AppointmentNotFoundError(id);
+    }
     await this.db.appointments.delete(id);
   }
 

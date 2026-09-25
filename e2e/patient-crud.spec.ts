@@ -1,5 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
-import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
+import {
+  configureDefaultPatientRecordNumber,
+  loginAsAdmin,
+  hashUrl,
+  uniqueEmail,
+} from "./helpers";
 
 /**
  * E2E de pacientes.
@@ -18,20 +23,32 @@ import { loginAsAdmin, hashUrl, uniqueEmail } from "./helpers";
 
 const PATIENT_FIRST = "E2E";
 const PATIENT_LAST = "SmokeTest";
-const SYNC_BUTTON_NAME = /^(Sincronizar|Forzar un ciclo de sync ahora)$/i;
+const SYNC_BUTTON_NAME =
+  /^(Sincronizar(?: ahora)?|Sync Now|Forzar un ciclo de sync ahora)$/i;
 
 async function forceSync(page: Page) {
   const syncBtn = page.getByRole("button", { name: SYNC_BUTTON_NAME });
   await expect(syncBtn).toBeEnabled({ timeout: 60_000 });
   await syncBtn.click();
-  await expect(page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first()).toBeVisible({
+  await expect(
+    page.getByText(/Sincronizado|Sin conexi[oó]n|Error de sync/i).first(),
+  ).toBeVisible({
     timeout: 60_000,
   });
 }
 
-async function readPatientRow(page: Page, id: string): Promise<{ deleted_at: string | null } | null> {
+async function readPatientRow(
+  page: Page,
+  id: string,
+): Promise<{
+  deleted_at: string | null;
+  whatsapp_enabled?: boolean | null;
+} | null> {
   return page.evaluate(async (patientId: string) => {
-    return new Promise<{ deleted_at: string | null } | null>((resolve, reject) => {
+    return new Promise<{
+      deleted_at: string | null;
+      whatsapp_enabled?: boolean | null;
+    } | null>((resolve, reject) => {
       const req = indexedDB.open("nutriclinica");
       req.onsuccess = () => {
         const db = req.result;
@@ -46,40 +63,243 @@ async function readPatientRow(page: Page, id: string): Promise<{ deleted_at: str
   }, id);
 }
 
-async function waitForPatientDeleted(page: Page, id: string): Promise<{ deleted_at: string | null } | null> {
-  await expect.poll(async () => (await readPatientRow(page, id))?.deleted_at ?? null, {
-    timeout: 30_000,
-  }).toMatch(/\d{4}/);
+async function waitForPatientDeleted(
+  page: Page,
+  id: string,
+): Promise<{
+  deleted_at: string | null;
+  whatsapp_enabled?: boolean | null;
+} | null> {
+  await expect
+    .poll(async () => (await readPatientRow(page, id))?.deleted_at ?? null, {
+      timeout: 30_000,
+    })
+    .toMatch(/\d{4}/);
   return readPatientRow(page, id);
 }
 
 test.describe.serial("Pacientes — soft-delete round-trip", () => {
   test.setTimeout(90_000);
 
-  test("crear paciente, sincronizar, soft-delete, re-sincronizar y NO resucita", async ({ page }) => {
+  test("crear paciente, sincronizar, soft-delete, re-sincronizar y NO resucita", async ({
+    page,
+  }) => {
     await loginAsAdmin(page);
+    await configureDefaultPatientRecordNumber(page);
     const email = uniqueEmail("crear");
 
     // 1) Ir al formulario de nuevo paciente
     await page.goto(hashUrl("/pacientes/nuevo"));
-    await expect(page.getByText(/nuevo paciente/i).first()).toBeVisible();
+    await expect(
+      page.getByText(/agregar paciente|nuevo paciente/i).first(),
+    ).toBeVisible();
 
     // 2) Llenar campos requeridos (usando placeholders, no getByLabel)
     await page.locator('input[name="firstName"]').fill(PATIENT_FIRST);
     await page.locator('input[name="lastName"]').fill(PATIENT_LAST);
     await page.locator('input[name="lastName"]').press("Tab"); // blur para validar
-    await page.locator('input[name="birthDate"]').fill("1990-01-15");
+    await page.locator('input[name="birthDate"]').fill("1990-04-09");
     // Sexo
     await page.locator('select[name="sex"]').selectOption("male");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
     await page.locator('input[name="email"]').fill(email);
+    await page.locator('input[name="phone"]').fill("+52 55 1234 5678");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="emergencyContactName"]')
+      .fill("Contacto E2E");
+    await page
+      .locator('select[name="emergencyContactRelationship"]')
+      .selectOption("Madre");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await expect(
+      page.locator('input[name="externalRecordNumber"]'),
+    ).toHaveValue(/^EXP-\d{2}-E2S\d{4,}$/);
+    await expect(
+      page.locator('input[name="externalRecordNumber"]'),
+    ).toHaveAttribute("readonly", "");
+    await page
+      .locator('textarea[name="admissionReason"]')
+      .fill("Registro de prueba E2E");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+
+    for (const field of [
+      "diagnosedConditions",
+      "previousSurgeries",
+      "currentTreatments",
+      "intolerances",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('input[name="familyHistoryMode"][value="none"]').check();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    for (const field of [
+      "supplements",
+      "medicationAllergies",
+      "medications",
+      "adverseMedicationOrSupplementEffects",
+    ]) {
+      await page
+        .locator(`input[name="${field}"][value="no"]`)
+        .check({ force: true });
+    }
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('input[name="breakfastTime"]').fill("08:00");
+    await page.locator('input[name="mainMealTime"]').fill("13:30");
+    await page.locator('input[name="dinnerTime"]').fill("20:00");
+    await page.locator('select[name="mealsPerDay"]').selectOption("3");
+    await page.locator('input[name="skipsMeals"][value="no"]').check();
+    await page.locator('input[name="scheduleVaries"][value="no"]').check();
+    await page.locator('select[name="mealDuration"]').selectOption("20To30");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('select[name="eatingOutFrequency"]')
+      .selectOption("rarely");
+    await page.locator('input[name="snacksBetweenMeals"][value="no"]').check();
+    await page.locator('input[name="eatsLateAtNight"][value="no"]').check();
+    await page.locator('input[name="frequentCravings"][value="no"]').check();
+    await page.locator('select[name="mealPreparer"]').selectOption("family");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('select[name="usualDietType"]').selectOption("omnivore");
+    await page.locator('input[name="avoidsFoods"][value="no"]').check();
+    await expect(page.locator('input[name="avoidedFoods"]')).toHaveCount(0);
+    await page
+      .locator('input[name="followsFoodRestrictions"][value="no"]')
+      .check();
+    await expect(
+      page.locator('input[name="foodRestrictionDetails"]'),
+    ).toHaveCount(0);
+    await page.locator('input[name="hasFoodDiscomfort"][value="no"]').check();
+    await expect(page.locator('input[name="discomfortFoods"]')).toHaveCount(0);
+    await page
+      .locator('select[name="specialEatingPreference"]')
+      .selectOption("none");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('select[name="waterIntake"]')
+      .selectOption("oneAndHalfToTwoLiters");
+    await page
+      .locator('input[name="drinksWaterThroughoutDay"][value="yes"]')
+      .check();
+    await page.locator('input[name="carriesWaterBottle"][value="yes"]').check();
+    await page
+      .locator('select[name="coffeeTeaFrequency"]')
+      .selectOption("onePerDay");
+    await page
+      .locator('select[name="sugaryDrinkFrequency"]')
+      .selectOption("never");
+    await page
+      .locator('input[name="consumesEnergyDrinks"][value="no"]')
+      .check();
+    await page.locator('select[name="otherBeverage"]').selectOption("none");
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page.locator('input[name="appetiteLevel"][value="normal"]').check();
+    await page.locator('input[name="earlySatiety"][value="no"]').check();
+    await page
+      .locator('input[name="hasDigestiveDiscomfort"][value="no"]')
+      .check();
+    await expect(
+      page.locator('input[name="otherDigestiveSymptom"]'),
+    ).toHaveCount(0);
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="activityLevel"][value="sedentary"]')
+      .check();
+    await page.locator('select[name="activityDaysPerWeek"]').selectOption("0");
+    await page
+      .locator('select[name="physicalActivityGoal"]')
+      .selectOption("health");
+    await page
+      .locator('input[name="hasPhysicalLimitation"][value="no"]')
+      .check();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
+    await page
+      .locator('input[name="sedentaryTime"][value="moreThan8"]')
+      .check();
+    await page
+      .locator('input[name="usualTransportation"][value="car"]')
+      .check();
+    await page
+      .locator('input[name="usesStairsFrequently"][value="no"]')
+      .check();
+    await page
+      .locator('input[name="activeBreakFrequency"][value="almostNever"]')
+      .check();
+    await page
+      .locator('input[name="dailyRoutineType"][value="seated"]')
+      .check();
+    await page
+      .getByRole("button", { name: /siguiente|next/i })
+      .last()
+      .click();
 
     // 3) Submit
-    const submit = page.getByRole("button", { name: /guardar|crear paciente|create patient|siguiente/i }).first();
+    const submit = page
+      .getByRole("button", {
+        name: /finalizar registro|finish registration/i,
+      })
+      .last();
     await submit.click();
+    const finalReviewDialog = page.getByTestId(
+      "final-registration-review-dialog",
+    );
+    await expect(finalReviewDialog).toBeVisible();
+    await expect(
+      finalReviewDialog.locator('[data-review-section="required"]'),
+    ).toHaveCount(0);
+    await finalReviewDialog
+      .getByRole("button", {
+        name: /guardar de todos modos|save anyway/i,
+      })
+      .click();
 
     // Tras crear, redirige al detalle del paciente
     await page.waitForURL(/\/pacientes\/[a-f0-9-]{36}$/, { timeout: 15_000 });
     const detailUrl = page.url();
+    await expect(page.getByText("Tamizaje inicial", { exact: true })).toBeVisible();
+    await expect(page.getByText("3 comidas", { exact: true })).toBeVisible();
     const patientId = detailUrl.match(/\/pacientes\/([a-f0-9-]{36})/)?.[1];
     expect(patientId).toBeTruthy();
 
@@ -100,7 +320,14 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
           const store = tx.objectStore("patients");
           const getReq = store.getAll();
           getReq.onsuccess = () => {
-            const rows = getReq.result as Array<{ id: string; first_name: string; last_name: string; status: string; deleted_at: string | null }>;
+            const rows = getReq.result as Array<{
+              id: string;
+              first_name: string;
+              last_name: string;
+              status: string;
+              deleted_at: string | null;
+              whatsapp_enabled?: boolean | null;
+            }>;
             resolve({
               total: rows.length,
               withThisId: rows.find((r) => r.id === id),
@@ -112,9 +339,18 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
         req.onerror = () => reject(req.error);
       });
     }, patientId);
-    console.log("After create + sync, patients:", JSON.stringify(allPatients, null, 2));
+    console.log(
+      "After create + sync, patients:",
+      JSON.stringify(allPatients, null, 2),
+    );
     // El paciente recién creado debe estar en Dexie con status='active', deleted_at=null
-    expect(allPatients).toMatchObject({ withThisId: { status: "active", deleted_at: null } });
+    expect(allPatients).toMatchObject({
+      withThisId: {
+        status: "active",
+        deleted_at: null,
+        whatsapp_enabled: true,
+      },
+    });
 
     // 6) Regresar al detalle y soft-delete
     await page.goto(detailUrl);
@@ -122,21 +358,30 @@ test.describe.serial("Pacientes — soft-delete round-trip", () => {
     await expect(deleteBtn).toBeVisible({ timeout: 10_000 });
     await deleteBtn.click();
     const cascadeDialog = page.getByTestId("cascade-delete-dialog");
-    const hasCascadeDialog = await cascadeDialog.isVisible({ timeout: 5_000 }).catch(() => false);
+    const hasCascadeDialog = await cascadeDialog
+      .isVisible({ timeout: 5_000 })
+      .catch(() => false);
     if (hasCascadeDialog) {
       await page.getByTestId("cascade-delete-all").click();
     }
 
     const afterDelete = await waitForPatientDeleted(page, patientId);
-    console.log("After soft-delete (local):", JSON.stringify(afterDelete, null, 2));
+    console.log(
+      "After soft-delete (local):",
+      JSON.stringify(afterDelete, null, 2),
+    );
     // Debe tener deleted_at set
-    expect(afterDelete).toMatchObject({ deleted_at: expect.stringMatching(/\d{4}/) });
+    expect(afterDelete).toMatchObject({
+      deleted_at: expect.stringMatching(/\d{4}/),
+    });
 
     // 7) Re-sincronizar y volver a verificar: NO resucita
     await forceSync(page);
     const afterResync = await waitForPatientDeleted(page, patientId);
     console.log("After re-sync:", JSON.stringify(afterResync, null, 2));
     // CRÍTICO: deleted_at debe seguir set, NO resucitar
-    expect(afterResync).toMatchObject({ deleted_at: expect.stringMatching(/\d{4}/) });
+    expect(afterResync).toMatchObject({
+      deleted_at: expect.stringMatching(/\d{4}/),
+    });
   });
 });

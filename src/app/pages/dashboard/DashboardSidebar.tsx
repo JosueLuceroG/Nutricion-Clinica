@@ -1,5 +1,6 @@
 import * as React from "react";
 import { NavLink } from "react-router-dom";
+import { preloadDashboardRoute } from "@app/dashboardRoutePreloaders";
 import {
   CalendarDays,
   ChevronLeft,
@@ -7,6 +8,7 @@ import {
   ClipboardList,
   Heart,
   HeartPulse,
+  History,
   Leaf,
   ReceiptText,
   Settings,
@@ -28,6 +30,7 @@ import { motivationalMessages } from "./motivationalMessages";
 interface DashboardSidebarProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  onUseLegacyLayout?: () => void;
 }
 
 function DashboardHomeIcon({ size = 24, strokeWidth = 1.75, className, ...props }: LucideProps) {
@@ -213,7 +216,7 @@ function usePrefersReducedMotion() {
   return prefersReducedMotion;
 }
 
-export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSidebarProps) {
+export function DashboardSidebar({ collapsed, onToggleCollapsed, onUseLegacyLayout }: DashboardSidebarProps) {
   const { resolvedTheme } = useTheme();
   const [activeImpactIndex, setActiveImpactIndex] = React.useState(getInitialImpactIndex);
   const [impactDragOffset, setImpactDragOffset] = React.useState(0);
@@ -339,7 +342,7 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
   };
 
   return (
-    <aside className="nc-dashboard-sidebar" aria-label="Navegación principal del dashboard">
+    <aside className="nc-dashboard-sidebar" aria-label="Navegación principal del dashboard" data-layout-sidebar="premium">
       <div className="nc-dashboard-sidebar__brand">
         <NavLink to="/" className="nc-dashboard-sidebar__brandLink" aria-label="NutriClinica dashboard">
           <img
@@ -365,10 +368,13 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `nc-dashboard-sidebar__item${isActive ? " nc-dashboard-sidebar__item--active" : ""}`
+                `nc-dashboard-sidebar__item${item.to === "/" ? " nc-dashboard-sidebar__item--dashboard" : ""}${isActive ? " nc-dashboard-sidebar__item--active" : ""}`
               }
               aria-label={collapsed ? item.label : undefined}
               title={collapsed ? item.label : undefined}
+              onPointerEnter={() => preloadDashboardRoute(item.to)}
+              onPointerDown={() => preloadDashboardRoute(item.to)}
+              onFocus={() => preloadDashboardRoute(item.to)}
             >
               {({ isActive }) => {
                 const isActiveDashboard = item.to === "/" && isActive;
@@ -376,7 +382,11 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
                 return (
                   <>
                     <span className="nc-dashboard-sidebar__itemIcon" aria-hidden="true">
-                      {isActiveDashboard ? <DashboardActiveHomeIcon size={19} /> : <Icon size={19} strokeWidth={1.75} />}
+                      {isActiveDashboard ? (
+                        <DashboardActiveHomeIcon size={22} />
+                      ) : (
+                        <Icon size={item.to === "/" ? 22 : 19} strokeWidth={1.75} />
+                      )}
                     </span>
                     <span className="nc-dashboard-sidebar__itemLabel" aria-hidden={collapsed ? "true" : undefined}>{item.label}</span>
                   </>
@@ -386,6 +396,23 @@ export function DashboardSidebar({ collapsed, onToggleCollapsed }: DashboardSide
           );
         })}
       </nav>
+
+      {onUseLegacyLayout && (
+        <button
+          type="button"
+          className="nc-dashboard-sidebar__item nc-dashboard-sidebar__legacy"
+          onClick={onUseLegacyLayout}
+          aria-label="Vista anterior"
+          title={collapsed ? "Vista anterior" : undefined}
+        >
+          <span className="nc-dashboard-sidebar__itemIcon" aria-hidden="true">
+            <History size={19} strokeWidth={1.75} />
+          </span>
+          <span className="nc-dashboard-sidebar__itemLabel" aria-hidden={collapsed ? "true" : undefined}>
+            Vista anterior
+          </span>
+        </button>
+      )}
 
       <section
         className={`nc-dashboard-impact nc-dashboard-impact--${activeImpact.theme} nc-dashboard-impact--decor-${activeImpact.decoration}${isImpactDragging ? " nc-dashboard-impact--dragging" : ""}`}

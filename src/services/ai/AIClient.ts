@@ -9,7 +9,9 @@ export interface AIRequest {
   temperature?: number;
   maxTokens?: number;
   provider?: AIProviderId;
-  apiKey?: string;
+  responseFormat?: "json";
+  capability?: string;
+  patientId?: string;
 }
 
 export interface AIResponse {

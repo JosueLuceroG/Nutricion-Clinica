@@ -1,0 +1,141 @@
+{
+  "datasetVersion": "retrieval-golden-v1-fnv1a-04ac7c38",
+  "policyVersion": "retrieval-policy.v2",
+  "policyFingerprint": "retrieval-policy.v2-fnv1a-0ca4d583",
+  "queries": 14,
+  "recallAtK": 0.714,
+  "hitRateAtK": 0.714,
+  "mrr": 0.429,
+  "citationValidity": 1,
+  "unauthorizedRetrievalRate": 0,
+  "revokedDocumentRetrievalRate": 0,
+  "noAnswerCorrectness": 1,
+  "perQuery": [
+    {
+      "id": "R001",
+      "kind": "exact",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R002",
+      "kind": "paraphrase",
+      "recall": 0,
+      "hit": false,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R003",
+      "kind": "synonym",
+      "recall": 0,
+      "hit": false,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R004",
+      "kind": "abbreviation",
+      "recall": 0,
+      "hit": false,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R005",
+      "kind": "lab_concept",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R006",
+      "kind": "ambiguous",
+      "recall": 0,
+      "hit": false,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R007",
+      "kind": "no_answer",
+      "recall": 1,
+      "hit": true,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R008",
+      "kind": "expired_only",
+      "recall": 1,
+      "hit": true,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R009",
+      "kind": "revoked_only",
+      "recall": 1,
+      "hit": true,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R010",
+      "kind": "unauthorized_only",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R011",
+      "kind": "poisoned_only",
+      "recall": 1,
+      "hit": true,
+      "rank": null,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R012",
+      "kind": "conflict",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R013",
+      "kind": "valid_current",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    },
+    {
+      "id": "R014",
+      "kind": "superseded_only",
+      "recall": 1,
+      "hit": true,
+      "rank": 1,
+      "securityOk": true,
+      "noAnswerOk": true
+    }
+  ]
+}

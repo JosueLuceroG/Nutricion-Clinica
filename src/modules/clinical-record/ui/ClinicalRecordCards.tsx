@@ -47,7 +47,7 @@ const SECTION_COMPONENT: Record<ClinicalSectionId, React.ComponentType<{ patient
   aiConsent: AiConsentCard,
 };
 
-export function ClinicalRecordCards({ patientId }: { patientId: string }) {
+export const ClinicalRecordCards = React.memo(function ClinicalRecordCards({ patientId }: { patientId: string }) {
   useTranslation();
   const sectionIds = usePreferencesStore((s) => s.clinicalSectionIds);
   const activeIds = sectionIds.length > 0 ? sectionIds : DEFAULT_CLINICAL_SECTION_IDS;
@@ -60,7 +60,7 @@ export function ClinicalRecordCards({ patientId }: { patientId: string }) {
       })}
     </div>
   );
-}
+});
 
 function AllergyCard({ patientId }: { patientId: string }) {
   const { data, loading, save, remove } = useAllergies(patientId);

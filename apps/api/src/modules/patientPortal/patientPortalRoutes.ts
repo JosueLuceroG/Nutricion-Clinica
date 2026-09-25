@@ -6,8 +6,9 @@ import { getPool } from '../../db/connection.js';
 import { requireAuth } from '../auth/middleware/requireAuth.js';
 import { requireSucursalAccess } from '../tenancy/middleware/requireSucursalAccess.js';
 import { ForbiddenError } from '../../middleware/errorHandler.js';
-import { sendEmail, logEmailSent, renderTemplate } from '../../services/email/emailService.js';
+import { sendEmail, logEmailSent, renderTemplate, escapeHtml } from '../../services/email/emailService.js';
 import { broadcastMessageNew, broadcastMessageRead } from './chatServer.js';
+import { issueWsTicket } from '../ws/websocketGateway.js';
 
 const router: Router = ExpressRouter();
 
@@ -17,7 +18,7 @@ const PortalTokenParam = z
   .max(256)
   .regex(/^[A-Za-z0-9._~-]+$/);
 
-const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging', 'meal_photos']);
+const PortalScopeSchema = z.enum(['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging', 'meal_photos', 'ai_support']);
 type PortalScope = z.infer<typeof PortalScopeSchema>;
 
 const DEFAULT_SCOPES: PortalScope[] = ['summary', 'plan', 'appointments', 'documents', 'adherence', 'messaging', 'meal_photos'];
@@ -64,7 +65,7 @@ const PortalMealPhotoBody = z.object({
   photoDataUrl: z.string().min(20).max(MAX_MEAL_PHOTO_DATA_URL_LENGTH),
 });
 
-interface PortalAccessRow {
+export interface PortalAccessRow {
   token_id: string;
   sucursal_id: string;
   paciente_id: string;
@@ -210,7 +211,8 @@ type PortalAuditEventType =
   | 'document_downloaded'
   | 'message_sent'
   | 'meal_photo_submitted'
-  | 'meal_photo_reviewed';
+  | 'meal_photo_reviewed'
+  | 'ai_support_requested';
 
 interface PortalMealExchange {
   foodId: string;
@@ -289,6 +291,11 @@ function todayDateOnly(): string {
 
 function fullName(row: Pick<PortalAccessRow, 'nombres' | 'apellido_paterno' | 'apellido_materno'>): string {
   return [row.nombres, row.apellido_paterno, row.apellido_materno].filter(Boolean).join(' ');
+}
+
+export function buildProfessionalPatientUrl(patientId: string, env: NodeJS.ProcessEnv = process.env): string {
+  const publicWebUrl = (env.PUBLIC_WEB_URL?.trim() || 'https://app.invalid').replace(/\/+$/, '');
+  return `${publicWebUrl}/#/pacientes/${encodeURIComponent(patientId)}`;
 }
 
 function notFound(res: Response): void {
@@ -456,7 +463,7 @@ function userAgent(req: Request): string | null {
   return req.get('user-agent')?.slice(0, 500) ?? null;
 }
 
-async function recordPortalAudit(
+export async function recordPortalAudit(
   pool: sql.ConnectionPool,
   input: {
     tokenId: string;
@@ -523,7 +530,7 @@ async function recordPortalAudit(
     );
 }
 
-async function loadPortalAccess(pool: sql.ConnectionPool, token: string): Promise<PortalAccessRow | null> {
+export async function loadPortalAccess(pool: sql.ConnectionPool, token: string): Promise<PortalAccessRow | null> {
   const tokenHash = hashPortalToken(token);
   const accessResult = await pool
     .request()
@@ -672,6 +679,44 @@ router.post('/tokens', requireAuth, requireSucursalAccess, async (req: Request, 
         status: 'active',
       },
     });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/ws-ticket', requireAuth, requireSucursalAccess, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    if (!req.user || !canManagePortalTokens(req.user.rol)) {
+      throw new ForbiddenError('Rol sin permisos para emitir tickets de chat');
+    }
+
+    const body = z.object({ pacienteId: z.string().uuid() }).parse(req.body);
+    const sucursalId = String(req.sucursalId);
+    const pool = await getPool();
+    const patient = await pool
+      .request()
+      .input('paciente_id', sql.UniqueIdentifier(), body.pacienteId)
+      .input('sucursal_id', sql.UniqueIdentifier(), sucursalId)
+      .query<{ id: string }>(
+        `SELECT id FROM pacientes
+          WHERE id = @paciente_id
+            AND sucursal_id = @sucursal_id
+            AND deleted_at IS NULL`,
+      );
+    if (patient.recordset.length === 0) {
+      res.status(404).json({ error: 'Paciente no encontrado' });
+      return;
+    }
+
+    const { ticket, expiresAt } = await issueWsTicket({
+      channel: 'chat',
+      sub: req.user.sub,
+      sucursalId,
+      resourceId: null,
+      pacienteId: body.pacienteId,
+      origin: req.headers.origin ?? '',
+    });
+    res.status(201).json({ ticket, expiresAt });
   } catch (err) {
     next(err);
   }
@@ -1192,7 +1237,7 @@ router.post('/:token/adherence', async (req: Request, res: Response, next: NextF
         asunto: subject,
         contenidoHtml: html,
         messageId: emailResult.messageId,
-        error: emailResult.success ? null : (emailResult.error ?? null),
+        error: emailResult.simulated ? 'SIMULATED_NOT_SENT' : emailResult.success ? null : (emailResult.error ?? null),
       });
     }
 
@@ -1535,6 +1580,36 @@ async function loadDocuments(pool: sql.ConnectionPool, pacienteId: string) {
   }));
 }
 
+router.post('/:token/ws-ticket', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const token = PortalTokenParam.safeParse(req.params.token);
+    if (!token.success) { notFound(res); return; }
+
+    const pool = await getPool();
+    const access = await loadPortalAccess(pool, token.data);
+    if (!access) { notFound(res); return; }
+
+    const scopes = new Set(parsePortalScopes(access.scopes_json));
+    if (!scopes.has('messaging')) {
+      throw new ForbiddenError('Este enlace no permite el chat');
+    }
+
+    await touchPortalToken(pool, access.token_id);
+
+    const { ticket, expiresAt } = await issueWsTicket({
+      channel: 'chat',
+      sub: access.paciente_id,
+      sucursalId: access.sucursal_id,
+      resourceId: null,
+      pacienteId: access.paciente_id,
+      origin: req.headers.origin ?? '',
+    });
+    res.status(201).json({ ticket, expiresAt });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.post('/:token/send-reminder', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const token = PortalTokenParam.safeParse(req.params.token);
@@ -1577,11 +1652,12 @@ router.post('/:token/send-reminder', async (req: Request, res: Response, next: N
       asunto: subject,
       contenidoHtml: html,
       messageId: result.messageId,
-      error: result.success ? null : (result.error ?? 'Error desconocido'),
+      error: result.simulated ? 'SIMULATED_NOT_SENT' : result.success ? null : (result.error ?? 'Error desconocido'),
     });
 
     res.json({
-      sent: result.success,
+      sent: result.success && !result.simulated,
+      simulated: result.simulated,
       messageId: result.messageId,
       to: access.email,
       appointmentDate: variables.appointmentDate,
@@ -1824,12 +1900,13 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
         );
       const prof = profResult.recordset[0];
       if (prof?.email) {
-        const html = `<p>El paciente <strong>${fullName(access)}</strong> ha enviado un mensaje desde el portal.</p>
+        const professionalUrl = buildProfessionalPatientUrl(access.paciente_id);
+        const html = `<p>El paciente <strong>${escapeHtml(fullName(access))}</strong> ha enviado un mensaje desde el portal.</p>
                       <blockquote style="padding:12px;margin:12px 0;border-left:4px solid #3b82f6;background:#f8fafc;">
-                        ${body.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                        ${escapeHtml(body.content)}
                       </blockquote>
-                      <p><a href="${req.protocol}://${req.get('host')}/#/pacientes/${access.paciente_id}" style="color:#3b82f6;">Ver en NutriClínica</a></p>`;
-        const subject = `Nuevo mensaje de ${fullName(access)} - NutriClínica`;
+                      <p><a href="${escapeHtml(professionalUrl)}" style="color:#3b82f6;">Ver en NutriClínica</a></p>`;
+        const subject = 'Nuevo mensaje del portal - NutriClínica';
         const emailResult = await sendEmail({ to: prof.email, subject, html });
         await logEmailSent({
           pacienteId: access.paciente_id,
@@ -1838,7 +1915,7 @@ router.post('/:token/messages', async (req: Request, res: Response, next: NextFu
           asunto: subject,
           contenidoHtml: html,
           messageId: emailResult.messageId,
-          error: emailResult.success ? null : (emailResult.error ?? 'Error desconocido'),
+          error: emailResult.simulated ? 'SIMULATED_NOT_SENT' : emailResult.success ? null : (emailResult.error ?? 'Error desconocido'),
         });
       }
     } catch {

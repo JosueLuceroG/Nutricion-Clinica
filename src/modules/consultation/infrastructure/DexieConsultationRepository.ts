@@ -9,7 +9,7 @@ import type { PatientId } from "@modules/patient/domain/PatientId";
 import type { ConsultationRow } from "./consultationMapper";
 import { consultationRowToDomain, consultationDomainToRow } from "./consultationMapper";
 import { NutriClinicaDB } from "@services/db/dexieSchema";
-import { rowMatchesSucursal, withCurrentSucursalScope } from "@services/tenancy/sucursalScope";
+import { requireActiveSucursalId, rowMatchesSucursal, withSucursalScope } from "@services/tenancy/sucursalScope";
 import type { Collection } from "dexie";
 
 const DEFAULT_LIMIT = 100;
@@ -20,13 +20,16 @@ export class DexieConsultationRepository implements ConsultationRepository {
 
   async save(consultation: Consultation): Promise<void> {
     const row = consultationDomainToRow(consultation);
+    const sucursalId = requireActiveSucursalId();
     const existing = await this.dbInstance.consultations.get(row.id).catch(() => null);
-    await this.dbInstance.consultations.put(withCurrentSucursalScope(row, existing));
+    assertOwnedBySucursal(existing, sucursalId);
+    await this.dbInstance.consultations.put(withSucursalScope(row, sucursalId));
   }
 
-  async findById(id: ConsultationId): Promise<Consultation | null> {
+  async findById(id: ConsultationId, includeDeleted = false): Promise<Consultation | null> {
     const row = await this.dbInstance.consultations.get(id.toString());
-    if (!row) return null;
+    if (!row || !rowMatchesSucursal(row, requireActiveSucursalId()) ||
+      (!includeDeleted && row.deleted_at != null)) return null;
     return consultationRowToDomain(row);
   }
 
@@ -56,20 +59,27 @@ export class DexieConsultationRepository implements ConsultationRepository {
     if (soft) {
       const existing = await this.dbInstance.consultations.get(id.toString());
       if (!existing) return;
+      const sucursalId = requireActiveSucursalId();
+      if (!rowMatchesSucursal(existing, sucursalId)) return;
       const domain = consultationRowToDomain(existing);
       const deleted = domain.softDelete();
-      await this.dbInstance.consultations.put(withCurrentSucursalScope(consultationDomainToRow(deleted), existing));
+      await this.dbInstance.consultations.put(withSucursalScope(consultationDomainToRow(deleted), sucursalId));
     } else {
-      await this.dbInstance.consultations.delete(id.toString());
+      const existing = await this.dbInstance.consultations.get(id.toString());
+      if (existing && rowMatchesSucursal(existing, requireActiveSucursalId())) {
+        await this.dbInstance.consultations.delete(id.toString());
+      }
     }
   }
 
   async nextConsultationNumber(patientId: PatientId): Promise<number> {
     const pid = patientId.toString();
+    const sucursalId = requireActiveSucursalId();
     const maxNumber = await this.dbInstance.consultations
       .where("[patient_id+consultation_date]")
       .between([pid, ""], [pid, "\uffff"])
-      .filter((row: ConsultationRow) => row.deleted_at === null)
+      .filter((row: ConsultationRow) => row.deleted_at === null &&
+        rowMatchesSucursal(row, sucursalId))
       .toArray()
       .then((rows) => rows.reduce((max, r) => Math.max(max, r.consultation_number), 0));
     return maxNumber + 1;
@@ -80,6 +90,9 @@ export class DexieConsultationRepository implements ConsultationRepository {
     query: ConsultationQuery,
   ): Collection<ConsultationRow, string> {
     let collection: Collection<ConsultationRow, string> = source;
+    const activeSucursalId = requireActiveSucursalId();
+    collection = collection.filter((row: ConsultationRow) =>
+      rowMatchesSucursal(row, activeSucursalId));
     if (query.sucursalId) {
       const sucursalId = query.sucursalId;
       collection = collection.filter((row: ConsultationRow) => rowMatchesSucursal(row, sucursalId));
@@ -102,6 +115,15 @@ export class DexieConsultationRepository implements ConsultationRepository {
       collection = collection.filter((row: ConsultationRow) => row.consultation_date <= toIso);
     }
     return collection;
+  }
+}
+
+function assertOwnedBySucursal(
+  row: ConsultationRow | null | undefined,
+  sucursalId: string,
+): void {
+  if (row && !rowMatchesSucursal(row, sucursalId)) {
+    throw new Error("La consulta pertenece a otra sucursal");
   }
 }
 

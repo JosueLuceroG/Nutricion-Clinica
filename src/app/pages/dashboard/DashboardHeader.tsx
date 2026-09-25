@@ -1,21 +1,29 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Archive,
   BarChart3,
   Bell,
+  CalendarDays,
   CalendarPlus,
   CheckCircle2,
   ChevronRight,
+  ClipboardList,
   HelpCircle,
   LogOut,
   Plus,
+  ReceiptText,
   Search,
   Settings,
-  SlidersHorizontal,
   Star,
+  Stethoscope,
   User,
   UserPlus,
+  UsersRound,
+  UtensilsCrossed,
+  WalletCards,
+  type LucideIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -27,36 +35,23 @@ import {
 } from "@components/ui/dropdown-menu";
 import { useAuthStore } from "@store/authStore";
 import { useCommandPaletteStore } from "@store/commandPaletteStore";
+import {
+  useNotificationStore,
+  type DashboardNotification,
+  type NotificationAction,
+  type NotificationTab,
+} from "@store/notificationStore";
+import { getGlobalSearchShortcutLabel } from "@app/layout/globalSearchEngine";
+import { DashboardQuickAccessButton } from "@modules/dashboard-quick-access/ui";
+import { NewConsultationQuickDialog } from "@modules/consultation/ui/quick-consultation";
+import { authApi } from "@services/api/authApi";
+import { toast } from "sonner";
+import type {
+  QuickConsultationAction,
+  QuickConsultationPatient,
+} from "@modules/consultation/application/quickConsultationTypes";
 
 type PeriodOfDay = "morning" | "afternoon" | "night";
-type NotificationTab = "inbox" | "general" | "archived";
-type NotificationAction = "accept" | "reject";
-type NotificationType =
-  | "patient_message"
-  | "consultation"
-  | "nutrition_plan"
-  | "document"
-  | "clinical_record"
-  | "payment"
-  | "system";
-
-interface DashboardNotification {
-  id: string;
-  type: NotificationType;
-  initials: string;
-  tone: "teal" | "blue" | "aqua" | "slate";
-  personName?: string;
-  patientName?: string;
-  message: string;
-  subject?: string;
-  suffix?: string;
-  category: string;
-  timeAgo: string;
-  read: boolean;
-  archived: boolean;
-  requiresAction?: boolean;
-  actions?: NotificationAction[];
-}
 
 interface NotificationDragState {
   id: string;
@@ -73,6 +68,7 @@ declare global {
 
 interface DashboardHeaderProps {
   onCustomizeKpis?: () => void;
+  dashboardEditing?: boolean;
 }
 
 function getFirstName(fullName?: string | null): string {
@@ -94,9 +90,115 @@ function getGreetingForPeriod(periodOfDay: PeriodOfDay): string {
   return "Buena noche";
 }
 
+const sectionLabels: Record<string, string> = {
+  pacientes: "Pacientes",
+  consultas: "Consultas",
+  agenda: "Agenda",
+  planes: "Planes",
+  smae: "Alimentos",
+  billing: "Facturación",
+  configuracion: "Configuración",
+  laboratorio: "Laboratorio",
+  calculos: "Cálculos",
+  recetas: "Recetas",
+  objetivos: "Objetivos",
+  adherencia: "Adherencia",
+  documentos: "Documentos",
+  "plan-semanal": "Plan semanal",
+  importar: "Importar",
+  medicamentos: "Medicamentos",
+  reportes: "Reportes",
+  notificaciones: "Notificaciones",
+  perfil: "Perfil",
+  seguridad: "Seguridad",
+  telemedicina: "Telemedicina",
+  ayuda: "Ayuda",
+};
+
+const sectionIcons: Record<string, LucideIcon> = {
+  pacientes: UsersRound,
+  consultas: ClipboardList,
+  agenda: CalendarDays,
+  planes: ReceiptText,
+  smae: UtensilsCrossed,
+  billing: WalletCards,
+  configuracion: Settings,
+};
+
+function getHeaderBreadcrumbIcon(pathname: string): LucideIcon {
+  const section = pathname.split("/").filter(Boolean)[0];
+  return (section && sectionIcons[section]) || Stethoscope;
+}
+
+function getHeaderBreadcrumb(pathname: string): string[] {
+  const segments = pathname.split("/").filter(Boolean);
+  const section = segments[0];
+  if (!section) return [];
+
+  const labels = [sectionLabels[section] ?? "Página actual"];
+
+  if (section === "pacientes") {
+    if (segments[1] === "nuevo") return [...labels, "Nuevo paciente"];
+    if (segments[1] === "importar") return [...labels, "Importar CSV"];
+    if (!segments[1]) return labels;
+    if (!segments[2]) return [...labels, "Perfil del paciente"];
+
+    const patientAreaLabels: Record<string, string> = {
+      editar: "Editar paciente",
+      antropometria: "Antropometría",
+      laboratorio: "Laboratorio",
+      consultas: "Consultas",
+      planes: "Planes",
+      adherencia: "Adherencia",
+    };
+    const patientArea = patientAreaLabels[segments[2]];
+    if (patientArea) labels.push(patientArea);
+
+    const patientActionLabels: Record<string, string> = {
+      nueva: segments[2] === "consultas" ? "Nueva consulta" : "Nueva medición",
+      nuevo: segments[2] === "planes" ? "Nuevo plan" : "Nuevo panel",
+      scan: "Escanear laboratorio",
+    };
+    const patientAction = patientActionLabels[segments[3]];
+    if (patientAction) labels.push(patientAction);
+    return labels;
+  }
+
+  if (section === "consultas") {
+    if (segments[1] === "nueva") labels.push("Nueva consulta");
+    else if (segments[1]) labels.push("Detalle de consulta");
+  } else if (section === "planes" && segments[1]) {
+    labels.push("Detalle del plan");
+  } else if (section === "billing") {
+    const billingLabels: Record<string, string> = {
+      report: "Reporte",
+      expenses: "Gastos",
+      payments: "Pagos",
+    };
+    if (segments[1] && billingLabels[segments[1]]) labels.push(billingLabels[segments[1]]);
+    else if (segments[2] === "receipt") labels.push("Recibo");
+  } else if (section === "telemedicina") {
+    if (segments[1] === "nueva") labels.push("Nueva sala");
+    else if (segments[1]) labels.push("Videollamada");
+  } else if (section === "seguridad" && segments[1] === "2fa") {
+    labels.push("Autenticación en dos pasos");
+  }
+
+  return labels;
+}
+
+function getHeaderBreadcrumbTarget(pathname: string, index: number): string | null {
+  const segments = pathname.split("/").filter(Boolean);
+  const section = segments[0];
+  if (!section) return null;
+  if (index === 0) return `/${section}`;
+  if (section === "pacientes" && index === 1 && segments.length > 3) {
+    return `/${segments.slice(0, 3).join("/")}`;
+  }
+  return null;
+}
+
 const GREETING_EMOJI_STORAGE_KEY = "nutriclinica.dashboard.greetingEmoji";
-const NOTIFICATION_STATE_STORAGE_KEY = "nutriclinica.dashboard.notifications";
-const NOTIFICATION_TAB_STORAGE_KEY = "nutriclinica.dashboard.notificationTab";
 const NOTIFICATION_SWIPE_REVEAL_WIDTH = 92;
 const NOTIFICATION_SWIPE_THRESHOLD = 72;
 
@@ -105,144 +207,6 @@ const greetingEmojisByPeriod: Record<PeriodOfDay, string[]> = {
   afternoon: ["💙", "🌿", "🍎", "✨"],
   night: ["🌙", "✨", "💙", "🌿"],
 };
-
-const notificationPreviewItems: DashboardNotification[] = [
-  {
-    id: "patient-message-plan",
-    type: "patient_message",
-    initials: "AT",
-    tone: "teal",
-    personName: "Ana Torres",
-    patientName: "Ana Torres",
-    message: "envió un mensaje sobre su plan de alimentación.",
-    category: "Mensaje de paciente",
-    timeAgo: "Hace 12 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-followup",
-    type: "patient_message",
-    initials: "CG",
-    tone: "blue",
-    personName: "Carlos Gómez",
-    patientName: "Carlos Gómez",
-    message: "respondió en el chat de seguimiento.",
-    category: "Chat de seguimiento",
-    timeAgo: "Hace 24 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-consultation",
-    type: "patient_message",
-    initials: "ML",
-    tone: "aqua",
-    personName: "María López",
-    patientName: "María López",
-    message: "solicitó información sobre su próxima consulta.",
-    category: "Mensaje de paciente",
-    timeAgo: "Hace 42 min",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "patient-message-menu",
-    type: "patient_message",
-    initials: "AV",
-    tone: "slate",
-    personName: "Andrea Vargas",
-    patientName: "Andrea Vargas",
-    message: "envió una duda sobre su menú semanal.",
-    category: "Menú semanal",
-    timeAgo: "Hace 1 hora",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "consultation-note",
-    type: "consultation",
-    initials: "JR",
-    tone: "blue",
-    personName: "Javier Ruiz",
-    patientName: "Carlos Gómez",
-    message: "dejó una nota en la consulta de ",
-    subject: "Carlos Gómez",
-    suffix: ".",
-    category: "Consulta nutricional",
-    timeAgo: "Hace 2 horas",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "shared-file",
-    type: "document",
-    initials: "ML",
-    tone: "aqua",
-    personName: "María López",
-    patientName: "María López",
-    message: "compartió el archivo ",
-    subject: "Bioimpedancia_abril.pdf",
-    suffix: " contigo.",
-    category: "Documentos",
-    timeAgo: "Hace 3 horas",
-    read: false,
-    archived: false,
-    requiresAction: true,
-    actions: ["reject", "accept"],
-  },
-  {
-    id: "clinical-record",
-    type: "clinical_record",
-    initials: "DS",
-    tone: "slate",
-    personName: "Diego Sánchez",
-    patientName: "Andrea Vargas",
-    message: "actualizó la ficha clínica de ",
-    subject: "Andrea Vargas",
-    suffix: ".",
-    category: "Ficha clínica",
-    timeAgo: "Hace 1 día",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "today-consultation",
-    type: "system",
-    initials: "NC",
-    tone: "blue",
-    personName: "NutriClinica",
-    message: "registró una nueva consulta para hoy.",
-    category: "Agenda",
-    timeAgo: "Hace 1 día",
-    read: false,
-    archived: false,
-  },
-  {
-    id: "plan-review",
-    type: "nutrition_plan",
-    initials: "PR",
-    tone: "teal",
-    personName: "Plan alimenticio",
-    message: "pendiente de revisión clínica.",
-    category: "Planes",
-    timeAgo: "Hace 2 días",
-    read: true,
-    archived: true,
-  },
-  {
-    id: "payment-review",
-    type: "payment",
-    initials: "PG",
-    tone: "slate",
-    personName: "Pagos",
-    message: "registró un pago pendiente de validar.",
-    category: "Cobros",
-    timeAgo: "Hace 2 días",
-    read: true,
-    archived: true,
-  },
-];
 
 const notificationEmptyState: Record<NotificationTab, { title: string; subtitle: string }> = {
   inbox: {
@@ -255,76 +219,9 @@ const notificationEmptyState: Record<NotificationTab, { title: string; subtitle:
   },
   archived: {
     title: "No hay notificaciones archivadas",
-    subtitle: "Las notificaciones que marques como leídas aparecerán aquí.",
+    subtitle: "Las notificaciones que archives aparecerán aquí.",
   },
 };
-
-function isNotificationTab(value: unknown): value is NotificationTab {
-  return value === "inbox" || value === "general" || value === "archived";
-}
-
-function getNotificationDefaults(): DashboardNotification[] {
-  return notificationPreviewItems.map((notification) => ({
-    ...notification,
-    actions: notification.actions ? [...notification.actions] : undefined,
-  }));
-}
-
-function getStoredNotifications(): DashboardNotification[] {
-  if (typeof window === "undefined") return getNotificationDefaults();
-
-  try {
-    const storedValue = window.localStorage.getItem(NOTIFICATION_STATE_STORAGE_KEY);
-    if (!storedValue) return getNotificationDefaults();
-
-    const storedNotifications = JSON.parse(storedValue) as Array<Partial<DashboardNotification>>;
-    if (!Array.isArray(storedNotifications)) return getNotificationDefaults();
-
-    const persistedState = new Map(
-      storedNotifications
-        .filter((notification) => typeof notification.id === "string")
-        .map((notification) => [notification.id, notification]),
-    );
-
-    return getNotificationDefaults().map((notification) => {
-      const persistedNotification = persistedState.get(notification.id);
-      if (!persistedNotification) return notification;
-
-      return {
-        ...notification,
-        read: persistedNotification.read === true,
-        archived: persistedNotification.archived === true,
-      };
-    });
-  } catch {
-    return getNotificationDefaults();
-  }
-}
-
-function getStoredNotificationTab(): NotificationTab {
-  if (typeof window === "undefined") return "inbox";
-
-  try {
-    const storedValue = window.localStorage.getItem(NOTIFICATION_TAB_STORAGE_KEY);
-    return isNotificationTab(storedValue) ? storedValue : "inbox";
-  } catch {
-    return "inbox";
-  }
-}
-
-function saveNotificationState(notifications: DashboardNotification[], activeTab: NotificationTab) {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(
-      NOTIFICATION_STATE_STORAGE_KEY,
-      JSON.stringify(notifications.map(({ id, read, archived }) => ({ id, read, archived }))),
-    );
-    window.localStorage.setItem(NOTIFICATION_TAB_STORAGE_KEY, activeTab);
-  } catch {
-    // Persistence is best-effort for local mock notifications.
-  }
-}
 
 function getRandomIndex(max: number): number {
   if (max <= 1) return 0;
@@ -380,20 +277,42 @@ function getInitials(fullName: string): string {
     .toUpperCase();
 }
 
-export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
+function getLocalDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function DashboardHeader({ onCustomizeKpis, dashboardEditing }: DashboardHeaderProps) {
+  const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { t } = useTranslation();
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
-  const [activeNotificationTab, setActiveNotificationTab] = React.useState<NotificationTab>(getStoredNotificationTab);
-  const [notifications, setNotifications] = React.useState<DashboardNotification[]>(getStoredNotifications);
+  const activeNotificationTab = useNotificationStore((state) => state.activeTab);
+  const notifications = useNotificationStore((state) => state.items);
+  const setActiveNotificationTab = useNotificationStore((state) => state.setActiveTab);
+  const markNotificationRead = useNotificationStore((state) => state.markRead);
+  const archiveVisibleNotifications = useNotificationStore((state) => state.archiveVisible);
+  const resolveNotificationAction = useNotificationStore((state) => state.resolveAction);
+  const archiveNotification = useNotificationStore((state) => state.archive);
+  const resetNotificationMockData = useNotificationStore((state) => state.resetMockData);
   const [swipedNotificationId, setSwipedNotificationId] = React.useState<string | null>(null);
   const [notificationDragState, setNotificationDragState] = React.useState<NotificationDragState | null>(null);
   const suppressNotificationClickRef = React.useRef(false);
   const [avatarMenuOpen, setAvatarMenuOpen] = React.useState(false);
+  const [quickConsultationOpen, setQuickConsultationOpen] = React.useState(false);
+  const [quickConsultationPatientId, setQuickConsultationPatientId] = React.useState<string | undefined>();
+  const quickConsultationTriggerRef = React.useRef<HTMLButtonElement>(null);
   const openCommand = useCommandPaletteStore((state) => state.setOpen);
+  const searchShortcutLabel = getGlobalSearchShortcutLabel();
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const displayName = user?.nombreCompleto?.trim() || "Administrador";
   const firstName = getFirstName(displayName);
+  const isDashboard = location.pathname === "/";
+  const breadcrumbItems = getHeaderBreadcrumb(location.pathname);
+  const BreadcrumbIcon = getHeaderBreadcrumbIcon(location.pathname);
   const [headerDate, setHeaderDate] = React.useState(() => new Date());
   const periodOfDay = getPeriodOfDay(headerDate);
   const greeting = getGreetingForPeriod(periodOfDay);
@@ -405,16 +324,21 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const initials = getInitials(displayName);
   const inboxNotifications = notifications.filter((item) => item.type === "patient_message" && !item.archived);
   const generalNotifications = notifications.filter((item) => !item.archived);
-  const archivedNotifications = notifications.filter((item) => item.read || item.archived);
-  const visibleNotificationItems = activeNotificationTab === "inbox"
-    ? inboxNotifications
-    : activeNotificationTab === "general"
-      ? generalNotifications
-      : archivedNotifications;
-  const notificationTabs: Array<{ key: NotificationTab; label: string; count: number }> = [
+  const archivedNotifications = notifications.filter((item) => item.archived);
+  const visibleNotificationItems =
+    activeNotificationTab === "inbox" ? inboxNotifications : activeNotificationTab === "general" ? generalNotifications : archivedNotifications;
+  const notificationTabs: Array<{
+    key: NotificationTab;
+    label: string;
+    count: number;
+  }> = [
     { key: "inbox", label: "Bandeja", count: inboxNotifications.length },
     { key: "general", label: "General", count: generalNotifications.length },
-    { key: "archived", label: "Archivadas", count: archivedNotifications.length },
+    {
+      key: "archived",
+      label: "Archivadas",
+      count: archivedNotifications.length,
+    },
   ];
   const notificationCount = generalNotifications.filter((item) => !item.read).length;
   const hasVisibleNotifications = visibleNotificationItems.length > 0;
@@ -422,6 +346,45 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   const markAllDisabled = activeNotificationTab === "archived" || !hasMarkableNotifications;
   const activeEmptyState = notificationEmptyState[activeNotificationTab];
   const canSwipeNotifications = activeNotificationTab !== "archived";
+
+  React.useEffect(() => {
+    if (searchParams.get("quickConsultation") !== "1") return;
+
+    const patientId = searchParams.get("patientId") ?? undefined;
+    setQuickConsultationPatientId(patientId);
+    setQuickConsultationOpen(true);
+    setNotificationsOpen(false);
+    setAvatarMenuOpen(false);
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete("quickConsultation");
+    nextParams.delete("patientId");
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const openQuickConsultation = () => {
+    setNotificationsOpen(false);
+    setAvatarMenuOpen(false);
+    setQuickConsultationPatientId(undefined);
+    setQuickConsultationOpen(true);
+  };
+
+  const handleQuickConsultationContinue = (
+    patient: QuickConsultationPatient,
+    action: QuickConsultationAction,
+  ) => {
+    setQuickConsultationOpen(false);
+    if (action === "schedule-later") {
+      navigate(
+        `/agenda?date=${getLocalDateKey()}&patientId=${encodeURIComponent(patient.id)}&create=1`,
+      );
+      return;
+    }
+
+    navigate(
+      `/pacientes/${encodeURIComponent(patient.id)}/consultas/nueva?mode=start-now&source=dashboard`,
+    );
+  };
   const getNotificationSwipeOffset = (id: string) => {
     if (notificationDragState?.id === id) {
       return Math.max(Math.min(notificationDragState.currentX - notificationDragState.startX, 0), -NOTIFICATION_SWIPE_REVEAL_WIDTH);
@@ -434,19 +397,11 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     // Placeholder until the patient chat screen exists.
   };
   const openNotificationTarget = (notification: DashboardNotification) => {
-    void notification;
-    // Placeholder until detail screens are wired per notification type.
+    if (notification.targetRoute) navigate(notification.targetRoute);
   };
   const handleMarkAllNotifications = () => {
     if (markAllDisabled) return;
-
-    setNotifications((current) => current.map((notification) => {
-      const shouldArchive = activeNotificationTab === "inbox"
-        ? notification.type === "patient_message" && !notification.archived
-        : !notification.archived;
-
-      return shouldArchive ? { ...notification, read: true, archived: true } : notification;
-    }));
+    archiveVisibleNotifications(activeNotificationTab);
     setSwipedNotificationId(null);
   };
   const handleNotificationClick = (notification: DashboardNotification) => {
@@ -457,38 +412,28 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       return;
     }
 
-    if (notification.type === "patient_message") {
+    if (notification.targetRoute) {
+      openNotificationTarget(notification);
+    } else if (notification.type === "patient_message") {
       openPatientConversation(notification);
     } else {
       openNotificationTarget(notification);
     }
 
-    setNotifications((current) => current.map((item) => (
-      item.id === notification.id ? { ...item, read: true } : item
-    )));
+    markNotificationRead(notification.id);
   };
-  const handleNotificationKeyDown = (
-    event: React.KeyboardEvent<HTMLElement>,
-    notification: DashboardNotification,
-  ) => {
+  const handleNotificationKeyDown = (event: React.KeyboardEvent<HTMLElement>, notification: DashboardNotification) => {
     if (event.target !== event.currentTarget) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
     handleNotificationClick(notification);
   };
   const handleNotificationAction = (id: string, action: NotificationAction) => {
-    void action;
-    setNotifications((current) => current.map((notification) => (
-      notification.id === id
-        ? { ...notification, read: true, archived: true }
-        : notification
-    )));
+    resolveNotificationAction(id, action);
     setSwipedNotificationId(null);
   };
   const handleArchiveNotification = (id: string) => {
-    setNotifications((current) => current.map((notification) => (
-      notification.id === id ? { ...notification, read: true, archived: true } : notification
-    )));
+    archiveNotification(id);
     setSwipedNotificationId(null);
   };
   const handleNotificationPointerDown = (event: React.PointerEvent<HTMLElement>, id: string) => {
@@ -506,9 +451,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     event.currentTarget.setPointerCapture(event.pointerId);
   };
   const handleNotificationPointerMove = (event: React.PointerEvent<HTMLElement>, id: string) => {
-    setNotificationDragState((current) => (
-      current?.id === id ? { ...current, currentX: event.clientX } : current
-    ));
+    setNotificationDragState((current) => (current?.id === id ? { ...current, currentX: event.clientX } : current));
   };
   const finishNotificationSwipe = (event: React.PointerEvent<HTMLElement>, id: string) => {
     if (notificationDragState?.id !== id) return;
@@ -548,10 +491,6 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   }, [greetingEmojiState]);
 
   React.useEffect(() => {
-    saveNotificationState(notifications, activeNotificationTab);
-  }, [activeNotificationTab, notifications]);
-
-  React.useEffect(() => {
     setSwipedNotificationId(null);
     setNotificationDragState(null);
   }, [activeNotificationTab]);
@@ -560,10 +499,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     if (typeof window === "undefined") return;
 
     window.resetNutriClinicaNotificationMockData = () => {
-      window.localStorage.removeItem(NOTIFICATION_STATE_STORAGE_KEY);
-      window.localStorage.removeItem(NOTIFICATION_TAB_STORAGE_KEY);
-      setNotifications(getNotificationDefaults());
-      setActiveNotificationTab("inbox");
+      resetNotificationMockData();
       setSwipedNotificationId(null);
       setNotificationDragState(null);
     };
@@ -571,7 +507,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
     return () => {
       delete window.resetNutriClinicaNotificationMockData;
     };
-  }, []);
+  }, [resetNotificationMockData]);
 
   React.useEffect(() => {
     if (!notificationsOpen && !avatarMenuOpen) return;
@@ -580,27 +516,15 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
-      if (
-        notificationsOpen &&
-        swipedNotificationId &&
-        !target.closest(".nc-dashboard-notification-menu__swipeItem")
-      ) {
+      if (notificationsOpen && swipedNotificationId && !target.closest(".nc-dashboard-notification-menu__swipeItem")) {
         setSwipedNotificationId(null);
       }
 
-      if (
-        notificationsOpen &&
-        !target.closest(".nc-dashboard-notification-menu") &&
-        !target.closest(".nc-dashboard-header__notification")
-      ) {
+      if (notificationsOpen && !target.closest(".nc-dashboard-notification-menu") && !target.closest(".nc-dashboard-header__notification")) {
         setNotificationsOpen(false);
       }
 
-      if (
-        avatarMenuOpen &&
-        !target.closest(".nc-dashboard-avatar-menu") &&
-        !target.closest(".nc-dashboard-header__avatar")
-      ) {
+      if (avatarMenuOpen && !target.closest(".nc-dashboard-avatar-menu") && !target.closest(".nc-dashboard-header__avatar")) {
         setAvatarMenuOpen(false);
       }
     };
@@ -621,14 +545,57 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
   }, [avatarMenuOpen, notificationsOpen, swipedNotificationId]);
 
   return (
-    <header className="nc-dashboard-header">
+    <>
+    <header className="nc-dashboard-header" data-quick-notes-header>
       <div className="nc-dashboard-header__inner">
-        <section className="nc-dashboard-header__intro" aria-label="Resumen del día">
+        <section className="nc-dashboard-header__intro" aria-label={isDashboard ? "Resumen del día" : "Contexto de navegación"}>
           <h1 className="nc-dashboard-header__title">
-            <span className="nc-dashboard-header__greetingText">{greeting}, {firstName}</span>
-            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">{greetingEmoji}</span>
+            <span className="nc-dashboard-header__greetingText">
+              {greeting}, {firstName}
+            </span>
+            <span className="nc-dashboard-header__greetingEmoji" aria-hidden="true">
+              {greetingEmoji}
+            </span>
           </h1>
-          <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
+          {isDashboard ? (
+            <p className="nc-dashboard-header__subtitle">Aquí tienes el resumen de tu clínica hoy.</p>
+          ) : (
+            <nav className="nc-dashboard-header__breadcrumb" aria-label="Ruta actual">
+              <BreadcrumbIcon className="nc-dashboard-header__breadcrumbIcon" strokeWidth={1.75} aria-hidden="true" />
+              <ChevronRight className="nc-dashboard-header__breadcrumbChevron" aria-hidden="true" />
+              <Link
+                to="/"
+                className="nc-dashboard-header__breadcrumbSection nc-dashboard-header__breadcrumbLink"
+              >
+                Gestión Clínica y Nutricional
+              </Link>
+              {breadcrumbItems.map((item, index) => {
+                const isCurrent = index === breadcrumbItems.length - 1;
+                const target = isCurrent
+                  ? null
+                  : getHeaderBreadcrumbTarget(location.pathname, index);
+                const className = `nc-dashboard-header__breadcrumbItem${isCurrent ? " nc-dashboard-header__breadcrumbItem--current" : " nc-dashboard-header__breadcrumbLink"}`;
+                return (
+                  <React.Fragment key={`${item}-${index}`}>
+                    <ChevronRight className="nc-dashboard-header__breadcrumbChevron" aria-hidden="true" />
+                    {target ? (
+                      <Link to={target} className={className} title={item}>
+                        {item}
+                      </Link>
+                    ) : (
+                      <span
+                        className={className}
+                        aria-current={isCurrent ? "page" : undefined}
+                        title={item}
+                      >
+                        {item}
+                      </span>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </nav>
+          )}
         </section>
 
         <div className="nc-dashboard-header__searchSlot">
@@ -636,33 +603,33 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             type="button"
             className="nc-dashboard-search"
             onClick={() => openCommand(true)}
-            aria-label="Buscar pacientes, consultas, alimentos"
+            aria-label={t("layout.global_search_placeholder")}
+            aria-haspopup="dialog"
           >
             <Search className="nc-dashboard-search__icon" size={19} strokeWidth={2} aria-hidden="true" />
-            <span className="nc-dashboard-search__placeholder">Buscar pacientes, consultas, alimentos...</span>
-            <kbd className="nc-dashboard-search__kbd">Ctrl K</kbd>
+            <span className="nc-dashboard-search__placeholder">{t("layout.global_search_placeholder")}</span>
+            <kbd className="nc-dashboard-search__kbd">{searchShortcutLabel}</kbd>
           </button>
         </div>
 
         <div className="nc-dashboard-header__actions">
           <div className="nc-dashboard-header__ctaGroup" aria-label="Acciones rápidas del dashboard">
-            <button type="button" className="nc-dashboard-button nc-dashboard-button--outline" onClick={onCustomizeKpis}>
-              <SlidersHorizontal size={16} strokeWidth={2} aria-hidden="true" />
-              <span>Personalizar KPIs</span>
-            </button>
+            <DashboardQuickAccessButton
+              onCustomizeDashboard={onCustomizeKpis}
+              dashboardEditing={dashboardEditing}
+            />
             <button
+              ref={quickConsultationTriggerRef}
               type="button"
               className="nc-dashboard-button nc-dashboard-button--soft"
-              onClick={() => navigate("/consultas/nueva")}
+              onClick={openQuickConsultation}
+              aria-haspopup="dialog"
+              aria-expanded={quickConsultationOpen}
             >
               <CalendarPlus size={17} strokeWidth={2} aria-hidden="true" />
               <span>Nueva consulta</span>
             </button>
-            <button
-              type="button"
-              className="nc-dashboard-button nc-dashboard-button--primary"
-              onClick={() => navigate("/pacientes/nuevo")}
-            >
+            <button type="button" className="nc-dashboard-button nc-dashboard-button--primary" onClick={() => navigate("/pacientes/nuevo")}>
               <Plus size={18} strokeWidth={2.2} aria-hidden="true" />
               <span>Agregar paciente</span>
             </button>
@@ -685,38 +652,27 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                 <DropdownMenuLabel className="nc-dashboard-notification-menu__header">
                   <span className="nc-dashboard-notification-menu__title">Notificaciones</span>
                   <span className="nc-dashboard-notification-menu__headerActions">
-                    <button
-                      type="button"
-                      className="nc-dashboard-notification-menu__markAll"
-                      disabled={markAllDisabled}
-                      onClick={handleMarkAllNotifications}
-                    >
+                    <button type="button" className="nc-dashboard-notification-menu__markAll" disabled={markAllDisabled} onClick={handleMarkAllNotifications}>
                       Marcar todas
                     </button>
                     <button
                       type="button"
                       className="nc-dashboard-notification-menu__settings"
                       aria-label="Configurar notificaciones"
-                      onClick={() => navigate("/configuracion")}
+                      onClick={() => navigate("/configuracion?section=clinical-alerts")}
                     >
                       <Settings size={17} strokeWidth={2} aria-hidden="true" />
                     </button>
                   </span>
                 </DropdownMenuLabel>
-                <div
-                  className="nc-dashboard-notification-menu__tabs"
-                  role="tablist"
-                  aria-label="Secciones de notificaciones"
-                >
+                <div className="nc-dashboard-notification-menu__tabs" role="tablist" aria-label="Secciones de notificaciones">
                   {notificationTabs.map((tab) => {
                     const isActive = activeNotificationTab === tab.key;
 
                     return (
                       <button
                         type="button"
-                        className={`nc-dashboard-notification-menu__tab${
-                          isActive ? " nc-dashboard-notification-menu__tab--active" : ""
-                        }`}
+                        className={`nc-dashboard-notification-menu__tab${isActive ? " nc-dashboard-notification-menu__tab--active" : ""}`}
                         role="tab"
                         aria-selected={isActive}
                         key={tab.key}
@@ -756,7 +712,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                             className="nc-dashboard-notification-menu__item"
                             role="listitem"
                             tabIndex={0}
-                            style={{ transform: `translateX(${swipeOffset}px)` }}
+                            style={{
+                              transform: `translateX(${swipeOffset}px)`,
+                            }}
                             onClick={() => handleNotificationClick(item)}
                             onKeyDown={(event) => handleNotificationKeyDown(event, item)}
                             onPointerDown={(event) => handleNotificationPointerDown(event, item.id)}
@@ -764,11 +722,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                             onPointerUp={(event) => finishNotificationSwipe(event, item.id)}
                             onPointerCancel={(event) => finishNotificationSwipe(event, item.id)}
                           >
-                            <span
-                              className="nc-dashboard-notification-menu__avatar"
-                              data-tone={item.tone}
-                              aria-hidden="true"
-                            >
+                            <span className="nc-dashboard-notification-menu__avatar" data-tone={item.tone} aria-hidden="true">
                               {item.initials}
                               <span className="nc-dashboard-notification-menu__avatarStatus" />
                             </span>
@@ -784,10 +738,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                                 {item.timeAgo} • {item.category}
                               </span>
                               {item.requiresAction && item.actions && !item.read && !item.archived && (
-                                <span
-                                  className="nc-dashboard-notification-menu__itemActions"
-                                  aria-label="Acciones de notificación"
-                                >
+                                <span className="nc-dashboard-notification-menu__itemActions" aria-label="Acciones de notificación">
                                   {item.actions.includes("reject") && (
                                     <button
                                       type="button"
@@ -841,11 +792,7 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                   </div>
                 )}
                 <div className="nc-dashboard-notification-menu__footer">
-                  <button
-                    type="button"
-                    className="nc-dashboard-notification-menu__footerAction"
-                    onClick={() => navigate("/notificaciones")}
-                  >
+                  <button type="button" className="nc-dashboard-notification-menu__footerAction" onClick={() => navigate("/notificaciones")}>
                     <span>Ver todas las notificaciones</span>
                     <ChevronRight size={15} strokeWidth={2} aria-hidden="true" />
                   </button>
@@ -854,15 +801,8 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             </DropdownMenu>
             <DropdownMenu open={avatarMenuOpen} onOpenChange={setAvatarMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="nc-dashboard-header__avatar"
-                  aria-label="Abrir menú de usuario"
-                  aria-expanded={avatarMenuOpen}
-                >
-                  <span className="nc-dashboard-header__avatarFallback">
-                    {initials || <UserPlus size={18} aria-hidden="true" />}
-                  </span>
+                <button type="button" className="nc-dashboard-header__avatar" aria-label="Abrir menú de usuario" aria-expanded={avatarMenuOpen}>
+                  <span className="nc-dashboard-header__avatarFallback">{initials || <UserPlus size={18} aria-hidden="true" />}</span>
                   <span className="nc-dashboard-header__avatarStatus" aria-hidden="true" />
                 </button>
               </DropdownMenuTrigger>
@@ -903,8 +843,9 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
                 <DropdownMenuItem
                   className="nc-dashboard-avatar-menu__item nc-dashboard-avatar-menu__item--danger"
                   onClick={() => {
-                    logout();
-                    navigate("/login", { replace: true });
+                    void authApi.logout()
+                      .then(() => navigate("/login", { replace: true }))
+                      .catch((error) => toast.error(error instanceof Error ? error.message : "No fue posible cerrar sesión"));
                   }}
                 >
                   <LogOut size={14} strokeWidth={1.85} aria-hidden="true" />
@@ -914,8 +855,28 @@ export function DashboardHeader({ onCustomizeKpis }: DashboardHeaderProps) {
             </DropdownMenu>
           </div>
         </div>
-
       </div>
     </header>
+    {quickConsultationOpen && (
+      <NewConsultationQuickDialog
+        open
+        initialPatientId={quickConsultationPatientId}
+        onOpenChange={(nextOpen) => {
+          setQuickConsultationOpen(nextOpen);
+          if (!nextOpen) {
+            setQuickConsultationPatientId(undefined);
+            window.requestAnimationFrame(() =>
+              quickConsultationTriggerRef.current?.focus(),
+            );
+          }
+        }}
+        onRegisterPatient={() => {
+          setQuickConsultationOpen(false);
+          navigate("/pacientes/nuevo?returnTo=quick-consultation");
+        }}
+        onContinue={handleQuickConsultationContinue}
+      />
+    )}
+    </>
   );
 }

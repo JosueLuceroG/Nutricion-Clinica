@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import argon2 from 'argon2';
 import sql from 'mssql';
 import { getPool, closePool } from './connection.js';
+import { assertTargetSafe } from '../modules/deployment/targetGuard.js';
 
 interface SeedConfig {
   adminEmail: string;
@@ -12,9 +13,15 @@ interface SeedConfig {
 }
 
 function readConfig(): SeedConfig {
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+  if (!adminPassword || adminPassword.length < 12) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD es obligatorio (min 12 caracteres). Abortando seed (fail-closed): no se crea el admin sin password segura explicita.',
+    );
+  }
   return {
     adminEmail: process.env.SEED_ADMIN_EMAIL ?? 'admin@nutriclinica.local',
-    adminPassword: process.env.SEED_ADMIN_PASSWORD ?? 'CambiaEstaPassword123!',
+    adminPassword,
     adminNombre: process.env.SEED_ADMIN_NOMBRE ?? 'Administrador',
     sucursalNombre: process.env.SEED_SUCURSAL_NOMBRE ?? 'Sucursal Centro',
   };
@@ -99,6 +106,8 @@ export async function runSeed(): Promise<{ sucursalId: string; profesionalId: st
 async function main(): Promise<void> {
   console.log('=== nutriclinica: seed (sucursal + admin) ===');
   try {
+    // Build 09.5A §6, §26-27: fail-closed contra PRODUCTION/UNKNOWN.
+    assertTargetSafe('seed', process.env);
     const result = await runSeed();
     console.log(`ok sucursal_id=${result.sucursalId}`);
     console.log(`ok profesional_id=${result.profesionalId}`);

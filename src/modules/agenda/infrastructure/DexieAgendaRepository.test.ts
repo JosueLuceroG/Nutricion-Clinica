@@ -7,9 +7,11 @@ import { Schedule } from "../domain/Schedule";
 import { Block } from "../domain/Block";
 import { createAppointmentId, createScheduleId, createBlockId } from "../domain";
 import { AppointmentNotFoundError, ScheduleNotFoundError, BlockNotFoundError } from "../domain/AgendaRepository";
+import { useSyncStore } from "@store/syncStore";
 
 const professionalId = crypto.randomUUID();
 const patientId = crypto.randomUUID();
+const sucursalId = crypto.randomUUID();
 
 const makeAppointment = (overrides: Partial<{
   date: string;
@@ -60,6 +62,7 @@ describe("DexieAgendaRepository", () => {
   let db: NutriClinicaDB;
 
   beforeEach(async () => {
+    useSyncStore.getState().setSucursalId(sucursalId);
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
     await db.delete();
     db = new NutriClinicaDB(`test-${Math.random().toString(36).slice(2)}`);
@@ -148,6 +151,17 @@ describe("DexieAgendaRepository", () => {
 
     it("deleteAppointment lanza AppointmentNotFoundError si no existe", async () => {
       await expect(repo.deleteAppointment(createAppointmentId())).rejects.toBeInstanceOf(AppointmentNotFoundError);
+    });
+
+    it("oculta y protege citas de otra sucursal", async () => {
+      const appointment = makeAppointment();
+      await repo.saveAppointment(appointment);
+      await db.appointments.update(appointment.id, { office_id: crypto.randomUUID() });
+
+      expect(await repo.findAppointmentById(appointment.id)).toBeNull();
+      expect(await repo.listAppointmentsByDate(appointment.date)).toEqual([]);
+      await expect(repo.deleteAppointment(appointment.id)).rejects.toBeInstanceOf(AppointmentNotFoundError);
+      expect(await db.appointments.get(appointment.id)).toBeDefined();
     });
   });
 

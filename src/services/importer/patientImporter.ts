@@ -12,19 +12,19 @@ const COLUMN_ALIASES: Record<string, keyof PatientCsvRow> = {
   nombre: "firstName",
   nombres: "firstName",
   "first name": "firstName",
-  "firstname": "firstName",
+  firstname: "firstName",
   apellido: "lastName",
   apellidos: "lastName",
   "last name": "lastName",
-  "lastname": "lastName",
+  lastname: "lastName",
   "segundo apellido": "secondLastName",
   "second last name": "secondLastName",
-  "secondlastname": "secondLastName",
+  secondlastname: "secondLastName",
   "fecha de nacimiento": "birthDate",
-  "fecha_nacimiento": "birthDate",
+  fecha_nacimiento: "birthDate",
   "birth date": "birthDate",
-  "birthdate": "birthDate",
-  "nacimiento": "birthDate",
+  birthdate: "birthDate",
+  nacimiento: "birthDate",
   sexo: "sex",
   sex: "sex",
   genero: "gender",
@@ -32,7 +32,7 @@ const COLUMN_ALIASES: Record<string, keyof PatientCsvRow> = {
   gender: "gender",
   "estado civil": "maritalStatus",
   "marital status": "maritalStatus",
-  "maritalstatus": "maritalStatus",
+  maritalstatus: "maritalStatus",
   escolaridad: "education",
   education: "education",
   ocupacion: "occupation",
@@ -46,18 +46,22 @@ const COLUMN_ALIASES: Record<string, keyof PatientCsvRow> = {
   "telefono secundario": "secondaryPhone",
   "teléfono secundario": "secondaryPhone",
   "secondary phone": "secondaryPhone",
-  "secondaryphone": "secondaryPhone",
+  secondaryphone: "secondaryPhone",
+  whatsapp: "whatsappEnabled",
+  "whatsapp habilitado": "whatsappEnabled",
+  "whatsapp enabled": "whatsappEnabled",
+  whatsappenabled: "whatsappEnabled",
   "contacto emergencia": "emergencyContactName",
   "contacto de emergencia": "emergencyContactName",
   "emergency contact": "emergencyContactName",
-  "emergencycontactname": "emergencyContactName",
+  emergencycontactname: "emergencyContactName",
   parentesco: "emergencyContactRelationship",
   "parentesco emergencia": "emergencyContactRelationship",
   "emergency relationship": "emergencyContactRelationship",
   "telefono emergencia": "emergencyContactPhone",
   "teléfono de emergencia": "emergencyContactPhone",
   "emergency phone": "emergencyContactPhone",
-  "emergencycontactphone": "emergencyContactPhone",
+  emergencycontactphone: "emergencyContactPhone",
   notas: "generalNotes",
   notes: "generalNotes",
   "notas generales": "generalNotes",
@@ -76,6 +80,7 @@ export interface PatientCsvRow {
   email?: string;
   phone?: string;
   secondaryPhone?: string;
+  whatsappEnabled?: string;
   emergencyContactName?: string;
   emergencyContactRelationship?: string;
   emergencyContactPhone?: string;
@@ -99,7 +104,9 @@ function normalizeHeader(h: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function mapHeaders(headers: string[]): Map<number, keyof PatientCsvRow> {
+export function mapHeaders(
+  headers: string[],
+): Map<number, keyof PatientCsvRow> {
   const map = new Map<number, keyof PatientCsvRow>();
   headers.forEach((h, i) => {
     const key = COLUMN_ALIASES[normalizeHeader(h)];
@@ -163,6 +170,17 @@ export function parseDate(raw: string): Date | null {
   return Number.isNaN(fallback.getTime()) ? null : fallback;
 }
 
+function parseWhatsappEnabled(raw: string): boolean {
+  const normalized = raw
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (["true", "1", "si", "yes"].includes(normalized)) return true;
+  if (["false", "0", "no"].includes(normalized)) return false;
+  throw new Error(`Valor de WhatsApp no reconocido: "${raw}"`);
+}
+
 export function mapRow(
   rowIndex: number,
   values: string[],
@@ -197,16 +215,43 @@ export function mapRow(
     }
   }
   if (mapped.email) {
-    try { Email.from(mapped.email); } catch { errors.push(`Email inválido: "${mapped.email}"`); }
+    try {
+      Email.from(mapped.email);
+    } catch {
+      errors.push(`Email inválido: "${mapped.email}"`);
+    }
   }
   if (mapped.phone) {
-    try { Phone.from(mapped.phone); } catch { errors.push(`Teléfono inválido: "${mapped.phone}"`); }
+    try {
+      Phone.from(mapped.phone);
+    } catch {
+      errors.push(`Teléfono inválido: "${mapped.phone}"`);
+    }
   }
   if (mapped.secondaryPhone) {
-    try { Phone.from(mapped.secondaryPhone); } catch { errors.push(`Teléfono secundario inválido: "${mapped.secondaryPhone}"`); }
+    try {
+      Phone.from(mapped.secondaryPhone);
+    } catch {
+      errors.push(`Teléfono secundario inválido: "${mapped.secondaryPhone}"`);
+    }
+  }
+  if (mapped.whatsappEnabled) {
+    try {
+      parseWhatsappEnabled(mapped.whatsappEnabled);
+    } catch (err) {
+      errors.push(
+        err instanceof Error ? err.message : "Valor de WhatsApp inválido",
+      );
+    }
   }
   if (mapped.emergencyContactPhone) {
-    try { Phone.from(mapped.emergencyContactPhone); } catch { errors.push(`Teléfono de emergencia inválido: "${mapped.emergencyContactPhone}"`); }
+    try {
+      Phone.from(mapped.emergencyContactPhone);
+    } catch {
+      errors.push(
+        `Teléfono de emergencia inválido: "${mapped.emergencyContactPhone}"`,
+      );
+    }
   }
 
   return {
@@ -224,7 +269,10 @@ export interface PatientImportResult {
 }
 
 export class PatientRowImportError extends Error {
-  constructor(public readonly rowNumber: number, public readonly fieldErrors: string[]) {
+  constructor(
+    public readonly rowNumber: number,
+    public readonly fieldErrors: string[],
+  ) {
     super(`Fila ${rowNumber}: ${fieldErrors.join("; ")}`);
     this.name = "PatientRowImportError";
   }
@@ -237,7 +285,9 @@ export function toPatientCreate(row: MappedRow): PatientCreate {
   const m = row.mapped;
   const birthDate = parseDate(m.birthDate);
   if (!birthDate) {
-    throw new PatientRowImportError(row.rowNumber, [`Fecha inválida: ${m.birthDate}`]);
+    throw new PatientRowImportError(row.rowNumber, [
+      `Fecha inválida: ${m.birthDate}`,
+    ]);
   }
   return {
     firstName: m.firstName,
@@ -252,9 +302,14 @@ export function toPatientCreate(row: MappedRow): PatientCreate {
     email: m.email ? Email.from(m.email) : null,
     phone: m.phone ? Phone.from(m.phone) : null,
     secondaryPhone: m.secondaryPhone ? Phone.from(m.secondaryPhone) : null,
+    whatsappEnabled: m.whatsappEnabled
+      ? parseWhatsappEnabled(m.whatsappEnabled)
+      : null,
     emergencyContactName: m.emergencyContactName ?? null,
     emergencyContactRelationship: m.emergencyContactRelationship ?? null,
-    emergencyContactPhone: m.emergencyContactPhone ? Phone.from(m.emergencyContactPhone) : null,
+    emergencyContactPhone: m.emergencyContactPhone
+      ? Phone.from(m.emergencyContactPhone)
+      : null,
     generalNotes: m.generalNotes ?? null,
   };
 }
@@ -268,9 +323,17 @@ export function tryCreatePatient(row: MappedRow): Patient | null {
   }
 }
 
-export const REQUIRED_COLUMNS: Array<keyof PatientCsvRow> = ["firstName", "lastName", "birthDate", "sex"];
+export const REQUIRED_COLUMNS: Array<keyof PatientCsvRow> = [
+  "firstName",
+  "lastName",
+  "birthDate",
+  "sex",
+];
 
-export function validateRequiredHeaders(headers: string[]): { missing: string[]; ok: boolean } {
+export function validateRequiredHeaders(headers: string[]): {
+  missing: string[];
+  ok: boolean;
+} {
   const map = mapHeaders(headers);
   const present = new Set(map.values());
   const missing = REQUIRED_COLUMNS.filter((k) => !present.has(k));

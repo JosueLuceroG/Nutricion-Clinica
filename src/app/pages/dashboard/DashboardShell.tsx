@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useLocation } from "react-router-dom";
 import { Check, ChevronLeft, ChevronRight, Maximize2, Minimize2, Minus, Monitor, Moon, Palette, Square, Sun, X } from "lucide-react";
 import { useTheme } from "@app/providers/ThemeProvider";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@components/ui/dropdown-menu";
@@ -11,6 +12,9 @@ import "./DashboardPage.css";
 interface DashboardShellProps {
   children: React.ReactNode;
   onCustomizeKpis?: () => void;
+  dashboardEditing?: boolean;
+  mainLabel?: string;
+  onUseLegacyLayout?: () => void;
 }
 
 const THEME_LONG_PRESS_MS = 1000;
@@ -203,7 +207,6 @@ function DesktopWindowTitlebar() {
       onPointerDown={handleDragStart}
     >
       <div className="nc-dashboard-desktop-titlebar__brand">
-        <img src="/assets/icon.png" alt="" width="18" height="18" aria-hidden="true" />
         <span className="nc-dashboard-desktop-titlebar__name">NutriClinica</span>
         <span className="nc-dashboard-desktop-titlebar__separator" aria-hidden="true" />
         <span className="nc-dashboard-desktop-titlebar__subtitle">Gestión Clínica y Nutricional</span>
@@ -275,9 +278,15 @@ function DesktopWindowTitlebar() {
   );
 }
 
-export function DashboardShell({ children, onCustomizeKpis }: DashboardShellProps) {
+export function DashboardShell({ children, onCustomizeKpis, dashboardEditing, mainLabel = "Dashboard NutriClinica", onUseLegacyLayout }: DashboardShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const isTauriDesktop = useIsTauriDesktop();
+  const location = useLocation();
+  const mainRef = React.useRef<HTMLElement>(null);
+
+  React.useLayoutEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname, location.search]);
 
   return (
     <div className={`nc-dashboard-shell${sidebarCollapsed ? " nc-dashboard-shell--collapsed" : ""}${isTauriDesktop ? " nc-dashboard-shell--tauri" : ""}`}>
@@ -286,6 +295,7 @@ export function DashboardShell({ children, onCustomizeKpis }: DashboardShellProp
       <DashboardSidebar
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((value) => !value)}
+        onUseLegacyLayout={onUseLegacyLayout}
       />
 
       <button
@@ -301,10 +311,13 @@ export function DashboardShell({ children, onCustomizeKpis }: DashboardShellProp
       </button>
 
       <div className="nc-dashboard-workspace">
-        <DashboardHeader onCustomizeKpis={onCustomizeKpis} />
+        <DashboardHeader
+          onCustomizeKpis={onCustomizeKpis}
+          dashboardEditing={dashboardEditing}
+        />
         <DashboardMobileNav />
 
-        <main className="nc-dashboard-main" aria-label="Dashboard NutriClinica">
+        <main ref={mainRef} className="nc-dashboard-main" aria-label={mainLabel}>
           <div className="nc-dashboard-container">{children}</div>
         </main>
 

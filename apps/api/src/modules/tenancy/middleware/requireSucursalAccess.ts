@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { UnauthorizedError, ForbiddenError } from '../../../middleware/errorHandler.js';
-import type { Role } from '@nutriclinica/shared';
+import { canonicalSyncId, type Role } from '@nutriclinica/shared';
 
 const HEADER_NAME = 'x-sucursal-id';
 const QUERY_PARAM = 'sucursalId';
@@ -24,11 +24,14 @@ export function requireSucursalAccess(req: Request, _res: Response, next: NextFu
     next(new ForbiddenError(`Falta header '${HEADER_NAME}' o query param '${QUERY_PARAM}'`));
     return;
   }
-  if (req.user.rol !== 'admin' && !req.user.sucursalIds.includes(sucursalId)) {
+  const canonicalSucursalId = canonicalSyncId(sucursalId);
+  if (req.user.rol !== 'admin' && !req.user.sucursalIds.some(
+    (assigned) => canonicalSyncId(assigned) === canonicalSucursalId,
+  )) {
     next(new ForbiddenError(`El profesional no tiene acceso a la sucursal ${sucursalId}`));
     return;
   }
-  req.sucursalId = sucursalId;
+  req.sucursalId = canonicalSucursalId;
   next();
 }
 

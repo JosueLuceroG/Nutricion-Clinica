@@ -17,7 +17,7 @@ import type { LinkedCounts } from "../application/patientUseCases";
  *
  *  - **Archivar** (preserva el historial, oculta del dashboard).
  *  - **Eliminar todo** (cascade soft-delete de paciente + consultas +
- *    planes + laboratorios + antropometrias).
+ *    planes + laboratorios + antropometrias + adherencia).
  *
  * Si la cancelación o la propia confirmación necesita esperar a la
  * acción, `busy` desactiva todos los botones y muestra el spinner.
@@ -35,7 +35,8 @@ export interface CascadeDeletePatientDialogProps {
 
 function totalCounts(counts: LinkedCounts | null): number {
   if (!counts) return 0;
-  return counts.consultations + counts.mealPlans + counts.labPanels + counts.anthropometry;
+  return counts.consultations + counts.mealPlans + counts.labPanels +
+    counts.anthropometry + counts.adherenceRecords;
 }
 
 export function CascadeDeletePatientDialog({
@@ -66,7 +67,7 @@ export function CascadeDeletePatientDialog({
             {t("patient.cascade_delete_title")}
           </DialogTitle>
           <DialogDescription>
-            {t("patient.cascade_dialog_desc", { name: patientName })}
+            {t("patient.cascade_delete_desc", { name: patientName })}
           </DialogDescription>
         </DialogHeader>
 
@@ -79,6 +80,7 @@ export function CascadeDeletePatientDialog({
               <li>• {t("patient.linked_meal_plans", { count: counts.mealPlans })}</li>
               <li>• {t("patient.linked_lab_panels", { count: counts.labPanels })}</li>
               <li>• {t("patient.linked_anthropometry", { count: counts.anthropometry })}</li>
+              <li>• {t("patient.linked_adherence_records", { count: counts.adherenceRecords })}</li>
               <li className="pt-1 font-medium text-amber-900 dark:text-amber-200">
                 {t("patient.linked_total", { count: total })}
               </li>

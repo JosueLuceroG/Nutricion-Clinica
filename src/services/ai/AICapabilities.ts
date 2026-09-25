@@ -92,6 +92,16 @@ export const AI_CAPABILITIES: AICapabilityDef[] = [
     cacheable: false,
     cacheTtlMinutes: 0,
   },
+  {
+    id: "generateDashboardKpi",
+    nameKey: "ai.capability.generate_dashboard_kpi",
+    descriptionKey: "ai.capability.generate_dashboard_kpi_desc",
+    model: "gpt-4o-mini",
+    temperature: 0.2,
+    maxTokens: 450,
+    cacheable: false,
+    cacheTtlMinutes: 0,
+  },
 ];
 
 export function getCapabilityDef(id: CapabilityId): AICapabilityDef | undefined {

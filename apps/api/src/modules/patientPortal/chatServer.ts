@@ -1,9 +1,5 @@
-import { WebSocketServer, WebSocket } from 'ws';
-import type { Server } from 'node:http';
-import sql from 'mssql';
-import { getPool } from '../../db/connection.js';
-import { verifyToken } from '../auth/application/authService.js';
-import type { JwtPayload } from '@nutriclinica/shared';
+import { WebSocket } from 'ws';
+import type { WsTicketInfo } from '../ws/websocketGateway.js';
 
 interface ChatMessage {
   type: 'message:new' | 'message:read';
@@ -50,71 +46,21 @@ function isConnectedPacienteId(pacienteId: string): boolean {
   return false;
 }
 
-export function createChatServer(httpServer: Server): WebSocketServer {
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/chat' });
+export function registerChatChannel(ws: WebSocket, info: WsTicketInfo): void {
+  const clientInfo: ClientInfo = {
+    ws,
+    userId: info.sub,
+    pacienteId: info.pacienteId,
+  };
+  clients.set(ws, clientInfo);
 
-  wss.on('connection', async (ws, req) => {
-    const url = new URL(req.url ?? '', 'http://localhost');
-    const token = url.searchParams.get('token');
-    const portalToken = url.searchParams.get('portalToken');
-
-    let userId: string;
-    let pacienteId: string | null = null;
-
-    if (token) {
-      let payload: JwtPayload;
-      try {
-        payload = await verifyToken(token);
-      } catch {
-        ws.close(4001, 'Token inválido');
-        return;
-      }
-      userId = payload.sub;
-
-      const pId = url.searchParams.get('pacienteId');
-      if (pId) {
-        const isValid = typeof pId === 'string' && /^[0-9a-f-]{36}$/i.test(pId);
-        if (isValid) {
-          pacienteId = pId;
-        }
-      }
-    } else if (portalToken) {
-      const pool = await getPool();
-      const result = await pool
-        .request()
-        .input('token', sql.NVarChar(512), portalToken)
-        .query<{ paciente_id: string; expires_at: Date; revoked_at: Date | null }>(
-          `SELECT paciente_id, expires_at, revoked_at
-             FROM patient_portal_tokens
-            WHERE token_hash = CONVERT(NVARCHAR(64), HASHBYTES('SHA2_256', @token), 2)
-              AND revoked_at IS NULL
-              AND expires_at > SYSUTCDATETIME()`,
-        );
-      const row = result.recordset[0];
-      if (!row) {
-        ws.close(4001, 'Token de portal inválido o expirado');
-        return;
-      }
-      userId = row.paciente_id;
-      pacienteId = row.paciente_id;
-    } else {
-      ws.close(4001, 'Token requerido');
-      return;
-    }
-
-    const clientInfo: ClientInfo = { ws, userId, pacienteId };
-    clients.set(ws, clientInfo);
-
-    ws.on('close', () => {
-      clients.delete(ws);
-    });
-
-    ws.on('error', () => {
-      clients.delete(ws);
-    });
+  ws.on('close', () => {
+    clients.delete(ws);
   });
 
-  return wss;
+  ws.on('error', () => {
+    clients.delete(ws);
+  });
 }
 
 export { isConnectedPacienteId };

@@ -1,15 +1,14 @@
 import * as React from "react";
 import { ArrowDown, ArrowUp, Eye, EyeOff, RotateCcw, SlidersHorizontal, X } from "lucide-react";
-import type { DashboardPremiumKpiId } from "@store/preferencesStore";
 import type { DashboardKpiItem } from "./dashboardMockData";
 
 interface DashboardKpiCustomizerProps {
   open: boolean;
   items: DashboardKpiItem[];
-  hiddenIds: DashboardPremiumKpiId[];
+  hiddenIds: string[];
   onClose: () => void;
-  onMove: (id: DashboardPremiumKpiId, direction: -1 | 1) => void;
-  onToggle: (id: DashboardPremiumKpiId) => void;
+  onMove: (id: string, direction: -1 | 1) => void;
+  onToggle: (id: string) => void;
   onReset: () => void;
 }
 

@@ -1,11 +1,17 @@
 import * as React from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { StatusBar } from "./StatusBar";
 import { CommandPalette } from "./CommandPalette";
 import { ContextPanel } from "./ContextPanel";
+import { NotificationScopeController } from "./NotificationScopeController";
+import { QuickNotesProvider } from "@modules/quick-notes/ui";
+import { DashboardQuickAccessScopeController } from "@modules/dashboard-quick-access/ui";
+import { ClinicalAlertController } from "@modules/clinical-alerts";
+import { DashboardShell } from "@app/pages/dashboard/DashboardShell";
+import { useDashboardLayoutStore } from "@store/dashboardLayoutStore";
 import { useUIStore } from "@store/uiStore";
 import { cn } from "@utils/cn";
 
@@ -21,14 +27,69 @@ function PageFallback() {
   );
 }
 
+const dashboardShellSections = [
+  "/pacientes",
+  "/consultas",
+  "/agenda",
+  "/planes",
+  "/smae",
+  "/billing",
+  "/configuracion",
+];
+const layoutModeStorageKey = "nutriclinica.layout.mode";
+
 export function AppLayout() {
   const { t } = useTranslation();
   const location = useLocation();
+  const navigate = useNavigate();
   const contextOpen = useUIStore((s) => s.contextPanelOpen);
-  const isDashboardRoute = location.pathname === "/";
+  const dashboardEditing = useDashboardLayoutStore((state) => state.isEditing);
+  const [usesLegacyLayout, setUsesLegacyLayout] = React.useState(() => {
+    try {
+      return window.sessionStorage.getItem(layoutModeStorageKey) === "legacy";
+    } catch {
+      return false;
+    }
+  });
+  const supportsDashboardShell =
+    location.pathname === "/" ||
+    dashboardShellSections.some(
+      (section) =>
+        location.pathname === section ||
+        location.pathname.startsWith(`${section}/`),
+    );
+  const canUseLegacyLayout = location.pathname !== "/" && supportsDashboardShell;
+  const usesDashboardShell =
+    supportsDashboardShell && (!canUseLegacyLayout || !usesLegacyLayout);
+
+  const changeLayoutMode = (legacy: boolean) => {
+    setUsesLegacyLayout(legacy);
+    try {
+      if (legacy) window.sessionStorage.setItem(layoutModeStorageKey, "legacy");
+      else window.sessionStorage.removeItem(layoutModeStorageKey);
+    } catch {
+      // Keep the in-memory preference when session storage is unavailable.
+    }
+  };
+
+  React.useLayoutEffect(() => {
+    const htmlOverflow = document.documentElement.style.overflow;
+    const bodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+
+    return () => {
+      document.documentElement.style.overflow = htmlOverflow;
+      document.body.style.overflow = bodyOverflow;
+    };
+  }, []);
 
   return (
     <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground">
+      <NotificationScopeController />
+      <ClinicalAlertController />
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-background focus:text-foreground focus:ring-2 focus:ring-ring focus:rounded-md"
@@ -36,31 +97,57 @@ export function AppLayout() {
         {t("common.skip_to_content")}
       </a>
 
-      {!isDashboardRoute && <Sidebar />}
+      {!usesDashboardShell && (
+        <Sidebar
+          onUsePremiumLayout={
+            canUseLegacyLayout && usesLegacyLayout
+              ? () => changeLayoutMode(false)
+              : undefined
+          }
+        />
+      )}
 
-      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {!isDashboardRoute && <Header />}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {!usesDashboardShell && <Header />}
 
-        <div className="flex min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <main
             id="main-content"
-            className={cn("min-w-0 flex-1 overflow-y-auto", isDashboardRoute && "bg-[#f7faff]")}
+            className={cn(
+              "min-h-0 min-w-0 flex-1",
+              usesDashboardShell ? "overflow-hidden bg-[#f7faff]" : "overflow-y-auto",
+            )}
             tabIndex={-1}
             aria-label={t("layout.main_content")}
           >
-            <React.Suspense fallback={<PageFallback />}>
-              <Outlet />
-            </React.Suspense>
+            {usesDashboardShell ? (
+              <DashboardShell
+                onCustomizeKpis={() => navigate("/?customize=1")}
+                dashboardEditing={dashboardEditing}
+                mainLabel={location.pathname === "/" ? "Dashboard NutriClinica" : "Área de trabajo NutriClinica"}
+                onUseLegacyLayout={canUseLegacyLayout ? () => changeLayoutMode(true) : undefined}
+              >
+                <React.Suspense fallback={<PageFallback />}>
+                  <Outlet />
+                </React.Suspense>
+              </DashboardShell>
+            ) : (
+              <React.Suspense fallback={<PageFallback />}>
+                <Outlet />
+              </React.Suspense>
+            )}
           </main>
 
           <div role="status" aria-live="polite" aria-atomic="true" className="sr-only" />
 
-          {!isDashboardRoute && contextOpen && <ContextPanel />}
+          {!usesDashboardShell && contextOpen && <ContextPanel />}
         </div>
 
-        {!isDashboardRoute && <StatusBar />}
+        {!usesDashboardShell && <StatusBar />}
       </div>
 
+      <QuickNotesProvider />
+      <DashboardQuickAccessScopeController />
       <CommandPalette />
     </div>
   );

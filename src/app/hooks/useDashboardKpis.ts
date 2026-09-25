@@ -1,32 +1,49 @@
 import * as React from "react";
-import { patientService } from "@services/patientService";
-import { consultationService } from "@services/consultationService";
-import { mealPlanService } from "@services/mealPlanService";
+import { agendaService } from "@services/agendaService";
 import { db } from "@services/db";
-import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 import { useAuthStore } from "@store/authStore";
 import { useSyncStore } from "@store/syncStore";
 import type { Patient } from "@modules/patient/domain/Patient";
 import type { Consultation } from "@modules/consultation/domain/Consultation";
-import type { ConsultationRow } from "@modules/consultation/infrastructure/consultationMapper";
+import {
+  consultationRowToDomain,
+  type ConsultationRow,
+} from "@modules/consultation/infrastructure/consultationMapper";
 import type { MealPlan } from "@modules/mealplan/domain/MealPlan";
+import type { Appointment } from "@modules/agenda/domain/Appointment";
+import { patientRowToDomain } from "@modules/patient/infrastructure/patientMapper";
+import { mealPlanRowToDomain } from "@modules/mealplan/infrastructure/mealPlanMapper";
+import { BILLING_REPORT_ROLES } from "@modules/auth/authRoles";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
 
 export interface DashboardKpis {
   totalActivePatients: number;
   totalPatients: number;
+  newPatientsThisMonth: number;
+  newPatientsPreviousMonth: number;
   activePlans: number;
   consultationsToday: number;
+  scheduledConsultationsToday: number;
   consultationsThisMonth: number;
   upcomingConsultations: Consultation[];
+  upcomingAppointments: Appointment[];
+  appointmentsToday: Appointment[];
+  unconfirmedAppointments: Appointment[];
   patientNamesById: Record<string, string>;
   expiringPlans: MealPlan[];
   recentPatients: Patient[];
   pendingSync: number;
   pendingPayments: number;
   pendingPaymentsAmount: number;
+  pendingPaymentsThisMonth: number;
+  pendingPaymentsAmountThisMonth: number;
   incomeThisMonth: number;
+  incomePreviousMonth: number;
+  incomeActivity: number[];
+  paymentsThisMonth: number;
   recentPayments: DashboardRecentPayment[];
   weeklyActivity: DashboardWeeklyActivityPoint[];
+  monthlyActivity: DashboardWeeklyActivityPoint[];
 }
 
 export interface DashboardRecentPayment {
@@ -65,12 +82,28 @@ const endOfMonth = (d: Date): Date => {
 
 const startOfWeek = (d: Date): Date => {
   const mondayOffset = d.getDay() === 0 ? -6 : 1 - d.getDay();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + mondayOffset, 0, 0, 0, 0);
+  return new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate() + mondayOffset,
+    0,
+    0,
+    0,
+    0,
+  );
 };
 
 const endOfWeek = (d: Date): Date => {
   const start = startOfWeek(d);
-  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6, 23, 59, 59, 999);
+  return new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate() + 6,
+    23,
+    59,
+    59,
+    999,
+  );
 };
 
 const withinDays = (d: Date, days: number): boolean => {
@@ -79,11 +112,43 @@ const withinDays = (d: Date, days: number): boolean => {
   return target >= now && target <= now + days * 24 * 60 * 60 * 1000;
 };
 
-const sameDay = (a: Date, b: Date): boolean => {
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate();
+const toDateOnly = (d: Date): string => {
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0"),
+  ].join("-");
 };
+
+const addDays = (d: Date, days: number): Date => {
+  return new Date(
+    d.getFullYear(),
+    d.getMonth(),
+    d.getDate() + days,
+    0,
+    0,
+    0,
+    0,
+  );
+};
+
+const appointmentStart = (appointment: Appointment): Date => {
+  return new Date(`${appointment.date}T${appointment.startTime}:00`);
+};
+
+const isOperationalAppointment = (appointment: Appointment): boolean => {
+  return (
+    appointment.status === "scheduled" ||
+    appointment.status === "confirmed" ||
+    appointment.status === "in_progress"
+  );
+};
+
+const appointmentMatchesSucursal = (
+  appointment: Appointment,
+  sucursalId: string | null,
+): boolean =>
+  rowMatchesSucursal({ sucursal_id: appointment.officeId }, sucursalId);
 
 const weekDayLabels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 
@@ -96,161 +161,328 @@ const inRange = (d: Date, from: Date, to: Date): boolean => {
   return time >= from.getTime() && time <= to.getTime();
 };
 
+const paymentStatusForRow = (row: ConsultationRow): string => {
+  return row.payment_status ?? (row.paid ? "paid" : "pending");
+};
+
+const paidAmountForRow = (row: ConsultationRow): number => {
+  const paymentStatus = paymentStatusForRow(row);
+  const amount =
+    row.amount_paid ?? (paymentStatus === "paid" || row.paid ? row.cost : 0);
+  return Math.max(0, amount);
+};
+
+const pendingAmountForRow = (row: ConsultationRow): number => {
+  return paymentStatusForRow(row) === "partial"
+    ? Math.max(0, row.cost - paidAmountForRow(row))
+    : row.cost;
+};
+
 /**
  * Hook del dashboard.
  *
- * Reglas de filtrado:
- *  - `recentPatients` se construye desde la lista global (incluye archivados)
- *    porque la lista de "recientes" es histórica, no operativa.
- *  - `upcomingConsultations`, `consultationsThisMonth` y `expiringPlans` se
- *    filtran por el conjunto de pacientes con `status === "active"`. Pacientes
- *    archivados no aparecen en el dashboard operativo.
- *  - `activePlans` y `totalActivePatients` se derivan de los totales
- *    server-side / repositorio (no se refiltran en cliente).
- *
- * Si el cálculo de `activePatientIds` falla, se cae al fallback: los items
- * de consultas y planes se devuelven tal cual, marcados con un warning en
- * consola. Esto preserva disponibilidad del dashboard aunque la carga
- * inicial de pacientes tarde más de la cuenta.
+ * Las métricas operativas futuras se limitan a pacientes activos. Los datos
+ * históricos y financieros conservan pacientes inactivos o archivados para
+ * no alterar consultas, ingresos ni saldos ya registrados.
  */
-export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => void } {
+export function useDashboardKpis(): AsyncState<DashboardKpis> & {
+  reload: () => void;
+} {
   const [state, setState] = React.useState<AsyncState<DashboardKpis>>(initial);
+  const loadGenerationRef = React.useRef(0);
   const syncSucursalId = useSyncStore((s) => s.sucursalId);
   const authSucursalId = useAuthStore((s) => s.sucursalActivaId);
+  const role = useAuthStore((s) => s.user?.rol ?? null);
   const activeSucursalId = syncSucursalId ?? authSucursalId ?? null;
+  const canViewFinancialData = Boolean(
+    role && (BILLING_REPORT_ROLES as readonly string[]).includes(role),
+  );
 
   const load = React.useCallback(() => {
+    const loadGeneration = ++loadGenerationRef.current;
     setState((s) => ({ ...s, loading: true, error: null }));
     const now = new Date();
+    const monthStart = startOfMonth(now);
+    const monthEnd = endOfMonth(now);
+    const previousMonthDate = new Date(
+      now.getFullYear(),
+      now.getMonth() - 1,
+      1,
+    );
+    const previousMonthStart = startOfMonth(previousMonthDate);
+    const previousMonthEnd = endOfMonth(previousMonthDate);
+    const previousMonthComparisonEnd = new Date(
+      previousMonthDate.getFullYear(),
+      previousMonthDate.getMonth(),
+      Math.min(now.getDate(), previousMonthEnd.getDate()),
+      now.getHours(),
+      now.getMinutes(),
+      now.getSeconds(),
+      now.getMilliseconds(),
+    );
     const weekStart = startOfWeek(now);
     const weekEnd = endOfWeek(now);
-    const scopedQuery = activeSucursalId ? { sucursalId: activeSucursalId } : {};
+    const todayDateOnly = toDateOnly(now);
+    const upcomingEndDateOnly = toDateOnly(addDays(now, 30));
     Promise.all([
-      patientService.list.execute({ ...scopedQuery, limit: 500 }),
-      mealPlanService.list.execute({ ...scopedQuery, status: "active", limit: 500 }),
-      consultationService.list.execute({
-        ...scopedQuery,
-        from: startOfMonth(now),
-        to: endOfMonth(now),
-        limit: 500,
-      }),
-      consultationService.list.execute({
-        ...scopedQuery,
-        from: weekStart,
-        to: weekEnd,
-        limit: 500,
-      }),
-      consultationService.list.execute({
-        ...scopedQuery,
-        status: ["scheduled", "in-progress"],
-        limit: 500,
-      }),
-      db.consultations
-        .filter((r) => {
-          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
-          if (r.deleted_at) return false;
-          if (!(r.cost > 0)) return false;
-          const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
-          return ps === "pending" || ps === "partial";
-        })
+      db.patients
+        .filter(
+          (r) =>
+            r.deleted_at === null &&
+            rowMatchesSucursal(r, activeSucursalId),
+        )
+        .toArray(),
+      db.meal_plans
+        .filter(
+          (r) =>
+            r.deleted_at === null &&
+            r.status === "active" &&
+            rowMatchesSucursal(r, activeSucursalId),
+        )
         .toArray(),
       db.consultations
-        .filter((r) => {
-          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
-          if (r.deleted_at) return false;
-          if (!(r.cost > 0)) return false;
-          const t = new Date(r.consultation_date).getTime();
-          if (t < startOfMonth(now).getTime() || t > endOfMonth(now).getTime()) return false;
-          const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
-          return ps === "paid";
-        })
+        .filter(
+          (r) =>
+            rowMatchesSucursal(r, activeSucursalId) && !r.deleted_at,
+        )
         .toArray(),
-      db.consultations
-        .filter((r) => {
-          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
-          if (r.deleted_at) return false;
-          if (!(r.cost > 0)) return false;
-          const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
-          return ps === "paid" || ps === "partial";
-        })
-        .toArray(),
+      agendaService.listByRange(todayDateOnly, upcomingEndDateOnly),
+      db.sync_queue
+        .filter(
+          (r) =>
+            rowMatchesSucursal(
+              { sucursal_id: r.sucursalId },
+              activeSucursalId,
+            ) &&
+            (r.status === "pending" ||
+              r.status === "error" ||
+              r.status === "conflict"),
+        )
+        .count(),
     ])
       .then(
         ([
-          patientsAll,
-          activePlansAll,
-          consultsThisMonth,
-          consultsThisWeek,
-          upcomingConsultations,
-          pendingRows,
-          incomeRows,
-          recentPaymentRows,
+          patientRows,
+          activePlanRows,
+          consultationRows,
+          appointmentRange,
+          pendingSync,
         ]) => {
-          // Construimos el set de pacientes activos para filtrar
-          // consultas / planes. Esto oculta del dashboard los pacientes
-          // archivados y sus entidades vinculadas.
+          if (loadGeneration !== loadGenerationRef.current) return;
+
+          const scopedConsultationRows = consultationRows as ConsultationRow[];
+          const consultRowsThisMonth = canViewFinancialData
+            ? scopedConsultationRows.filter((row) => {
+                if (row.status !== "completed") return false;
+                const time = new Date(row.consultation_date).getTime();
+                return time >= monthStart.getTime() && time <= now.getTime();
+              })
+            : [];
+          const consultRowsThisWeek = canViewFinancialData
+            ? scopedConsultationRows.filter((row) => {
+                if (row.status !== "completed") return false;
+                const time = new Date(row.consultation_date).getTime();
+                return (
+                  time >= weekStart.getTime() &&
+                  time <= Math.min(weekEnd.getTime(), now.getTime())
+                );
+              })
+            : [];
+          const upcomingConsultationRows = scopedConsultationRows.filter(
+            (row) => row.status === "scheduled" || row.status === "in-progress",
+          );
+          const pendingRows = scopedConsultationRows.filter((row) => {
+            if (!(row.cost > 0)) return false;
+            if (row.status !== "completed" && row.status !== "in-progress")
+              return false;
+            const paymentStatus = paymentStatusForRow(row);
+            return paymentStatus === "pending" || paymentStatus === "partial";
+          });
+          const recentPaymentRows = scopedConsultationRows.filter((row) => {
+            if (!(row.cost > 0)) return false;
+            const paymentStatus = paymentStatusForRow(row);
+            return paymentStatus === "paid" || paymentStatus === "partial";
+          });
+          const patientsAll = patientRows.map(patientRowToDomain);
+          const activePlansAll = activePlanRows.map(mealPlanRowToDomain);
+          const consultsThisMonth = consultRowsThisMonth.map(
+            consultationRowToDomain,
+          );
+          const consultsThisWeek = consultRowsThisWeek.map(
+            consultationRowToDomain,
+          );
+          const upcomingConsultations = upcomingConsultationRows.map(
+            consultationRowToDomain,
+          );
           const activePatientIds = new Set(
-            (patientsAll.items as Patient[])
+            patientsAll
               .filter((p) => p.status === "active")
               .map((p) => p.id.toString()),
           );
           const patientNamesById = Object.fromEntries(
-            (patientsAll.items as Patient[]).map((p) => [p.id.toString(), p.fullName]),
+            patientsAll.map((p) => [p.id.toString(), p.fullName]),
+          );
+          const activePlans = activePlansAll.filter((p) =>
+            activePatientIds.has(p.patientId.toString()),
           );
 
-          const expiring = (activePlansAll.items as MealPlan[])
-            .filter(
-              (p) =>
-                p.endDate &&
-                withinDays(p.endDate, 30) &&
-                activePatientIds.has(p.patientId.toString()),
-            );
+          const expiring = activePlans.filter(
+            (p) =>
+              p.endDate &&
+              withinDays(p.endDate, 7) &&
+              activePatientIds.has(p.patientId.toString()),
+          );
 
-          const recent = [...(patientsAll.items as Patient[])]
+          const recent = [...patientsAll]
             .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
             .slice(0, 5);
+          const newPatientsThisMonth = patientsAll.filter((p) =>
+            inRange(p.recordOpenedAt, monthStart, now),
+          ).length;
+          const newPatientsPreviousMonth = patientsAll.filter((p) =>
+            inRange(
+              p.recordOpenedAt,
+              previousMonthStart,
+              previousMonthComparisonEnd,
+            ),
+          ).length;
 
-          const upcoming = (upcomingConsultations.items as Consultation[]).filter(
-            (c) => activePatientIds.has(c.patientId.toString()),
+          const upcoming = upcomingConsultations.filter((c) =>
+            activePatientIds.has(c.patientId.toString()),
           );
 
-          const thisMonth = (consultsThisMonth.items as Consultation[]).filter(
-            (c) => activePatientIds.has(c.patientId.toString()),
+          const appointments = (appointmentRange as Appointment[])
+            .filter(
+              (appointment) =>
+                activePatientIds.has(appointment.patientId) &&
+                appointmentMatchesSucursal(appointment, activeSucursalId) &&
+                isOperationalAppointment(appointment),
+            )
+            .sort(
+              (a, b) =>
+                appointmentStart(a).getTime() - appointmentStart(b).getTime(),
+            );
+          const appointmentsToday = appointments.filter(
+            (appointment) => appointment.date === todayDateOnly,
           );
-          const today = thisMonth.filter((c) => sameDay(c.consultationDate, now));
+          const unconfirmedAppointments = appointments.filter(
+            (appointment) => appointment.status === "scheduled",
+          );
 
-          const weeklyActivity: DashboardWeeklyActivityPoint[] = weekDayLabels.map((day) => ({
-            day,
-            consultas: 0,
-            nuevos: 0,
-          }));
-          (consultsThisWeek.items as Consultation[])
-            .filter((c) => activePatientIds.has(c.patientId.toString()))
-            .forEach((c) => {
-              weeklyActivity[weekDayIndex(c.consultationDate)]!.consultas += 1;
-            });
-          (patientsAll.items as Patient[])
-            .filter((p) => p.status === "active" && inRange(p.recordOpenedAt, weekStart, weekEnd))
+          const thisMonth = consultsThisMonth;
+          const todayConsultations = thisMonth.filter(
+            (c) => toDateOnly(c.consultationDate) === todayDateOnly,
+          );
+          const consultationsToday = todayConsultations.length;
+          const scheduledConsultationsToday = appointmentsToday.length;
+
+          const weeklyActivity: DashboardWeeklyActivityPoint[] =
+            weekDayLabels.map((day) => ({
+              day,
+              consultas: 0,
+              nuevos: 0,
+            }));
+          consultsThisWeek.forEach((c) => {
+            weeklyActivity[weekDayIndex(c.consultationDate)]!.consultas += 1;
+          });
+          patientsAll
+            .filter((p) =>
+              inRange(
+                p.recordOpenedAt,
+                weekStart,
+                now < weekEnd ? now : weekEnd,
+              ),
+            )
             .forEach((p) => {
               weeklyActivity[weekDayIndex(p.recordOpenedAt)]!.nuevos += 1;
             });
 
-          const pendingPaymentsAmount = (pendingRows as ConsultationRow[]).reduce(
-            (sum: number, r: ConsultationRow) => {
-              const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
-              const ap = r.amount_paid ?? 0;
-              return ps === "partial" ? sum + Math.max(0, r.cost - ap) : sum + r.cost;
-            },
+          const weeksInMonth = Math.ceil(monthEnd.getDate() / 7);
+          const monthlyActivity: DashboardWeeklyActivityPoint[] = Array.from(
+            { length: weeksInMonth },
+            (_, index) => ({
+              day: `Sem ${index + 1}`,
+              consultas: 0,
+              nuevos: 0,
+            }),
+          );
+          thisMonth.forEach((consultation) => {
+            const weekIndex = Math.min(
+              weeksInMonth - 1,
+              Math.floor((consultation.consultationDate.getDate() - 1) / 7),
+            );
+            monthlyActivity[weekIndex]!.consultas += 1;
+          });
+          patientsAll
+            .filter((p) => inRange(p.recordOpenedAt, monthStart, now))
+            .forEach((patient) => {
+              const weekIndex = Math.min(
+                weeksInMonth - 1,
+                Math.floor((patient.recordOpenedAt.getDate() - 1) / 7),
+              );
+              monthlyActivity[weekIndex]!.nuevos += 1;
+            });
+
+          const scopedPendingRows = pendingRows as ConsultationRow[];
+          const scopedPendingRowsThisMonth = scopedPendingRows.filter((r) => {
+            const t = new Date(r.consultation_date).getTime();
+            return t >= monthStart.getTime() && t <= monthEnd.getTime();
+          });
+          const scopedIncomeRows = (
+            recentPaymentRows as ConsultationRow[]
+          ).filter((r) => {
+            const paymentDate = new Date(
+              r.paid_at ?? r.consultation_date,
+            ).getTime();
+            return (
+              paymentDate >= monthStart.getTime() &&
+              paymentDate <= now.getTime()
+            );
+          });
+          const scopedPreviousIncomeRows = (
+            recentPaymentRows as ConsultationRow[]
+          ).filter((r) => {
+            const paymentDate = new Date(
+              r.paid_at ?? r.consultation_date,
+            ).getTime();
+            return (
+              paymentDate >= previousMonthStart.getTime() &&
+              paymentDate <= previousMonthComparisonEnd.getTime()
+            );
+          });
+          const scopedRecentPaymentRows =
+            recentPaymentRows as ConsultationRow[];
+
+          const pendingPaymentsAmount = scopedPendingRows.reduce(
+            (sum: number, r: ConsultationRow) => sum + pendingAmountForRow(r),
             0,
           );
-          const incomeThisMonth = (incomeRows as ConsultationRow[]).reduce(
-            (sum: number, r: ConsultationRow) => sum + r.cost,
+          const pendingPaymentsAmountThisMonth =
+            scopedPendingRowsThisMonth.reduce(
+              (sum: number, r: ConsultationRow) => sum + pendingAmountForRow(r),
+              0,
+            );
+          const incomeThisMonth = scopedIncomeRows.reduce(
+            (sum: number, r: ConsultationRow) => sum + paidAmountForRow(r),
             0,
           );
-          const recentPayments = (recentPaymentRows as ConsultationRow[])
+          const incomeActivity = Array.from({ length: weeksInMonth }, () => 0);
+          scopedIncomeRows.forEach((row) => {
+            const paymentDate = new Date(row.paid_at ?? row.consultation_date);
+            const weekIndex = Math.min(
+              weeksInMonth - 1,
+              Math.floor((paymentDate.getDate() - 1) / 7),
+            );
+            incomeActivity[weekIndex] += paidAmountForRow(row);
+          });
+          const incomePreviousMonth = scopedPreviousIncomeRows.reduce(
+            (sum: number, r: ConsultationRow) => sum + paidAmountForRow(r),
+            0,
+          );
+          const recentPayments = scopedRecentPaymentRows
             .map((r) => {
-              const paymentStatus = r.payment_status ?? (r.paid ? "paid" : "pending");
-              const amountPaid = r.amount_paid ?? (r.paid ? r.cost : 0);
+              const paymentStatus = paymentStatusForRow(r);
+              const amountPaid = paidAmountForRow(r);
               return {
                 patientName: patientNamesById[r.patient_id] ?? "(sin nombre)",
                 concept: r.reason || "Consulta nutricional",
@@ -264,46 +496,70 @@ export function useDashboardKpis(): AsyncState<DashboardKpis> & { reload: () => 
               };
             })
             .sort((a, b) => {
-              const aTime = (a.paidAt ?? a.updatedAt ?? a.consultationDate).getTime();
-              const bTime = (b.paidAt ?? b.updatedAt ?? b.consultationDate).getTime();
+              const aTime = (
+                a.paidAt ??
+                a.updatedAt ??
+                a.consultationDate
+              ).getTime();
+              const bTime = (
+                b.paidAt ??
+                b.updatedAt ??
+                b.consultationDate
+              ).getTime();
               return bTime - aTime;
             })
             .slice(0, 3);
 
           setState({
             data: {
-              totalPatients: patientsAll.total,
+              totalPatients: patientsAll.length,
               totalActivePatients: activePatientIds.size,
-              activePlans: activePlansAll.total,
-              consultationsToday: today.length,
+              newPatientsThisMonth,
+              newPatientsPreviousMonth,
+              activePlans: activePlans.length,
+              consultationsToday,
+              scheduledConsultationsToday,
               consultationsThisMonth: thisMonth.length,
               upcomingConsultations: upcoming,
+              upcomingAppointments: appointments,
+              appointmentsToday,
+              unconfirmedAppointments,
               patientNamesById,
               expiringPlans: expiring,
               recentPatients: recent,
-              pendingSync: 0,
-              pendingPayments: pendingRows.length,
+              pendingSync,
+              pendingPayments: scopedPendingRows.length,
               pendingPaymentsAmount,
+              pendingPaymentsThisMonth: scopedPendingRowsThisMonth.length,
+              pendingPaymentsAmountThisMonth,
               incomeThisMonth,
+              incomePreviousMonth,
+              incomeActivity,
+              paymentsThisMonth: scopedIncomeRows.length,
               recentPayments,
               weeklyActivity,
+              monthlyActivity,
             },
             error: null,
             loading: false,
           });
         },
       )
-      .catch((err) =>
+      .catch((err) => {
+        if (loadGeneration !== loadGenerationRef.current) return;
         setState({
           data: null,
           error: err instanceof Error ? err : new Error(String(err)),
           loading: false,
-        }),
-      );
-  }, [activeSucursalId]);
+        });
+      });
+  }, [activeSucursalId, canViewFinancialData]);
 
   React.useEffect(() => {
     load();
+    return () => {
+      loadGenerationRef.current += 1;
+    };
   }, [load]);
 
   return { ...state, reload: load };

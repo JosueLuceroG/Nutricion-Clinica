@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { PatientRecordNumberConfig } from "@modules/patient/application/patientRecordNumber";
 
 export type UsageMode = "beginner" | "normal";
 export type SubscriptionPlan = "free" | "premium";
@@ -80,8 +81,6 @@ export interface PreferencesState {
   usageMode: UsageMode;
   aiEnabled: boolean;
   aiProvider: AIProviderType;
-  openAiApiKey: string;
-  openAiModel: string;
   subscriptionPlan: SubscriptionPlan;
   pdfBrandingEnabled: boolean;
   clinicDisplayName: string;
@@ -89,6 +88,8 @@ export interface PreferencesState {
   dashboardPremiumKpiOrder: DashboardPremiumKpiId[];
   dashboardPremiumKpiHiddenIds: DashboardPremiumKpiId[];
   clinicalSectionIds: ClinicalSectionId[];
+  patientRecordNumberConfig: PatientRecordNumberConfig | null;
+  patientRecordNumberNextSequence: number;
   setLanguage: (lang: PreferencesState["language"]) => void;
   setDateFormat: (format: PreferencesState["dateFormat"]) => void;
   setCurrency: (currency: PreferencesState["currency"]) => void;
@@ -96,8 +97,6 @@ export interface PreferencesState {
   setUsageMode: (mode: UsageMode) => void;
   setAiEnabled: (enabled: boolean) => void;
   setAiProvider: (provider: AIProviderType) => void;
-  setOpenAiApiKey: (key: string) => void;
-  setOpenAiModel: (model: string) => void;
   setSubscriptionPlan: (plan: SubscriptionPlan) => void;
   setPdfBrandingEnabled: (enabled: boolean) => void;
   setClinicDisplayName: (name: string) => void;
@@ -108,6 +107,10 @@ export interface PreferencesState {
   resetDashboardPremiumKpis: () => void;
   setClinicalSectionIds: (ids: ClinicalSectionId[]) => void;
   resetClinicalSections: () => void;
+  setPatientRecordNumberConfig: (
+    config: PatientRecordNumberConfig | null,
+  ) => void;
+  advancePatientRecordNumberSequence: () => void;
 }
 
 export const usePreferencesStore = create<PreferencesState>()(
@@ -120,8 +123,6 @@ export const usePreferencesStore = create<PreferencesState>()(
       usageMode: "normal",
       aiEnabled: false,
       aiProvider: "ollama",
-      openAiApiKey: "",
-      openAiModel: "gpt-4o-mini",
       subscriptionPlan: "free",
       pdfBrandingEnabled: true,
       clinicDisplayName: "NutriClinica",
@@ -129,6 +130,8 @@ export const usePreferencesStore = create<PreferencesState>()(
       dashboardPremiumKpiOrder: DEFAULT_DASHBOARD_PREMIUM_KPI_IDS,
       dashboardPremiumKpiHiddenIds: [],
       clinicalSectionIds: DEFAULT_CLINICAL_SECTION_IDS,
+      patientRecordNumberConfig: null,
+      patientRecordNumberNextSequence: 1,
       setLanguage: (language) => set({ language }),
       setDateFormat: (dateFormat) => set({ dateFormat }),
       setCurrency: (currency) => set({ currency }),
@@ -136,8 +139,6 @@ export const usePreferencesStore = create<PreferencesState>()(
       setUsageMode: (usageMode) => set({ usageMode }),
       setAiEnabled: (aiEnabled) => set({ aiEnabled }),
       setAiProvider: (aiProvider) => set({ aiProvider }),
-      setOpenAiApiKey: (openAiApiKey) => set({ openAiApiKey }),
-      setOpenAiModel: (openAiModel) => set({ openAiModel }),
       setSubscriptionPlan: (subscriptionPlan) => set({ subscriptionPlan }),
       setPdfBrandingEnabled: (pdfBrandingEnabled) => set({ pdfBrandingEnabled }),
       setClinicDisplayName: (clinicDisplayName) => set({ clinicDisplayName }),
@@ -151,6 +152,13 @@ export const usePreferencesStore = create<PreferencesState>()(
       }),
       setClinicalSectionIds: (clinicalSectionIds) => set({ clinicalSectionIds }),
       resetClinicalSections: () => set({ clinicalSectionIds: DEFAULT_CLINICAL_SECTION_IDS }),
+      setPatientRecordNumberConfig: (patientRecordNumberConfig) =>
+        set({ patientRecordNumberConfig }),
+      advancePatientRecordNumberSequence: () =>
+        set((state) => ({
+          patientRecordNumberNextSequence:
+            Math.max(1, state.patientRecordNumberNextSequence) + 1,
+        })),
     }),
     { name: "preferences-store" },
   ),

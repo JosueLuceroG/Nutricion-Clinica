@@ -1,4 +1,5 @@
 import { httpRequest } from './httpClient.js';
+import { getApiBaseUrl } from './apiBaseUrl.js';
 import { useAuthStore } from '@store/authStore';
 import { useSyncStore } from '@store/syncStore';
 import type { TelemedicinaGrabacionDTO, TelemedicinaSalaDTO } from '@nutriclinica/shared';
@@ -19,15 +20,8 @@ export interface UploadGrabacionInput {
   consentTextVersion: string;
 }
 
-function getBaseUrl(): string {
-  const fromVite = (import.meta as unknown as { env?: Record<string, string> }).env?.VITE_API_URL;
-  if (fromVite) return fromVite;
-  const fromProcess = typeof process !== 'undefined' ? process.env?.VITE_API_URL : undefined;
-  return fromProcess ?? 'http://localhost:3000';
-}
-
 function buildUrl(path: string): string {
-  return `${getBaseUrl().replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
+  return `${getApiBaseUrl()}/${path.replace(/^\//, '')}`;
 }
 
 function authHeaders(): Record<string, string> {
@@ -46,6 +40,10 @@ export const telemedicinaApi = {
 
   async get(id: string): Promise<TelemedicinaSalaDTO> {
     return httpRequest(`/telemedicina/${id}`);
+  },
+
+  async getWsTicket(salaId: string): Promise<{ ticket: string; expiresAt: string }> {
+    return httpRequest(`/telemedicina/${salaId}/ws-ticket`, { method: 'POST' });
   },
 
   async create(input: CreateSalaInput): Promise<{ id: string }> {

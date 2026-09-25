@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { PageHeader, PageContent } from "@app/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import { Input } from "@components/ui/input";
@@ -12,6 +13,16 @@ import { calculateBMR, calculateBMRBoth, BMRFormulaLabel } from "@utils/calculat
 import { calculateTDEE, distributionToGrams, type ActivityFactor, ActivityLevel, ActivityLevelLabel, ActivityLevelDescription } from "@utils/calculations/tdee";
 import { bodyFatFromBMI } from "@utils/calculations/bodyComposition";
 import { calculateCKDepi2021, GFRCategoryLabel, classifyGFR, calculateHOMA, interpretHOMA, calculateLDL } from "@utils/calculations/labCalculations";
+
+const TOOL_TARGET_IDS = {
+  bmi: "calculator-bmi",
+  bmr: "calculator-bmr",
+  tdee: "calculator-tdee",
+  "body-fat": "calculator-body-fat",
+  egfr: "calculator-egfr",
+  "homa-ir": "calculator-homa-ir",
+  ldl: "calculator-ldl",
+} as const;
 
 const bmiColor = (bmi: number): string => {
   if (bmi < 18.5) return "text-blue-500";
@@ -39,9 +50,9 @@ function BMICalculator() {
   };
 
   return (
-    <Card>
+    <Card id="calculator-bmi" tabIndex={-1} aria-labelledby="calculator-bmi-title">
       <CardHeader>
-        <CardTitle>IMC — Índice de Masa Corporal</CardTitle>
+        <CardTitle id="calculator-bmi-title">IMC — Índice de Masa Corporal</CardTitle>
         <CardDescription>Peso (kg) / (talla en m)²</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -106,9 +117,9 @@ function BMRCalculator() {
   };
 
   return (
-    <Card>
+    <Card id="calculator-bmr" tabIndex={-1} aria-labelledby="calculator-bmr-title">
       <CardHeader>
-        <CardTitle>TMB — Tasa Metabólica Basal</CardTitle>
+        <CardTitle id="calculator-bmr-title">TMB — Tasa Metabólica Basal</CardTitle>
         <CardDescription>Mifflin-St Jeor / Harris-Benedict (kcal/día)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -191,9 +202,9 @@ function TDEECalculator() {
   };
 
   return (
-    <Card>
+    <Card id="calculator-tdee" tabIndex={-1} aria-labelledby="calculator-tdee-title">
       <CardHeader>
-        <CardTitle>GET — Gasto Energético Total</CardTitle>
+        <CardTitle id="calculator-tdee-title">GET — Gasto Energético Total</CardTitle>
         <CardDescription>TDEE = TMB × factor de actividad + macronutrientes</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -253,9 +264,9 @@ function BodyCompCalculator() {
   };
 
   return (
-    <Card>
+    <Card id="calculator-body-fat" tabIndex={-1} aria-labelledby="calculator-body-fat-title">
       <CardHeader>
-        <CardTitle>Composición corporal (Deurenberg)</CardTitle>
+        <CardTitle id="calculator-body-fat-title">Composición corporal (Deurenberg)</CardTitle>
         <CardDescription>% grasa estimado desde IMC, edad y sexo</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -350,8 +361,8 @@ function LabCalculator() {
         <CardDescription>eGFR (CKD-EPI 2021), HOMA-IR, LDL (Friedewald)</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-4">
-          <h4 className="font-medium">eGFR — Tasa de filtración glomerular</h4>
+        <div id="calculator-egfr" className="space-y-4" tabIndex={-1} aria-labelledby="calculator-egfr-title">
+          <h4 id="calculator-egfr-title" className="font-medium">eGFR — Tasa de filtración glomerular</h4>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="egfr-cr">Creatinina (mg/dL)</Label>
@@ -381,8 +392,8 @@ function LabCalculator() {
           )}
         </div>
         <Separator />
-        <div className="space-y-4">
-          <h4 className="font-medium">HOMA-IR — Resistencia a la insulina</h4>
+        <div id="calculator-homa-ir" className="space-y-4" tabIndex={-1} aria-labelledby="calculator-homa-ir-title">
+          <h4 id="calculator-homa-ir-title" className="font-medium">HOMA-IR — Resistencia a la insulina</h4>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="homa-ins">Insulina ayuno (µUI/mL)</Label>
@@ -402,8 +413,8 @@ function LabCalculator() {
           )}
         </div>
         <Separator />
-        <div className="space-y-4">
-          <h4 className="font-medium">LDL (Friedewald)</h4>
+        <div id="calculator-ldl" className="space-y-4" tabIndex={-1} aria-labelledby="calculator-ldl-title">
+          <h4 id="calculator-ldl-title" className="font-medium">LDL (Friedewald)</h4>
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ldl-ct">Colesterol total (mg/dL)</Label>
@@ -433,6 +444,24 @@ function LabCalculator() {
 
 export function CalculationsPage() {
   const { t } = useTranslation();
+  const [searchParams] = useSearchParams();
+  const tool = searchParams.get("tool");
+
+  React.useEffect(() => {
+    if (!tool || !Object.hasOwn(TOOL_TARGET_IDS, tool)) return;
+
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.getElementById(TOOL_TARGET_IDS[tool as keyof typeof TOOL_TARGET_IDS]);
+      if (!target) return;
+
+      const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
+      target.focus({ preventScroll: true });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [tool]);
+
   return (
     <>
       <PageHeader

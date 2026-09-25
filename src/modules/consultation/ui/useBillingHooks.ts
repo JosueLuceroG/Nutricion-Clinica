@@ -2,10 +2,39 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db as defaultDb, type NutriClinicaDB } from "@services/db/dexieSchema";
 import { consultationRowToDomain } from "@modules/consultation/infrastructure/consultationMapper";
 import { PatientId } from "@modules/patient/domain/PatientId";
-import type { Consultation } from "@modules/consultation/domain/Consultation";
+import { Consultation } from "@modules/consultation/domain/Consultation";
+import { Vitals } from "@modules/consultation/domain/Vitals";
 import { consultationService } from "@services/consultationService";
 import type { RegisterPaymentInput } from "@modules/consultation/application/consultationUseCases";
 import { patientService } from "@services/patientService";
+import { useAuthStore } from "@store/authStore";
+import { useSyncStore } from "@store/syncStore";
+import { rowMatchesSucursal } from "@services/tenancy/sucursalScope";
+
+const useActiveSucursalId = (): string | null => {
+  const syncSucursalId = useSyncStore((state) => state.sucursalId);
+  const authSucursalId = useAuthStore((state) => state.sucursalActivaId);
+  return syncSucursalId ?? authSucursalId ?? null;
+};
+
+const visibleBillingConsultation = (
+  consultation: Consultation,
+  redactClinical: boolean,
+): Consultation =>
+  redactClinical
+    ? Consultation.reconstitute({
+        ...consultation.toProps(),
+        reason: "",
+        subjective: null,
+        objective: null,
+        vitals: Vitals.empty(),
+        assessment: null,
+        plan: null,
+        anthropometryId: null,
+        labPanelId: null,
+        nextVisitDate: null,
+      })
+    : consultation;
 
 export interface PendingPaymentItem {
   consultation: Consultation;
@@ -42,15 +71,21 @@ export const usePendingPayments = (
   dbInstance: NutriClinicaDB = defaultDb,
 ) => {
   const { from, to, patientQuery = "" } = filters;
+  const activeSucursalId = useActiveSucursalId();
+  const redactClinical = useAuthStore(
+    (state) => state.user?.rol === "facturacion",
+  );
 
   const result = useLiveQuery(
     async (): Promise<{ items: PendingPaymentItem[]; total: number; totalAmount: number }> => {
+      if (!activeSucursalId) return { items: [], total: 0, totalAmount: 0 };
       const fromMs = from?.getTime() ?? 0;
       const toMs = to?.getTime() ?? Number.MAX_SAFE_INTEGER;
 
       const rows = await dbInstance.consultations
         .filter((r) => {
           if (r.deleted_at) return false;
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           const ps = r.payment_status ?? (r.paid ? "paid" : "pending");
           if (ps === "paid" || ps === "refunded" || ps === "cancelled") return false;
           if (!(r.cost > 0)) return false;
@@ -62,13 +97,17 @@ export const usePendingPayments = (
 
       const patientIds = Array.from(new Set(rows.map((r) => r.patient_id)));
       const patientRows = patientIds.length
-        ? await dbInstance.patients.where("id").anyOf(patientIds).toArray()
+        ? (await dbInstance.patients.where("id").anyOf(patientIds).toArray())
+            .filter((row) => rowMatchesSucursal(row, activeSucursalId))
         : [];
       const patientNameById = new Map(patientRows.map((p) => [p.id, `${p.first_name} ${p.last_name}`]));
 
       const items: PendingPaymentItem[] = rows
         .map((r) => {
-          const consultation = consultationRowToDomain(r);
+          const consultation = visibleBillingConsultation(
+            consultationRowToDomain(r),
+            redactClinical,
+          );
           const patientName = patientNameById.get(r.patient_id) ?? "(sin nombre)";
           const ps = consultation.paymentStatus ?? "pending";
           const ap = consultation.amountPaid ?? 0;
@@ -87,7 +126,7 @@ export const usePendingPayments = (
       const totalAmount = items.reduce((sum, it) => sum + it.remainingAmount, 0);
       return { items, total: items.length, totalAmount };
     },
-    [dbInstance, from?.getTime(), to?.getTime(), patientQuery],
+    [dbInstance, from?.getTime(), to?.getTime(), patientQuery, activeSucursalId, redactClinical],
     { items: [] as PendingPaymentItem[], total: 0, totalAmount: 0 },
   );
 
@@ -106,17 +145,25 @@ export const usePendingPayments = (
 export const useConsultationLive = (
   id: string | null,
   dbInstance: NutriClinicaDB = defaultDb,
-) =>
-  useLiveQuery(
+) => {
+  const activeSucursalId = useActiveSucursalId();
+  const redactClinical = useAuthStore(
+    (state) => state.user?.rol === "facturacion",
+  );
+  return useLiveQuery(
     async (): Promise<Consultation | null> => {
-      if (!id) return null;
+      if (!id || !activeSucursalId) return null;
       const row = await dbInstance.consultations.get(id);
-      if (!row) return null;
-      return consultationRowToDomain(row);
+      if (!row || !rowMatchesSucursal(row, activeSucursalId)) return null;
+      return visibleBillingConsultation(
+        consultationRowToDomain(row),
+        redactClinical,
+      );
     },
-    [dbInstance, id],
+    [dbInstance, id, activeSucursalId, redactClinical],
     null,
   );
+};
 
 export interface PaymentRecord {
   consultation: Consultation;
@@ -137,15 +184,23 @@ export const usePaymentsHistory = (
   dbInstance: NutriClinicaDB = defaultDb,
 ) => {
   const { from, to, patientQuery = "", paymentStatus, patientIdFilter } = filters;
+  const activeSucursalId = useActiveSucursalId();
+  const redactClinical = useAuthStore(
+    (state) => state.user?.rol === "facturacion",
+  );
 
   const result = useLiveQuery(
     async (): Promise<{ items: PaymentRecord[]; total: number; totalIncome: number; totalPending: number }> => {
+      if (!activeSucursalId) {
+        return { items: [], total: 0, totalIncome: 0, totalPending: 0 };
+      }
       const fromMs = from?.getTime() ?? 0;
       const toMs = to?.getTime() ?? Number.MAX_SAFE_INTEGER;
 
       const rows = await dbInstance.consultations
         .filter((r) => {
           if (r.deleted_at) return false;
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           if (!(r.cost > 0)) return false;
           if (patientIdFilter && r.patient_id !== patientIdFilter) return false;
           const t = new Date(r.consultation_date).getTime();
@@ -160,13 +215,17 @@ export const usePaymentsHistory = (
 
       const patientIds = rows.length ? Array.from(new Set(rows.map((r) => r.patient_id))) : [];
       const patientRows = patientIds.length
-        ? await dbInstance.patients.where("id").anyOf(patientIds).toArray()
+        ? (await dbInstance.patients.where("id").anyOf(patientIds).toArray())
+            .filter((row) => rowMatchesSucursal(row, activeSucursalId))
         : [];
       const patientNameById = new Map(patientRows.map((p) => [p.id, `${p.first_name} ${p.last_name}`]));
 
       const items: PaymentRecord[] = rows
         .map((r) => {
-          const consultation = consultationRowToDomain(r);
+          const consultation = visibleBillingConsultation(
+            consultationRowToDomain(r),
+            redactClinical,
+          );
           const patientName = patientNameById.get(r.patient_id) ?? "(sin nombre)";
           const ps = consultation.paymentStatus ?? "pending";
           const ap = consultation.amountPaid ?? 0;
@@ -192,7 +251,7 @@ export const usePaymentsHistory = (
 
       return { items, total: items.length, totalIncome, totalPending };
     },
-    [dbInstance, from?.getTime(), to?.getTime(), patientQuery, paymentStatus, patientIdFilter],
+    [dbInstance, from?.getTime(), to?.getTime(), patientQuery, paymentStatus, patientIdFilter, activeSucursalId, redactClinical],
     { items: [] as PaymentRecord[], total: 0, totalIncome: 0, totalPending: 0 },
   );
 
@@ -213,13 +272,16 @@ export const usePatientPaymentSummary = (
   patientId: string | null,
   dbInstance: NutriClinicaDB = defaultDb,
 ): PatientPaymentSummary | null => {
+  const activeSucursalId = useActiveSucursalId();
   return useLiveQuery(
     async () => {
-      if (!patientId) return null;
+      if (!patientId || !activeSucursalId) return null;
       const rows = await dbInstance.consultations
+        .where("patient_id")
+        .equals(patientId)
         .filter((r) => {
           if (r.deleted_at) return false;
-          if (r.patient_id !== patientId) return false;
+          if (!rowMatchesSucursal(r, activeSucursalId)) return false;
           if (!(r.cost > 0)) return false;
           return true;
         })
@@ -227,6 +289,7 @@ export const usePatientPaymentSummary = (
 
       let totalCost = 0;
       let totalPaid = 0;
+      let totalPending = 0;
       let paidCount = 0;
       let pendingCount = 0;
       let partialCount = 0;
@@ -240,24 +303,29 @@ export const usePatientPaymentSummary = (
           paidCount += 1;
         } else if (ps === "partial") {
           totalPaid += ap;
-          totalCost -= row.cost - ap;
+          totalPending += row.cost - ap;
           partialCount += 1;
-        } else {
+        } else if (ps === "pending") {
+          totalPending += row.cost;
           pendingCount += 1;
+        } else {
+          // refunded / cancelled: ni pagadas ni por cobrar — se excluyen
+          // del costo total, de lo pagado y de lo pendiente.
+          totalCost -= row.cost;
         }
       }
 
       return {
         totalCost,
         totalPaid,
-        totalPending: totalCost - totalPaid,
+        totalPending,
         consultationCount: rows.length,
         paidCount,
         pendingCount,
         partialCount,
       };
     },
-    [dbInstance, patientId],
+    [dbInstance, patientId, activeSucursalId],
     null,
   );
 };
@@ -266,16 +334,17 @@ export const usePatientPaymentSummary = (
  * Carga un Patient como live query.
  */
 export const usePatientLive = (id: string | null) => {
+  const activeSucursalId = useActiveSucursalId();
   return useLiveQuery(
     async () => {
-      if (!id) return null;
+      if (!id || !activeSucursalId) return null;
       try {
         return await patientService.get.execute(PatientId.fromUnsafe(id));
       } catch {
         return null;
       }
     },
-    [id],
+    [id, activeSucursalId],
     null,
   );
 };

@@ -1,13 +1,17 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type Theme = "light" | "dark" | "alternative" | "system" | "high-contrast";
+export type Theme =
+  | "light"
+  | "dark"
+  | "alternative"
+  | "system"
+  | "high-contrast";
 
 interface UIState {
   sidebarCollapsed: boolean;
   mobileSidebarOpen: boolean;
   contextPanelOpen: boolean;
-  commandPaletteOpen: boolean;
   theme: Theme;
   setSidebarCollapsed: (collapsed: boolean) => void;
   toggleSidebar: () => void;
@@ -15,7 +19,6 @@ interface UIState {
   toggleMobileSidebar: () => void;
   setContextPanelOpen: (open: boolean) => void;
   toggleContextPanel: () => void;
-  setCommandPaletteOpen: (open: boolean) => void;
   setTheme: (theme: Theme) => void;
 }
 
@@ -25,7 +28,6 @@ export const useUIStore = create<UIState>()(
       sidebarCollapsed: false,
       mobileSidebarOpen: false,
       contextPanelOpen: true,
-      commandPaletteOpen: false,
       theme: "system",
       setSidebarCollapsed: (sidebarCollapsed) => set({ sidebarCollapsed }),
       toggleSidebar: () =>
@@ -36,7 +38,6 @@ export const useUIStore = create<UIState>()(
       setContextPanelOpen: (contextPanelOpen) => set({ contextPanelOpen }),
       toggleContextPanel: () =>
         set((state) => ({ contextPanelOpen: !state.contextPanelOpen })),
-      setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
       setTheme: (theme) => set({ theme }),
     }),
     {

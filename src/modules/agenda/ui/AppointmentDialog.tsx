@@ -15,12 +15,21 @@ interface AppointmentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedDate: string;
+  initialPatientId?: string;
   patients: Array<{ id: string; name: string }>;
   onSubmit: (data: NewAppointmentFormInput) => Promise<void>;
   loadAvailableSlots?: (date: string, slotDurationMin?: number) => Promise<TimeSlot[]>;
 }
 
-export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, onSubmit, loadAvailableSlots }: AppointmentDialogProps) {
+export function AppointmentDialog({
+  open,
+  onOpenChange,
+  selectedDate,
+  initialPatientId,
+  patients,
+  onSubmit,
+  loadAvailableSlots,
+}: AppointmentDialogProps) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = React.useState(false);
   const [slots, setSlots] = React.useState<TimeSlot[]>([]);
@@ -29,7 +38,7 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
   const form = useForm<NewAppointmentFormInput>({
     resolver: zodResolver(NewAppointmentFormSchema),
     defaultValues: {
-      patientId: "",
+      patientId: initialPatientId ?? "",
       date: selectedDate,
       startTime: "09:00",
       endTime: "09:30",
@@ -43,7 +52,7 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
   React.useEffect(() => {
     if (open) {
       form.reset({
-        patientId: "",
+        patientId: initialPatientId ?? "",
         date: selectedDate,
         startTime: "09:00",
         endTime: "09:30",
@@ -53,7 +62,9 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
         cost: 0,
       });
     }
-  }, [open, selectedDate, form]);
+  }, [open, selectedDate, initialPatientId, form]);
+
+  const appointmentDate = form.watch("date");
 
   React.useEffect(() => {
     if (!open || !loadAvailableSlots) {
@@ -66,7 +77,7 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
     let cancelled = false;
     setSlotsLoading(true);
     setSlotsError(null);
-    loadAvailableSlots(selectedDate, 30)
+    loadAvailableSlots(appointmentDate, 30)
       .then((result) => {
         if (!cancelled) setSlots(result);
       })
@@ -83,7 +94,7 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
     return () => {
       cancelled = true;
     };
-  }, [open, selectedDate, loadAvailableSlots]);
+  }, [open, appointmentDate, loadAvailableSlots]);
 
   const handleSlotSelect = (slot: TimeSlot) => {
     if (!slot.available) return;
@@ -109,7 +120,7 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
         <DialogHeader>
           <DialogTitle>{t("agenda.new_title")}</DialogTitle>
           <DialogDescription>
-            {t("agenda.schedule_desc", { date: selectedDate })}
+            {t("agenda.schedule_desc", { date: appointmentDate })}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -130,6 +141,14 @@ export function AppointmentDialog({ open, onOpenChange, selectedDate, patients, 
             </Select>
             {form.formState.errors.patientId && (
               <p className="text-xs text-destructive">{form.formState.errors.patientId.message}</p>
+            )}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="appointment-date">{t("common.date")}</Label>
+            <Input id="appointment-date" type="date" {...form.register("date")} />
+            {form.formState.errors.date && (
+              <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>
             )}
           </div>
 

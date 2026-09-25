@@ -1,4 +1,11 @@
-import { Patient, type PatientCreate, type PatientUpdate, type PatientQuery, type PatientRepository, PatientNotFoundError } from "../domain/PatientRepository";
+import {
+  Patient,
+  type PatientCreate,
+  type PatientUpdate,
+  type PatientQuery,
+  type PatientRepository,
+  PatientNotFoundError,
+} from "../domain/PatientRepository";
 import type { PatientId } from "../domain/PatientId";
 
 export interface LinkedCounts {
@@ -6,6 +13,7 @@ export interface LinkedCounts {
   mealPlans: number;
   labPanels: number;
   anthropometry: number;
+  adherenceRecords: number;
 }
 
 /**
@@ -66,7 +74,9 @@ export class GetPatientUseCase {
 export class ListPatientsUseCase {
   constructor(private readonly repo: PatientRepository) {}
 
-  async execute(query?: PatientQuery): Promise<{ items: Patient[]; total: number }> {
+  async execute(
+    query?: PatientQuery,
+  ): Promise<{ items: Patient[]; total: number }> {
     const [items, total] = await Promise.all([
       this.repo.findAll(query),
       this.repo.count(query),
@@ -145,7 +155,7 @@ export class RestorePatientUseCase {
   constructor(private readonly repo: PatientRepository) {}
 
   async execute(id: PatientId): Promise<Patient> {
-    const existing = await this.repo.findById(id);
+    const existing = await this.repo.findById(id, true);
     if (!existing) {
       throw new PatientNotFoundError(id);
     }
@@ -167,6 +177,7 @@ export class RestorePatientUseCase {
       email: existing.email,
       phone: existing.phone,
       secondaryPhone: existing.secondaryPhone,
+      whatsappEnabled: existing.whatsappEnabled,
       emergencyContactName: existing.emergencyContactName,
       emergencyContactRelationship: existing.emergencyContactRelationship,
       emergencyContactPhone: existing.emergencyContactPhone,
@@ -186,7 +197,9 @@ export class RestorePatientUseCase {
       dischargeReason: existing.dischargeReason,
       responsibleProfessionalId: existing.responsibleProfessionalId,
       externalRecordNumber: existing.externalRecordNumber,
+      admissionReason: existing.admissionReason,
       photoUrl: existing.photoUrl,
+      medicalIntake: existing.medicalIntake,
       status: "active",
       createdAt: existing.createdAt,
       updatedAt: new Date(),
@@ -199,7 +212,7 @@ export class RestorePatientUseCase {
 
 /**
  * Soft-delete en cascada: marca el paciente + todas sus consultas +
- * planes + laboratorios + antropometrias como deleted. Cada cambio
+ * planes + laboratorios + antropometrias + adherencia como deleted. Cada cambio
  * se persiste por separado para que el SyncEnqueuer encole cada fila
  * individualmente y el push las borre en el servidor también.
  */

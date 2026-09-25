@@ -1,0 +1,89 @@
+name: nutriclinica-local-deployment-simulation
+
+services:
+  api:
+    image: nutriclinica-api:${RELEASE_VERSION:?set RELEASE_VERSION}
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+      args:
+        RELEASE_VERSION: ${RELEASE_VERSION}
+        RELEASE_COMMIT: ${RELEASE_COMMIT:?set RELEASE_COMMIT}
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp
+    environment:
+      NODE_ENV: production
+      WORKLOAD_ROLE: api
+      ENVIRONMENT_CLASS: TEST
+      ENVIRONMENT_NAME: LOCAL_DEPLOYMENT_SIMULATION
+      INSTANCE_ID: local-simulation-api-1
+      RELEASE_VERSION: ${RELEASE_VERSION}
+      GIT_COMMIT: ${RELEASE_COMMIT}
+      API_BIND_HOST: 0.0.0.0
+      PORT: "3000"
+      TRUST_PROXY: "1"
+      BACKGROUND_JOBS_ENABLED: "false"
+      API_REPLICAS: "1"
+      JOBS_REPLICAS: "1"
+      SHUTDOWN_TIMEOUT_MS: "15000"
+      PUBLIC_API_URL: http://127.0.0.1:${API_PORT:-3000}
+      PUBLIC_WEB_URL: http://127.0.0.1:${WEB_PORT:-8080}
+      CORS_ORIGIN: http://127.0.0.1:${WEB_PORT:-8080}
+      DB_SERVER: sql-not-provisioned.invalid
+      DB_NAME: nutriclinica_local_sim_oltp
+      DWH_DATABASE: nutriclinica_local_sim_dwh
+      DB_ENCRYPT: "true"
+      DB_TRUST_CERT: "false"
+      DWH_ENABLED: "false"
+      DWH_SCHEDULED_LOAD_ENABLED: "false"
+      RETENTION_CLEANUP_ENABLED: "false"
+      AI_CERTIFICATION_STORE: memory
+      AI_TELEMETRY_STORE: memory
+      AI_EGRESS_ENABLED: "false"
+      AI_PATIENT_ENABLED: "false"
+      AI_SHADOW_STATE: DISABLED
+      EXTERNAL_SIDE_EFFECTS_MODE: DISABLED
+      API_ARTIFACT: nutriclinica-api:${RELEASE_VERSION}
+      WEB_ARTIFACT: nutriclinica-web:${RELEASE_VERSION}
+    ports:
+      - 127.0.0.1:${API_PORT:-3000}:3000
+    networks:
+      - server_private
+
+  web:
+    image: nutriclinica-web:${RELEASE_VERSION}
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        RELEASE_VERSION: ${RELEASE_VERSION}
+        RELEASE_COMMIT: ${RELEASE_COMMIT}
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0755
+      - /var/cache/nginx:uid=101,gid=101,mode=0755
+      - /var/run:uid=101,gid=101,mode=0755
+    environment:
+      API_UPSTREAM: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${WEB_PORT:-8080}:8080
+    networks:
+      - server_private
+
+networks:
+  server_private:
+    internal: true

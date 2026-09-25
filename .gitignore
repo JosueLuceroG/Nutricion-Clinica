@@ -26,9 +26,12 @@ test-results/
 
 # Build
 **/target/
-**/Cargo.lock
 **/dist/
+**/dist-deploy/
 **/gen/
+/dist-standalone-package/
+/.tmp/
+/release-manifest.json
 
 # OS
 Thumbs.db

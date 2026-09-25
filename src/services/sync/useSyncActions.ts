@@ -20,6 +20,7 @@ const queue = new SyncQueueRepository(db.sync_queue);
 export function useSyncActions() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const setPending = useSyncStore((s) => s.setPendingChanges);
+  const sucursalId = useSyncStore((s) => s.sucursalId);
   const [conflictCount, setConflictCount] = React.useState(0);
   const mountedRef = React.useRef(false);
 
@@ -31,18 +32,27 @@ export function useSyncActions() {
   }, []);
 
   const refreshCounts = React.useCallback(async () => {
+    if (!sucursalId) {
+      if (mountedRef.current) {
+        setPending(0);
+        setConflictCount(0);
+      }
+      return;
+    }
     const [pending, conflicts] = await Promise.all([
-      queue.countPending(),
-      queue.countConflicts(),
+      queue.countPending(sucursalId),
+      queue.countConflicts(sucursalId),
     ]);
     if (!mountedRef.current) return;
     setPending(pending);
     setConflictCount(conflicts);
-  }, [setPending]);
+  }, [setPending, sucursalId]);
 
   React.useEffect(() => {
     void refreshCounts();
-    const interval = setInterval(() => { void refreshCounts(); }, 5_000);
+    const interval = setInterval(() => {
+      void refreshCounts();
+    }, 5_000);
     return () => clearInterval(interval);
   }, [refreshCounts]);
 

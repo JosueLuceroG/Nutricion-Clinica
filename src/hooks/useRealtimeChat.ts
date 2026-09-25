@@ -1,4 +1,5 @@
 import * as React from "react";
+import { WS_TICKET_PROTOCOL } from "@nutriclinica/shared";
 
 export interface ChatMessage {
   id: string;
@@ -13,153 +14,288 @@ export interface ChatMessage {
 }
 
 interface UseRealtimeChatOptions {
-  wsUrl: string;
+  identityKey: string;
+  getWsConnection: () => Promise<{ url: string; ticket: string }>;
   fetchMessages: (signal?: AbortSignal) => Promise<ChatMessage[]>;
   sendMessage: (content: string) => Promise<void>;
   markAsRead: (messageId: string) => Promise<void>;
   pollInterval?: number;
 }
 
-export function useRealtimeChat(options: UseRealtimeChatOptions) {
-  const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [isRealtime, setIsRealtime] = React.useState(false);
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
-  const wsRef = React.useRef<WebSocket | null>(null);
-  const reconnectTimerRef = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const pollTimerRef = React.useRef<ReturnType<typeof setInterval> | undefined>(undefined);
-  const mountedRef = React.useRef(true);
+interface RealtimeSnapshot {
+  identityKey: string;
+  messages: ChatMessage[];
+  isRealtime: boolean;
+  loading: boolean;
+  error: string | null;
+}
 
-  const loadMessages = React.useCallback(async (signal?: AbortSignal) => {
-    try {
-      const data = await options.fetchMessages(signal);
-      if (mountedRef.current) {
-        setMessages(data);
-        setError(null);
+function initialSnapshot(identityKey: string): RealtimeSnapshot {
+  return {
+    identityKey,
+    messages: [],
+    isRealtime: false,
+    loading: true,
+    error: null,
+  };
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    error.name === "AbortError"
+  );
+}
+
+export function useRealtimeChat(options: UseRealtimeChatOptions) {
+  const {
+    identityKey,
+    getWsConnection,
+    fetchMessages,
+    sendMessage,
+    markAsRead: markMessageAsRead,
+    pollInterval = 30_000,
+  } = options;
+  const [snapshot, setSnapshot] = React.useState<RealtimeSnapshot>(() =>
+    initialSnapshot(identityKey),
+  );
+  const generationRef = React.useRef(0);
+  const refreshRef = React.useRef<() => void>(() => undefined);
+
+  React.useEffect(() => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
+    let active = true;
+    let socket: WebSocket | null = null;
+    let connecting = false;
+    let reconnectDelay = 1000;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let pollTimer: ReturnType<typeof setInterval> | undefined;
+    let fetchController: AbortController | null = null;
+
+    setSnapshot(initialSnapshot(identityKey));
+
+    function isCurrentGeneration(): boolean {
+      return active && generationRef.current === generation;
+    }
+
+    function updateSnapshot(
+      update: (current: RealtimeSnapshot) => RealtimeSnapshot,
+    ): void {
+      if (!isCurrentGeneration()) return;
+      setSnapshot((current) =>
+        current.identityKey === identityKey ? update(current) : current,
+      );
+    }
+
+    async function loadMessages(showLoading = false): Promise<void> {
+      if (!isCurrentGeneration()) return;
+      fetchController?.abort();
+      const controller = new AbortController();
+      fetchController = controller;
+      if (showLoading) {
+        updateSnapshot((current) => ({ ...current, loading: true }));
       }
-    } catch (err) {
-      if (mountedRef.current && !signal?.aborted) {
-        setError(err instanceof Error ? err.message : String(err));
-      }
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
+      try {
+        const data = await fetchMessages(controller.signal);
+        if (
+          !isCurrentGeneration() ||
+          controller.signal.aborted ||
+          fetchController !== controller
+        ) {
+          return;
+        }
+        updateSnapshot((current) => ({
+          ...current,
+          messages: data,
+          error: null,
+        }));
+      } catch (error) {
+        if (
+          !isCurrentGeneration() ||
+          controller.signal.aborted ||
+          isAbortError(error) ||
+          fetchController !== controller
+        ) {
+          return;
+        }
+        updateSnapshot((current) => ({
+          ...current,
+          error: error instanceof Error ? error.message : String(error),
+        }));
+      } finally {
+        if (fetchController === controller) {
+          fetchController = null;
+          updateSnapshot((current) => ({ ...current, loading: false }));
+        }
       }
     }
-  }, [options.fetchMessages]);
 
-  React.useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+    function startPolling(): void {
+      if (!isCurrentGeneration() || pollTimer) return;
+      pollTimer = setInterval(() => {
+        if (isCurrentGeneration()) void loadMessages();
+      }, pollInterval);
+    }
 
-  React.useEffect(() => {
-    let ws: WebSocket | null = null;
-    let reconnectDelay = 1000;
+    function stopPolling(): void {
+      if (!pollTimer) return;
+      clearInterval(pollTimer);
+      pollTimer = undefined;
+    }
 
-    function connect() {
-      if (!mountedRef.current) return;
+    function scheduleReconnect(): void {
+      if (!isCurrentGeneration() || reconnectTimer) return;
+      const delay = reconnectDelay;
+      reconnectDelay = Math.min(reconnectDelay * 2, 30_000);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = undefined;
+        if (isCurrentGeneration()) void connect();
+      }, delay);
+    }
+
+    async function connect() {
+      if (!isCurrentGeneration() || connecting || socket) return;
+      connecting = true;
+      let connection: { url: string; ticket: string };
       try {
-        ws = new WebSocket(options.wsUrl);
+        connection = await getWsConnection();
       } catch {
-        setIsRealtime(false);
-        startPolling();
+        if (isCurrentGeneration()) {
+          updateSnapshot((current) => ({ ...current, isRealtime: false }));
+          startPolling();
+          scheduleReconnect();
+        }
+        connecting = false;
+        return;
+      }
+      if (!isCurrentGeneration()) {
+        connecting = false;
         return;
       }
 
-      ws.onopen = () => {
-        if (mountedRef.current) {
-          setIsRealtime(true);
-          reconnectDelay = 1000;
-          stopPolling();
-        }
+      let nextSocket: WebSocket;
+      try {
+        nextSocket = new WebSocket(connection.url, [
+          WS_TICKET_PROTOCOL,
+          connection.ticket,
+        ]);
+      } catch {
+        connecting = false;
+        updateSnapshot((current) => ({ ...current, isRealtime: false }));
+        startPolling();
+        scheduleReconnect();
+        return;
+      }
+      connecting = false;
+      if (!isCurrentGeneration()) {
+        nextSocket.close();
+        return;
+      }
+      socket = nextSocket;
+
+      nextSocket.onopen = () => {
+        if (!isCurrentGeneration() || socket !== nextSocket) return;
+        updateSnapshot((current) => ({ ...current, isRealtime: true }));
+        reconnectDelay = 1000;
+        stopPolling();
       };
 
-      ws.onmessage = (event) => {
-        if (!mountedRef.current) return;
+      nextSocket.onmessage = (event) => {
+        if (!isCurrentGeneration() || socket !== nextSocket) return;
         try {
           const data = JSON.parse(event.data);
           if (data.type === "message:new" && data.message) {
-            setMessages((prev) => {
-              const exists = prev.some((m) => m.id === data.message.id);
-              return exists ? prev : [...prev, data.message];
+            updateSnapshot((current) => {
+              const exists = current.messages.some(
+                (message) => message.id === data.message.id,
+              );
+              return exists
+                ? current
+                : { ...current, messages: [...current.messages, data.message] };
             });
           } else if (data.type === "message:read" && data.messageId) {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === data.messageId ? { ...m, readAt: data.readAt ?? null } : m,
+            updateSnapshot((current) => ({
+              ...current,
+              messages: current.messages.map((message) =>
+                message.id === data.messageId
+                  ? { ...message, readAt: data.readAt ?? null }
+                  : message,
               ),
-            );
+            }));
           }
         } catch {
           // Ignore malformed messages
         }
       };
 
-      ws.onclose = () => {
-        if (mountedRef.current) {
-          setIsRealtime(false);
-          startPolling();
-          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
-          reconnectTimerRef.current = setTimeout(connect, reconnectDelay);
-        }
+      nextSocket.onclose = () => {
+        if (!isCurrentGeneration() || socket !== nextSocket) return;
+        socket = null;
+        updateSnapshot((current) => ({ ...current, isRealtime: false }));
+        startPolling();
+        scheduleReconnect();
       };
 
-      ws.onerror = () => {
-        ws?.close();
+      nextSocket.onerror = () => {
+        if (isCurrentGeneration() && socket === nextSocket) nextSocket.close();
       };
-
-      wsRef.current = ws;
     }
 
-    function startPolling() {
-      if (pollTimerRef.current) return;
-      pollTimerRef.current = setInterval(() => {
-        if (mountedRef.current && !isRealtime) {
-          void loadMessages();
-        }
-      }, options.pollInterval ?? 30000);
-    }
-
-    function stopPolling() {
-      if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
-        pollTimerRef.current = undefined;
-      }
-    }
-
-    // Initial load
     void loadMessages();
-
-    // Try WebSocket
-    connect();
+    void connect();
+    const refresh = () => void loadMessages(true);
+    refreshRef.current = refresh;
 
     return () => {
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      active = false;
+      if (generationRef.current === generation) generationRef.current += 1;
+      fetchController?.abort();
+      fetchController = null;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      reconnectTimer = undefined;
       stopPolling();
-      if (ws) {
-        ws.onclose = null;
-        ws.close();
+      if (refreshRef.current === refresh) {
+        refreshRef.current = () => undefined;
       }
-      wsRef.current = null;
+      if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        socket.close();
+        socket = null;
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [options.wsUrl, options.pollInterval]);
+  }, [identityKey, getWsConnection, fetchMessages, pollInterval]);
 
-  const send = React.useCallback(async (content: string) => {
-    await options.sendMessage(content);
-  }, [options.sendMessage]);
+  const send = React.useCallback(
+    async (content: string) => {
+      await sendMessage(content);
+    },
+    [sendMessage],
+  );
 
-  const markAsRead = React.useCallback(async (messageId: string) => {
-    await options.markAsRead(messageId);
-  }, [options.markAsRead]);
+  const markAsRead = React.useCallback(
+    async (messageId: string) => {
+      await markMessageAsRead(messageId);
+    },
+    [markMessageAsRead],
+  );
 
-  const refresh = React.useCallback(() => {
-    setLoading(true);
-    void loadMessages();
-  }, [loadMessages]);
+  const refresh = React.useCallback(() => refreshRef.current(), []);
 
-  return { messages, send, markAsRead, loading, error, isRealtime, refresh };
+  const hasCurrentIdentity = snapshot.identityKey === identityKey;
+
+  return {
+    messages: hasCurrentIdentity ? snapshot.messages : [],
+    send,
+    markAsRead,
+    loading: hasCurrentIdentity ? snapshot.loading : true,
+    error: hasCurrentIdentity ? snapshot.error : null,
+    isRealtime: hasCurrentIdentity ? snapshot.isRealtime : false,
+    refresh,
+  };
 }

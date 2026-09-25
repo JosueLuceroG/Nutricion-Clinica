@@ -10,10 +10,22 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
+    "build:deploy": "tsx src/scripts/buildDeploymentArtifacts.ts",
     "start": "node dist/server.js",
+    "start:deploy": "node dist-deploy/server.js",
+    "start:jobs": "node dist-deploy/jobs.js",
+    "start:migrate": "node dist-deploy/migrate.js",
+    "start:dwh-schema": "node dist-deploy/dwh-schema.js",
+    "start:retention-backfill": "node dist-deploy/retention-backfill.js",
     "typecheck": "tsc --noEmit",
     "migrate": "tsx src/db/migrate.ts",
     "seed": "tsx src/db/seed.ts",
+    "reset:staging": "tsx src/db/stagingReset.ts",
+    "ai:evaluate": "tsx src/scripts/evaluateModels.ts",
+    "ai:benchmark": "tsx src/scripts/benchmarkCandidates.ts",
+    "ai:evaluate-retrieval": "tsx src/scripts/evaluateRetrieval.ts",
+    "ai:evaluate-groundness": "tsx src/scripts/evaluateGroundness.ts",
+    "release:manifest": "tsx src/scripts/generateReleaseManifest.ts",
     "test": "vitest run"
   },
   "dependencies": {
@@ -41,6 +53,7 @@
     "@types/node-cron": "^3.0.11",
     "@types/nodemailer": "^8.0.0",
     "@types/ws": "^8.18.1",
+    "esbuild": "0.25.12",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^3.2.4"

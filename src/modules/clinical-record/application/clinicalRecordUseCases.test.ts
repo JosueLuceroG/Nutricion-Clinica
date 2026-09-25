@@ -3,6 +3,8 @@ import type { ClinicalRecordRepository } from "../domain/ClinicalRecordRepositor
 import type { AllergyProps } from "../domain/Allergy";
 import type { MedicationProps } from "../domain/Medication";
 import type { ClinicalEventProps } from "../domain/ClinicalEvent";
+import type { SnapshotExpedienteProps } from "../domain/SnapshotExpediente";
+import type { SnapshotExpedienteRepository } from "../domain/SnapshotExpedienteRepository";
 import { PatientId } from "@modules/patient/domain/PatientId";
 import {
   CreateAllergyUseCase,
@@ -10,6 +12,7 @@ import {
   ListAllergiesUseCase,
   CreateMedicationUseCase,
   ListMedicationsUseCase,
+  CreateSnapshotExpedienteUseCase,
 } from "./clinicalRecordUseCases";
 
 class InMemoryClinicalRecordRepo implements ClinicalRecordRepository {
@@ -153,5 +156,55 @@ describe("ListMedicationsUseCase", () => {
     await create.execute({ patientId, name: "Losartán", activeIngredient: "Losartán", dose: "50mg", frequency: "cada-24h", startDate: "2026-01-01" });
     const results = await new ListMedicationsUseCase(repo).execute(patientId.toString());
     expect(results).toHaveLength(2);
+  });
+});
+
+describe("CreateSnapshotExpedienteUseCase", () => {
+  class InMemorySnapshotRepo implements SnapshotExpedienteRepository {
+    rows = new Map<string, SnapshotExpedienteProps>();
+    saveCalls = 0;
+    async findByConsultaId(consultaId: string): Promise<SnapshotExpedienteProps | null> {
+      return Array.from(this.rows.values()).find((s) => s.consultaId === consultaId) ?? null;
+    }
+    async findByPatientId(patientId: string): Promise<SnapshotExpedienteProps[]> {
+      return Array.from(this.rows.values()).filter((s) => s.patientId === patientId);
+    }
+    async save(snapshot: SnapshotExpedienteProps): Promise<void> {
+      this.saveCalls += 1;
+      this.rows.set(snapshot.id, snapshot);
+    }
+  }
+
+  it("crea el snapshot de la consulta", async () => {
+    const repo = new InMemorySnapshotRepo();
+    const useCase = new CreateSnapshotExpedienteUseCase(repo);
+    const snapshot = await useCase.execute({
+      consultaId: "c1",
+      patientId: "p1",
+      contenidoJsonExpediente: { reason: "Control" },
+      profesionalId: "system",
+    });
+    expect(snapshot.consultaId).toBe("c1");
+    expect(repo.saveCalls).toBe(1);
+  });
+
+  it("NO duplica si ya existe un snapshot para la misma consulta (doble disparo)", async () => {
+    const repo = new InMemorySnapshotRepo();
+    const useCase = new CreateSnapshotExpedienteUseCase(repo);
+    const first = await useCase.execute({
+      consultaId: "c1",
+      patientId: "p1",
+      contenidoJsonExpediente: { reason: "Control" },
+      profesionalId: "system",
+    });
+    const second = await useCase.execute({
+      consultaId: "c1",
+      patientId: "p1",
+      contenidoJsonExpediente: { reason: "Control" },
+      profesionalId: "system",
+    });
+    expect(repo.saveCalls).toBe(1);
+    expect(repo.rows.size).toBe(1);
+    expect(second.id.value).toBe(first.id.value);
   });
 });

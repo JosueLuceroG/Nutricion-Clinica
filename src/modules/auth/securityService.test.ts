@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { hasModuleAccess, checkPermission, canAccessModule } from "./securityService";
+import {
+  hasModuleAccess,
+  checkPermission,
+  canAccessModule,
+} from "./securityService";
 
 const mockGetState = vi.fn<() => { user: { rol: string } | null }>();
 
@@ -73,8 +77,9 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("agenda", "asistente")).toBe(true);
     });
 
-    it("asistente has patients:read which also matches other actions (current behaviour)", () => {
-      expect(hasModuleAccess("patients", "asistente", "write")).toBe(true);
+    it("asistente cannot write with a patients:read permission", () => {
+      expect(hasModuleAccess("patients", "asistente", "write")).toBe(false);
+      expect(hasModuleAccess("patients", "asistente", "read")).toBe(true);
     });
 
     it("asistente does not have access to billing or mealplan", () => {
@@ -86,10 +91,14 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("patients", "soporte_tecnico")).toBe(true);
       expect(hasModuleAccess("consultations", "soporte_tecnico")).toBe(true);
       expect(hasModuleAccess("billing", "soporte_tecnico")).toBe(true);
+      expect(hasModuleAccess("patients", "soporte_tecnico", "write")).toBe(
+        false,
+      );
     });
 
-    it("soporte_tecnico has full access to backup and sync", () => {
-      expect(hasModuleAccess("backup", "soporte_tecnico")).toBe(true);
+    it("soporte_tecnico cannot access backup but retains sync access", () => {
+      expect(hasModuleAccess("backup", "soporte_tecnico")).toBe(false);
+      expect(hasModuleAccess("backup", "soporte_tecnico", "write")).toBe(false);
       expect(hasModuleAccess("sync", "soporte_tecnico")).toBe(true);
     });
 
@@ -97,6 +106,7 @@ describe("hasModuleAccess", () => {
       expect(hasModuleAccess("patients", "auditor")).toBe(true);
       expect(hasModuleAccess("consultations", "auditor")).toBe(true);
       expect(hasModuleAccess("billing", "auditor")).toBe(true);
+      expect(hasModuleAccess("patients", "auditor", "write")).toBe(false);
     });
 
     it("auditor has full access to audit module", () => {
@@ -152,7 +162,9 @@ describe("hasModuleAccess", () => {
     });
 
     it("returns false when role is undefined", () => {
-      expect(hasModuleAccess("patients", undefined as unknown as string)).toBe(false);
+      expect(hasModuleAccess("patients", undefined as unknown as string)).toBe(
+        false,
+      );
     });
   });
 });

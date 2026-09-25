@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { SyncConflictError, SyncAuthError, SyncSchemaMismatchError } from "./errors";
+import { SyncConflictError, SyncAuthError, SyncSchemaMismatchError, ApiContractMismatchError } from "./errors";
 
 describe("SyncConflictError", () => {
   it("tiene el nombre correcto y propiedades", () => {
@@ -38,5 +38,16 @@ describe("SyncSchemaMismatchError", () => {
     expect(error.serverVersion).toBe(5);
     expect(error.clientVersion).toBe(3);
     expect(error.message).toBe("Schema mismatch: server=5 client=3");
+  });
+});
+
+describe("ApiContractMismatchError", () => {
+  it("tiene el nombre correcto y almacena contratos", () => {
+    const error = new ApiContractMismatchError("v2", "v1");
+
+    expect(error.name).toBe("ApiContractMismatchError");
+    expect(error.serverContract).toBe("v2");
+    expect(error.clientContract).toBe("v1");
+    expect(error.message).toBe("API contract mismatch: server=v2 client=v1");
   });
 });
