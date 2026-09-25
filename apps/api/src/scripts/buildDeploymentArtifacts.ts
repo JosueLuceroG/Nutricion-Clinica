@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
@@ -25,6 +25,12 @@ await build({
       "applyDwhSchema.ts",
     ),
     healthcheck: join(apiRoot, "src", "scripts", "containerHealthcheck.ts"),
+    "standalone-preflight": join(
+      apiRoot,
+      "src",
+      "scripts",
+      "standalonePreflight.ts",
+    ),
     "retention-backfill": join(
       apiRoot,
       "src",
@@ -57,13 +63,9 @@ copyFileSync(
   join(outdir, "dwh-schema.sql"),
 );
 copyFileSync(
-  join(
-    apiRoot,
-    "src",
-    "modules",
-    "dwh",
-    "schema",
-    "dwh-upgrade-08-003.sql",
-  ),
+  join(apiRoot, "src", "modules", "dwh", "schema", "dwh-upgrade-08-003.sql"),
   join(outdir, "dwh-upgrade-08-003.sql"),
 );
+cpSync(join(apiRoot, "migrations"), join(outdir, "migrations"), {
+  recursive: true,
+});

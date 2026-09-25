@@ -286,6 +286,12 @@ if (/BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY/.test(logs)) {
 await Promise.all([
   access(resolve("apps/api/dist-deploy/dwh-schema.sql")),
   access(resolve("apps/api/dist-deploy/dwh-upgrade-08-003.sql")),
+  access(resolve("apps/api/dist-deploy/standalone-preflight.js")),
+  access(
+    resolve(
+      "apps/api/dist-deploy/migrations/039-deployment-certification-persistence.sql",
+    ),
+  ),
 ]);
 await expectGuardedArtifact("apps/api/dist-deploy/migrate.js");
 await expectGuardedArtifact("apps/api/dist-deploy/dwh-schema.js");

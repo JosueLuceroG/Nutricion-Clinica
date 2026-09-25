@@ -3,6 +3,7 @@ import {
   applyMigrations,
   checksumOf,
   listMigrations,
+  shouldSkipStandaloneLegacyMigration,
   splitSqlBatches,
 } from "./migrate.js";
 
@@ -115,6 +116,24 @@ describe("migrate — utilidades", () => {
     );
 
     expect(batches).toEqual(["SELECT 1;"]);
+  });
+
+  it("omite solo el SQL DWH historico en workload standalone", () => {
+    expect(
+      shouldSkipStandaloneLegacyMigration("031-dwh.sql", {
+        STANDALONE_MODE: "true",
+      }),
+    ).toBe(true);
+    expect(
+      shouldSkipStandaloneLegacyMigration("031-dwh.sql", {
+        STANDALONE_MODE: "false",
+      }),
+    ).toBe(false);
+    expect(
+      shouldSkipStandaloneLegacyMigration("032-ai-actions.sql", {
+        STANDALONE_MODE: "true",
+      }),
+    ).toBe(false);
   });
 });
 

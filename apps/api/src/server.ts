@@ -51,6 +51,14 @@ import {
 } from "./services/jobs/runtimeJobs.js";
 import { closePool } from "./db/connection.js";
 import { closeDwhPool } from "./modules/dwh/dwhConnection.js";
+import {
+  runStandalonePreflight,
+  formatStandalonePreflightReport,
+} from "./modules/standalone/preflight.js";
+import {
+  installStandaloneApiPrefix,
+  mountStandaloneWeb,
+} from "./modules/standalone/webHosting.js";
 
 const corsOrigins = (
   process.env.CORS_ORIGIN ??
@@ -90,6 +98,9 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "10mb" }));
+if (process.env.STANDALONE_MODE === "true") {
+  installStandaloneApiPrefix(app);
+}
 
 app.use("/health", createHealthRouter({ isShuttingDown: () => shuttingDown }));
 app.use("/auth", authRouter);
@@ -121,6 +132,9 @@ app.use("/dwh/analytics", dwhAnalyticsRouter);
 app.use("/observability", telemetryRouter);
 app.use("/shadow", shadowRouter);
 app.use("/deployment", deploymentRouter);
+if (process.env.STANDALONE_MODE === "true") {
+  mountStandaloneWeb(app, process.env.NUTRICLINICA_WEB_ROOT);
+}
 
 app.use(errorHandler);
 
@@ -134,6 +148,17 @@ const websocketServer = setupWebsocketGateway(httpServer, {
 let runtimeJobs: RuntimeJobsHandle | null = null;
 
 async function bootstrap(): Promise<void> {
+  if (process.env.STANDALONE_MODE === "true") {
+    const preflight = await runStandalonePreflight(process.env, "runtime");
+    if (!preflight.ok) {
+      const failed = preflight.checks
+        .filter((check) => check.status === "fail")
+        .map((check) => check.id)
+        .join(",");
+      throw new Error(`standalone preflight failed: ${failed || "unknown"}`);
+    }
+    console.log(formatStandalonePreflightReport(preflight));
+  }
   try {
     assertStartupConfigValid(process.env, {
       role: "api",

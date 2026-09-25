@@ -25,7 +25,43 @@ pnpm deployment:test
 pnpm deployment:api-artifact:test
 $env:CI='true'; $env:VITE_API_URL='/api'; pnpm build
 pnpm deployment:web-artifact:verify
+pnpm deployment:standalone:test
 ```
+
+## Windows standalone package
+
+`windows/build-package.ps1` assembles a self-contained application package from
+the API deployment bundle and the Web artifact. The build must be supplied a
+reviewed Node 20+ runtime; the runtime is part of the package so the end user
+does not run Node, pnpm or migrations manually. API production dependencies are
+scoped to the API, installed with hoisted physical links, and stripped of pnpm
+workspace metadata so the package can be moved without the source repository.
+
+```powershell
+pwsh -File deployment/windows/build-package.ps1 -NodeRuntimePath <approved-node.exe>
+```
+
+The package uses the Windows Task Scheduler as an OS-native host supervisor (no
+third-party service wrapper). It starts exactly one API process and one jobs
+process, restarts failed children with bounded backoff, and serves the Web
+artifact from the API process when `NUTRICLINICA_WEB_ROOT` is configured. This
+is a service-equivalent supervisor, not proof of an installed MSI/NSIS product;
+the installer integration and signed Windows release remain conditional until
+they are exercised on the target host.
+
+The operator lifecycle is exposed by `deployment/windows/install.ps1`,
+`start.ps1`, `stop.ps1`, `restart.ps1`, `status.ps1`, `backup.ps1`,
+`restore.ps1` and `uninstall.ps1`. Secrets are read only from the protected
+server-side `config/server-secrets.env`; they are never copied into `web`,
+Desktop, manifests or logs. Uninstall deliberately retains data, backups and
+logs.
+
+The full-install backup is a directory package containing native OLTP/DWH SQL
+backups, hashed external files and an encrypted Desktop export supplied by the
+authorized UI. A clean snapshot requires a clean sync state and an explicit
+Desktop export; `-SnapshotMode emergency` is visibly marked and cannot be
+restored without an explicit override. The existing local Dexie backup remains
+a limited client export and is not a substitute for this contract.
 
 Validate an approved non-secret driver file with:
 

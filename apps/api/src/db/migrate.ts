@@ -31,6 +31,16 @@ export function checksumOf(content: string): string {
     .digest("hex");
 }
 
+export function shouldSkipStandaloneLegacyMigration(
+  filename: string,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return (
+    env.STANDALONE_MODE?.trim().toLowerCase() === "true" &&
+    filename === "031-dwh.sql"
+  );
+}
+
 export function splitSqlBatches(content: string): string[] {
   const batches: string[] = [];
   const lines = content
@@ -133,9 +143,17 @@ export async function applyMigrations(
     try {
       await transaction.begin();
       transactionStarted = true;
+      const standaloneLegacyDwh = shouldSkipStandaloneLegacyMigration(
+        m.filename,
+      );
+      if (standaloneLegacyDwh) {
+        log(
+          `skip  ${m.filename} SQL en standalone; el schema DWH usa su propia base`,
+        );
+      }
       // Split only on SQL Server batch separators so IF/BEGIN/END blocks
       // remain intact even when they contain semicolon-terminated statements.
-      const batches = splitSqlBatches(m.content);
+      const batches = standaloneLegacyDwh ? [] : splitSqlBatches(m.content);
       for (let i = 0; i < batches.length; i++) {
         const stmt = batches[i]!;
         try {

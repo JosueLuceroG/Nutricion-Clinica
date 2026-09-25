@@ -14,6 +14,7 @@ import {
   startRuntimeJobs,
   type RuntimeJobsHandle,
 } from "./services/jobs/runtimeJobs.js";
+import { runStandalonePreflight } from "./modules/standalone/preflight.js";
 
 const readyMarker = join(tmpdir(), "nutriclinica-jobs-ready");
 let runtime: ReturnType<typeof readServerRuntimeConfig> | null = null;
@@ -22,6 +23,17 @@ let shuttingDown = false;
 
 async function preflightDependencies(): Promise<void> {
   const environmentClass = readEnvironmentClass(process.env);
+  if (process.env.STANDALONE_MODE === "true") {
+    const report = await runStandalonePreflight(process.env, "runtime");
+    if (!report.ok) {
+      const failed = report.checks
+        .filter((check) => check.status === "fail")
+        .map((check) => check.id)
+        .join(",");
+      throw new Error(`standalone preflight failed: ${failed || "unknown"}`);
+    }
+    return;
+  }
   if (environmentClass !== "STAGING" && environmentClass !== "PRODUCTION")
     return;
 

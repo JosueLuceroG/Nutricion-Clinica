@@ -214,9 +214,10 @@ export function setupWebsocketGateway(
           return;
         }
 
+        const pathname = url.pathname.replace(/^\/api(?=\/)/, "");
         let channel: WsChannel | null = null;
-        if (url.pathname === "/ws/telemedicina") channel = "telemedicina";
-        else if (url.pathname === "/ws/chat") channel = "chat";
+        if (pathname === "/ws/telemedicina") channel = "telemedicina";
+        else if (pathname === "/ws/chat") channel = "chat";
         if (!channel) {
           rejectUpgrade(socket, 404);
           return;
