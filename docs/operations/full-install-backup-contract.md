@@ -34,6 +34,14 @@ limited Dexie export: patients, consultations, anthropometry, labs, meal plans,
 adherence, audit data, RAG metadata, certification state and other migrated
 tables. The Desktop export covers only local state it is authorized to export.
 
+For external acceptance reporting, the implementation names map as follows:
+`MUST_BACKUP` means `BACKED_UP`, `REBUILDABLE` remains `REBUILDABLE`, and
+`MUST_NOT_BACKUP` means `INTENTIONALLY_EXCLUDED`. `OPTIONAL` is conditional
+metadata, not an omission: each deployment must resolve it explicitly as
+backed up or intentionally excluded. In the local SQL-backed rehearsal,
+Memory, RAG and telemetry resolved to `BACKED_UP`; session drafts, secrets and
+rotating logs resolved to `INTENTIONALLY_EXCLUDED`.
+
 ## 2. Package layout
 
 ```text
@@ -137,3 +145,16 @@ An accepted backup rehearsal records, without PHI or secrets:
 - Desktop authorized import result;
 - post-restore OLTP/DWH schema and readiness result;
 - RTO/RPO measurements and any conditional blocker.
+
+### Local rehearsal record
+
+On 2026-09-27/28, fixture `step03b-local` produced a final commit-bound clean
+snapshot with digest
+`sha256:d14dff71d1e58dcf41302510c981d6dfabbb695cef47809a7805508d46c6d617` and
+also produced two independent clean snapshots used to restore the first with
+the second as the rollback backup. Manifest validation, digest/hash checks,
+`RESTORE VERIFYONLY`, native OLTP/DWH restore, external-file reconciliation,
+Desktop staging and post-restore readiness all passed. The rehearsal used SQL
+Server Express; the backup script correctly fell back from unsupported `WITH
+COMPRESSION` to a checksummed native backup. No secrets or PHI were placed in
+the manifest, logs or package.

@@ -1,6 +1,6 @@
 # Step 03B - Standalone Windows Operations
 
-Fecha: 2026-09-17. Estado actual: **CONDITIONAL / NOT READY**.
+Fecha: 2026-09-28. Estado actual: **CONDITIONAL / LOCAL EVIDENCE COMPLETE**.
 
 Este documento define el modo standalone de NutriClinica para un host Windows
 dedicado. No cambia el modelo de dominio ni crea una segunda aplicacion. El
@@ -115,6 +115,8 @@ pwsh -File deployment/windows/uninstall.ps1 -InstallRoot <package-root>
 The lifecycle scripts require PowerShell 7 (`pwsh.exe`). The installer performs
 the install/runtime preflights and registers the Task Scheduler host task; the
 operator does not need to invoke Node, pnpm or SQL migration commands manually.
+Run installation from an elevated PowerShell session: registering a `SYSTEM`
+Task Scheduler task is an administrator operation.
 
 Installation performs, in order:
 
@@ -173,6 +175,12 @@ authentication is preferred where the service identity has an approved database
 grant. SQL authentication, when required, reads credentials only from the
 protected server file.
 
+Native SQL restore also requires the approved restore operator to have the
+server-level permission needed by `RESTORE VERIFYONLY` and `RESTORE DATABASE`
+(for example, a dedicated restore principal with the required `dbcreator`
+grant). The disposable rehearsal used a temporary login with that grant; it
+was not treated as an application secret or as a production permission.
+
 OLTP migration and DWH schema are separate one-shot workloads. API startup does
 not migrate. The DWH store uses `getDwhPool()` and the DWH database must differ
 from `DB_NAME`; moving analytics tables into OLTP is prohibited.
@@ -203,13 +211,38 @@ Implemented and unit/static-tested in this repository:
 - standalone preflight and no-secret failure reporting;
 - package lifecycle scripts, manifest contract and inventory tests.
 
+Local disposable evidence completed on 2026-09-27/28 with fixture
+`step03b-local`, release `0.1.0-step03b` and implementation commit `93fbe16`:
+
+- the generated package installed with the embedded Node runtime and no manual
+  Node/pnpm/migration command;
+- install/runtime preflight passed with OLTP `039` and DWH `dwh-08-003`;
+- Task Scheduler registered `NutriClinicaHost` as a `SYSTEM` boot trigger;
+- API and jobs ran as separate supervised workers, including a jobs-child
+  failure followed by bounded-backoff restart;
+- `/health/ready`, `/api/health/ready` and the same-process Web root returned
+  successfully on loopback;
+- host restart preserved a synthetic SQL marker;
+- the final commit-bound clean snapshot has manifest digest
+  `sha256:d14dff71d1e58dcf41302510c981d6dfabbb695cef47809a7805508d46c6d617`;
+  the isolated restore rehearsal used independent source/rollback digests
+  `sha256:6bfe4176c370bb907f8e35919d24e42e26c874ae826fbf8ffd4cda447b4106a9`
+  and `sha256:250c41a019a835890236892e83d7a0b2f48c6049da6d88dcb86c083cde5354a4`;
+- restore verified both native SQL media, restored OLTP/DWH, restored hashed
+  external files, staged the authorized Desktop export and passed runtime
+  preflight; the post-restore marker and file contents matched the baseline;
+- real SQL evidence also passed sync integrity `15/15`, DWH ETL `18/18`,
+  certification persistence `5/5`, telemetry `9/9` and RAG/Memory stores
+  `5/5`.
+
 Not yet certifiable as `PASS` here:
 
-- a real packaged Node runtime and signed installer on a target Windows host;
-- actual Task Scheduler boot, child failure/restart and OS reboot evidence;
+- an actual OS reboot (the boot trigger is registered and inspected, but the
+  machine was not rebooted during this rehearsal);
+- a physical Internet-disconnected core ERP exercise;
+- a launched Tauri Desktop session and authorized UI import of the staged
+  Desktop export (Web and API same-process connectivity were exercised);
 - customer SQL edition/licensing and service-account approval;
-- full-install SQL/file/Desktop backup and isolated restore rehearsal;
-- an authorized full offline/recovery exercise with synthetic data;
 - remote staging, DNS/TLS/WSS, provider, registry or off-host storage.
 
 Final Step 03B reporting must use `PASS`, `CONDITIONAL` or `FAIL` separately

@@ -4,6 +4,10 @@ Scope: one Windows host, SQL Server OLTP plus a distinct DWH database, local
 Web/API, Desktop Dexie state and configured external files. Use synthetic
 fixtures only. Never point this runbook at production or a real patient.
 
+The restore operator must have the approved SQL Server permission required for
+`RESTORE VERIFYONLY` and `RESTORE DATABASE`; application SQL credentials do not
+implicitly grant that authority.
+
 ## 1. Recovery acceptance scenario
 
 Create a disposable instance containing at least:
@@ -147,3 +151,11 @@ restart/reboot: PASS / CONDITIONAL / FAIL
 RTO/RPO: <measured values or NOT MEASURED>
 blockers: <explicit, no secrets/PHI>
 ```
+
+The 2026-09-27/28 local rehearsal used fixture `step03b-local`: OLTP `039`, DWH
+`dwh-08-003`, clean manifest digests were validated, native SQL/file restore
+passed, the Desktop export was staged for authorized UI import, and post-
+restore readiness returned `200`. Sync integrity, DWH ETL, certification,
+telemetry and SQL RAG/Memory tests also passed on disposable synthetic SQL.
+The reboot, physical Internet-off and authorized Tauri UI-import gates remain
+`CONDITIONAL`/`NOT_TESTED` and must not be reported as `PASS`.
