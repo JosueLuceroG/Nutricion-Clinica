@@ -36,7 +36,7 @@ function Read-VerifiedBackupManifest {
   Assert-StandaloneFile -Path $digestPath
   $validationOutput = Join-Path $paths.StateRoot "$Label-manifest-validation-$PID.json"
   try {
-    & $paths.Node $manifestCli validate --input $manifestPath --output $validationOutput --digest-input $digestPath
+    & $paths.Node $manifestCli validate --input $manifestPath --output $validationOutput --digest-input $digestPath | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "$Label manifest validation failed" }
   } finally {
     Remove-Item -LiteralPath $validationOutput -Force -ErrorAction SilentlyContinue

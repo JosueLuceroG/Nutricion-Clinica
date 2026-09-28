@@ -11,13 +11,18 @@ import { readEnvironmentClass } from "../modules/deployment/environmentIdentity.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const BUNDLED_MIGRATIONS_DIR = join(__dirname, "..", "migrations");
-const SOURCE_MIGRATIONS_DIR = join(__dirname, "..", "..", "migrations");
+const MIGRATIONS_CANDIDATES = [
+  // Flattened standalone package: api/migrations.
+  join(__dirname, "migrations"),
+  // Workspace deployment bundle: api/dist-deploy/migrations.
+  join(__dirname, "..", "migrations"),
+  // TypeScript source tree: apps/api/migrations.
+  join(__dirname, "..", "..", "migrations"),
+];
 const MIGRATIONS_DIR =
   process.env.NUTRICLINICA_MIGRATIONS_DIR?.trim() ||
-  (existsSync(BUNDLED_MIGRATIONS_DIR)
-    ? BUNDLED_MIGRATIONS_DIR
-    : SOURCE_MIGRATIONS_DIR);
+  MIGRATIONS_CANDIDATES.find((candidate) => existsSync(candidate)) ||
+  MIGRATIONS_CANDIDATES[0];
 
 export interface MigrationFile {
   filename: string;

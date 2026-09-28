@@ -40,9 +40,13 @@ Invoke-StandaloneNode -Paths $paths -Entry $paths.PreflightEntry -Arguments @("-
 $supervisor = Join-Path $PSScriptRoot "supervisor.ps1"
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue
 if (-not $pwsh) { throw "PowerShell 7 (pwsh.exe) is required for the standalone host supervisor" }
-$taskCommand = "`"$($pwsh.Source)`" -NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$supervisor`" -InstallRoot `"$($paths.Root)`""
-& schtasks.exe /Create /TN $paths.TaskName /SC ONSTART /DELAY 0001:00 /RU SYSTEM /RL HIGHEST /TR $taskCommand /F | Out-Host
-if ($LASTEXITCODE -ne 0) { throw "Unable to register the Windows host task" }
+$taskArguments = "-NoLogo -NoProfile -ExecutionPolicy Bypass -File `"$supervisor`" -InstallRoot `"$($paths.Root)`""
+$taskAction = New-ScheduledTaskAction -Execute $pwsh.Source -Argument $taskArguments -WorkingDirectory $paths.Root
+$taskTrigger = New-ScheduledTaskTrigger -AtStartup
+$taskSettings = New-ScheduledTaskSettingsSet -StartWhenAvailable
+$taskPrincipal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+Register-ScheduledTask -TaskName $paths.TaskName -Action $taskAction -Trigger $taskTrigger `
+  -Settings $taskSettings -Principal $taskPrincipal -Force | Out-Null
 
 Write-StandaloneLog -Paths $paths -Message "install completed task=$($paths.TaskName)"
 if ($StartAfterInstall) {

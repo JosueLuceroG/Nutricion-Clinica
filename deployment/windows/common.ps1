@@ -221,7 +221,10 @@ function Protect-StandaloneSecrets {
   if (-not (Test-Path -LiteralPath $Paths.SecretsFile -PathType Leaf)) {
     throw "Protected server secret file is missing: $($Paths.SecretsFile)"
   }
-  & icacls.exe $Paths.SecretsFile /inheritance:r /grant:r "SYSTEM:F" "Administrators:F" | Out-Null
+  # Use well-known SIDs so ACL provisioning works on localized Windows hosts.
+  $operatorSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+  $operatorGrant = "*{0}:F" -f $operatorSid
+  & icacls.exe $Paths.SecretsFile /inheritance:r /grant:r "*S-1-5-18:F" "*S-1-5-32-544:F" $operatorGrant | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Unable to protect the server secret file" }
 }
 
@@ -245,13 +248,16 @@ function Invoke-StandaloneNode {
   Assert-StandaloneFile -Path $Paths.Node
   Assert-StandaloneFile -Path $Entry
   $previousRole = $env:WORKLOAD_ROLE
+  $previousLocation = Get-Location
   try {
     if ($WorkloadRole) { Set-Item -Path "Env:WORKLOAD_ROLE" -Value $WorkloadRole }
+    Set-Location -LiteralPath $Paths.ApiRoot
     & $Paths.Node $Entry @Arguments
     if ($LASTEXITCODE -ne 0) {
       throw "Standalone node workload failed: $([IO.Path]::GetFileName($Entry)) exit=$LASTEXITCODE"
     }
   } finally {
+    Set-Location -LiteralPath $previousLocation
     if ($null -eq $previousRole) {
       Remove-Item -Path Env:WORKLOAD_ROLE -ErrorAction SilentlyContinue
     } else {

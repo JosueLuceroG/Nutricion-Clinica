@@ -29,7 +29,8 @@ test("Windows package exposes the complete operator lifecycle", async () => {
   assert.match(install, /DwhSchemaEntry/);
   assert.match(install, /Initialize-StandaloneConfiguration/);
   assert.match(install, /pwsh\.exe/);
-  assert.match(install, /schtasks\.exe/);
+  assert.match(install, /Register-ScheduledTask/);
+  assert.match(install, /New-ScheduledTaskTrigger/);
   const environment = await script("standalone.env.example");
   assert.match(environment, /^STANDALONE_MODE=true$/m);
 
