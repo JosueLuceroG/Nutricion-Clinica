@@ -10,6 +10,7 @@ const [
   nginxSecurityHeaders,
   dockerignore,
   serviceWorker,
+  ciWorkflow,
   releaseWorkflow,
 ] = await Promise.all([
   readFile("apps/api/Dockerfile", "utf8"),
@@ -19,6 +20,7 @@ const [
   readFile("nginx-security-headers.conf", "utf8"),
   readFile(".dockerignore", "utf8"),
   readFile("public/sw.js", "utf8"),
+  readFile(".github/workflows/ci.yml", "utf8"),
   readFile(".github/workflows/release.yml", "utf8"),
 ]);
 
@@ -141,4 +143,9 @@ test("release workflow materializes target-bound Desktop metadata portably", () 
   )?.[0];
   assert.ok(buildJobHeader);
   assert.doesNotMatch(buildJobHeader, /TAURI_SIGNING_PRIVATE_KEY/);
+});
+
+test("CI extracts Buildx image digests with valid shell quoting", () => {
+  assert.equal((ciWorkflow.match(/node -p "JSON\.parse/g) ?? []).length, 2);
+  assert.doesNotMatch(ciWorkflow, /node -p \\"/);
 });

@@ -238,8 +238,8 @@ jobs:
           JOBS_REPLICAS: "1"
           RELEASE_MANIFEST_VERIFICATION_MODE: foundation
         run: |
-          export API_ARTIFACT_DIGEST="$(node -p \"JSON.parse(require('fs').readFileSync('api-image-metadata.json','utf8'))['containerimage.digest']\")"
-          export WEB_ARTIFACT_DIGEST="$(node -p \"JSON.parse(require('fs').readFileSync('web-image-metadata.json','utf8'))['containerimage.digest']\")"
+          export API_ARTIFACT_DIGEST="$(node -p "JSON.parse(require('fs').readFileSync('api-image-metadata.json','utf8'))['containerimage.digest']")"
+          export WEB_ARTIFACT_DIGEST="$(node -p "JSON.parse(require('fs').readFileSync('web-image-metadata.json','utf8'))['containerimage.digest']")"
           export API_ARTIFACT="local/nutriclinica-api@${API_ARTIFACT_DIGEST}"
           export WEB_ARTIFACT="local/nutriclinica-web@${WEB_ARTIFACT_DIGEST}"
           pnpm --filter @nutriclinica/api release:manifest
