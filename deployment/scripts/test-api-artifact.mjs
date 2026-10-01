@@ -100,6 +100,12 @@ async function testJobsArtifact() {
     child.kill("SIGKILL");
     throw new Error(`jobs artifact did not start: ${output}`);
   }
+  if (output.includes("=== nutriclinica: migraciones SQL Server ===")) {
+    child.kill("SIGKILL");
+    throw new Error(
+      "jobs artifact executed the migration CLI as a side effect",
+    );
+  }
   child.kill("SIGTERM");
   let timeout;
   const exit = await Promise.race([

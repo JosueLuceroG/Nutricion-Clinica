@@ -3,9 +3,9 @@ import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import sql from "mssql";
-import { getPool, closePool } from "./connection.js";
+import { getPool } from "./connection.js";
 import { assertTargetSafe } from "../modules/deployment/targetGuard.js";
 import { readEnvironmentClass } from "../modules/deployment/environmentIdentity.js";
 
@@ -241,44 +241,4 @@ async function fetchAppliedMigrations(
     .request()
     .query<AppliedRow>("SELECT filename, checksum FROM dbo.schema_migrations");
   return result.recordset;
-}
-
-async function main(): Promise<void> {
-  const args = process.argv.slice(2);
-  const force = args.includes("--force");
-  console.log("=== nutriclinica: migraciones SQL Server ===");
-  try {
-    // Build 09.5A §6, §26-27: fail-closed contra PRODUCTION/UNKNOWN.
-    assertTargetSafe("migrate", process.env);
-    const results = await applyMigrations({ force });
-    const errors = results.filter((r) => r.status === "error");
-    console.log(
-      `\nresultado: ${results.length} archivos, ${errors.length} errores`,
-    );
-    if (errors.length > 0) {
-      process.exitCode = 1;
-    }
-  } catch (err) {
-    const environmentClass = readEnvironmentClass(process.env);
-    console.error(
-      "error fatal:",
-      environmentClass === "LOCAL" || environmentClass === "TEST"
-        ? err instanceof Error
-          ? err.message
-          : String(err)
-        : err instanceof Error
-          ? err.name
-          : "UnknownMigrationError",
-    );
-    process.exitCode = 1;
-  } finally {
-    await closePool();
-  }
-}
-
-const invokedDirectly = process.argv[1]
-  ? resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))
-  : false;
-if (invokedDirectly) {
-  void main();
 }

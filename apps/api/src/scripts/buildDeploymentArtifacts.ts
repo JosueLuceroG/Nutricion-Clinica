@@ -15,7 +15,7 @@ await build({
   entryPoints: {
     server: join(apiRoot, "src", "server.ts"),
     jobs: join(apiRoot, "src", "jobs.ts"),
-    migrate: join(apiRoot, "src", "db", "migrate.ts"),
+    migrate: join(apiRoot, "src", "db", "migrateCli.ts"),
     "dwh-schema": join(
       apiRoot,
       "src",

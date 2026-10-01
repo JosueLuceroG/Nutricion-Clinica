@@ -18,7 +18,7 @@
     "start:dwh-schema": "node dist-deploy/dwh-schema.js",
     "start:retention-backfill": "node dist-deploy/retention-backfill.js",
     "typecheck": "tsc --noEmit",
-    "migrate": "tsx src/db/migrate.ts",
+    "migrate": "tsx src/db/migrateCli.ts",
     "seed": "tsx src/db/seed.ts",
     "reset:staging": "tsx src/db/stagingReset.ts",
     "ai:evaluate": "tsx src/scripts/evaluateModels.ts",
