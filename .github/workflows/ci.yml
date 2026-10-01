@@ -156,6 +156,8 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Run portable UI E2E tests
+        env:
+          VITE_AI_ENABLED: "true"
         run: pnpm e2e:portable
 
       - name: Upload test results on failure

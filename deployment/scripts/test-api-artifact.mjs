@@ -86,7 +86,8 @@ async function testJobsArtifact() {
     output += chunk.toString();
   });
   const exitPromise = new Promise((resolveExit) => {
-    child.once("exit", (code, signal) => resolveExit({ code, signal }));
+    // `close` fires after stdout/stderr drain; `exit` can race the shutdown log.
+    child.once("close", (code, signal) => resolveExit({ code, signal }));
   });
   const deadline = Date.now() + 5_000;
   while (
@@ -120,7 +121,9 @@ async function testJobsArtifact() {
     (exit.code !== 0 ||
       !output.includes("[nutriclinica-jobs] shutdown SIGTERM"))
   ) {
-    throw new Error("jobs artifact did not complete graceful SIGTERM shutdown");
+    throw new Error(
+      `jobs artifact did not complete graceful SIGTERM shutdown: code=${exit.code}, signal=${exit.signal}, output=${JSON.stringify(output)}`,
+    );
   }
 }
 
