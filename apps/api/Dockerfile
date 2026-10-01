@@ -9,6 +9,7 @@ WORKDIR /workspace
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY deployment/scripts/prepare.mjs deployment/scripts/prepare.mjs
 
 RUN pnpm install --frozen-lockfile --filter @nutriclinica/api...
 

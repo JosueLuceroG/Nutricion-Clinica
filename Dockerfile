@@ -10,6 +10,7 @@ RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY deployment/scripts/prepare.mjs deployment/scripts/prepare.mjs
 RUN pnpm install --frozen-lockfile
 
 COPY . .

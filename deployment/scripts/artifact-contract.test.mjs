@@ -30,6 +30,10 @@ test("API and Web images are pinned, non-root, traceable, and health checked", (
   assert.match(apiDockerfile, /org\.opencontainers\.image\.revision=/);
   assert.match(apiDockerfile, /pnpm --config\.inject-workspace-packages=true/);
   assert.doesNotMatch(apiDockerfile, /COPY\s+\.env/);
+  assert.match(
+    apiDockerfile,
+    /COPY deployment\/scripts\/prepare\.mjs[\s\S]*RUN pnpm install/,
+  );
 
   assert.match(webDockerfile, /^FROM node:24\.13\.0-alpine/m);
   assert.match(webDockerfile, /^FROM nginx:1\.28\.0-alpine/m);
@@ -39,6 +43,10 @@ test("API and Web images are pinned, non-root, traceable, and health checked", (
   );
   assert.match(webDockerfile, /^USER nginx$/m);
   assert.match(webDockerfile, /^HEALTHCHECK /m);
+  assert.match(
+    webDockerfile,
+    /COPY deployment\/scripts\/prepare\.mjs[\s\S]*RUN pnpm install/,
+  );
   assert.doesNotMatch(`${apiDockerfile}\n${webDockerfile}`, /:latest\b/);
 });
 
@@ -78,7 +86,10 @@ test("Nginx preserves SPA, WebSocket, cache, and telemedicine contracts", () => 
   assert.match(nginxSecurityHeaders, /Content-Security-Policy/);
   assert.match(nginxSecurityHeaders, /default-src 'self'/);
   assert.match(nginxSecurityHeaders, /connect-src 'self'/);
-  assert.doesNotMatch(nginxSecurityHeaders, /connect-src[^;]*(?:\*|\bws:|\bhttp:)/i);
+  assert.doesNotMatch(
+    nginxSecurityHeaders,
+    /connect-src[^;]*(?:\*|\bws:|\bhttp:)/i,
+  );
   assert.match(nginxSecurityHeaders, /object-src 'none'/);
   assert.match(nginxSecurityHeaders, /frame-ancestors 'none'/);
   assert.match(nginx, /listen 8080/);
